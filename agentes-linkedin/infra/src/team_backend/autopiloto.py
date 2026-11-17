@@ -43,6 +43,15 @@ _POST_SELL=(r'hire me|book a call|schedule a call|link in (?:bio|comments)|limit
 POST_CTA=re.compile(_POST_CTA,re.I)
 POST_SELL=re.compile(_POST_SELL,re.I)
 POST_PITCH=re.compile(_POST_SELL+'|'+_POST_CTA,re.I)
+# BIB-09-comentario-calentamiento (LI-07-M001-K04, LI-07-M005-K05): a warm-up comment on a buyer's post is an own
+# contribution and one question, 25–40 words, without applause or selling. Fixed rules; the lead judges the rest.
+WARMUP_WORDS=(25,40)
+WORD=re.compile(r"[^\W_]+(?:['’\-][^\W_]+)*")
+APPLAUSE=re.compile(r'great (?:post|read|share|insight|work)|love (?:this|it|how|that)|congrat|amazing (?:post|work|news)|well said|'
+                    r'so true|spot on|kudos|excelente (?:post|publicaci[oó]n|aporte)|gran post|felicidades|felicitaciones|'
+                    r'enhorabuena|me encant[oó]|👏|🙌|💯|🔥',re.I)
+WARMUP_SELL=re.compile(r'our team builds|we help (?:startups|companies|founders|teams)|happy to (?:help|show)|i can help|'
+                       r'let me know if you need|podemos ayudar|te ayudamos|te puedo ayudar|con gusto te (?:ayudo|muestro)',re.I)
 POST_LENGTH=(200,2200)
 POST_MAX_HASHTAGS=3
 
@@ -106,14 +115,34 @@ def comment_text_issues(proposal):
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
     if proposal.source=='agent' and proposal.post_id and idioma.english_on_spanish(text,proposal.post.text):
         issues.append('Está en inglés y la publicación está en español')  # Gustavo, 2026-11-12
+    from . import calentamiento
+    if proposal.post_id and calentamiento.warmup_post(proposal.post):issues+=warmup_text_issues(text)
     public,private=guardas.blocks()
     return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
 
+def warmup_text_issues(text):
+    """The fixed rules of a warm-up comment (calentamiento.warmup_post): 25–40 words, ends with one question, no
+    applause, no offer of help. Selling, links and the rest are the rules of every comment."""
+    text=text or '';issues=[];words=len(WORD.findall(text));low,high=WARMUP_WORDS
+    if not low<=words<=high:issues.append(f'Comentario de calentamiento fuera de {low}–{high} palabras ({words})')
+    if not text.rstrip().rstrip('"\'”’»)').endswith('?'):issues.append('Comentario de calentamiento que no termina en una pregunta')
+    elif text.count('?')>1:issues.append('Comentario de calentamiento con más de una pregunta')
+    if APPLAUSE.search(text):issues.append('Comentario de calentamiento que aplaude o felicita')
+    if WARMUP_SELL.search(text):issues.append('Comentario de calentamiento que ofrece ayuda o servicios')
+    return issues
+
 def comment_author_issues(proposal):
-    """INT-03 rule about the target, which no redraft can fix: one comment per referent within the cooldown."""
+    """INT-03 rule about the target, which no redraft can fix: one comment per referent within the cooldown and, with
+    BUYER_WARMUP_ENABLED, one per author of the post (a buyer has no referent)."""
+    from . import calentamiento
+    states=['approved','executing','sent','confirmed','uncertain'];now=timezone.now()
+    hours=int(author_cooldown().total_seconds()//3600)
     if proposal.post and proposal.post.referent_id and proposal.post.referent_id in recent_comment_authors(
-            proposal.account,timezone.now(),states=['approved','executing','sent','confirmed','uncertain'],exclude=proposal.pk):
-        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {int(author_cooldown().total_seconds()//3600)} h']
+            proposal.account,now,states=states,exclude=proposal.pk):
+        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {hours} h']
+    if (calentamiento.enabled() and proposal.post and proposal.post.author_provider_id and
+            proposal.post.author_provider_id in recent_comment_author_ids(proposal.account,now,states=states,exclude=proposal.pk)):
+        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {hours} h']
     return []
 
 def policy_review(proposal,lead_budget=None):
@@ -363,11 +392,27 @@ def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
     if exclude:qs=qs.exclude(pk=exclude)
     return set(qs.values_list('post__referent_id',flat=True))
 
+def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=None):
+    """Authors (author_provider_id) who already got (or are about to get) a comment within the cooldown: the wait of
+    phase 2 is per author of the post, referent or buyer."""
+    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+                                     created_at__gte=now-author_cooldown())
+    if exclude:qs=qs.exclude(pk=exclude)
+    return set(filter(None,qs.values_list('post__author_provider_id',flat=True)))
+
 def _observe(user,account,now):
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
     last=account.referents.filter(active=True).order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
-    if not account.referents.filter(active=True).exists() or (last and last>now-every) or _pending('observe',account=str(account.id)):return 0
+    referents_due=account.referents.filter(active=True).exists() and not (last and last>now-every)
+    if _pending('observe',account=str(account.id)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
+    if not referents_due:
+        # Phase 2: the buyers warming up have their own reads; when only they are due, observe reads only them.
+        from . import calentamiento
+        if not (calentamiento.enabled() and calentamiento.reading_due(account,now)):return 0
+        _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[],'solo_compradores':True},
+                                    request_id=_job_id('observe-buyers',account.id,bucket))
+        return int(created)
     _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[]},request_id=_job_id('observe',account.id,bucket))
     return int(created)
 
@@ -408,6 +453,8 @@ def _propose(user,account,now):
     if room<=0 or pending:return 0  # one paid draft at a time keeps spend within the daily cap
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
     prefilter=prefilter_enabled()
+    from . import calentamiento
+    if calentamiento.enabled():return _propose_groups(user,account,now,max_age,prefilter)
     # A verdict is never older than its post, so verdicts from before the oldest candidate are irrelevant.
     verdicts=prefilter_verdicts(now-max_age-timedelta(days=1)) if prefilter else {}
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
@@ -428,6 +475,35 @@ def _propose(user,account,now):
         return int(created)
     return 0
 
+def _propose_groups(user,account,now,max_age,prefilter):
+    """Phase 2 (BUYER_WARMUP_ENABLED): the same one-draft-at-a-time within the same caps, budget and daily drafts, but
+    the day's INT-03 slots are shared by group (calentamiento.rooms: compradores 6, comunidad 2, referentes 2 of 10) and a
+    group with nothing to comment passes its slots on. Buyers' posts first, warmest author first; then the referents' as
+    today. The wait is per author of the post. The prefilter judges both, with the buyer's own wording for a buyer."""
+    from . import calentamiento, experimentos
+    verdicts=prefilter_verdicts(now-max(max_age,calentamiento.post_max_age())-timedelta(days=1)) if prefilter else {}
+    skips=[pid for pid,decision in verdicts.items() if decision=='skip']
+    authors=recent_comment_author_ids(account,now)
+    referents=list(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
+                   .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                   .exclude(author_provider_id__in=list(authors)).exclude(id__in=skips).order_by('-posted_at')[:30])
+    focus=experimentos.active_focus(account,now)
+    if focus:referents.sort(key=lambda post:post.referent_id!=focus.referent_id)
+    groups={'compradores':calentamiento.buyer_posts(account,now,authors,skips)[:30],'comunidad':[],'referentes':referents}
+    room=calentamiento.rooms(account,now,{group for group,posts in groups.items() if posts})
+    asked=0
+    for group in calentamiento.GROUPS:
+        if room[group]<=0:continue
+        for post in groups[group]:
+            if not experimentos.eligible(post,now):continue
+            if prefilter and str(post.id) not in verdicts:
+                if asked>=PREFILTER_PER_TICK:return 0  # the next candidates are judged on the next tick
+                asked+=1
+                if _prefilter(post)=='skip':continue
+            _,created=enqueue_operation(user,'propose_comment',{'post':str(post.id)},request_id=_job_id('propose',post.id))
+            return int(created)
+    return 0
+
 def _lead_redraft(user,account,now):
     """A comment the lead discarded in the last 24 h gets ONE redraft with the lead's reasons (docs/compuertas.md): same
     write slot, budget, daily room and one-draft-at-a-time as _propose. The redraft goes through the rules and the lead
@@ -442,15 +518,26 @@ def _lead_redraft(user,account,now):
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     if int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted<=0:return 0
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
+    from . import calentamiento
+    warm=calentamiento.enabled()
+    target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
+    if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
+        target|=Q(post__posted_at__gte=now-calentamiento.post_max_age(),post__referent__isnull=True,
+                  post__author_provider_id__in=[j.contact.provider_user_id for j in calentamiento.warming(account)])
     discarded=(ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
-                                             decided_at__gte=now-timedelta(hours=24),post__posted_at__gte=now-max_age,
-                                             post__referent__active=True)
+                                             decided_at__gte=now-timedelta(hours=24)).filter(target)
                .exclude(post__referent_id__in=recent_comment_authors(account,now))
                .annotate(drafts=Count('post__proposals',filter=Q(post__proposals__capability='INT-03'))).filter(drafts=1)
                .select_related('post').order_by('-decided_at'))
+    if warm:discarded=discarded.exclude(post__author_provider_id__in=list(recent_comment_author_ids(account,now)))
     from . import experimentos
-    for proposal in discarded[:10]:
+    rows=list(discarded[:10]);room=None
+    if warm:
+        buyers=calentamiento.buyer_ids(account)
+        room=calentamiento.rooms(account,now,{calentamiento.group_of(p.post,buyers) for p in rows})
+    for proposal in rows:
+        if room is not None and room.get(calentamiento.group_of(proposal.post,buyers),0)<=0:continue
         if not experimentos.eligible(proposal.post,now):continue
         _,created=enqueue_operation(user,'propose_comment',{'post':str(proposal.post_id),'redraft_of':str(proposal.id)},
                                     request_id=_job_id('redraft',proposal.id))

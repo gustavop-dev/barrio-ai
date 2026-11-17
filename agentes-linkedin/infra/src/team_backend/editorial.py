@@ -610,7 +610,11 @@ def _stage(piece,name,payload,unit_ids=None):
 
 def _signals(now):
     posts=(ObservedPost.objects.select_related('referent').filter(is_repost=False,posted_at__gte=now-timedelta(days=SIGNAL_DAYS))
-           .exclude(text='').order_by('-posted_at')[:SIGNAL_LIMIT])
+           .exclude(text=''))
+    from . import calentamiento
+    if calentamiento.enabled():  # a buyer's post (phase 2) is read to comment it, not as a signal for his own pieces
+        posts=posts.exclude(referent__isnull=True,author_provider_id__in=list(calentamiento.buyer_ids_all()))
+    posts=posts.order_by('-posted_at')[:SIGNAL_LIMIT]
     return [{'id':str(p.id),'author':p.author_name,'why_followed':p.referent.reason if p.referent else '',
              'posted_at':p.posted_at.isoformat() if p.posted_at else None,
              'reactions':p.reactions_count,'comments':p.comments_count,'text':p.text[:700]} for p in posts]

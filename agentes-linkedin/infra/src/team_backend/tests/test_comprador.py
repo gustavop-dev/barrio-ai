@@ -399,8 +399,9 @@ class FunnelTests(BuyerBase):
                          ['elegidos','calentados','calentados_2','invitados','aceptaron','recibieron_mensaje','respondieron','interesados','reunion'])
         self.assertEqual({s['personas'] for s in funnel['acumulado']['etapas']},{0})
         self.assertEqual((len(funnel['semanas']),funnel['acumulado']['muestra_chica']),(3,True))
-        self.assertEqual(set(funnel['comparaciones']),{'ruta','calentamiento','nota','senal','entrada'})
+        self.assertEqual(set(funnel['comparaciones']),{'ruta','calentamiento','nota','senal','senal_de_compra','entrada'})
         self.assertEqual(set(funnel['comparaciones']['senal']),{'con_senal','sin_senal'})
+        self.assertEqual(set(funnel['comparaciones']['senal_de_compra']),{'con_senal_de_compra','sin_senal_de_compra'})
         self.assertEqual(set(funnel['estado_actual']),set(BuyerJourney.Step.values))
         for bad in (0,27,'x'):
             with self.assertRaisesMessage(ValueError,'semanas'):comprador.funnel(bad)

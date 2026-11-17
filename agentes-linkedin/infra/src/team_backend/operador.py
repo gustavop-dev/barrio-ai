@@ -49,9 +49,10 @@ LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04',
 # BIB-09-primer-mensaje (class 09, activated in knowledge.clases.METODOLOGIAS_ACTIVAS): loaded whole, only with
 # the methodology named, by Relaciones when a second reply closes and by the lead when it judges that first message.
 FIRST_MESSAGE_UNITS=list(METODOLOGIAS_ACTIVAS['primer_mensaje']['unidades'])
-# BIB-09-comentario-calentamiento (classes 07 and 10): the warm-up comment on a buyer's post. Not activated yet: its
-# baseline is measured first (docs/linea-base-comentario-calentamiento.md); no agent can load these units today.
-WARMUP_COMMENT_UNITS=['LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K04','LI-07-M005-K07','LI-07-M004-K03','LI-10-V009-K01']
+# BIB-09-comentario-calentamiento (classes 07 and 10, activated in METODOLOGIAS_ACTIVAS): the warm-up comment on a buyer's
+# post (phase 2, calentamiento.py). Loaded whole, only with the methodology named, by Relaciones when it drafts a comment
+# on a warming buyer's post and by the lead when it reviews one. Baseline: docs/linea-base-comentario-calentamiento.md.
+WARMUP_COMMENT_UNITS=list(METODOLOGIAS_ACTIVAS['comentario_calentamiento']['unidades'])
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'
@@ -437,13 +438,16 @@ def add_referent(user,account,identifier,reason):
     profile=get_connector(account).get_user(slug)
     return store(profile)  # rechecks capacity and duplicates under the account lock
 
-def observe(user,account,referent_ids=None,limit=5):
-    """DESC-04: read recent posts of active referents. Read-only; deduplicated by post id."""
+def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
+    """DESC-04: read recent posts of active referents. Read-only; deduplicated by post id. With BUYER_WARMUP_ENABLED it
+    also reads the posts of the buyers due (calentamiento.read_posts, its own daily cap); `buyers_only` skips the
+    referents when only the buyers are due (autopiloto._observe)."""
     require(user,'operate_linkedin')
     if not 1<=limit<=20:raise ValueError('Límite de lectura inválido')
     connector=get_connector(account)
     referents=Referent.objects.filter(account=account,active=True)
     if referent_ids:referents=referents.filter(id__in=referent_ids)
+    if buyers_only:referents=referents.none()
     context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS})
     summary={'referents':0,'new_posts':0,'seen_posts':0,'errors':[],**grounding,'course_context':context,
              'selection_basis':'audience_and_evidence','popularity_implies_fit':False,'evidence':[]}
@@ -477,10 +481,15 @@ def observe(user,account,referent_ids=None,limit=5):
         referent.last_observed_at=timezone.now();referent.save(update_fields=['last_observed_at'])
         observed.append(referent.id)
     # «What worked for them» (modelos_crecimiento): outliers of what was just read. Never fails the observation.
-    try:summary['models']=modelos_crecimiento.after_observe(account,connector,observed)
-    except Exception:
-        import logging
-        logging.getLogger(__name__).exception('growth_models_refresh_failed account=%s',account.id)
+    if observed or not buyers_only:
+        try:summary['models']=modelos_crecimiento.after_observe(account,connector,observed)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception('growth_models_refresh_failed account=%s',account.id)
+    from . import calentamiento
+    if calentamiento.enabled():
+        account.refresh_from_db(fields=['paused'])  # a read error above may have paused it
+        if not account.paused:summary['compradores']=calentamiento.read_posts(account,connector)  # phase 2: buyers warming up
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
         from .notificaciones import avisar
@@ -984,6 +993,17 @@ afirmaciones por verificar las opiniones o perspectivas dichas como tales, las p
 de la publicación atribuidas a su autor. Si una idea necesita un dato que no tienes, dila como opinión o pregunta en vez
 de afirmarla.'''
 
+# BIB-09-comentario-calentamiento: added to COMMENT_SYSTEM only for a buyer's post (calentamiento.warmup_post).
+WARMUP_SYSTEM='''Comentario de calentamiento (metodología comentario_calentamiento; unidades de las clases 07 y 10 en el
+contexto). El autor es un posible cliente de Gustavo al que todavía no le escribió: el comentario es para que lo reconozca
+antes de la invitación, nunca para venderle (calentamiento en el input).
+- Estructura fija (LI-07-M005-K05): primero un aporte propio y concreto sobre lo que cuenta la publicación (un mecanismo,
+  una práctica, un matiz o un hecho de public_facts), nunca repetirla, resumirla ni felicitar; después UNA sola pregunta
+  abierta y concreta sobre su experiencia, su decisión o su aprendizaje, al final, fácil de contestar en el hilo.
+- Entre 25 y 40 palabras (LI-07-M001-K04). Sin aplausos ni felicitaciones («Great post», «Congrats», 👏), sin vender, sin
+  ofrecer ayuda ni servicios y sin pedir contacto.
+- Si no hay un aporte genuino para esta publicación, decision="skip".'''
+
 # Lo que un agente puede cargar por ID: solo las clases que leen hoy los agentes (knowledge.clases), no toda la biblioteca.
 # Las unidades de una metodología activada se cargan solo cuando quien llama la nombra (`metodologia`).
 AGENT_UNIT=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
@@ -1034,9 +1054,18 @@ def validate_course_citations(citations,grounding):
         raise ValueError('Citas del curso ausentes o no recuperadas para este rol')
     return list(dict.fromkeys(citations))
 
-def _draft_comment(message,units):
+def comment_system(warm=False):
+    """The drafter's instructions: a warm-up comment adds the methodology's (WARMUP_SYSTEM) to the usual ones."""
+    return voz.with_voice(COMMENT_SYSTEM+('\n\n'+WARMUP_SYSTEM if warm else ''))
+
+def warmup_units(unit_ids,token_budget=COURSE_TOKEN_BUDGET):
+    """The comment's units plus the activated warm-up units, loaded whole with the methodology named."""
+    ids=list(unit_ids)+[u for u in WARMUP_COMMENT_UNITS if u not in unit_ids]
+    return course_context(ids,token_budget,metodologia='comentario_calentamiento')
+
+def _draft_comment(message,units,warm=False):
     """One paid draft: instructions, voice and course units go in cached system blocks; the post and its context in the message."""
-    answer=providers.claude(voz.with_voice(COMMENT_SYSTEM),message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment',
+    answer=providers.claude(comment_system(warm),message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment',
                             context=course_block(units))
     try:data=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None
@@ -1078,13 +1107,18 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
         if previous is None:raise ValueError('El comentario a reescribir no es uno que el líder descartó.')
         if ActionProposal.objects.filter(post=post,capability='INT-03').count()>1:
             raise Conflict('Este comentario ya se reescribió una vez con las razones del líder; no se reescribe otra vez.')
-    from . import catalogo
+    from . import calentamiento, catalogo
     unit_ids,origin=catalogo.units_for('comentar',COMMENT_UNITS)  # the active catalog's core, else the fixed list
-    units,missing,omitted=course_context(unit_ids)
-    if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
+    # Phase 2: a comment on a warming buyer's post follows the activated «comentario_calentamiento» methodology; without
+    # its units there is no draft at all (a buyer is never commented without it).
+    warm=calentamiento.warmup_post(post)
+    units,missing,omitted=warmup_units(unit_ids) if warm else course_context(unit_ids)
+    if missing:raise ValueError('Biblioteca no disponible para el comentario de calentamiento.' if warm else
+                                'Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     _audit(user,'operator.comment_grounded',post.id,course_missing=missing,course_omitted=omitted,
-           course_citations=[u['unit_id'] for u in units],course_source=origin)
+           course_citations=[u['unit_id'] for u in units],course_source=origin,
+           **({'course_methodology':'comentario_calentamiento'} if warm else {}))
     try:others=[{'author':c['author']['display_name'],'text':c['text'][:600]} for c in get_connector(post.account).list_comments(post.provider_post_id,limit=10)]
     except ConnectorError:others=[]
     public_facts,private_guidance=memory.confirmed_blocks()
@@ -1094,6 +1128,7 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
     inputs['referent_evidence']=(runtime.snapshot('referent_signals',lambda:experimentos.signals(post))
                                 if runtime else experimentos.signals(post))
     inputs['comment_language']=COMMENT_LANGUAGE
+    if warm:inputs['calentamiento']=calentamiento.draft_inputs(post)
     inputs['recent_own_comments']=recent_own_comments(post.account,exclude_post=post)
     # Frozen in the cycle ledger like the referent signals: it proves what the drafter received (None: nothing measured).
     outcomes=runtime.snapshot('comment_outcomes',lambda:comment_outcomes(post)) if runtime else comment_outcomes(post)
@@ -1103,7 +1138,7 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
     if previous is not None:
         reasons=[str(r) for r in (previous.review or {}).get('reasons') or []]
         inputs['revision']={'previous_comment':previous.payload.get('text',''),'lead_reasons':reasons}
-    answer,data,citations,risks=_draft_comment(json.dumps(inputs,ensure_ascii=False,default=str),units)
+    answer,data,citations,risks=_draft_comment(json.dumps(inputs,ensure_ascii=False,default=str),units,warm)
     if previous is not None:risks.append(compuertas.LEAD_REDRAFT+': '+'; '.join(reasons))
     # R4: a draft that breaks only a fixed rule (hashtag, link, length, pitch…) gets ONE redraft naming the concrete issues,
     # within the daily budget. If the redraft still breaks a rule, the policy discards it as before. A lead redraft already
@@ -1114,7 +1149,7 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
         revision={'previous_comment':data['comment'],'rule_violations':issues,
                   'claims_needing_evidence':list(data.get('claims_needing_evidence',[]))}
         try:
-            answer,data,citations,risks=_draft_comment(json.dumps(dict(inputs,revision=revision),ensure_ascii=False,default=str),units)
+            answer,data,citations,risks=_draft_comment(json.dumps(dict(inputs,revision=revision),ensure_ascii=False,default=str),units,warm)
             risks.append('Reescrito una vez por las reglas fijas: '+'; '.join(issues))
         except ValueError as exc:risks.append(f'No se pudo reescribir ({exc}); queda el primer borrador.')
     oficina_eventos.emit('entrega','relaciones_comunidad','operador_cuenta','Comentario redactado')
@@ -1195,7 +1230,8 @@ def _run_job(job):
             return 'complete','experiments',''
         if job.kind=='observe':
             account=ConnectorAccount.objects.get(id=params['account'])
-            summary=_network_tool(job,lambda:observe(user,account,params.get('referents'),int(params.get('limit',5))))
+            summary=_network_tool(job,lambda:observe(user,account,params.get('referents'),int(params.get('limit',5)),
+                                                     buyers_only=bool(params.get('solo_compradores'))))
             oficina_eventos.job_done(job.kind,summary)
             return 'complete',f'observed:{summary["new_posts"]}+{summary["seen_posts"]}','; '.join(e['error'] for e in summary['errors'])
         if job.kind=='propose_comment':

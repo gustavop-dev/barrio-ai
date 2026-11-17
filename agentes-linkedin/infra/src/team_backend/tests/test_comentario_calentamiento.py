@@ -14,12 +14,13 @@ import re
 import uuid
 from contextlib import contextmanager
 from datetime import timedelta
-from unittest import expectedFailure
 from unittest.mock import patch
 
+from django.test import SimpleTestCase
 from django.utils import timezone
-from team_backend import autopiloto, evaluaciones, jobs, operador
-from team_backend.models import ActionProposal, Contact, Job, ObservedPost
+from knowledge import db
+from team_backend import autopiloto, evaluaciones, jobs, lider, operador
+from team_backend.models import ActionProposal, AuditEvent, Contact, Job, ObservedPost
 from team_backend.tests.test_comprador_e2e import BuyerPathBase
 
 CASE = evaluaciones.COURSE_CASES['comentario_calentamiento']
@@ -212,7 +213,6 @@ class WarmupCommentBase(BuyerPathBase):
 class WarmupCommentCaseTests(WarmupCommentBase):
     """Las variantes de BIB-09-comentario-calentamiento. Línea base: docs/linea-base-comentario-calentamiento.md."""
 
-    @expectedFailure  # Línea base: observe solo lee referentes y _propose solo propone posts de referentes activos.
     def test_flow_the_posts_of_a_warming_buyer_are_read_and_proposed(self):
         run = self.warm(['C1'])
         self.assertTrue(run['read']['C1'])
@@ -225,14 +225,12 @@ class WarmupCommentCaseTests(WarmupCommentBase):
         self.assertEqual(self.fake.list_comments(run['posts']['C1'].provider_post_id)[0]['text'], comment('C1'))
         self.assertEqual(self.messages_sent(), 0)
 
-    @expectedFailure  # Línea base: los agentes no pueden cargar unidades de las clases 07 y 10.
     def test_c1_the_draft_loads_the_warm_up_units(self):
         self.warm(['C1'])
         context = self.drafts[0]['context']
         for uid in operador.WARMUP_COMMENT_UNITS:
             self.assertIn(uid, context)
 
-    @expectedFailure  # Línea base: no hay regla de aplauso; lo para el líder (aporta) después de pagar su revisión.
     def test_c2_applause_is_stopped_by_the_rules(self):
         run = self.warm(['C2'])
         self.assertEqual((run['outcomes']['C2']['publicado'], run['outcomes']['C2']['stopped_by']), (False, 'reglas'))
@@ -241,17 +239,14 @@ class WarmupCommentCaseTests(WarmupCommentBase):
         run = self.warm(['C3'])
         self.assertEqual((run['outcomes']['C3']['publicado'], run['outcomes']['C3']['stopped_by']), (False, 'reglas'))
 
-    @expectedFailure  # Línea base: la regla de longitud es 40–900 caracteres, no 25–40 palabras.
     def test_c4_more_than_40_words_is_stopped_by_the_rules(self):
         run = self.warm(['C4'])
         self.assertEqual((run['outcomes']['C4']['publicado'], run['outcomes']['C4']['stopped_by']), (False, 'reglas'))
 
-    @expectedFailure  # Línea base: ninguna regla exige la pregunta final.
     def test_c5_without_a_question_is_stopped_by_the_rules(self):
         run = self.warm(['C5'])
         self.assertEqual((run['outcomes']['C5']['publicado'], run['outcomes']['C5']['stopped_by']), (False, 'reglas'))
 
-    @expectedFailure  # Línea base: «aporta» acepta una pregunta concreta sin aporte propio.
     def test_c6_a_question_without_an_own_contribution_is_stopped_by_the_judge(self):
         run = self.warm(['C6'])
         self.assertEqual((run['outcomes']['C6']['publicado'], run['outcomes']['C6']['stopped_by']), (False, 'juez'))
@@ -275,12 +270,10 @@ class WarmupCommentCaseTests(WarmupCommentBase):
         result = {k: v for k, v in result.items() if k in CASE['expected'] or k == 'course_citations'}
         return evaluaciones.grade_course_case('comentario_calentamiento', result, grounding), result
 
-    @expectedFailure  # Línea base: sin lectura, propuesta, reglas ni preguntas del calentamiento.
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
 
-    @expectedFailure  # Línea base: la metodología no está activada.
     def test_the_case_loads_whole_versioned_sources_and_rejects_wrong_behaviour(self):
         context, grounding = evaluaciones.course_case_context('comentario_calentamiento')
         self.assertIn('limits_errors', context)
@@ -291,3 +284,156 @@ class WarmupCommentCaseTests(WarmupCommentBase):
         self.assertFalse(evaluaciones.grade_course_case('comentario_calentamiento', dict(result, mensajes_enviados=1), grounding)['passed'])
         self.assertFalse(evaluaciones.grade_course_case('comentario_calentamiento', dict(CASE['expected'], course_citations=['LI-07-V001-K01']),
                                                         grounding)['passed'])
+
+
+class WarmupRulesTests(SimpleTestCase):
+    """Las reglas fijas del calentamiento (autopiloto.warmup_text_issues): 25–40 palabras, una sola pregunta al final, sin
+    aplauso ni ofrecer servicios. El aporte propio lo juzga el líder (cal_aporte), no una regla."""
+
+    def test_the_case_comments(self):
+        issues = {v: autopiloto.warmup_text_issues(comment(v)) for v in VARIANTS}
+        self.assertEqual(issues['C1'], [])
+        self.assertEqual(issues['C6'], [])  # pasa las reglas: lo para el juez
+        self.assertIn('Comentario de calentamiento que aplaude o felicita', issues['C2'])
+        self.assertIn('Comentario de calentamiento que ofrece ayuda o servicios', issues['C3'])
+        self.assertEqual(issues['C4'], ['Comentario de calentamiento fuera de 25–40 palabras (58)'])
+        self.assertEqual(issues['C5'], ['Comentario de calentamiento que no termina en una pregunta'])
+
+    def test_length_question_and_applause_in_either_language(self):
+        ok = ('Pasar de 40 campos a tres preguntas suele mover la activación porque el formulario esconde quién decide. '
+              '¿Qué pregunta separa mejor a las cuentas que pagan de las que solo prueban?')
+        self.assertEqual(autopiloto.warmup_text_issues(ok), [])
+        self.assertEqual(autopiloto.warmup_text_issues('Short take. Why?'), ['Comentario de calentamiento fuera de 25–40 palabras (3)'])
+        two = ok.replace('decide. ', 'decide? ')
+        self.assertIn('Comentario de calentamiento con más de una pregunta', autopiloto.warmup_text_issues(two))
+        self.assertIn('Comentario de calentamiento que aplaude o felicita', autopiloto.warmup_text_issues('¡Felicidades! ' + ok))
+        self.assertIn('Comentario de calentamiento que aplaude o felicita', autopiloto.warmup_text_issues(ok.replace('¿Qué', '🔥 ¿Qué')))
+        self.assertIn('Comentario de calentamiento que ofrece ayuda o servicios',
+                      autopiloto.warmup_text_issues(ok.replace('¿Qué', 'Te puedo ayudar con eso. ¿Qué')))
+        # A closing quote or parenthesis after the question mark is still a final question.
+        self.assertEqual(autopiloto.warmup_text_issues(ok[:-1] + '?»'), [])
+
+
+class WarmupProcedureTests(WarmupCommentBase):
+    """Quién carga la metodología y qué pasa sin ella."""
+
+    def test_the_lead_asks_the_warm_up_questions_only_on_a_buyer_post(self):
+        run = self.warm(['C1'])
+        reviews = [c for c in self.jev_calls if c['purpose'] == 'lead-review']
+        grounding = reviews[0]['state']['course_grounding']
+        self.assertEqual(grounding['course_methodology'], 'comentario_calentamiento')
+        self.assertEqual(grounding['course_citations'], operador.LEAD_UNITS + operador.WARMUP_COMMENT_UNITS)
+        self.assertEqual(grounding['criterion_sources']['cal_pregunta'], ['LI-07-M005-K05'])
+        self.assertLessEqual(lider.CAL_IDS, set(reviews[0]['questions']))
+        self.assertIn('calentamiento', reviews[0]['state'])
+        self.assertEqual(run['outcomes']['C1']['proposal'].review['thresholds']['cal_aporte'], ['min', 0.7])
+        event = AuditEvent.objects.filter(action='operator.comment_grounded').latest('created_at')
+        self.assertEqual(event.metadata['course_methodology'], 'comentario_calentamiento')
+        self.jev_calls.clear()
+        outcome, _ = self.referent(comment('C1'))
+        review = [c for c in self.jev_calls if c['purpose'] == 'lead-review'][0]
+        self.assertFalse(lider.CAL_IDS & set(review['questions']))
+        self.assertNotIn('course_methodology', review['state']['course_grounding'])
+        self.assertNotIn('LI-07-M005-K05', self.drafts[-1]['context'])
+        self.assertTrue(outcome['publicado'])
+
+    def test_a_buyer_comment_the_lead_discarded_gets_its_one_redraft(self):
+        run = self.warm(['C6'])
+        self.assertEqual(run['outcomes']['C6']['stopped_by'], 'juez')
+        with patch.dict(os.environ, {'BUYER_WARMUP_ENABLED': 'false'}), self.lead():
+            self.assertEqual(autopiloto._lead_redraft(self.bot, self.account, timezone.now()), 0)  # today: referents only
+        with self.lead():
+            self.assertEqual(autopiloto._lead_redraft(self.bot, self.account, timezone.now()), 1)
+        job = Job.objects.get(kind='propose_comment', state='queued')
+        self.assertEqual(job.params, {'post': str(run['posts']['C6'].id), 'redraft_of': str(run['outcomes']['C6']['proposal'].id)})
+
+    def test_the_prefilter_reads_a_buyer_writing_about_their_company_as_the_topic(self):
+        self.warm(['C1'])
+        prefilter = [c for c in self.jev_calls if c['purpose'] == 'comment-prefilter'][0]
+        self.assertIn('autor_posible_cliente', prefilter['state'])
+        self.assertIn('autor_posible_cliente', prefilter['questions']['tema']['instructions'])
+        self.assertIn('sin una decisión, una experiencia o una idea', prefilter['questions']['promocion']['instructions'])
+
+    def test_without_the_warm_up_units_a_buyer_is_never_drafted_nor_approved(self):
+        with db.connect() as c:
+            c.execute('DELETE FROM units WHERE id = ANY(%s)', (operador.WARMUP_COMMENT_UNITS,))
+        run = self.warm(['C1'])
+        self.assertEqual(run['outcomes']['C1']['stopped_by'], 'sin_borrador')
+        job = Job.objects.filter(kind='propose_comment').order_by('-created_at').first()
+        self.assertIn('Biblioteca no disponible para el comentario de calentamiento', job.error)
+        # The referent's comment is unaffected.
+        outcome, _ = self.referent(comment('C1'))
+        self.assertTrue(outcome['publicado'])
+
+    def test_with_the_switch_off_a_buyer_comment_is_judged_as_any_comment(self):
+        with patch.dict(os.environ, {'BUYER_WARMUP_ENABLED': 'false'}):
+            run = self.warm(['C4'])
+        self.assertFalse(run['read']['C4'])  # nobody read it: stored by hand, as today
+        self.assertFalse(run['proposed'])
+        self.assertTrue(run['outcomes']['C4']['publicado'])  # 58 words: today's rules let it out
+        self.assertNotIn('LI-07-M005-K05', self.drafts[0]['context'])
+        self.assertFalse([c for c in self.jev_calls if lider.CAL_IDS & set(c['questions'])])
+
+
+class WarmupActivationTests(SimpleTestCase):
+    """La activación es por metodología: solo sus seis unidades, solo cuando se nombra, solo en sus roles."""
+
+    def test_the_activated_list_is_the_case_and_the_graph_list(self):
+        from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, legible_por_agentes
+        activa = METODOLOGIAS_ACTIVAS['comentario_calentamiento']
+        self.assertEqual(CLASES_AGENTES, tuple(range(1, 7)))
+        self.assertEqual(list(activa['unidades']), operador.WARMUP_COMMENT_UNITS)
+        self.assertEqual((activa['evaluacion'], activa['lista']), (CASE['id'], 'operador.WARMUP_COMMENT_UNITS'))
+        self.assertEqual(CASE['units'], operador.WARMUP_COMMENT_UNITS)
+        self.assertLessEqual(set(CASE['required']), set(operador.WARMUP_COMMENT_UNITS))
+        self.assertEqual(activa['roles'], ('relaciones_comunidad', 'lider_jev'))
+        for uid in operador.WARMUP_COMMENT_UNITS:
+            self.assertTrue(legible_por_agentes(uid, 'comentario_calentamiento'))
+            self.assertFalse(legible_por_agentes(uid))
+            self.assertFalse(legible_por_agentes(uid, 'primer_mensaje'))
+        # LI-07-M007-K05 («nunca comentes con bots») is read for the decision that wins, never activated.
+        self.assertFalse(legible_por_agentes('LI-07-M007-K05', 'comentario_calentamiento'))
+        from team_backend.orquestacion import load_graph
+        graph = load_graph()
+        self.assertEqual(graph['course_lists']['operador.WARMUP_COMMENT_UNITS'], operador.WARMUP_COMMENT_UNITS)
+        self.assertEqual([n['id'] for n in graph['nodes'] if 'operador.WARMUP_COMMENT_UNITS' in n['course_lists']],
+                         ['relaciones_comunidad', 'lider_jev'])
+
+    def test_only_its_roles_name_the_methodology_in_code(self):
+        from pathlib import Path
+        source = Path(operador.__file__).parent
+        naming = {p.name for p in source.glob('*.py') if "metodologia='comentario_calentamiento'" in p.read_text(encoding='utf-8')}
+        self.assertEqual(naming, {'operador.py', 'lider.py'})  # relaciones_comunidad (borrador) y lider_jev
+        using = {p.name for p in source.glob('*.py') if 'WARMUP_COMMENT_UNITS' in p.read_text(encoding='utf-8')}
+        self.assertEqual(using, {'operador.py', 'lider.py', 'evaluaciones.py'})
+
+
+class WarmupReadingRegistryTests(SimpleTestCase):
+    """El registro de lectura nombra exactamente las unidades activadas, con su hash, puntero y fuentes, y la decisión de
+    Gustavo que gana sobre «nunca comentes con bots»."""
+
+    def test_the_reading_registry_matches_the_activation(self):
+        from pathlib import Path
+        from knowledge.clases import METODOLOGIAS_ACTIVAS
+        activa = METODOLOGIAS_ACTIVAS['comentario_calentamiento']
+        self.assertEqual(activa['registro'], 'relaciones/registro-lectura-comentario-calentamiento.json')
+        path = Path(operador.__file__).resolve().parents[3] / 'equipos' / activa['registro']
+        if not path.exists():
+            self.skipTest('La imagen solo empaqueta grafo.yaml; el registro vive en equipos/relaciones.')
+        registry = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual((registry['metodologia'], registry['evaluacion'], registry['lista']),
+                         ('comentario_calentamiento', activa['evaluacion'], activa['lista']))
+        self.assertEqual(tuple(registry['roles']), activa['roles'])
+        self.assertEqual([u['unidad_id'] for u in registry['unidades']], operador.WARMUP_COMMENT_UNITS)
+        self.assertEqual(registry['alcance']['por_clase'], {'07': 5, '10': 1})
+        for unit in registry['unidades']:
+            prefix = unit['unidad_id'][3:5]
+            self.assertEqual(unit['clase'], int(prefix))
+            self.assertTrue(unit['lectura_completa'])
+            self.assertRegex(unit['hash'], r'^[0-9a-f]{64}$')
+            self.assertRegex(unit['pointer'], r'^/learning_units/\d+$')
+            self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
+            self.assertTrue(unit['fuentes_con_prefijo_de_clase'])
+            self.assertTrue(all(key.startswith(prefix + ':') for key in unit['fuentes_con_prefijo_de_clase']))
+        self.assertTrue(any('Nunca comentes con bots' in d and 'Gustavo' in d for d in registry['decisiones_vigentes_que_ganan']))
+        self.assertTrue(any('25–35' in item for item in registry['no_convertido_en_regla']))

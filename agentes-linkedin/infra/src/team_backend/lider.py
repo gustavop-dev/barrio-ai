@@ -26,6 +26,7 @@ from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one 
 CRITERIA_DEL_BARRIO=_lead_criteria()
 LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
+WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
@@ -35,16 +36,21 @@ CRITERION_SOURCES={
     'dm_toque':['LI-09-M003-K02','LI-09-V011-K01'],'dm_puente':['LI-09-M003-K02','LI-09-M003-K04'],
     'dm_pregunta':['LI-09-M003-K03'],'dm_un_tema':['LI-09-M003-K04'],'dm_en_persona':['LI-09-M004-K02'],
     'dm_pitch':['LI-09-M002-K04','LI-03-M006-K01'],
+    # BIB-09-comentario-calentamiento: the class 07 criterion behind each question about a warm-up comment.
+    'cal_aporte':['LI-07-M005-K05','LI-07-M001-K04'],'cal_pregunta':['LI-07-M005-K05'],'cal_aplauso':['LI-07-M001-K04','LI-07-M005-K05'],
 }
 
 def ground_questions(state,questions):
-    """Load the lead's units (and, with a first message to judge, the activated class 09 units) and point each question
-    at its criterion. If the class 09 units are missing, the first message is not judged (no card) and the rest of the
-    review goes on as before."""
+    """Load the lead's units (and, with a first message to judge, the activated class 09 units; with a warm-up comment,
+    the activated class 07/10 units) and point each question at its criterion. If the class 09 units are missing, the
+    first message is not judged (no card) and the rest of the review goes on as before. If the warm-up units are missing,
+    course_missing says so and the review waits (lider._review: retry): a buyer is never commented without them."""
     def ground(units,metodologia=None):
         return operador.role_context('lider',units,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},
                                      metodologia=metodologia)
-    if 'primer_mensaje' in state:
+    if 'calentamiento' in state:
+        context,grounding=ground(LEAD_UNITS+[u for u in WARMUP_COMMENT_UNITS if u not in LEAD_UNITS],metodologia='comentario_calentamiento')
+    elif 'primer_mensaje' in state:
         context,grounding=ground(LEAD_UNITS+[u for u in FIRST_MESSAGE_UNITS if u not in LEAD_UNITS],metodologia='primer_mensaje')
         if grounding['course_missing'] and set(grounding['course_missing'])<=set(FIRST_MESSAGE_UNITS):
             state.pop('primer_mensaje')
@@ -84,6 +90,28 @@ DM_CHECKS=[('dm_toque','min',0.7,'el primer mensaje no retoma algo concreto que 
            ('dm_en_persona','min',0.6,'el primer mensaje no suena a lo que le diría en persona'),
            ('dm_pitch','max',0.2,'el primer mensaje vende o pide una reunión')]
 DM_IDS=frozenset(qid for qid,*_ in DM_CHECKS)
+# BIB-09-comentario-calentamiento: a comment on a warming buyer's post is also judged as a warm-up comment (LI-07-M005-K05,
+# LI-07-M001-K04): an own concrete contribution, one open question about their experience, no applause. Length, the
+# question mark and applause or selling words are fixed rules first (autopiloto.warmup_text_issues). A failing check
+# discards the comment, like the other checks of a comment.
+CAL_CHECKS=[('cal_aporte','min',0.7,'el comentario de calentamiento no aporta algo propio y concreto'),
+            ('cal_pregunta','min',0.6,'el comentario de calentamiento no termina en una pregunta abierta sobre su experiencia'),
+            ('cal_aplauso','max',0.2,'el comentario de calentamiento aplaude o felicita en vez de aportar')]
+CAL_IDS=frozenset(qid for qid,*_ in CAL_CHECKS)
+
+def warmup_questions():
+    return {
+        'cal_aporte':_noul('¿El `comentario` aporta algo propio y concreto que la `publicacion` no dice (un mecanismo, una práctica, '
+                           'un matiz o un hecho de `hechos_publicos_de_gustavo`), en vez de repetirla, resumirla o elogiarla?',
+                           'Suma una idea concreta propia sobre lo que cuenta el autor',
+                           'Repite o resume la publicación, felicita, o es una opinión genérica que serviría para cualquier post'),
+        'cal_pregunta':_noul('¿El `comentario` termina con una sola pregunta abierta y concreta sobre la experiencia, la decisión o el '
+                             'aprendizaje del autor, que puede contestar en el hilo?',
+                             'Una pregunta acotada sobre qué hizo, qué eligió o qué cambiaría',
+                             'Ninguna pregunta, varias, una retórica o una genérica («¿qué opinas?», «¿cómo lo ves?»)'),
+        'cal_aplauso':_noul('¿El `comentario` es sobre todo un aplauso o una felicitación («gran post», «felicidades», emojis de '
+                            'aplauso) en vez de un aporte?'),
+    }
 DM_UNAVAILABLE='Líder: el primer mensaje no se juzgó (Biblioteca no disponible para la clase 09)'
 
 def drafted_message(proposal):
@@ -182,6 +210,8 @@ def _questions(proposal,orientation):
     if capability==CAP.COMMENT:
         post=proposal.post
         state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'comentario':proposal.payload['text']}
+        from . import calentamiento
+        warm=calentamiento.warmup_post(post)
         questions={
             'aporta':_noul('¿El `comentario` aporta algo concreto a la conversación de la `publicacion`: una opinión con fundamento, '
                            'un matiz o una pregunta específica?','Aporta una idea concreta relacionada con el tema de la publicación',
@@ -191,6 +221,11 @@ def _questions(proposal,orientation):
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
         }
+        if warm:
+            state['calentamiento']={'autor':post.author_name,
+                                    'que_es':'Comentario en el post de un posible cliente al que Gustavo calienta antes de invitarlo: '
+                                             'un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir.'}
+            questions.update(warmup_questions())
         kind='text'
     elif capability==CAP.REPLY:
         row=proposal.comment;piece=row.piece;decision=row.decision or {}
@@ -300,6 +335,7 @@ def _questions(proposal,orientation):
         checks=[(qid,bound,GUSTAVO_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
     ground_questions(state,questions)
     if 'primer_mensaje' in state:checks.extend(DM_CHECKS)  # still there: its class 09 units were loaded
+    if 'calentamiento' in state:checks.extend(CAL_CHECKS)
     return state,questions,checks
 
 def review(proposal):
@@ -350,6 +386,14 @@ def comment_worthy(post):
     state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':CRITERIA_DEL_BARRIO}
     topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
            'IA aplicada, startups o negocio')
+    from . import calentamiento
+    warm=calentamiento.warmup_post(post)
+    if warm:
+        # A buyer (a founder) writes about their own company and product: that is the topic of a warm-up comment, not
+        # «promotion» (BIB-09-comentario-calentamiento, LI-07-M005-K07: comments of value on prospects' posts).
+        state['autor_posible_cliente']=('El autor es un posible cliente (founder) al que Gustavo calienta antes de invitarlo: que '
+                                        'hable de su empresa, su producto o su trabajo es justo el tema a comentar.')
+        topic+=', o la empresa, el producto o el trabajo del propio autor (`autor_posible_cliente`)'
     if orientation:
         state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_gustavo`'
     questions={
@@ -358,7 +402,9 @@ def comment_worthy(post):
                           'Es una frase suelta, un enlace sin contexto, un meme o un texto sin nada que discutir'),
         'tema':_noul(topic+'?'),
         'vacante':_noul('¿La `publicacion` es sobre todo un anuncio de vacantes, de contratación o de búsqueda de empleo?'),
-        'promocion':_noul('¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
+        'promocion':_noul('¿La `publicacion` es solo un anuncio de un producto, un servicio, un evento, un curso o un lanzamiento, sin '
+                          'una decisión, una experiencia o una idea sobre la que preguntarle algo concreto al autor?' if warm else
+                          '¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
                           'sin una idea que discutir?'),
         'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
                      'premio o agradecimiento?'),

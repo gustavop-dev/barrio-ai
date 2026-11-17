@@ -1,0 +1,220 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "relaciones",
+  "metodologia": "comentario_calentamiento",
+  "evaluacion": "BIB-09-comentario-calentamiento",
+  "fecha": "2026-11-16",
+  "metodo": "Lectura con SELECT de units.original en la biblioteca local (barrio-biblioteca-db), sin escribir en ella. hash = units.sha256 (sha256 del JSON canónico de la unidad, knowledge.ingest.canonical); source_path, pointer y fuentes de units y unit_evidence.",
+  "alcance": {
+    "unidades_leidas_completas": 6,
+    "por_clase": {
+      "07": 5,
+      "10": 1
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 6 unidades (5 de la clase 07 y 1 de la clase 10) y de LI-07-M007-K05 para la decisión que gana, no de toda la clase ni de las clases 07–12. Solo estas 6 unidades están activadas para los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS)."
+  },
+  "roles": [
+    "relaciones_comunidad",
+    "lider_jev"
+  ],
+  "lista": "operador.WARMUP_COMMENT_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-07-M005-K05",
+      "clase": 7,
+      "titulo": "Comentar con valor: aportar una experiencia concreta y abrir conversación con una pregunta",
+      "hash": "a4d3b76032116a730134abb86b3a7187b2dac8fddc894c11576584e7246dbd53",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "«Aporta + pregunta = conversación»: el comentario de calentamiento suma algo propio y concreto sobre lo que cuenta el autor y termina con una pregunta que puede contestar en el hilo. «¡Excelente post! 👏👏»: «Nadie lo recuerda».",
+      "limites_y_excepciones": [
+        "El ejemplo de México es un comentario modelo: el equipo nunca se apropia de una experiencia que Gustavo no tiene (guardas.invented_experience). El aporte puede ser un mecanismo, una práctica, un matiz o un hecho público de Gustavo.",
+        "No prohíbe los emojis en general: lo que señala es el elogio genérico. La regla fija prohíbe el aplauso y la felicitación, no todo emoji.",
+        "La fórmula no garantiza respuesta."
+      ],
+      "uso": {
+        "regla_fija": "autopiloto.warmup_text_issues: termina en una sola pregunta; sin aplausos ni felicitaciones (APPLAUSE)",
+        "pregunta_del_lider": "cal_aporte (mín. 0,7), cal_pregunta (mín. 0,6) y cal_aplauso (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
+      "pointer": "/learning_units/122",
+      "fuentes_con_prefijo_de_clase": [
+        "07:f2904ef2674f22a47a04:p032"
+      ]
+    },
+    {
+      "unidad_id": "LI-07-M001-K04",
+      "clase": 7,
+      "titulo": "Calentamiento mediante interacciones con sentido y comentarios que aportan",
+      "hash": "d52b0e0da629d569e06011c3a4efc8d387d0075b2d145781beea0f13fcff15f6",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "«Comentar no es aplaudir»: aporta algo tuyo y termina en una pregunta, de 25 a 40 palabras y sin vender. Comentar con valor es el primer peldaño de «Genera confianza antes de escribir».",
+      "limites_y_excepciones": [
+        "El intervalo de esta fuente es 25–40 palabras y no se sustituye por el de otro documento (el prompt 7.2 de LI-07-M007-K05 dice 25–35): rige 25–40.",
+        "Las barras de la escalera no son puntuaciones ni múltiplos de visibilidad.",
+        "«Sin vender» es condición expresa: además del pitch de todo comentario, el de calentamiento no ofrece ayuda ni servicios."
+      ],
+      "uso": {
+        "regla_fija": "autopiloto.warmup_text_issues: 25–40 palabras (WARMUP_WORDS) y sin ofrecer ayuda ni servicios (WARMUP_SELL), además de PITCH, enlaces y contacto de todo comentario",
+        "pregunta_del_lider": "cal_aporte y cal_aplauso"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
+      "pointer": "/learning_units/97",
+      "fuentes_con_prefijo_de_clase": [
+        "07:b84c04863141a075531b:p001"
+      ]
+    },
+    {
+      "unidad_id": "LI-07-M005-K04",
+      "clase": 7,
+      "titulo": "La escalera de visibilidad: acciones, avisos y exposición ante la red del prospecto",
+      "hash": "b5c23da60a045bf2d18edd307d758c689eef20665dbbae12396bc7bb9e55f225",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Comentar con valor es la acción que más expone ante el prospecto: le llega un aviso y su red puede verla. Por eso el calentamiento del comprador comenta sus posts, después de seguirlo.",
+      "limites_y_excepciones": [
+        "Las barras no son porcentajes, multiplicadores ni promesas de alcance.",
+        "Reaccionar y seguir avisan «a veces»: no se afirma que siempre lleguen.",
+        "Es la descripción didáctica del material, no una validación del funcionamiento de LinkedIn."
+      ],
+      "uso": {
+        "regla_fija": "calentamiento.read_posts y autopiloto._propose_groups: el equipo lee y comenta los posts de los compradores que ya sigue (RED-01)",
+        "pregunta_del_lider": "ninguna propia: fundamenta el contexto del borrador"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
+      "pointer": "/learning_units/121",
+      "fuentes_con_prefijo_de_clase": [
+        "07:f2904ef2674f22a47a04:p031",
+        "07:qt00244",
+        "07:qt00245",
+        "07:qt00246",
+        "07:qt00247",
+        "07:qt00248"
+      ]
+    },
+    {
+      "unidad_id": "LI-07-M005-K07",
+      "clase": 7,
+      "titulo": "Rutina diaria de red y calentamiento: 10 solicitudes, 5 comentarios y 3 interacciones",
+      "hash": "d94651e02d4d66a2ed1b415443357ead266cef70a4e0b6f5d805b1179482019a",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Los comentarios del calentamiento van en posts de prospectos y son «de valor»; las interacciones, con referentes que el cliente lee. De ahí el reparto del día entre compradores, comunidad y referentes.",
+      "limites_y_excepciones": [
+        "La página dice «15–5–3» en el encabezado y 10/5/3 en los bloques: no se corrige ni se adopta ninguna cifra.",
+        "Los 20 minutos son el marco del material, no una medición.",
+        "No se completa el número con elogios: la condición «de valor» se conserva."
+      ],
+      "uso": {
+        "regla_fija": "calentamiento.quotas: el tope diario de INT-03 se reparte compradores 6, comunidad 2, referentes 2 (BUYER_COMMENT_SHARE, decisión de Gustavo del plan, no la cifra del curso); los topes no cambian",
+        "pregunta_del_lider": "ninguna propia"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
+      "pointer": "/learning_units/124",
+      "fuentes_con_prefijo_de_clase": [
+        "07:f2904ef2674f22a47a04:p034",
+        "07:qt00262",
+        "07:qt00263",
+        "07:qt00264",
+        "07:qt00265",
+        "07:qt00266",
+        "07:qt00267",
+        "07:qt00268",
+        "07:qt00274"
+      ]
+    },
+    {
+      "unidad_id": "LI-07-M004-K03",
+      "clase": 7,
+      "titulo": "La I de CITA y el efecto de mera exposición: ser reconocido antes de hablar",
+      "hash": "f704c963c0482ef08d81e710d36c7ae8f08182315e677d5a76282c45aec0c7c1",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "«Lo que vemos varias veces nos parece confiable» (Zajonc, 1968, como lo cita la diapositiva): aparecer antes del contacto directo para que la invitación llegue de alguien reconocible.",
+      "limites_y_excepciones": [
+        "La secuencia de tres apariciones es una ilustración: no prueba que tres sean necesarias ni suficientes.",
+        "Reconocimiento no equivale a intención de compra.",
+        "«Aparece en todos lados» no autoriza más plataformas, frecuencias ni contactos."
+      ],
+      "uso": {
+        "regla_fija": "calentamiento.invite_at: dos comentarios del intento antes de invitar (BUYER_WARMUP_COMMENTS=2), como mucho BUYER_WARMUP_MAX_DAYS=14 días después del seguimiento",
+        "pregunta_del_lider": "ninguna propia"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
+      "pointer": "/learning_units/115",
+      "fuentes_con_prefijo_de_clase": [
+        "07:f2904ef2674f22a47a04:p024",
+        "07:f2904ef2674f22a47a04:p025"
+      ]
+    },
+    {
+      "unidad_id": "LI-10-V009-K01",
+      "clase": 10,
+      "titulo": "Calentar dos veces: antes de la invitación y antes del primer mensaje, para no parecer un bot",
+      "hash": "27005832db668241feb0de47425baeb2a0658b6aaac8dc62ea69ea6b11269d29",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Hay dos calentamientos: uno antes de la invitación («para que me acepte») y otro antes del primer mensaje. Esta fase hace el primero; el error típico es escribir en cuanto acepta.",
+      "limites_y_excepciones": [
+        "La mayoría no contestará: la tasa de respuesta decide si el método se mantiene (embudo del comprador, calentados frente a no calentados).",
+        "El docente dice que automatizar «también está bien» y que él lo automatiza todo: aquí rige la decisión de Gustavo (agentes con revisión del líder, sin mensajes privados automáticos).",
+        "El calentamiento de la cuenta antes de una campaña es otro tema y no se usa aquí.",
+        "El segundo calentamiento (antes del primer mensaje) es de la fase 3."
+      ],
+      "uso": {
+        "regla_fija": "calentamiento.invitable: con el interruptor encendido, un comprador con recorrido se invita solo cuando terminó su calentamiento",
+        "pregunta_del_lider": "ninguna propia"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-10-revisada.json",
+      "pointer": "/learning_units/18",
+      "fuentes_con_prefijo_de_clase": [
+        "10:0b14f1f411a3bf76e583:p001",
+        "10:qt00183",
+        "10:qt00184",
+        "10:qt00219",
+        "10:qt00222",
+        "10:qt00223",
+        "10:qt00224",
+        "10:qt00225",
+        "10:qt00226",
+        "10:qt00227",
+        "10:qt00228",
+        "10:qt00229",
+        "10:qt00230",
+        "10:qt00231",
+        "10:qt00232",
+        "10:qt00233",
+        "10:qt00234",
+        "10:qt00235",
+        "10:qt00236",
+        "10:qt00237"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "LI-07-M007-K05 dice «La IA propone, tú decides. Nunca comentes con bots». Gana la decisión de Gustavo: los agentes redactan y publican los comentarios de calentamiento con las reglas fijas y la revisión del líder (Jev), dentro de los topes de INT-03, y él puede pasar INT-03 a modo approval u off. Esta unidad no se activa ni se convierte en regla.",
+    "Sin mensajes privados automáticos (INB-08): el calentamiento solo comenta en público y prepara la invitación (RED-02, sin nota por defecto).",
+    "Sin cambios de topes de INT-03 ni de la rampa de RED-02: el reparto 6/2/2 es dentro del tope del día.",
+    "El comentario va en el idioma de la publicación (Gustavo, 12/11/2026).",
+    "Nunca se retira una invitación ni se vuelve a invitar mientras siga pendiente: retirarla es manual (GET /api/v1/red/invitaciones-pendientes)."
+  ],
+  "no_convertido_en_regla": [
+    "el prompt 7.2 (LI-07-M007-K05): cinco alternativas, 25–35 palabras y «sin emojis»; rige 25–40 de LI-07-M001-K04 y solo se prohíbe el aplauso",
+    "la rutina 10–5–3 o «15–5–3» (discrepancia del material) y los 20 minutos al día",
+    "tres apariciones como número necesario o suficiente (LI-07-M004-K03)",
+    "automatizarlo todo como hace el docente (LI-10-V009-K01)",
+    "compartir con opinión, mencionar con sentido, reaccionar y visitar el perfil como acciones del calentamiento (no hay acciones permitidas nuevas en esta fase)",
+    "responder en el hilo del comprador cuando contesta nuestro comentario: no hay acción permitida para eso todavía; su respuesta adelanta la invitación",
+    "el segundo calentamiento, antes del primer mensaje (fase 3)"
+  ],
+  "siguiente_paso": "Fase 3 del plan outbound: el primer mensaje después de aceptar, con su segundo calentamiento. Medir antes en el embudo calentados frente a no calentados y calentados_2."
+}

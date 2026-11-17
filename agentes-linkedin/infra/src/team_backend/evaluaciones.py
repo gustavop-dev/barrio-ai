@@ -205,18 +205,22 @@ def selection_request(run,piece,panel=True):
 def comment_request(run,post,revision=None):
     """operador._draft_comment without reading LinkedIn (existing_comments stays empty): instructions, voice and course
     units in cached system blocks; `revision` makes it the redraft after a rule violation."""
-    units,missing,_=run.context(run.units('comentar',operador.COMMENT_UNITS)[0])
-    if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
+    from . import calentamiento
+    warm=calentamiento.warmup_post(post)
+    units,missing,_=run.context(run.units('comentar',operador.COMMENT_UNITS)[0],warm=warm)
+    if missing:raise ValueError('Biblioteca no disponible para el comentario de calentamiento.' if warm else
+                                'Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
     from . import experimentos
     inputs['referent_evidence']=experimentos.signals(post)
     inputs['comment_language']=operador.COMMENT_LANGUAGE
+    if warm:inputs['calentamiento']=calentamiento.draft_inputs(post)
     # What production would have shown then: his comments before this post was observed, never the one on this post.
     inputs['recent_own_comments']=operador.recent_own_comments(post.account,before=post.observed_at,exclude_post=post)
     if revision:inputs['revision']=revision
-    return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
+    return {'system':operador.comment_system(warm),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
 
 def classify_request(run,contacts):
@@ -371,9 +375,11 @@ class Run:
             return ids,f'catalogo:{self.catalog}'
         return catalogo.units_for(shelf,fallback)
 
-    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET):
-        key=(tuple(unit_ids),budget)
-        if key not in self._units:self._units[key]=operador.course_context(list(unit_ids),budget)
+    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False):
+        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does."""
+        key=(tuple(unit_ids),budget,warm)
+        if key not in self._units:
+            self._units[key]=operador.warmup_units(list(unit_ids),budget) if warm else operador.course_context(list(unit_ids),budget)
         return self._units[key]
 
     def guard(self,worst):

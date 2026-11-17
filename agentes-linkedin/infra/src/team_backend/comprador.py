@@ -20,6 +20,7 @@ import logging
 import os
 import time
 from datetime import timedelta
+from types import SimpleNamespace
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -310,12 +311,15 @@ def _fold(touches):
     return state
 
 def next_at(journey,state,contact):
-    """When something is due. Phase 1 only mirrors today's rule: a followed person may be invited NETWORK_INVITE_AFTER_HOURS
-    after the follow (right away when they commented on his post); a rest ends at its date. Each phase adds its own."""
+    """When something is due. Phase 1 mirrors today's rule: a followed person may be invited NETWORK_INVITE_AFTER_HOURS
+    after the follow (right away when they commented on his post); a rest ends at its date. Phase 2, with
+    BUYER_WARMUP_ENABLED: when the warm-up is done (calentamiento.invite_at). Each phase adds its own."""
     step=state.step()
     if step==Step.RESTING:return state.rest[1]
     if step==Step.WARMING and 'warming' in state.first:
         if contact.source==Contact.Source.OWN_POST:return state.first['warming']
+        from . import calentamiento
+        if calentamiento.enabled():return calentamiento.invite_at(state,contact)
         from .red import invite_after
         return state.first['warming']+invite_after()
     return None
@@ -468,14 +472,16 @@ def rest(journey,reason,until,at=None,note=''):
                   {'motivo':reason,'hasta':until.isoformat(),'intento':journey.attempt,'nota':(note or '')[:300]})
 
 @transaction.atomic
-def retry(journey,angle,at=None):
+def retry(journey,angle,at=None,signal=False):
     """A new attempt once the rest is over, with the angle it will use. A follow and a connection carry over; the
-    invitation, the messages and the reply of the earlier attempt do not."""
+    invitation, the messages and the reply of the earlier attempt do not. `signal`: the person gave a signal during the
+    rest, which wakes them before its date (plan: «Una señal durante el descanso lo despierta de inmediato»)."""
     at=at or timezone.now();journey=_locked(journey)
     if journey.step!=Step.RESTING:raise ValueError('Solo se reintenta desde el descanso.')
-    if journey.rest_until and at<journey.rest_until:raise ValueError(f'El descanso termina el {journey.rest_until:%Y-%m-%d}.')
+    if journey.rest_until and at<journey.rest_until and not signal:raise ValueError(f'El descanso termina el {journey.rest_until:%Y-%m-%d}.')
     if not (angle or '').strip():raise ValueError('Cada intento dice qué ángulo usa.')
-    return _write(journey,Kind.RETRY,at,f'reintento:{journey.attempt+1}',{'numero':journey.attempt+1,'angulo':angle.strip()[:300]})
+    detail={'numero':journey.attempt+1,'angulo':angle.strip()[:300],**({'por_senal':True} if signal else {})}
+    return _write(journey,Kind.RETRY,at,f'reintento:{journey.attempt+1}',detail)
 
 @transaction.atomic
 def leave(journey,reason,at=None,note=''):
@@ -592,10 +598,12 @@ def journey(contact):
 
 REFS=('proposal','execution','post','comment','conversation','opportunity','outcome')
 
-def temperature(person,now=None):
-    """The signals a person gave (direction «entrante»), newest first, each with its age in days and its source. No
-    weights: phase 2 decides what they are worth and how they order people. Works for anyone: a buyer's journey keeps
-    them all; for someone else they are read from Barrio's rows as they are now."""
+def temperature(person,now=None,weigh=None):
+    """The signals a person gave (direction «entrante»), newest first, each with its age in days and its source, and
+    what they are worth (phase 2, calentamiento.WEIGHTS: Máxima 5, Alta 3, Media 1; a signal older than 30 days weighs
+    half) plus the buying signals with a source the web stage check cited (class 08); the weight only with
+    BUYER_WARMUP_ENABLED or `weigh=True`. Works for anyone: a buyer's journey keeps them all; for someone else they are
+    read from Barrio's rows as they are now."""
     now=now or timezone.now()
     row=person if isinstance(person,BuyerJourney) else journey(person)
     contact=row.contact if row else person
@@ -612,7 +620,12 @@ def temperature(person,now=None):
               'antes_de_invitar':not invited or at<invited,'detalle':detail,'ref':refs} for at,kind,detail,refs in found]
     by_kind={}
     for s in signals:by_kind[s['tipo']]=by_kind.get(s['tipo'],0)+1
-    return {'persona':str(contact.pk),'recorrido':str(row.pk) if row else None,'senales':signals,'total':len(signals),'por_tipo':by_kind,
+    from . import calentamiento
+    weight={}
+    if calentamiento.enabled() if weigh is None else weigh:
+        peso,_=calentamiento.weigh([SimpleNamespace(kind=kind,at=at) for at,kind,_d,_r in found],contact,now)
+        weight={'peso':peso,'nivel':calentamiento.level(peso),'senales_de_compra':calentamiento.buying_signals(contact)}
+    return {**weight,'persona':str(contact.pk),'recorrido':str(row.pk) if row else None,'senales':signals,'total':len(signals),'por_tipo':by_kind,
             'ultima':signals[0]['at'] if signals else None,'dias_desde_ultima':signals[0]['dias'] if signals else None,
             'antes_de_invitar':sum(1 for s in signals if s['antes_de_invitar'])}
 
@@ -651,6 +664,8 @@ DEFINITIONS={
     'paso_pct':'De quienes llegaron a la etapa anterior, qué porcentaje llegó a esta.',
     'desde_elegidos_pct':'Porcentaje de los elegidos que llegó a esta etapa.',
     'calentados':'Comentarios del equipo en posts suyos antes de su primera invitación.',
+    'calentados_2':'Dos comentarios o más antes de su primera invitación: el calentamiento completo de la fase 2.',
+    'senal_de_compra':'La verificación web de su empresa citó una señal de compra con fuente (ronda, contratación o expansión).',
     'aceptaron':'Conectados: aceptó la invitación de Gustavo o Gustavo aceptó la suya.',
     'recibieron_mensaje':'Gustavo marcó «Hecho, le escribí» o el inbox muestra un mensaje suyo.',
     'respondieron':'Un mensaje de la persona después del primero de Gustavo.',
@@ -685,6 +700,10 @@ def _activity(journeys,touches,start,end):
     for name,kind in ACTIVITY_TOUCHES.items():out[name]=sum(1 for t in touches if t.kind==kind and start<=t.at<end)
     out['senales_entrantes']=sum(1 for t in touches if t.direction==IN and start<=t.at<end)
     return out
+
+def _buying(journey):
+    from . import calentamiento
+    return bool(calentamiento.buying_signals(journey.contact))
 
 def funnel(weeks=8,now=None,account=None):
     """The buyer's funnel (GET /api/v1/resultados/embudo-comprador): cumulative and by week (cohorts by the week they
@@ -723,6 +742,8 @@ def funnel(weeks=8,now=None,account=None):
                                  'no_calentados':block(j for j in outbound if j.comments_before_invite==0)},
                 'nota':{'con_nota':block(j for j in outbound if j.invite_note is True),'sin_nota':block(j for j in outbound if j.invite_note is False)},
                 'senal':{'con_senal':block(j for j in outbound if j.signal_before_invite),'sin_senal':block(j for j in outbound if not j.signal_before_invite)},
+                'senal_de_compra':{'con_senal_de_compra':block(j for j in outbound if _buying(j)),
+                                   'sin_senal_de_compra':block(j for j in outbound if not _buying(j))},
                 'entrada':{'saliente':block(outbound),'entrante':block(inbound)}},
             'borradores':drafts(outbound),'estado_actual':steps,
             'descanso':count('rest_reason',RestReason.values),'salidas':count('exit_reason',ExitReason.values)}
