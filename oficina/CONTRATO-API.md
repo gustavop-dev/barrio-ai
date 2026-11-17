@@ -219,6 +219,23 @@ En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, veta
 
 `classification` vale `{}` mientras no se haya clasificado (la PWA muestra «Sin clasificar todavía»). En `evidence`, el campo que no corresponde a su `source` llega `null`.
 
+**Comprador: nivel y puntaje (BAR-24, 17/11/2026).** `ContactOutput` suma `buyer`. Es `null` para quien no es comprador. Para un comprador:
+
+```text
+"buyer": { "level": "confirmado|probable|por_confirmar|no_encaja",
+           "profile": "startup_financiada|bootstrapped|stealth|ejecutivo|",
+           "us_market": false, "score": 0..100, "version": "buyer_score_v1",
+           "breakdown": { "evidencia|mercado|papel|servicios|confianza": { "points", "max", "value", "why" } },
+           "warnings": ["perfil con poca información", "sin ubicación"], "evidence": "…", "sources": ["https://…"],
+           "entry": { "level", "score", "version", "at": "ISO" } | null }
+```
+
+- Los `points` del desglose siempre suman `score`. El puntaje ordena a los compradores y nunca excluye a nadie; solo `no_encaja` saca del barrio.
+- `entry` es el nivel y el puntaje con que el equipo fue por la persona. Siguen a su nivel mientras solo está elegida y se fijan con el primer follow o la primera invitación; después no cambian aunque suba de nivel. Es `null` si no tiene recorrido.
+- Un comprador que encaja y cuya verificación web sigue en curso tiene `next_step` «El equipo la seguirá; mientras, busca en la web la etapa de su empresa».
+- `classification.stage_check.verdict` usa los mismos cuatro niveles. Los contactos verificados antes del 17/11/2026 pueden traer `semilla_o_mas`, `presemilla` o `sin_evidencia`, que equivalen a `confirmado`, `no_encaja` y `por_confirmar`.
+- Tipos en `compartido/src/api/types.ts` (`ContactBuyer`).
+
 | `stage` | Etiqueta en la PWA | Significado |
 | --- | --- | --- |
 | `candidate` | Por clasificar | Descubierto; pendiente de clasificar. |
@@ -452,6 +469,17 @@ Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos c
 **Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
 
 **Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, señal de compra con fuente, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
+
+Desde el 17/11/2026 (BAR-24) trae además `entrada_comprador`, de solo lectura, con los compradores salientes separados por el nivel y por el tramo de puntaje con que el equipo fue por ellos:
+
+```text
+"entrada_comprador": {
+  "por_nivel": { "confirmado|probable|por_confirmar|no_encaja|sin_nivel": { "elegidos", "seguidos", "calentados", "invitados", "aceptaron", "respondieron" } },
+  "por_puntaje": { "80-100|60-79|40-59|0-39|sin_puntaje": { …las mismas seis etapas… } },
+  "version": "buyer_score_v1" }
+```
+
+`calentados` cuenta a quien recibió al menos un comentario antes de la invitación. `sin_nivel` y `sin_puntaje` agrupan los recorridos anteriores a BAR-24.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes

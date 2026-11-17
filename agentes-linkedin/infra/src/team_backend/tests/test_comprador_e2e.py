@@ -12,7 +12,7 @@ from contextlib import ExitStack, contextmanager
 from datetime import timedelta
 from unittest.mock import patch
 from django.utils import timezone
-from team_backend import autopiloto, calentamiento, comprador, conversaciones, evaluaciones, jobs, operador, red, respuestas
+from team_backend import autopiloto, calentamiento, comprador, conversaciones, evaluaciones, jobs, nivel_comprador, operador, red, respuestas
 from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BuyerJourney, BuyerTouch, Contact, Job, ObservedPost,
                                  PostComment)
 from team_backend.tests.test_respuestas import CLOSING, FOLLOW_UP, QUESTION, RepliesBase, draft
@@ -36,7 +36,7 @@ class BuyerPathBase(RepliesBase):
         from team_backend import research
         def claude(system,message,**kwargs):
             if kwargs['purpose']=='network-stage':
-                return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
+                return {'text':json.dumps({'verdict':'confirmado','evidence':'La fuente dice que levantó una ronda semilla.',
                                            'source_urls':['https://news.example/acme-seed']}),'model':'claude-sonnet-5-5'}
             cited=['LI-03-M005-K06']+(['LI-03-M006-K01'] if note else [])
             out=[{'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
@@ -207,7 +207,9 @@ class TodayBuyerPathTests(BuyerPathBase):
         rebuilt=self.journey(ana)
         self.assertEqual((rebuilt.step,rebuilt.origin,rebuilt.comments_before_invite,rebuilt.signal_before_invite),('acepto','reconstruido',1,True))
 
-    def test_a_buyer_waiting_for_the_web_is_not_chosen_yet(self):
+    def test_a_buyer_the_web_has_not_confirmed_walks_the_path_por_confirmar(self):
+        # BAR-24 (Gustavo, 17/11/2026): nothing found on the web yet is not a «no». She is chosen por_confirmar, followed,
+        # invited and accepted like the others, and her journey keeps the level and score she entered with.
         from team_backend import research
         self.fake.seed_person('beto-acme','Beto Acme',headline='Founder at Acme',search='founder pre-seed',location='Austin, Texas')
         self.job('discover_network')
@@ -215,18 +217,40 @@ class TodayBuyerPathTests(BuyerPathBase):
         with self.classifier({'Beto Acme':(True,0.9)}),patch('team_backend.research.research',return_value=nothing):
             self.job('classify_contacts')
         beto=Contact.objects.get(display_name='Beto Acme')
-        self.assertEqual(beto.classification['stage_check']['state'],'pending')
-        self.assertFalse(BuyerJourney.objects.exists())  # the stage is not confirmed: not chosen
-        self.assertEqual(self.funnel()['acumulado']['personas'],0)
+        entered=beto.classification['buyer']
+        self.assertEqual((beto.stage,beto.classification['stage_check']['state'],entered['level']),('fit','pending','por_confirmar'))
+        journey=self.journey(beto)
+        self.assertEqual((journey.step,journey.entry_level,journey.entry_score,journey.entry_score_version),
+                         ('elegido','por_confirmar',entered['score'],nivel_comprador.SCORE_VERSION))
+        self.assertEqual(self.step_follow(beto).state,'confirmed')
 
-    def test_a_buyer_outside_the_united_states_is_not_chosen(self):
-        self.fake.seed_person('caro-mx','Caro MX',headline='Founder at Acme',search='founder pre-seed',location='Mexico City')
-        self.job('discover_network')
+        # The next day the web finds the seed round: her level and score go up; what she entered with stays.
         stop=self.providers()
-        try:self.job('classify_contacts')
+        try:red.check_stages(self.gustavo,self.account,now=timezone.now()+timedelta(days=1))
         finally:stop()
-        self.assertFalse(Contact.objects.get(display_name='Caro MX').classification['fit'])
-        self.assertFalse(BuyerJourney.objects.exists())
+        beto.refresh_from_db()
+        self.assertEqual((beto.classification['stage_check']['state'],beto.classification['buyer']['level']),('ok','confirmado'))
+        self.assertGreater(beto.classification['buyer']['score'],entered['score'])
+        self.assertEqual(self.step_invite(beto).state,'confirmed')
+        beto=self.step_accept(beto)
+        journey=self.journey(beto)
+        self.assertEqual((beto.stage,journey.step,journey.entry_level,journey.entry_score),('connected','acepto','por_confirmar',entered['score']))
+
+        entry=self.funnel()['entrada_comprador']
+        self.assertEqual(entry['por_nivel']['por_confirmar'],
+                         {'elegidos':1,'seguidos':1,'calentados':0,'invitados':1,'aceptaron':1,'respondieron':0})
+        self.assertEqual(entry['por_nivel']['confirmado']['elegidos'],0)
+        self.assertEqual(entry['por_puntaje'][nivel_comprador.band(entered['score'])]['aceptaron'],1)
+
+    def test_a_buyer_from_latin_america_is_chosen_after_the_us_ones(self):
+        # Gustavo, 17/11/2026: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una».
+        self.fake.seed_person('caro-mx','Caro MX',headline='Founder & CEO at Acme',search='founder pre-seed',location='Mexico City')
+        ana=self.step_choose()
+        caro=Contact.objects.get(display_name='Caro MX')
+        self.assertTrue(caro.classification['fit'])
+        self.assertEqual((self.journey(caro).entry_level,self.journey(ana).entry_level),('confirmado','confirmado'))
+        self.assertLess(caro.classification['buyer']['score'],ana.classification['buyer']['score'])  # market: latam 8, objetivo 20
+        self.assertEqual([c.display_name for c in red.prioritized([caro,ana])],['Ana Acme','Caro MX'])
 
 
 class ConversationOnHisPostTests(BuyerPathBase):
@@ -318,8 +342,8 @@ class WarmupPathBase(BuyerPathBase):
         return patch('knowledge.providers.claude',side_effect=claude)
 
     # -- steps (production code only)
-    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme',note='',headline='Founder & CEO at Acme'):
-        contact=self.step_choose(slug,name,note=note,headline=headline)
+    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme',note='',headline='Founder & CEO at Acme',location='Austin, Texas'):
+        contact=self.step_choose(slug,name,location=location,note=note,headline=headline)
         follow=self.step_follow(contact)
         self.assertEqual(follow.state,'confirmed')
         contact.refresh_from_db()
@@ -473,6 +497,23 @@ class WarmupBuyerPathTests(WarmupPathBase):
         self.assertEqual(self.approve_open(ana,'RED-02').state,'confirmed')
         self.assertEqual(self.journey(ana).comments_before_invite,1)
         self.assertEqual(self.stages(self.funnel()['acumulado'])['calentados_2'],0)
+
+    def test_a_buyer_from_latin_america_warms_up_like_one_from_the_united_states(self):
+        # BAR-24: Latin America comes after the United States in the order, never off the path. With the switch on she
+        # is read, commented twice after the author wait and invited without a note, like Ana.
+        caro=self.chosen_and_followed('caro-mx','Caro MX',location='Mexico City')
+        journey=self.journey(caro)
+        follow=journey.touches.get(kind='seguir')
+        self.assertEqual((journey.step,journey.next_at,journey.entry_level),('calentando',follow.at+timedelta(days=14),'confirmado'))
+        self.warm_up(caro)
+        self.plan()
+        invite=self.approve_open(caro,'RED-02')
+        self.assertEqual((invite.state,Contact.objects.get(pk=caro.pk).stage),('confirmed','invited'))
+        journey=self.journey(caro)
+        self.assertEqual((journey.step,journey.warm_comments,journey.comments_before_invite),('invitado',2,2))
+        entry=self.funnel()['entrada_comprador']['por_nivel']['confirmado']
+        self.assertEqual({k:entry[k] for k in ('elegidos','seguidos','calentados','invitados')},
+                         {'elegidos':1,'seguidos':1,'calentados':1,'invitados':1})
 
     def test_2_without_posts_she_takes_the_route_without_posts_and_is_invited_at_14_days(self):
         ana=self.chosen_and_followed()
@@ -1548,18 +1589,19 @@ class NoPostsPathBase(SequencePathBase):
         super().setUp()
         env=patch.dict(os.environ,{'BUYER_NO_POSTS_ROUTE_ENABLED':'true'})
         env.start();self.addCleanup(env.stop)
-        self.stage_signals=[];self.web_keys=[]
+        self.stage_signals=[];self.web_keys=[];self.stage_verdict='confirmado'
         self.human=self.gustavo_api()  # the clock moves weeks ahead: a session would not outlive it
 
     def signal(self,kind='ronda',days=10,url=SEED_URL,evidence='Acme raised a seed round to turn its pilot into a product.'):
         return {'tipo':kind,'fecha':(timezone.now()-timedelta(days=days)).date().isoformat(),'source_url':url,'evidencia':evidence}
 
     def providers(self,fit=True,note=''):
-        """BuyerPathBase's, with the web check citing self.stage_signals (each one with its source among the findings)."""
+        """BuyerPathBase's, with the web check citing self.stage_signals (each one with its source among the findings) and
+        answering self.stage_verdict."""
         from team_backend import research
         def claude(system,message,**kwargs):
             if kwargs['purpose']=='network-stage':
-                return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
+                return {'text':json.dumps({'verdict':self.stage_verdict,'evidence':'La fuente dice que levantó una ronda semilla.',
                                            'source_urls':[SEED_URL],'senales':list(self.stage_signals)}),'model':'claude-sonnet-5-5'}
             out=[{'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
                   'confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
@@ -1860,6 +1902,32 @@ class NoPostsBuyerPathTests(NoPostsPathBase):
         retry=journey.touches.get(kind='reintento')
         self.assertEqual((journey.attempt,retry.detail['tipo'],retry.detail['senal']),(2,'senal_nueva',HIRING_URL))
         self.assertEqual(self.funnel()['ruta_sin_posts']['reverificaciones'],{'pedidas':1,'hechas':1,'con_senal_nueva':1,'vencidas':0})
+
+    def test_7b_the_re_check_raises_the_level_of_a_buyer_por_confirmar_and_her_entry_stays(self):
+        # BAR-24: the web read her company and could not say (por_confirmar, with a source); she went the whole way to a
+        # rest. The one re-check finds the round: her level and score go up, the journey keeps what she entered with.
+        self.stage_verdict='por_confirmar'
+        ana=self.answered('ana-acme','Ana Acme')
+        entered=ana.classification['buyer']
+        self.assertEqual((ana.classification['stage_check']['state'],entered['level'],self.journey(ana).entry_level),
+                         ('ok','por_confirmar','por_confirmar'))
+        self.invite(ana)
+        invited=self.journey(ana).touches.get(kind='invitacion').at
+        self.plan(now=invited+timedelta(days=21,hours=1))
+        self.plan(now=self.journey(ana).rest_until+MINUTE)
+        self.stage_verdict='confirmado'
+        stop=self.providers()
+        try:self.job('classify_contacts')
+        finally:stop()
+        self.assertEqual(len([k for k in self.web_keys if 'reverificacion' in k]),1)
+        ana=Contact.objects.get(pk=ana.pk)
+        buyer=ana.classification['buyer']
+        self.assertEqual((buyer['level'],buyer['basis'],ana.classification['fit']),('confirmado','web',True))
+        self.assertGreater(buyer['score'],entered['score'])
+        self.assertEqual([h['event'] for h in ana.history if h['event']=='stage_rechecked'],['stage_rechecked'])
+        self.assertIn('por_confirmar → confirmado',[h['detail'] for h in ana.history if h['event']=='stage_rechecked'][0])
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.entry_level,journey.entry_score),('descanso','por_confirmar',entered['score']))
 
     def test_9_reads_stay_inside_their_caps_and_no_visit_is_simulated(self):
         from team_backend.connectors import FakeConnector

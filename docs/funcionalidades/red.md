@@ -36,6 +36,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 | [BAR-21](#bar-21) | Secuencia de mensajes 2 a 4 para el comprador que no respondió (outbound, fase 4) | backend · Tu turno | implementado, apagado |
 | [BAR-22](#bar-22) | La ruta del comprador que no publica: el puente por su empresa y los reintentos (outbound, fase 5) | backend | implementado, apagado |
 | [BAR-23](#bar-23) | Su respuesta, el enlace de agenda (Cal.com), la entrega del lead y la lectura semanal del embudo (outbound, fase 6) | backend · Tu turno | implementado, apagado |
+| [BAR-24](#bar-24) | Compradores por niveles y con puntaje, Latinoamérica después de EE. UU. y cupos blandos por papel | backend · API | funciona |
 
 ---
 
@@ -428,9 +429,9 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   - Rampa RED-02 **8/40 → 16/80 → 20/100**, arranca en **16/80**; la primera etapa es solo el paso atrás tras una aceptación débil. La salud no cambia: sube tras siete días con ≥40 % sobre ≥20 invitaciones maduras, baja con <40 % o caída de 10 puntos, pausa bajo 25 %. La migración reubica la etapa vigente: primera o segunda → 16/80, tercera → 20/100.
   - RED-01 (seguir) **20/día y 100/semana**.
   - `NETWORK_BATCHES=09:00-11:00,15:00-17:00`: las acciones de red salen en dos tandas, con 3–8 minutos entre escrituras (`NETWORK_BATCH_SPACING_SECONDS`, nunca menos de dos); la primera tanda envía como máximo la mitad de las invitaciones del día; durante una tanda los comentarios esperan; fuera de ellas la red espera. Sin la variable rige el espaciado común de 20–40 minutos.
-- **A quién invita y en qué orden:** todos los papeles salvo los líderes (que se siguen y se comentan), incluidos aliados y pares de búsqueda. El cupo del día se llena así: compradores en EE. UU., resto de la comunidad en EE. UU., comunidad en Latinoamérica, resto; dentro de cada grupo, mayor confianza primero. Las invitaciones se revisan antes que los follows.
-- **Ubicación (`ubicacion.region`):** EE. UU. por país, estado o gran área metropolitana; Latinoamérica por país o gran ciudad; ubicación vacía no se adivina. `NETWORK_BUYER_REGION=us` (vacío apaga la regla): un comprador fuera de EE. UU. no encaja; una invitación recibida conserva el veredicto simple. Los compradores clasificados antes de la regla se barren una vez en el plan.
-- **Etapa del comprador (`NETWORK_STAGE_CHECK=true`):** un comprador afín en EE. UU. espera (`stage_check: pending`) hasta que una búsqueda web con citas muestre ronda semilla o posterior, o clientes que pagan; Sonnet decide solo con esos hallazgos (`semilla_o_mas`, `presemilla`, `sin_evidencia`). Sin hallazgos reintenta al día siguiente, hasta tres intentos. Presemilla o sin evidencia lo saca del barrio con la regla visible. Cupo propio `NETWORK_STAGE_CHECKS_PER_DAY=6` (claves `etapa:`), aparte de la investigación editorial; la pregunta pública solo lleva nombre y titular saneados.
+- **A quién invita y en qué orden:** todos los papeles salvo los líderes (que se siguen y se comentan), incluidos aliados y pares de búsqueda. El cupo del día se llena así: compradores en EE. UU., resto de la comunidad en EE. UU., comunidad en Latinoamérica, resto; dentro de cada grupo, mayor confianza primero. Las invitaciones se revisan antes que los follows. Desde el 17/11/2026 los cupos blandos por papel deciden a quién le toca y, dentro de los compradores, el puntaje ([BAR-24](#bar-24)).
+- **Ubicación (`ubicacion.region`):** EE. UU. por país, estado o gran área metropolitana; Latinoamérica por país o gran ciudad; ubicación vacía no se adivina. `NETWORK_BUYER_REGION=us` (vacío apaga la regla): un comprador fuera de EE. UU. no encaja; una invitación recibida conserva el veredicto simple. Los compradores clasificados antes de la regla se barren una vez en el plan. **Cambiado el 17/11/2026 ([BAR-24](#bar-24)):** la región ya no saca a nadie, solo ordena (EE. UU. primero, después Latinoamérica).
+- **Etapa del comprador (`NETWORK_STAGE_CHECK=true`):** un comprador afín en EE. UU. espera (`stage_check: pending`) hasta que una búsqueda web con citas muestre ronda semilla o posterior, o clientes que pagan; Sonnet decide solo con esos hallazgos (`semilla_o_mas`, `presemilla`, `sin_evidencia`). Sin hallazgos reintenta al día siguiente, hasta tres intentos. Presemilla o sin evidencia lo saca del barrio con la regla visible (**cambiado el 17/11/2026, [BAR-24](#bar-24):** cuatro niveles, solo la evidencia en contra saca, y la espera ya no frena el follow ni la invitación). Cupo propio `NETWORK_STAGE_CHECKS_PER_DAY=6` (claves `etapa:`), aparte de la investigación editorial; la pregunta pública solo lleva nombre y titular saneados.
 - **Señales de perfil (`Contact.signals`):** seguidores, conexiones y bio, leídas por LinkedIn directo al leer el perfil y su tarjeta. El conector directo no lee el idioma ni las marcas de creador, contratando, abierto a trabajo, premium o influencer: ya no llegan. El clasificador las recibe con la región; no hay mínimo de seguidores (Gustavo: «lo veremos con la data»).
 - **Búsqueda:** `NETWORK_SEARCH_LOCATION=United States` (id leído una vez con `search_parameters`, el autocompletado de ubicación de LinkedIn, y guardado); `NETWORK_SEARCHES_PER_RUN=2`; una consulta que termina en `[es]` busca perfiles en español.
 - **Dudas del líder:** un descarte del líder deja descansar a esa persona `NETWORK_LEAD_REST_DAYS=30` días para esa acción y crea el aviso `network_doubt` («El líder frenó a una persona que encaja», con enlace a la persona). En la ficha, «Sí, encaja» (`POST /api/v1/red/contacts/<id>/encaja`) guarda `confirmed_by_gustavo`: el líder deja de revisar las acciones de esa persona y el descanso termina.
@@ -438,8 +439,8 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 - **Criterios de aceptación:**
   1. **Dado** una rampa nueva, **cuando** se consulta el cupo de RED-02, **entonces** es 16/día y 80/semana; un override solo baja etapas.
   2. **Dado** tandas configuradas, **cuando** se intenta una invitación fuera de ellas, **entonces** espera; dentro de la primera, el cupo es la mitad del día.
-  3. **Dado** un comprador afín en Medellín y otro en Austin, **cuando** se clasifican, **entonces** el primero queda descartado con la regla de ubicación y el segundo espera la verificación web antes de cualquier acción.
-  4. **Dado** un comprador sin ronda visible tras tres días, **cuando** termina el último intento, **entonces** queda descartado con `sin_evidencia` y no se propone.
+  3. ~~**Dado** un comprador afín en Medellín y otro en Austin, **cuando** se clasifican, **entonces** el primero queda descartado con la regla de ubicación y el segundo espera la verificación web antes de cualquier acción.~~ Reemplazado por [BAR-24](#bar-24), criterio 3.
+  4. ~~**Dado** un comprador sin ronda visible tras tres días, **cuando** termina el último intento, **entonces** queda descartado con `sin_evidencia` y no se propone.~~ Reemplazado por [BAR-24](#bar-24), criterio 2.
   5. **Dado** un descarte del líder, **cuando** vuelve a correr el plan, **entonces** no se propone a esa persona por 30 días; tras «Sí, encaja», se propone y se aprueba sin el líder.
   6. **Dado** compradores, aliados, pares y un líder en EE. UU. y Latinoamérica, **cuando** se planifica, **entonces** las invitaciones siguen el orden de arriba y el líder solo se sigue.
 - **Cobertura QA:** `tests/test_red_eeuu.py`, `test_fase2_curso.py`, `PersonaScreen.test.tsx`; ejecución en CI, no local.
@@ -453,7 +454,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 - **Qué hace para Gustavo:** cada comprador elegido tiene su recorrido: en qué paso va (elegido, calentando, invitado, aceptó, mensaje 1 a 4, respondió, interesado, reunión, en descanso o salió), por qué ruta, cuándo le toca lo siguiente, y un registro de cada toque del equipo y de cada señal de la persona, con su fuente y su fecha. De ahí sale el embudo por semana. Todavía no hay pantalla: es la línea base de las fases 2 a 6 de [plan-outbound.md](../plan-outbound.md#orden-propuesto).
 - **Decisiones de Gustavo (17/11/2026):** las señales de la persona (respondió un comentario, comentó su post, lo invitó, aceptó, le escribió) se guardan aparte de lo que hace el equipo, con fecha y fuente. Salir no es borrar: el descanso lleva motivo, fecha de vuelta, número de intento y el ángulo de cada intento, y es distinto de la salida definitiva (pidió no ser contactado, no le interesa, descartado por Gustavo).
 - **Código:** `comprador.py`; modelos `BuyerJourney` y `BuyerTouch` (migración `0048_recorrido_comprador`); ganchos pasivos en `red.py` (`_classify_batch`, `check_stages`, `outbound_rules`, `sync`, `on_rejected`, `discard`, `confirm_fit`), `operador._finish`, `respuestas._store` y `close_dm`, `conversaciones._from_messages`, `oportunidades.create`/`update` y `desenlaces_captura._comment`; `resultados_views.EmbudoComprador`; `manage.py comprador reconstruir|embudo`.
-- **Quién entra:** un contacto clasificado `comprador` que encaja y, con la verificación web activa, con `stage_check: ok` o con «Sí, encaja». También un comprador al que el equipo ya siguió o invitó con un criterio anterior: entra y sale por regla si hoy no encaja. `Contact.stage` no cambia.
+- **Quién entra:** un contacto clasificado `comprador` que encaja y cuya verificación web no encontró evidencia en contra (`stage_check` distinto de `failed`; desde el 17/11/2026 también mientras espera, [BAR-24](#bar-24)), o con «Sí, encaja». El recorrido guarda el nivel y el puntaje con que el equipo fue por la persona (`entry_level`, `entry_score`, `entry_score_version`): siguen a su nivel mientras solo está elegida y se fijan con el primer follow o la primera invitación. También un comprador al que el equipo ya siguió o invitó con un criterio anterior: entra y sale por regla si hoy no encaja. `Contact.stage` no cambia.
 - **El registro (`BuyerTouch`):** solo se añade; editar o borrar una fila da error. Tres direcciones:
   - `saliente`, lo que hizo el equipo o Gustavo: seguir, comentar un post suyo, reaccionar, responderle en el hilo de un post de Gustavo, invitar (con o sin nota), aceptar su invitación, «Hecho, le escribí» y un mensaje de Gustavo leído en el inbox.
   - `entrante`, las señales de la persona: respondió a un comentario del equipo (el desenlace a 72 h), comentó un post de Gustavo, lo invitó, aceptó, le escribió primero o respondió un mensaje. «Reaccionó» y «nos siguió» tienen tipo, pero hoy ninguna lectura automática los trae.
@@ -464,7 +465,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 - **Embudo:** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; permiso `operate_linkedin`). Trae el acumulado y cada semana (cohorte de elegidos y actividad), el paso de cada etapa a la siguiente, las comparaciones (ruta, calentados frente a no calentados, con nota frente a sin nota, con señal antes de invitar frente a sin señal, saliente frente a entrante) y los borradores pendientes frente a enviados. Con menos de 30 invitaciones avisa «muestra chica». Forma completa en «Embudo del comprador» de [`metricas-resultados.md`](../../agentes-linkedin/infra/docs/metricas-resultados.md).
 - **Para las fases 2 a 6:** escriben con `record`, `rest`, `retry`, `leave`, `set_route` y `set_angle`, y leen con `journey`, `current`, `temperature` (las señales de una persona con su edad, sin pesos), `due`, `drafts` y `funnel`. Las pruebas de punta a punta (`test_comprador_e2e.BuyerPathBase`) se amplían con un método por paso nuevo.
 - **Criterios de aceptación:**
-  1. **Dado** un comprador en Austin con ronda semilla verificada en la web, **cuando** se clasifica, **entonces** tiene recorrido en `elegido`. Si la web aún no respondió o está fuera de EE. UU., no tiene recorrido.
+  1. **Dado** un comprador en Austin con ronda semilla verificada en la web, **cuando** se clasifica, **entonces** tiene recorrido en `elegido`. Desde [BAR-24](#bar-24), si la web aún no respondió entra `por_confirmar`, y uno de Latinoamérica también entra, después de los de EE. UU.
   2. **Dado** que el equipo lo sigue, comenta un post suyo, él responde ese comentario, se le invita sin nota y acepta, **cuando** corre cada paso con las funciones de producción, **entonces** el recorrido pasa por calentando, invitado y aceptó, con un toque por paso y su referencia. La respuesta cuenta como señal antes de invitar.
   3. **Dado** un fallo del registro, aunque sea un error de base de datos dentro de la transacción de la acción (el descarte de Gustavo), **cuando** se ejecuta una acción, se clasifica o se descarta, **entonces** la acción termina y se guarda igual, y queda `buyer.record_failed`.
   4. **Dado** el historial sin recorridos, **cuando** corre `manage.py comprador reconstruir`, **entonces** crea los toques que habrían dejado los ganchos; una segunda corrida no añade nada y `--seco` no guarda.
@@ -491,7 +492,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 - **B. Comentar:** `_propose_groups` reparte el tope de INT-03 del día (15 por defecto desde el 17/11/2026, 7 el fin de semana) entre compradores, comunidad y referentes por `BUYER_COMMENT_SHARE` (8/2/5; 4/1/2 el fin de semana). Con el interruptor apagado, los 15 van a referentes, como hoy. Un grupo sin nada que comentar cede sus cupos al siguiente que tenga (compradores → comunidad → referentes, y vuelta); «comunidad» no tiene fuente de posts todavía, así que sus 2 cupos pasan a referentes, o a compradores si no hay posts de referentes. El presupuesto, los 20 borradores al día (`OPERATOR_DAILY_PROPOSALS`, antes 6) y un borrador a la vez rigen igual. Con la separación de 20 a 40 minutos caben unas 20 escrituras que no son de red al día: 15 comentarios solo con pocas respuestas ([plan-outbound.md](../plan-outbound.md), «Capacidad del día»). Posts de compradores de hasta `BUYER_POST_MAX_AGE_HOURS` (168) h; los de referentes siguen en 72 h. La espera de 48 h es por autor del post (`author_provider_id`), así que nunca hay dos comentarios a la misma persona el mismo día. El prefiltro del líder lee que un founder hable de su empresa como el tema, y solo descarta un anuncio sin nada que preguntar. Un comentario que el líder descartó tiene su reescritura también en el post de un comprador.
 - **C. El comentario:** la metodología `comentario_calentamiento` ([BIB-11](biblioteca-equipos.md#bib-11), [COM-13](comentarios-y-lider.md#com-13)).
 - **D. Invitar:** con el interruptor, un comprador con recorrido se invita cuando `calentamiento.invite_at` llega: el segundo comentario del intento (`BUYER_WARMUP_COMMENTS`), una señal que acelera o `BUYER_WARMUP_MAX_DAYS` (14) días después de seguirlo, lo que ocurra antes. Quien comentó un post de Gustavo (fuente `own_post`) se invita enseguida, como hoy. El resto de los roles (par, recomendador…) y quien no tiene recorrido siguen la regla de hoy. `next_at` del recorrido dice esa fecha (`comprador.due`).
-- **E. Reciprocidad:** `comprador.temperature` pesa las señales (`WEIGHTS`: invitó o agendó 5; respondió un comentario, comentó su post, le escribió o respondió un mensaje 3; nos siguió, reaccionó o aceptó 1) y la mitad si tienen más de 30 días. Ordena a quién leer y comentar primero y, en `red.prioritized`, EE. UU. → comprador → temperatura → confianza. Aceleran la invitación (`ACCELERATORS`): respondió un comentario del equipo, comentó un post de Gustavo, lo invitó o le escribió, en el último mes. Si la persona lo invita, sigue el flujo de RED-04 de siempre.
+- **E. Reciprocidad:** `comprador.temperature` pesa las señales (`WEIGHTS`: invitó o agendó 5; respondió un comentario, comentó su post, le escribió o respondió un mensaje 3; nos siguió, reaccionó o aceptó 1) y la mitad si tienen más de 30 días. Ordena a quién leer y comentar primero y, en `red.prioritized`, EE. UU. → comprador → puntaje + temperatura → confianza (fórmula en [BAR-24](#bar-24)). Aceleran la invitación (`ACCELERATORS`): respondió un comentario del equipo, comentó un post de Gustavo, lo invitó o le escribió, en el último mes. Si la persona lo invita, sigue el flujo de RED-04 de siempre.
 - **F. Sin posts:** tras `BUYER_NO_POSTS_READS` (2) lecturas en 10 días sin un post comentable, el recorrido toma la ruta `sin_posts` (`comprador.set_route`): ya no se lee ni se comenta, y se invita a los 14 días por la regla del máximo. La fase 5 construye el resto de esa ruta.
 - **G. Descanso:** `calentamiento.sweep` corre en cada `plan_network`. Quien tiene sus dos comentarios, fue invitado y no aceptó en `BUYER_REST_AFTER_DAYS` (21) días pasa a descanso `invitacion_no_aceptada` por `BUYER_REST_DAYS` (60) días (un año desde el tercer intento). En descanso no se lee ni se comenta. Una señal suya durante el descanso lo despierta con ese ángulo (`retry(signal=True)`, «Señal en el descanso: …»); al terminar el descanso empieza otro intento («otro post y otro tema»). La invitación pendiente nunca se reenvía ni se retira (no se toca `linkedin_directo/permitidas.py`): `GET /api/v1/red/invitaciones-pendientes?dias=21` le da a Gustavo la lista para retirarlas a mano si quiere.
 - **H. Señales de compra (clase 08):** con el interruptor, la misma llamada de la verificación web de la etapa (`red._judge_stage`, `purpose network-stage`) devuelve también las señales que los hallazgos citan (`ronda`, `contratacion`, `expansion`, con fecha y URL). Se guardan en `classification.stage_check.senales` solo si citan una URL recibida; sin fuente no cuentan. Pesan 2 cada una (1 sin fecha o de más de 30 días) en la temperatura. No hay llamadas nuevas.
@@ -682,3 +683,122 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   - La lectura semanal no ve clics en el enlace (Cal.com no los avisa): «responden pero no hay reuniones» se mide con reservas.
   - No hay respuesta automática ni recordatorio de la reunión; lo que pasa después es de la máquina de ventas.
 - **Cobertura QA:** `tests/test_comprador_e2e.py` (`ReplyBuyerPathTests`: el camino completo y las variantes 1 a 11), `tests/test_respuesta_comprador.py` (caso completo con funciones de producción, reglas fijas, decisión, fechas, firma y recepción del webhook, el pliegue con reuniones, la lectura semanal y su aviso, activación y registro), con conector y proveedores falsos y el reloj simulado, en una PostgreSQL desechable.
+
+## Compradores menos rígidos (17/11/2026)
+
+### BAR-24 · Compradores por niveles y con puntaje, Latinoamérica después de EE. UU. y cupos blandos por papel <a id="bar-24"></a>
+
+- **Dónde:** backend · API
+- **Estado:** funciona, con las variables de [BAR-17](#bar-17) (`NETWORK_BUYER_REGION`, `NETWORK_STAGE_CHECK`) y una nueva (`NETWORK_ROLE_SHARE`). No usa interruptores del outbound: con todos los `BUYER_*_ENABLED` apagados funciona igual.
+- **Qué hace para Gustavo:** deja de sacar del barrio a un comprador porque la web no sabe nada de su empresa. Cada comprador tiene un perfil, un nivel de evidencia y un puntaje explicable de 0 a 100. Solo la evidencia en contra lo saca. Los compradores de Latinoamérica entran después de los de EE. UU., y las invitaciones de la semana se reparten por papel sin que ningún papel se coma el cupo.
+- **Decisiones de Gustavo (17/11/2026):**
+  - «Siento que puede ser demasiado estricto, o que el verificador hace una pregunta demasiado rígida y no deja pasar a nadie».
+  - Compradores de Latinoamérica: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una».
+  - Reparto de papeles: «debería ser construido», pero «estamos cortando con una misma tijera a todos; podríamos cambiar las preguntas dependiendo del perfil, pero no ser tan rígidos».
+  - El objetivo no cambia: ronda semilla o posterior, o clientes que pagan («Semilla por delante», `posicionamiento.MODALITIES`).
+- **Dónde se perdía cada comprador (línea base, [`linea-base-compradores.md`](../../agentes-linkedin/infra/docs/linea-base-compradores.md)):**
+  - `red.CLASSIFY_SYSTEM` pedía `fit=false` «cuando falte información». Con eso, `red._classify_batch` sacaba a founders en stealth y a perfiles «Founder @X»: 45 de 53 compradores en 14 días, casi siempre «sin evidencia», no evidencia en contra.
+  - La regla de región descartaba a todo comprador fuera de EE. UU. Estaba en `red._classify_batch` y se repetía en `outbound_rules`, `outbound_target` y `network_issues`.
+  - `red.check_stages` hacía la misma pregunta genérica a todos. El juez tenía «Ante la duda, sin_evidencia», y tres intentos sin hallazgos terminaban en `failed`, es decir, descartado.
+  - `red.stage_waiting` frenaba el follow y la invitación mientras la verificación estaba en `pending`.
+  - Los reintentos caían justo después de medianoche, fuera de las horas de lectura.
+  - `red.diverse_candidates` no tenía reparto por papel. Las invitaciones salían así: par 53 %, aliado 26 %, comprador 9 %.
+- **Código:**
+  - `nivel_comprador.py` (nuevo): perfiles, niveles, preguntas, puntaje, entrada y reevaluación.
+  - `reparto.py` (nuevo): cupos blandos por papel.
+  - `red.py`:
+    - Clasificador: `CLASSIFY_SCHEMA` y `CLASSIFY_SYSTEM` (`buyer_profile`, `buyer_level`, `us_market`) y `_classify_batch`.
+    - Verificación web: `STAGE_SYSTEM`, `_judge_stage`, `check_stages`, `_settle_stage`, `_recheck_signals` y `_raise_level`.
+    - Plan y orden: `stage_waiting`, `outbound_rules`, `outbound_target`, `network_issues`, `plan`, `prioritized` y `buyer_score`.
+  - `comprador.py`: `chosen`, `_project` (entrada) y `funnel` (`entrada_comprador`).
+  - `BuyerJourney.entry_level`, `entry_score` y `entry_score_version` (migración `0053_entrada_nivel_comprador`).
+  - `lider.py` (`ROLE_MEANING` y el nivel en el estado), `serializers.ContactOutput.buyer`, `posicionamiento.LOCATION` y `compartido/src/api/types.ts` (`ContactBuyer`).
+  - `manage.py operador reevaluar-compradores`.
+- **Perfiles (`buyer_profile`), cada uno con su pregunta a la web y al juez:**
+  - `startup_financiada`: ronda, inversores y fecha.
+  - `bootstrapped`: clientes que pagan, precios, ingresos, empleados y años operando.
+  - `stealth`: salida previa, trayectoria, equipo, contrataciones y respaldo. Que la web no sepa nada es `por_confirmar`, nunca `no_encaja`.
+  - `ejecutivo`: si decide o influye en contratar desarrollo, y el tamaño de la empresa.
+  - Es la misma llamada de investigación con las mismas búsquedas. No hay llamadas pagadas nuevas ni cupos más altos.
+- **Niveles (`buyer_level`):**
+  - `confirmado`: ronda semilla o posterior, o clientes que pagan, con fuente.
+  - `probable`: señales indirectas, por ejemplo inversores sin ronda publicada, precios publicados, una salida previa o contrataciones.
+  - `por_confirmar`: no hay datos públicos todavía.
+  - `no_encaja`: evidencia en contra, por ejemplo presemilla declarada sin ingresos, alguien que vende para otros o alguien que pidió no ser contactado.
+  - **Cómo se combinan:** la evidencia en contra gana. Si no la hay, gana el nivel más fuerte entre el del perfil y el de la web. Un veredicto sin fuente recibida queda `por_confirmar`.
+  - **Cuándo se sale:** solo `no_encaja` saca del barrio, con la regla «La verificación encontró evidencia en contra: no es comprador».
+  - **Sin hallazgos:** tres intentos sin hallazgos dejan `por_confirmar` con `stage_check: ok`.
+  - **Mientras la web no termina:** el comprador se sigue y se invita igual.
+  - **Pregunta que no se puede hacer:** si la pregunta no pasa `research.safe_question`, queda `por_confirmar` y no frena la cola.
+- **Puntaje (`buyer_score_v1`, 0–100):** es la suma de componentes visibles, y el desglose siempre suma el total.
+  - **Evidencia:** confirmado 50, probable 33, por confirmar 16, no encaja 0.
+  - **Mercado:** objetivo 20; negocio en EE. UU. desde otra región 14; sin ubicación 12; Latinoamérica 8; otra región 4.
+  - **Papel:** decide 12; sin dato 9; influye 6.
+  - **Servicios:** construye software, producto o IA 12; sin dato 9; no coincide 6.
+  - **Confianza del clasificador:** hasta 6.
+  - **Perfil escueto:** cuando el titular tiene cuatro palabras o menos y no hay bio, solo se agrega el aviso «perfil con poca información». Cada dato que falta toma el valor del medio de su componente, nunca el piso.
+  - **Para qué sirve:** ordena dentro del cupo del comprador y nunca excluye a nadie.
+- **Prioridad con el outbound (`nivel_comprador.priority`):** `prioridad = puntaje + 5 × min(peso de temperatura, 8)`.
+  - El puntaje dice quién es la persona y la temperatura (`calentamiento.heats`), qué hizo de vuelta.
+  - Una señal Alta (+15) vale casi un nivel (17 puntos). El peso cuenta hasta 8 (+40).
+  - La temperatura solo cuenta con `BUYER_WARMUP_ENABLED=true`.
+  - Orden de `red.prioritized`:
+    1. Región: EE. UU., después Latinoamérica, después el resto.
+    2. Comprador antes que el resto de la comunidad.
+    3. Dentro de la región, primero quien vende en EE. UU.
+    4. Prioridad.
+    5. Confianza.
+- **Orden del cupo:**
+  1. Compradores de EE. UU. `confirmado` y `probable`.
+  2. Compradores de EE. UU. `por_confirmar`.
+  3. Compradores de Latinoamérica, primero los que tienen negocio o clientes en EE. UU. (`us_market`).
+  4. El resto.
+  - `NETWORK_BUYER_REGION=us` ya no saca a nadie, solo ordena. Con `''` el orden por región se apaga.
+- **Cupos blandos por papel (`NETWORK_ROLE_SHARE`, por defecto `comprador=20,recomendador+aliado=15,divulgador=20,par=25`, de la tabla del barrio LI-03-V021-K03):**
+  - El cupo decide a quién le toca, nunca cuántas invitaciones salen. La rampa, los topes y la ventana no cambian.
+  - Meta semanal de cada papel = su parte del total × min(tope semanal de RED-02, lo que la rampa permite esta semana).
+  - Cada turno va al papel con candidatos que esté más por debajo de su parte. Si hay empate, va el comprador.
+  - Un papel sin candidatos cede su turno, y nadie espera para cumplir un porcentaje.
+  - Dentro de cada papel se mantiene el orden de `red.plan`.
+  - `''` apaga los cupos. Un valor malo (líder, papel desconocido o repetido, parte ≤ 0) es un error de configuración, no un valor por defecto silencioso.
+  - El resumen del plan guarda el reparto con lo planeado.
+  - **Regla de `aliado`:** comparte el turno de los recomendadores. La tabla busca recomendadores entre «clientes, aliados y socios», y un aliado (alguien que vende servicios a founders) es quien recomienda a Gustavo.
+- **Verificación en la ventana:** `check_stages` corre solo dentro de `READ_WINDOW`. Un reintento queda para el inicio de la ventana siguiente, no 24 horas después.
+- **Entrada y embudo:**
+  - El recorrido guarda el nivel, el puntaje y la versión con que el equipo fue por la persona (`comprador._project`). Mientras solo está elegida siguen a su nivel, porque la verificación web suele responder el mismo día. El primer follow o la primera invitación los fijan, y una subida de nivel posterior cambia el puntaje actual, no la entrada.
+  - `GET /api/v1/resultados/embudo-comprador` trae `entrada_comprador`, de solo lectura:
+    - `por_nivel`: confirmado, probable, por confirmar, no encaja y sin nivel.
+    - `por_puntaje`: tramos 80-100, 60-79, 40-59 y 0-39, más sin puntaje.
+    - Cada grupo cuenta elegidos, seguidos, calentados, invitados, aceptaron y respondieron.
+  - `GET /api/v1/red/contacts/<id>` trae `buyer`: nivel, perfil, `us_market`, puntaje, desglose, versión, avisos, evidencia, fuentes y la entrada.
+- **Con el outbound ([BAR-18](#bar-18) a [BAR-23](#bar-23)):**
+  - Un comprador `por_confirmar` o de Latinoamérica es elegido y tiene recorrido, así que pasa por el calentamiento, las notas y los mensajes igual que uno de EE. UU. cuando esos interruptores se encienden.
+  - Las señales de compra (`senales`) siguen saliendo en la misma llamada del juez.
+  - La reverificación de un comprador en descanso (`_recheck_signals`) además sube su nivel si encuentra más evidencia con fuente. Nunca lo baja ni saca a nadie a mitad del recorrido: la evidencia en contra queda en la nota `stage_rechecked`.
+- **Reevaluación de quien salió con las reglas viejas:** `manage.py operador --usuario <u> reevaluar-compradores --cuenta <id>` lista sin cambiar nada; `--confirmar` aplica.
+  - **Grupos:**
+    - `fuera_de_eeuu`: se restaura en su lugar, `por_confirmar`.
+    - `sin_evidencia_web`: se restaura `por_confirmar` con `stage_check: ok`, sin búsqueda nueva.
+    - `sin_evidencia_clasificador`: vuelve a la cola y lo juzga la clasificación normal con el prompt nuevo, en sus lotes y su presupuesto.
+    - `sin_nivel`: se completan el nivel y el puntaje, y nada más cambia.
+  - **A quién no toca:** a nadie a quien Gustavo o LinkedIn le dijeron que no, a quien Gustavo confirmó, ni a quien está invitado, conectado o cerrado.
+  - **Registro y repetición:** cada fila deja `AuditEvent network.buyer_reevaluated`. Una segunda corrida no encuentra a nadie.
+  - **Qué imprime:** filas por puntaje («`61* por_confirmar reclasificar Nombre · grupo · motivo`»; el `*` marca un puntaje provisional).
+- **Criterios de aceptación:**
+  1. **Dado** un founder en stealth en Nueva York sin datos públicos, **cuando** se clasifica y la web no encuentra nada en tres días, **entonces** sigue en el barrio `por_confirmar`, se sigue y se invita.
+  2. **Dado** un comprador sin ronda visible, **cuando** termina el último intento, **entonces** queda `por_confirmar` (`ok`), no descartado. Solo la evidencia en contra con fuente (`no_encaja`) lo saca.
+  3. **Dado** un comprador afín en Bogotá y otro en Austin, **cuando** se clasifican y se planifica, **entonces** los dos encajan y el de Austin va primero.
+  4. **Dado** compradores de EE. UU. confirmado, probable y por confirmar, y de Latinoamérica con y sin negocio en EE. UU., **cuando** se planifica, **entonces** se invitan en ese orden y todos se invitan.
+  5. **Dado** el calentamiento encendido y un comprador `por_confirmar` con señales recientes, **cuando** se ordena, **entonces** puede pasar a uno confirmado frío de su misma región, nunca a uno de una región anterior.
+  6. **Dado** cupos por papel y pocos compradores, **cuando** se planifica, **entonces** sus turnos pasan a otros papeles y nadie espera.
+  7. **Dado** una corrida de `reevaluar-compradores` sin `--confirmar`, **cuando** termina, **entonces** nada cambió; con `--confirmar` cada uno queda una vez y una segunda corrida no encuentra a nadie.
+  8. **Dado** todos los `BUYER_*_ENABLED` apagados, **cuando** corre el caso `BAR-24-compradores`, **entonces** el resultado es el mismo y no se escribe ningún recorrido.
+- **Brechas:**
+  - Cómo responde el modelo real con el prompt nuevo solo se mide con una corrida pagada. Las pruebas miden qué hace el código con cada respuesta.
+  - La reevaluación no se corrió contra ninguna base real: la aplica Gustavo en producción.
+  - El puntaje usa el titular y la bio. Sin perfil leído, los componentes toman el valor del medio.
+- **Cobertura QA:**
+  - `tests/test_compradores_niveles.py`: el caso, niveles, puntaje, cupos y reevaluación.
+  - `tests/test_red_eeuu.py`, `tests/test_red.py` y `tests/test_comprador.py`.
+  - `tests/test_comprador_e2e.py`: el recorrido `por_confirmar`, el de Latinoamérica con y sin calentamiento, y la reverificación que sube el nivel.
+  - Se corrieron en local con proveedores falsos en una PostgreSQL desechable. La regresión completa corre en CI.

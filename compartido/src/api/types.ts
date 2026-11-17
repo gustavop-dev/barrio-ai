@@ -267,9 +267,9 @@ export interface ContactClassification {
   classified_at?: string;
   /** `us`, `latam`, `otro` or '' when the location says nothing (BAR-17). */
   region?: string;
-  /** A deterministic rule that overrode the model's verdict («Comprador fuera de EE. UU.…»). */
+  /** A deterministic rule that overrode the model's verdict («Evidencia en contra: no es comprador…»). */
   rule?: string;
-  /** A buyer waits for the web to show a seed round or later, or paying customers (BAR-17). */
+  /** The web looks for the stage of a buyer's company and sets its level; it holds no action (BAR-24). */
   stage_check?: ContactStageCheck;
   /** Gustavo said the person fits after a doubt of the lead: the lead no longer reviews their actions. */
   confirmed_by_gustavo?: { at: string; by: string };
@@ -279,9 +279,36 @@ export interface ContactStageCheck {
   state: 'pending' | 'ok' | 'failed';
   attempts?: number;
   next_at?: string;
-  verdict?: 'semilla_o_mas' | 'presemilla' | 'sin_evidencia';
+  /** BAR-24 levels; checks finished before 17/11/2026 keep the old verdicts. */
+  verdict?: BuyerLevel | 'semilla_o_mas' | 'presemilla' | 'sin_evidencia';
   evidence?: string;
   sources?: string[];
+}
+
+/** How much public evidence there is that the buyer is the one Gustavo looks for; only `no_encaja` takes them out. */
+export type BuyerLevel = 'confirmado' | 'probable' | 'por_confirmar' | 'no_encaja';
+
+export interface BuyerScorePart {
+  points: number;
+  max: number;
+  value: string | number;
+  why: string;
+}
+
+/** BAR-24: a buyer's level and explainable score (0–100; the breakdown adds up to it). Null for other roles. */
+export interface ContactBuyer {
+  level: BuyerLevel;
+  profile: '' | 'startup_financiada' | 'bootstrapped' | 'stealth' | 'ejecutivo';
+  us_market: boolean;
+  score: number;
+  breakdown: Record<'evidencia' | 'mercado' | 'papel' | 'servicios' | 'confianza', BuyerScorePart>;
+  version: string;
+  /** Notices only, never fewer points («perfil con poca información», «sin ubicación»). */
+  warnings: string[];
+  evidence: string;
+  sources: string[];
+  /** The level and score the team went after the buyer with (BuyerJourney), fixed by the first follow or invitation; null without a journey. */
+  entry?: { level: BuyerLevel; score: number | null; version: string; at: string } | null;
 }
 
 /** What the profile says about the person's reach and moment; a missing key was not given (never zero). */
@@ -372,6 +399,8 @@ export interface Contact extends ContactBrief {
   signals?: ContactSignals;
   region?: 'us' | 'latam' | 'otro' | null;
   lead_doubt?: ContactLeadDoubt | null;
+  /** BAR-24 (absent on older backends). */
+  buyer?: ContactBuyer | null;
 }
 
 /** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */

@@ -611,7 +611,7 @@
     {
       "id": "DESC-07",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Clasificación revisable por papel y modalidad según neighborhood_criteria; comprador es hipótesis hasta conocer necesidad y encaje."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Clasificación revisable por papel y modalidad según neighborhood_criteria; comprador es hipótesis hasta conocer necesidad y encaje. Desde el 17/11/2026 (BAR-24) el comprador lleva perfil y nivel de evidencia (confirmado, probable, por_confirmar, no_encaja) con puntaje explicable: la falta de evidencia pública es por_confirmar, solo la evidencia en contra lo descarta, y la región ordena sin excluir."
     },
     {
       "id": "DESC-07",

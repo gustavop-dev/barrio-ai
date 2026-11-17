@@ -184,6 +184,22 @@ class ContactOutput(serializers.ModelSerializer):
     conversation=serializers.SerializerMethodField()
     region=serializers.SerializerMethodField()
     lead_doubt=serializers.SerializerMethodField()
+    buyer=serializers.SerializerMethodField()
+    def get_buyer(self,obj):
+        """BAR-24: a buyer's level, profile, score (0–100, its breakdown adds up to it) and her entry (the level and score
+        the team went after her with); null for someone who is not a buyer."""
+        from . import red
+        result=red.buyer_score(obj)
+        if not result:return None
+        stored=(obj.classification or {}).get('buyer') or {}
+        from .models import BuyerJourney
+        journey=(BuyerJourney.objects.filter(contact=obj).values('entry_level','entry_score','entry_score_version','chosen_at').first()
+                 or {})
+        entry=({'level':journey['entry_level'],'score':journey['entry_score'],'version':journey['entry_score_version'],
+                'at':serializers.DateTimeField().to_representation(journey['chosen_at'])} if journey.get('entry_level') else None)
+        return {'level':result['level'],'profile':stored.get('profile') or '','us_market':bool(stored.get('us_market')),
+                'score':result['score'],'breakdown':result['breakdown'],'version':result['version'],'warnings':result['warnings'],
+                'evidence':stored.get('evidence') or '','sources':stored.get('sources') or [],'entry':entry}
     def get_region(self,obj):
         from . import ubicacion
         return ubicacion.region(obj.location)
@@ -241,8 +257,8 @@ class ContactOutput(serializers.ModelSerializer):
                     'action':{'id':str(action.id),'capability':action.capability,'state':action.state}}
         stage=obj.stage
         check=(obj.classification or {}).get('stage_check') or {}
-        if stage in ('fit','followed') and check.get('state')=='pending':
-            return {'owner':'equipo','text':'El equipo busca en la web si su startup tiene ronda semilla o clientes','at':check.get('next_at')}
+        if stage=='fit' and check.get('state')=='pending':  # the check holds nothing since 17/11/2026
+            return {'owner':'equipo','text':'El equipo la seguirá; mientras, busca en la web la etapa de su empresa','at':None}
         if stage=='candidate':return {'owner':'equipo','text':'El equipo la clasificará','at':None}
         if stage=='fit':return {'owner':'equipo','text':'El equipo la seguirá','at':None}
         if stage=='followed' and not (obj.classification or {}).get('fit'):
@@ -265,7 +281,7 @@ class ContactOutput(serializers.ModelSerializer):
         fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
                 'evidence','network_distance','is_following','stage','display_stage','classification','history','notes','followed_at',
                 'invited_at','connected_at','discovered_at','updated_at','open_action','opportunity','next_step','your_turn','last_event',
-                'conversation','signals','region','lead_doubt']
+                'conversation','signals','region','lead_doubt','buyer']
 
 class NoteInput(serializers.Serializer):
     text=serializers.CharField(max_length=4000)

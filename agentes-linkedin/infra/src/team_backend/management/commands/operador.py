@@ -25,6 +25,8 @@ class Command(BaseCommand):
         cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
         cola.add_argument('--cuenta',required=True);cola.add_argument('--antes',required=True,help='Fecha y hora ISO con zona, por ejemplo 2026-11-12T20:40:00+00:00')
         cola.add_argument('--confirmar',action='store_true')
+        reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
+        reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -71,6 +73,17 @@ class Command(BaseCommand):
                 result=red.requeue(user,account,before,confirm=o['confirmar'])
                 self.stdout.write(f"En cola clasificadas antes de {before.isoformat()}: {result['found']}. "+
                                   (f"Devueltas al clasificador: {result['requeued']}." if o['confirmar'] else 'Con --confirmar vuelven al clasificador.'))
+            elif o['accion']=='reevaluar-compradores':
+                from team_backend import nivel_comprador
+                result=nivel_comprador.reevaluate(user,account,confirm=o['confirmar'])
+                counts=', '.join(f'{group} ({nivel_comprador.ACTIONS[group]}): {n}' for group,n in result['found'].items())
+                self.stdout.write(f"Compradores a reevaluar: {result['total']}. {counts}.")
+                for row in result['people']:
+                    score='—' if row['score'] is None else f"{row['score']}{'*' if row['provisional'] else ''}"
+                    self.stdout.write(f"{score:>4}  {row['level']:<13} {row['action']:<12} {row['name']} · {row['group']} · {row['reason']}")
+                if any(row['provisional'] for row in result['people']):
+                    self.stdout.write('* Puntaje provisional: lo fija el clasificador al volver a juzgarlo.')
+                self.stdout.write(f"Aplicados: {result['applied']}." if o['confirmar'] else 'Sin --confirmar no se cambia nada.')
             elif o['accion']=='referentes-industria':
                 from decimal import Decimal, InvalidOperation
                 from team_backend import referentes_industria

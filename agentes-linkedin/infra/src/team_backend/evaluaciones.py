@@ -838,6 +838,95 @@ def grade_referents_case(dossier):
     return {'case':REFERENTS_CASE['id'],'passed':not errors,'errors':errors}
 
 
+# BAR-24: the buyers of the neighborhood (Gustavo, 17/11/2026: «puede ser demasiado estricto … no deja pasar a nadie»).
+# Seven synthetic people built from the verdicts measured in production on 17/11/2026 (anonymized: no real name, company
+# or profile). Each variant keeps two answers of the classifier: `antes`, what the production model answered with the
+# prompt of 12/11/2026 for that kind of profile, and `despues`, what the prompt of 17/11/2026 asks for. `web` is what the
+# web check finds about the company (None: nothing citable). tests/test_compradores_niveles.py runs the case through the
+# production functions (red.classify, red.check_stages, red.plan) with fake models and grades it with grade_buyers_case.
+# The fakes prove what the code does with those answers; whether the real model answers like `despues` is only measured
+# with a paid run. Nobody is invited, followed or written to outside the fake connector.
+BUYERS_CASE={
+    'id':'BAR-24-compradores',
+    'variants':{
+        'C1':{'label':'stealth con salida previa','name':'Cora Stealth','location':'New York, New York, United States',
+              'headline':'Co-founder & CTO · building a consumer AI company in stealth with a small team · previously '
+                         'co-founded a startup acquired by a large tech company','bio':'',
+              'antes':{'fit':False,'reason':'Co-founder y CTO en Nueva York que construye una empresa de IA de consumo con equipo '
+                                            'pequeño y ya tuvo una salida; la tracción actual es una hipótesis, pues está en stealth.'},
+              'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'probable','us_market':True,
+                         'reason':'Founder en stealth en Nueva York con una salida previa y equipo: señales indirectas.'},
+              'web':None},
+        'C2':{'label':'«Founder @X» sin más','name':'Beto Escueto','location':'San Francisco Bay Area','headline':'Founder @Lumora',
+              'bio':'',
+              'antes':{'fit':False,'reason':'El titular dice solo «Founder @Lumora» en EE. UU., sin evidencia de ronda semilla ni '
+                                            'clientes que pagan.'},
+              'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':True,
+                         'reason':'Founder en EE. UU. con un perfil escueto: hipótesis por confirmar.'},
+              'web':None},
+        'C3':{'label':'bootstrapped con clientes nombrados','name':'Clara Bootstrap','location':'Austin, Texas, United States',
+              'headline':'Founder & CEO at Agendia · bootstrapped scheduling SaaS for dental clinics',
+              'bio':'Bootstrapped since 2021. Customers include three regional dental groups; pricing on our site.',
+              'antes':{'fit':True,'reason':'Founder de un SaaS bootstrapped en Austin con clientes nombrados.'},
+              'despues':{'fit':True,'buyer_profile':'bootstrapped','buyer_level':'probable','us_market':True,
+                         'reason':'Founder de un SaaS bootstrapped en Austin con clientes nombrados y precios publicados.'},
+              'web':{'text':'Agendia lists paying dental clinics as customers and publishes monthly pricing plans.',
+                     'url':'https://agendia.example/pricing'}},
+        'C4':{'label':'founder en Latinoamérica','name':'Dana Bogotá','location':'Bogotá, D.C., Capital District, Colombia',
+              'headline':'Cofundadora y CEO de una fintech de pagos para comercios','bio':'',
+              'antes':{'fit':True,'reason':'Cofundadora y CEO de una fintech en Bogotá.'},
+              'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':False,
+                         'reason':'Cofundadora y CEO de una fintech en Bogotá, sin datos públicos de etapa.'},
+              'web':None},
+        'C5':{'label':'director de ventas de una empresa grande','name':'Eli Ventas','location':'Chicago, Illinois, United States',
+              'headline':'Enterprise Sales Director at a global cloud software company','bio':'',
+              'antes':{'fit':False,'reason':'Director de ventas enterprise de una empresa grande que vende; no decide compras.'},
+              'despues':{'fit':False,'buyer_profile':'ejecutivo','buyer_level':'no_encaja','us_market':True,
+                         'reason':'Vende para una empresa grande; no es founder ni decide contratar desarrollo.'},
+              'web':None},
+        'C6':{'label':'pide no ser contactado','name':'Fer Nocontact','location':'Miami, Florida, United States',
+              'headline':'Founder · Not taking sales calls or pitches','bio':'Please do not contact me with offers or pitches.',
+              'antes':{'fit':False,'reason':'Su perfil pide expresamente que no lo contacten.'},
+              'despues':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,
+                         'reason':'Pide expresamente que no lo contacten.'},
+              'web':None},
+        'C7':{'label':'presemilla declarada sin ingresos','name':'Gabi Idea','location':'Seattle, Washington, United States',
+              'headline':'Pre-seed founder · idea stage, no revenue yet · looking for a technical co-founder','bio':'',
+              'antes':{'fit':False,'reason':'Presemilla declarada, en etapa de idea y sin ingresos.'},
+              'despues':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,
+                         'reason':'Presemilla declarada sin ingresos: evidencia en contra.'},
+              'web':None},
+    },
+    # kept: still in the neighborhood after the web check; levels: accepted current levels; order: the invitations of
+    # the buyers who stay, first to last (US confirmado/probable → US por confirmar → Latin America).
+    'expected':{'C1':{'kept':True,'levels':['probable','por_confirmar']},'C2':{'kept':True,'levels':['por_confirmar'],'thin':True},
+                'C3':{'kept':True,'levels':['confirmado','probable']},'C4':{'kept':True,'levels':['por_confirmar']},
+                'C5':{'kept':False},'C6':{'kept':False},'C7':{'kept':False},
+                'order':['C3','C1','C2','C4']},
+}
+
+
+def grade_buyers_case(outcomes,order):
+    """outcomes: {variant: {kept, level, score, breakdown, warnings}}; order: the invited variants, first to last.
+    Errors name what failed: kept (the person left or stayed against the case), level, score (the breakdown does not add
+    up), thin (a brief profile lost points or carries no notice) and order."""
+    errors=[];expected=BUYERS_CASE['expected']
+    for variant,want in expected.items():
+        if variant=='order':continue
+        got=outcomes.get(variant) or {}
+        if bool(got.get('kept'))!=want['kept']:errors.append(f'{variant}:kept');continue
+        if not want['kept']:continue
+        if got.get('level') not in want['levels']:errors.append(f'{variant}:level')
+        breakdown=got.get('breakdown') or {}
+        if got.get('score') is None or sum(part.get('points',0) for part in breakdown.values())!=got['score']:
+            errors.append(f'{variant}:score')
+        if want.get('thin') and ('perfil con poca información' not in (got.get('warnings') or [])
+                                 or any(part.get('points',0)<0 for part in breakdown.values())):errors.append(f'{variant}:thin')
+    if list(order)!=expected['order']:errors.append('order')
+    kept=[v for v,w in expected.items() if v!='order' and bool((outcomes.get(v) or {}).get('kept'))==w['kept']]
+    return {'case':BUYERS_CASE['id'],'passed':not errors,'errors':errors,'kept_right':f'{len(kept)}/{len(expected)-1}'}
+
+
 def grade_evidence_case(result):
     """Grade the deterministic adapter output, never execute or pay a provider."""
     actual={key:result.coverage.get(key) for key in ('fit_pct','classification_coverage','unknown')}

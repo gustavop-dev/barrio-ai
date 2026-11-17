@@ -1620,6 +1620,12 @@ class BuyerJourney(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     contact=models.OneToOneField(Contact,on_delete=models.CASCADE,related_name='buyer_journey')
     entry=models.CharField(max_length=10,choices=Entry.choices,default=Entry.OUTBOUND)
+    # BAR-24 (17/11/2026): the level and score (nivel_comprador) the team went after the buyer with, fixed by its first
+    # follow or invitation and never overwritten after, so the funnel can compare whether the «por confirmar» accept and
+    # answer like the confirmed ones.
+    entry_level=models.CharField(max_length=14,blank=True)
+    entry_score=models.PositiveSmallIntegerField(null=True,blank=True)
+    entry_score_version=models.CharField(max_length=20,blank=True)
     route=models.CharField(max_length=12,choices=Route.choices,default=Route.UNKNOWN)
     step=models.CharField(max_length=12,choices=Step.choices,default=Step.CHOSEN,db_index=True)
     # When something is due for this person (comprador.next_at); null when nothing is scheduled.

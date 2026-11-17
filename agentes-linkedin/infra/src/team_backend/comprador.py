@@ -71,12 +71,13 @@ def _when(value):
 # --------------------------------------------------------------------------- who is a buyer
 
 def chosen(contact):
-    """The team goes after this buyer: classified as a fitting «comprador» and, where the web check applies, it passed
-    (or Gustavo said the person fits)."""
+    """The team goes after this buyer: classified as a fitting «comprador» and the web check found no evidence against
+    (or Gustavo said the person fits). Since 17/11/2026 (BAR-24) a pending check holds nothing: the buyer is chosen with
+    her level (nivel_comprador), of any region."""
     c=contact.classification or {}
     if c.get('role')!='comprador' or not c.get('fit'):return False
     check=c.get('stage_check')
-    return not check or check.get('state')=='ok' or bool(c.get('confirmed_by_gustavo'))
+    return not check or check.get('state')!='failed' or bool(c.get('confirmed_by_gustavo'))
 
 def was_chosen(contact):
     """Chosen now, or a buyer the team already acted on (followed or invited) under earlier criteria."""
@@ -421,6 +422,11 @@ def _project(journey,state,contact,has_posts):
     journey.rest_reason,journey.rest_until=(state.rest[0],state.rest[1]) if state.rest else ('',None)
     journey.exit_reason,journey.exited_at,journey.exit_step=(state.exit[0],state.exit[1],state.exit[2]) if state.exit else ('',None,'')
     journey.next_at=next_at(journey,state,contact)
+    # BAR-24: the level and score the team went after her with. While she is only chosen they follow her level (the web
+    # check usually answers the same day); the first thing the team does (the follow, or an invitation) fixes them.
+    if not journey.entry_level or not (first.get('warming') or invited):
+        from . import nivel_comprador
+        for field,value in nivel_comprador.entry_of(contact).items():setattr(journey,field,value)
     journey.updated_at=timezone.now()
 
 # --------------------------------------------------------------------------- exits and reopenings the contact shows
@@ -799,6 +805,10 @@ DEFINITIONS={
                  'mensajes respondieron los que respondieron. El curso dice que la mayoría responde al 2.º o 3.º: se mide, no se asume.'),
     'muestra_chica':SMALL_SAMPLE_TEXT,
     'con_senal':'La persona dio una señal (comentó su post, respondió un comentario, lo invitó, le escribió…) antes de su primera invitación.',
+    'entrada_comprador':('BAR-24: los compradores salientes por el nivel (confirmado, probable, por confirmar) y el tramo de '
+                         'puntaje (buyer_score_v1) con que el equipo fue por ellos (fijados con el primer follow o la primera '
+                         'invitación); cuántos se siguieron, calentaron (un comentario antes de invitar), invitaron, aceptaron '
+                         'y respondieron.'),
     'acumulado':'Todos los compradores elegidos por el equipo (entrada saliente); los que llegaron con su invitación van en comparaciones.entrada.'}
 
 def _pct(n,d):
@@ -834,6 +844,10 @@ def _buying(journey):
 def _sequence(journeys):
     from . import secuencia_comprador
     return secuencia_comprador.funnel(journeys)
+
+def _entry(journeys):
+    from . import nivel_comprador
+    return nivel_comprador.entry_funnel(journeys)
 
 def _replies(journeys):
     from . import respuesta_comprador
@@ -882,5 +896,6 @@ def funnel(weeks=8,now=None,account=None):
                 'senal_de_compra':{'con_senal_de_compra':block(j for j in outbound if _buying(j)),
                                    'sin_senal_de_compra':block(j for j in outbound if not _buying(j))},
                 'entrada':{'saliente':block(outbound),'entrante':block(inbound)}},
+            'entrada_comprador':_entry(outbound),
             'borradores':drafts(outbound),'secuencia':_sequence(outbound),'respuestas':_replies(outbound),'estado_actual':steps,
             'descanso':count('rest_reason',RestReason.values),'salidas':count('exit_reason',ExitReason.values)}

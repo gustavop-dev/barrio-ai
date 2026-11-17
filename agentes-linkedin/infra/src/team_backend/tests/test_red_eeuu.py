@@ -63,7 +63,8 @@ class SignalAndSearchTests(NetworkBase):
 
 
 class BuyerRegionTests(NetworkBase):
-    def test_a_buyer_must_be_in_the_united_states_and_waits_for_the_web(self):
+    def test_a_latin_american_buyer_stays_after_the_us_one_and_nobody_waits_for_the_web(self):
+        # Gustavo, 17/11/2026: «queremos ir hacia USA pero no los descartamos de una»; the web check orders, never holds.
         for slug,name,location,stage in (('us-founder','Una US','Austin, Texas','candidate'),
                                          ('co-founder','Dos CO','Medellín, Antioquia','candidate'),
                                          ('mx-founder','Tres MX','Mexico City','incoming')):
@@ -78,14 +79,15 @@ class BuyerRegionTests(NetworkBase):
             self.assertEqual({p['name']:p['signals'] for p in people}['Una US'],{'followers':900})
             una,dos,tres=(Contact.objects.get(display_name=n) for n in ('Una US','Dos CO','Tres MX'))
             self.assertEqual((una.stage,una.classification['fit'],una.classification['stage_check']['state']),('fit',True,'pending'))
-            self.assertEqual((dos.stage,dos.classification['fit']),('discarded',False))
-            self.assertIn('fuera de EE. UU.',dos.classification['rule'])
-            # A received invitation keeps the plain verdict: the location and stage rules shape outbound only.
+            self.assertEqual((dos.stage,dos.classification['fit'],dos.classification['stage_check']['state']),('fit',True,'pending'))
+            self.assertNotIn('rule',dos.classification)
+            self.assertEqual((una.classification['buyer']['level'],dos.classification['buyer']['level']),('por_confirmar','por_confirmar'))
+            # A received invitation keeps the plain verdict: the stage check shapes outbound only.
             self.assertEqual((tres.classification['fit'],'stage_check' in tres.classification),(True,False))
             red.plan(self.bot,self.account)
-            self.assertFalse(ActionProposal.objects.filter(contact=una).exists())  # waits for the web check
-            manual=operador.create_proposal(self.bot,None,'RED-01',{'user_id':una.provider_user_id},source='agent',contact=una)
-            self.assertIn('Falta que la web muestre su ronda semilla o clientes',red.network_issues(manual))
+            follows=list(ActionProposal.objects.filter(capability='RED-01').order_by('created_at').values_list('contact__display_name',flat=True))
+            self.assertEqual(follows,['Una US','Dos CO'])  # pending web checks hold nobody; the US goes first
+            self.assertEqual(red.network_issues(ActionProposal.objects.get(contact=dos)),[])
 
 
 class StageCheckTests(NetworkBase):
@@ -123,10 +125,14 @@ class StageCheckTests(NetworkBase):
     def test_a_seed_round_on_the_web_lets_the_buyer_go_ahead(self):
         ana=self.buyer('ana-seed','Ana Seed')
         self.assertTrue(red.stage_pending(self.account))
-        with patch('team_backend.research.research',return_value=self.found()) as web,self.judge('semilla_o_mas'):
+        with patch('team_backend.research.research',return_value=self.found()) as web,self.judge('confirmado'):
             summary=red.check_stages(self.bot,self.account)
         ana.refresh_from_db();check=ana.classification['stage_check']
-        self.assertEqual((summary,check['state'],check['sources']),({'checked':1,'passed':1},'ok',['https://news.example/acme-seed']))
+        self.assertEqual((summary,check['state'],check['sources']),({'checked':1,'passed':1,'levels':{'confirmado':1}},'ok',
+                                                                    ['https://news.example/acme-seed']))
+        buyer=ana.classification['buyer']  # the web's evidence and sources become the buyer's, with the score of the level
+        self.assertEqual((buyer['level'],buyer['basis'],buyer['sources']),('confirmado','web',['https://news.example/acme-seed']))
+        self.assertEqual(buyer['score'],red.buyer_score(ana)['score'])
         self.assertTrue(ana.classification['fit']);self.assertEqual(self.judged,['network-stage'])
         request=web.call_args.args[0]
         self.assertTrue(request.key.startswith(f'etapa:{ana.pk}:1:'));self.assertTrue(request.search)
@@ -136,25 +142,27 @@ class StageCheckTests(NetworkBase):
         red.plan(self.bot,self.account)
         self.assertTrue(ActionProposal.objects.filter(contact=ana,capability='RED-01').exists())
 
-    def test_pre_seed_leaves_and_no_evidence_retries_until_the_third_day(self):
+    def test_evidence_against_leaves_and_no_findings_stays_por_confirmar_after_three_tries(self):
         ana=self.buyer('ana-pre','Ana Pre');beto=self.buyer('beto-none','Beto None')
         web=lambda request:self.found() if request.key.startswith(f'etapa:{ana.pk}:') else NOTHING
-        with patch('team_backend.research.research',side_effect=web),self.judge('presemilla'):
+        with patch('team_backend.research.research',side_effect=web),self.judge('no_encaja'):
             red.check_stages(self.bot,self.account)
         ana.refresh_from_db();beto.refresh_from_db()
         self.assertEqual((ana.stage,ana.classification['fit'],ana.classification['stage_check']['state']),('discarded',False,'failed'))
-        self.assertIn('ronda semilla',ana.classification['rule'])
+        self.assertEqual((ana.classification['rule'],ana.classification['buyer']['level']),(red.NO_FIT_RULE,'no_encaja'))
         self.assertEqual((beto.classification['stage_check']['state'],beto.classification['stage_check']['attempts']),('pending',1))
-        self.assertFalse(red.stage_pending(self.account))  # the retry is due tomorrow
+        self.assertFalse(red.stage_pending(self.account))  # the retry is due at the next reading window
         when=timezone.now()
         for _ in range(2):
             when+=timedelta(days=1,minutes=5)
             with patch('team_backend.research.research',return_value=NOTHING):red.check_stages(self.bot,self.account,when)
         beto.refresh_from_db();check=beto.classification['stage_check']
         self.assertEqual((beto.stage,beto.classification['fit'],check['state'],check['attempts'],check['verdict']),
-                         ('discarded',False,'failed',3,'sin_evidencia'))
+                         ('fit',True,'ok',3,'por_confirmar'))  # «sin hallazgos» is no evidence against: he stays
+        self.assertEqual(beto.classification['buyer']['level'],'por_confirmar')
         red.plan(self.bot,self.account)
-        self.assertFalse(ActionProposal.objects.filter(contact__in=[ana,beto]).exists())
+        self.assertEqual(list(ActionProposal.objects.filter(contact__in=[ana,beto]).values_list('contact__display_name',flat=True)),
+                         ['Beto None'])
 
     def test_a_search_that_did_not_run_spends_no_attempt(self):
         ana=self.buyer('ana-wait','Ana Wait')
@@ -191,7 +199,7 @@ class StageCheckTests(NetworkBase):
     def test_a_week_of_research_without_findings_pauses_the_checks_without_spending_attempts(self):
         ana=self.buyer('ana-pausa','Ana Pausa');self.silent_runs()
         self.assertTrue(red.stage_pending(self.account))  # the job still runs once, to record the pause
-        with patch('team_backend.research.research',return_value=NOTHING) as web,self.judge('semilla_o_mas'):
+        with patch('team_backend.research.research',return_value=NOTHING) as web,self.judge('confirmado'):
             summary=red.check_stages(self.bot,self.account)
             self.assertEqual(red.check_stages(self.bot,self.account),summary)
         self.assertEqual(web.call_count,1);self.assertEqual(self.judged,[])  # one probe a day, then nothing
@@ -206,18 +214,18 @@ class StageCheckTests(NetworkBase):
 
     def test_the_probe_of_the_day_reopens_the_checks_when_the_web_answers_again(self):
         ana=self.buyer('ana-vuelve','Ana Vuelve');self.silent_runs()
-        with patch('team_backend.research.research',return_value=self.found()),self.judge('semilla_o_mas'):
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('confirmado'):
             summary=red.check_stages(self.bot,self.account)
         ana.refresh_from_db()
-        self.assertEqual((summary,ana.classification['stage_check']['state']),({'checked':1,'passed':1},'ok'))
+        self.assertEqual((summary['passed'],ana.classification['stage_check']['state']),(1,'ok'))
         self.assertFalse(AuditEvent.objects.filter(action='network.stage_check_paused').exists())
 
     def test_one_research_with_findings_keeps_the_checks_running(self):
         ana=self.buyer('ana-sigue','Ana Sigue');self.silent_runs(findings_in=5)
-        with patch('team_backend.research.research',return_value=self.found()),self.judge('semilla_o_mas'):
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('confirmado'):
             summary=red.check_stages(self.bot,self.account)
         ana.refresh_from_db()
-        self.assertEqual((summary,ana.classification['stage_check']['state']),({'checked':1,'passed':1},'ok'))
+        self.assertEqual((summary['passed'],ana.classification['stage_check']['state']),(1,'ok'))
         self.assertFalse(AuditEvent.objects.filter(action='network.stage_check_paused').exists())
 
 
@@ -227,21 +235,23 @@ class PlanOrderTests(NetworkBase):
         contact.location=location;contact.classification.update(role=role,confidence=confidence);contact.save()
         return contact
 
-    def test_invitations_fill_from_us_buyers_to_the_latam_community(self):
+    def test_invitations_take_turns_by_role_share_and_a_latam_buyer_is_invited_too(self):
         self.person('latam-par','Par LatAm','par','Bogotá, Colombia',confidence=0.99)
         self.person('us-ally','Aliado US','aliado','New York, NY',confidence=0.7)
         self.person('us-buyer','Comprador US','comprador','Austin, Texas',confidence=0.6)
         leader=self.person('us-leader','Líder US','lider','Miami, Florida',confidence=0.95)
         abroad=self.person('mx-buyer','Comprador MX','comprador','Monterrey, Mexico',confidence=0.95)
         graph=orquestacion.load_graph()
-        next(e for e in graph['edges'] if e['id']=='politica_red')['max_calls_per_cycle']=3
+        next(e for e in graph['edges'] if e['id']=='politica_red')['max_calls_per_cycle']=4
         with patch.dict(os.environ,{'NETWORK_BUYER_REGION':'us'}),patch('team_backend.orquestacion.load_graph',return_value=graph):
             summary=red.plan(self.bot,self.account)
-        self.assertEqual((summary['invite'],summary['follow'],summary['outbound_rules']['outside']),(3,0,1))
+        self.assertEqual((summary['invite'],summary['follow'],summary['outbound_rules']['outside']),(4,0,1))
         invited=list(ActionProposal.objects.filter(capability='RED-02').order_by('created_at').values_list('contact__display_name',flat=True))
-        self.assertEqual(invited,['Comprador US','Aliado US','Par LatAm'])
-        self.assertFalse(ActionProposal.objects.filter(contact__in=[leader,abroad]).exists())
-        abroad.refresh_from_db();self.assertFalse(abroad.classification['fit'])  # classified before the rule
+        # Every share starts the week at zero: the buyer wins the tie, then each turn goes to the share furthest below its
+        # own (allies share the recommenders'), and the Latin American buyer comes back when the buyers' turn does.
+        self.assertEqual(invited,['Comprador US','Aliado US','Par LatAm','Comprador MX'])
+        self.assertFalse(ActionProposal.objects.filter(contact=leader).exists())
+        abroad.refresh_from_db();self.assertTrue(abroad.classification['fit'])  # classified before 12/11: he stays
 
     def test_follows_take_what_invitations_leave_and_include_leaders(self):
         leader=self.person('fit-leader','Líder por seguir','lider','Miami, Florida',stage='fit')

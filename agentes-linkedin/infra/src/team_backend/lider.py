@@ -172,7 +172,9 @@ NETWORK_RISKS=tuple(qid for qid,_ in PERSON_CHECKS+[BUYER_CHECK])
 # What each role of the classifier (red.ROLES) means, as the lead reads it in `clasificacion.papel`.
 ROLE_MEANING={
     'par':'par: construye producto o software, o funda una startup de tecnología, como Gustavo',
-    'comprador':'comprador (hipótesis): dirige una empresa con producto u operación propia y podría contratar ingeniería de producto',
+    'comprador':'comprador (hipótesis): dirige una empresa con producto u operación propia y podría contratar ingeniería de producto. '
+                'Su nivel dice cuánta evidencia pública hay de su etapa; «por_confirmar» es que no hay datos públicos, nunca '
+                'evidencia en contra (17/11/2026)',
     'recomendador':'recomendador: trabaja cerca de founders (inversor, asesor, ejecutivo fraccional, aceleradora) y puede recomendar proveedores',
     'aliado':'aliado: ofrece a startups un servicio complementario al de Gustavo, no competidor',
     'divulgador':'divulgador: crea contenido con audiencia sobre los temas del barrio',
@@ -313,6 +315,8 @@ def _questions(proposal,orientation):
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
                'clasificacion':{'papel':ROLE_MEANING.get(role,role or ''),'razon':classification.get('reason') or ''},
                'criterios_del_barrio':CRITERIA_DEL_BARRIO}
+        buyer=classification.get('buyer') or {}
+        if role=='comprador' and buyer.get('level'):state['clasificacion']['nivel']=buyer['level']  # BAR-24, context only
         questions={
             'falsa':_noul('¿El perfil de `persona` parece falso, automatizado o de relleno: sin cargo ni actividad reconocible, o con '
                           'promesas de dinero fácil?','Titular vacío o incoherente, o promesas de ingresos, cripto u «oportunidades» por mensaje',
@@ -331,7 +335,8 @@ def _questions(proposal,orientation):
             questions['proveedor']=_noul('¿`persona` vive de vender sus propios servicios profesionales (consultoría, agencia, freelance, '
                                          'coaching) en vez de dirigir una empresa con producto u operación propia?',
                                          'Es consultor, freelancer, coach o dueño de una agencia de servicios',
-                                         'Dirige o fundó una empresa con producto, clientes u operación propia, aunque también asesore')
+                                         'Dirige o fundó una empresa con producto, clientes u operación propia, aunque también asesore, '
+                                         'esté en stealth o su perfil sea escueto («Founder @X»)')
         kind=capability
     if kind in ('text','post','reply'):
         public,_=memory.confirmed_blocks()

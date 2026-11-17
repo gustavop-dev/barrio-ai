@@ -88,17 +88,19 @@ class LogTests(BuyerBase):
 
 
 class ChosenTests(BuyerBase):
-    def test_only_a_fitting_buyer_whose_stage_passed_gets_a_journey(self):
+    def test_only_a_fitting_buyer_without_evidence_against_gets_a_journey(self):
+        # BAR-24 (17/11/2026): a pending web check holds nothing; only evidence against (failed) leaves a buyer out.
         cases={'par':{'fit':True,'role':'par'},'no-encaja':{'fit':False,'role':'comprador'},
                'web-pendiente':{'fit':True,'role':'comprador','stage_check':{'state':'pending'}},
                'web-ok':{'fit':True,'role':'comprador','stage_check':{'state':'ok','checked_at':timezone.now().isoformat()}},
-               'encaja-gustavo':{'fit':True,'role':'comprador','stage_check':{'state':'doubt'},
+               'web-en-contra':{'fit':True,'role':'comprador','stage_check':{'state':'failed'}},
+               'encaja-gustavo':{'fit':True,'role':'comprador','stage_check':{'state':'failed'},
                                  'confirmed_by_gustavo':{'at':timezone.now().isoformat(),'by':'gustavo'}}}
         for slug,classification in cases.items():
             contact=self.contact(slug,slug)
             Contact.objects.filter(pk=contact.pk).update(classification=classification)
             comprador.update(contact)
-        self.assertEqual(set(BuyerJourney.objects.values_list('contact__display_name',flat=True)),{'web-ok','encaja-gustavo'})
+        self.assertEqual(set(BuyerJourney.objects.values_list('contact__display_name',flat=True)),{'web-pendiente','web-ok','encaja-gustavo'})
 
     def test_a_buyer_the_team_acted_on_stays_and_leaves_by_rule_then_comes_back(self):
         contact,journey=self.buyer(stage='followed',followed_at=timezone.now()-3*D,

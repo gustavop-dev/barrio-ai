@@ -138,7 +138,7 @@ class BuyingSignalTests(WarmupBase):
 
         def claude(system, message, **kwargs):
             calls.append({'system': system, 'schema': kwargs['output_schema']})
-            data = {'verdict': 'semilla_o_mas', 'evidence': 'Levantó una ronda semilla.', 'source_urls': ['https://news.example/acme']}
+            data = {'verdict': 'confirmado', 'evidence': 'Levantó una ronda semilla.', 'source_urls': ['https://news.example/acme']}
             if 'senales' in kwargs['output_schema']['properties']:
                 data['senales'] = senales
             return {'text': json.dumps(data), 'model': 'claude-sonnet-5-5'}
