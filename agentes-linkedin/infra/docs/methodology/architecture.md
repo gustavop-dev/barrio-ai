@@ -22,6 +22,8 @@ La biblioteca contiene las clases 01–12 y los agentes leen 01–06: son dos co
 
 El grafo muestra también consultas directas de biblioteca desde DRF. Solo los trabajos de agentes van por la cola. Los proveedores siguen sujetos a LIVE_PROVIDERS, permisos, caché y reservas monetarias existentes. Cada Job pertenece a un usuario; las unidades son compartidas por el equipo. Ningún modelo de Django reescribe el contenido extraído. Los registros originales se adoptan mediante SQL idempotente y modelos unmanaged.
 
+Recorrido del comprador (`comprador.py`, outbound fase 1): `BuyerJourney` es una proyección, no un segundo dueño del estado. Su registro `BuyerTouch` solo se añade y cada fila nombra su origen (`key`: ejecución, comentario, desenlace, mensaje…); `update(contact)` reúne los hechos de las tablas existentes, añade los que faltan y pliega el registro en orden. Ganchos y reconstrucción usan esa función, así que coinciden y son idempotentes. Los ganchos corren al final de la acción real, cada uno en su savepoint, y un fallo solo se audita (`buyer.record_failed`). Ninguna compuerta, tope ni prioridad lee estas tablas en la fase 1; las fases siguientes escriben con `record`/`rest`/`retry`/`leave`, que validan la transición.
+
 ## Evolución planificada
 
 El [plan maestro del equipo autónomo](../plan-equipo-autonomo.md) define ciclos,

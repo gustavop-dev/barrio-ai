@@ -30,6 +30,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 | [BAR-15](#bar-15) | Ritmo, rampa, salud y reservas compartidas | backend | funciona |
 | [BAR-16](#bar-16) | Tier y notas excepcionales con alternativa sin nota | backend | funciona |
 | [BAR-17](#bar-17) | Barrio en EE. UU.: más invitaciones, compradores con ronda semilla y dudas del líder para Gustavo | app · backend | funciona |
+| [BAR-18](#bar-18) | Recorrido del comprador y embudo mínimo (outbound, fase 1) | backend | funciona |
 
 ---
 
@@ -437,3 +438,38 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   5. **Dado** un descarte del líder, **cuando** vuelve a correr el plan, **entonces** no se propone a esa persona por 30 días; tras «Sí, encaja», se propone y se aprueba sin el líder.
   6. **Dado** compradores, aliados, pares y un líder en EE. UU. y Latinoamérica, **cuando** se planifica, **entonces** las invitaciones siguen el orden de arriba y el líder solo se sigue.
 - **Cobertura QA:** `tests/test_red_eeuu.py`, `test_fase2_curso.py`, `PersonaScreen.test.tsx`; ejecución en CI, no local.
+
+## El sistema del comprador, fase 1 (16/11/2026)
+
+### BAR-18 · Recorrido del comprador y embudo mínimo <a id="bar-18"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona. Solo registra y lee: el equipo hace lo mismo que antes (mismos envíos, topes, rampa y prioridades) y ninguna compuerta lee estas tablas.
+- **Qué hace para Gustavo:** cada comprador elegido tiene su recorrido: en qué paso va (elegido, calentando, invitado, aceptó, mensaje 1 a 4, respondió, interesado, reunión, en descanso o salió), por qué ruta, cuándo le toca lo siguiente, y un registro de cada toque del equipo y de cada señal de la persona, con su fuente y su fecha. De ahí sale el embudo por semana. Todavía no hay pantalla: es la línea base de las fases 2 a 6 de [plan-outbound.md](../plan-outbound.md#orden-propuesto).
+- **Decisiones de Gustavo (17/11/2026):** las señales de la persona (respondió un comentario, comentó su post, lo invitó, aceptó, le escribió) se guardan aparte de lo que hace el equipo, con fecha y fuente. Salir no es borrar: el descanso lleva motivo, fecha de vuelta, número de intento y el ángulo de cada intento, y es distinto de la salida definitiva (pidió no ser contactado, no le interesa, descartado por Gustavo).
+- **Código:** `comprador.py`; modelos `BuyerJourney` y `BuyerTouch` (migración `0046_recorrido_comprador`); ganchos pasivos en `red.py` (`_classify_batch`, `check_stages`, `outbound_rules`, `sync`, `on_rejected`, `discard`, `confirm_fit`), `operador._finish`, `respuestas._store` y `close_dm`, `conversaciones._from_messages`, `oportunidades.create`/`update` y `desenlaces_captura._comment`; `resultados_views.EmbudoComprador`; `manage.py comprador reconstruir|embudo`.
+- **Quién entra:** un contacto clasificado `comprador` que encaja y, con la verificación web activa, con `stage_check: ok` o con «Sí, encaja». También un comprador al que el equipo ya siguió o invitó con un criterio anterior: entra y sale por regla si hoy no encaja. `Contact.stage` no cambia.
+- **El registro (`BuyerTouch`):** solo se añade; editar o borrar una fila da error. Tres direcciones:
+  - `saliente`, lo que hizo el equipo o Gustavo: seguir, comentar un post suyo, reaccionar, responderle en el hilo de un post de Gustavo, invitar (con o sin nota), aceptar su invitación, «Hecho, le escribí» y un mensaje de Gustavo leído en el inbox.
+  - `entrante`, las señales de la persona: respondió a un comentario del equipo (el desenlace a 72 h), comentó un post de Gustavo, lo invitó, aceptó, le escribió primero o respondió un mensaje. «Reaccionó» y «nos siguió» tienen tipo, pero hoy ninguna lectura automática los trae.
+  - `estado`: elegido, ruta, ángulo, descanso, reintento, salida, reabierto, ya conectados, no escribirle y oportunidad.
+  - Cada toque guarda su `key` de origen y apunta a la propuesta, la ejecución, el post, el comentario, la conversación, la oportunidad o el desenlace de donde salió.
+- **Cómo se llena:** `comprador.update(contact)` lee lo que Barrio ya guarda de la persona, añade lo que falta y recalcula el recorrido. Los ganchos y la reconstrucción usan esa misma función, así que dos pasadas dan lo mismo. Cada gancho corre en su propio savepoint: si falla, deja `AuditEvent buyer.record_failed` y la acción sigue. `BUYER_RECORD_ENABLED=false` apaga los ganchos sin tocar la reconstrucción. Una fecha del contacto (seguido, invitado, conectado) o su historial cuentan mientras no aparezca la fila propia de ese hecho; cuando aparece, la reemplaza (`comprador.current`).
+- **Salidas y descanso:** las salidas definitivas no se reabren. Las de una regla de hoy (`fuera_de_criterio`, `invitacion_cerrada`, `perfil_restringido`) se reabren si la persona acepta o escribe, o si vuelve a cumplir el criterio. Una regla no saca a nadie de un descanso; una salida definitiva, sí. `rest`, `retry` y `leave` validan cada paso. En esta fase nadie entra en descanso: las fases 2 a 6 lo harán.
+- **Embudo:** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; permiso `operate_linkedin`). Trae el acumulado y cada semana (cohorte de elegidos y actividad), el paso de cada etapa a la siguiente, las comparaciones (ruta, calentados frente a no calentados, con nota frente a sin nota, con señal antes de invitar frente a sin señal, saliente frente a entrante) y los borradores pendientes frente a enviados. Con menos de 30 invitaciones avisa «muestra chica». Forma completa en «Embudo del comprador» de [`metricas-resultados.md`](../../agentes-linkedin/infra/docs/metricas-resultados.md).
+- **Para las fases 2 a 6:** escriben con `record`, `rest`, `retry`, `leave`, `set_route` y `set_angle`, y leen con `journey`, `current`, `temperature` (las señales de una persona con su edad, sin pesos), `due`, `drafts` y `funnel`. Las pruebas de punta a punta (`test_comprador_e2e.BuyerPathBase`) se amplían con un método por paso nuevo.
+- **Criterios de aceptación:**
+  1. **Dado** un comprador en Austin con ronda semilla verificada en la web, **cuando** se clasifica, **entonces** tiene recorrido en `elegido`. Si la web aún no respondió o está fuera de EE. UU., no tiene recorrido.
+  2. **Dado** que el equipo lo sigue, comenta un post suyo, él responde ese comentario, se le invita sin nota y acepta, **cuando** corre cada paso con las funciones de producción, **entonces** el recorrido pasa por calentando, invitado y aceptó, con un toque por paso y su referencia. La respuesta cuenta como señal antes de invitar.
+  3. **Dado** un fallo del registro, aunque sea un error de base de datos dentro de la transacción de la acción (el descarte de Gustavo), **cuando** se ejecuta una acción, se clasifica o se descarta, **entonces** la acción termina y se guarda igual, y queda `buyer.record_failed`.
+  4. **Dado** el historial sin recorridos, **cuando** corre `manage.py comprador reconstruir`, **entonces** crea los toques que habrían dejado los ganchos; una segunda corrida no añade nada y `--seco` no guarda.
+  5. **Dado** un recorrido en descanso, **cuando** se reintenta antes de la fecha o sin ángulo, **entonces** se rechaza; después abre el intento 2 con su ángulo. Una salida definitiva no admite descanso ni reapertura, ni siquiera ante una respuesta.
+  6. **Dado** menos de 30 invitaciones, **cuando** se lee el embudo, **entonces** cada bloque trae `muestra_chica: true` y el aviso.
+- **Brechas:**
+  - Con el inbox apagado (`INBOX_ENABLED=false`, su valor por defecto) no hay «respondió» ni «le escribió» desde el inbox; el mensaje enviado solo llega por «Hecho, le escribí».
+  - El inbox guarda los últimos mensajes de cada conversación: el registro conserva lo que un gancho ya vio, pero la reconstrucción no recupera mensajes que salieron de esa ventana.
+  - El historial de un contacto guarda 30 eventos; una invitación recibida antigua puede quedar solo como «llegó por invitación».
+  - La ruta casi siempre queda `sin_definir` hasta la fase 2 (se marca `comentarios` cuando hay un post suyo observado o un comentario del equipo).
+  - Interesado y reunión quedan en 0 hasta la fase 6: una oportunidad registrada es un toque de estado, no una etapa.
+  - Volver a la cola de clasificación (`red.requeue`) no tiene gancho: se recoge en la siguiente clasificación.
+- **Cobertura QA:** `tests/test_comprador.py` (33) y `tests/test_comprador_e2e.py` (4), con conector y proveedores falsos; regresión completa del backend en una PostgreSQL desechable.

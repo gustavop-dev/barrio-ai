@@ -90,7 +90,7 @@ su caso de evaluación y su lista de lectura del curso, como el primer mensaje
 | 4 | Primer mensaje | Al aceptar, borrador de tres líneas con sus posts y los comentarios del equipo | Lo copia y lo envía | Existe solo tras una conversación en un post de Gustavo |
 | 5 | Secuencia | M2 a los 4 días, M3 a los 5, M4 a los 7. Si responde, se detiene todo | Envía cada uno | No existe |
 | 6 | Respuesta y entrega | Clasifica la respuesta, prepara el borrador con el enlace de agenda y entrega el lead al agendar | Conversa y envía | No existe |
-| 7 | Medir | Embudo por etapa, semana contra semana | Lee una frase y un cambio por semana | No existe por etapa |
+| 7 | Medir | Embudo por etapa, semana contra semana | Lee una frase y un cambio por semana | Hecho el registro por persona y el embudo mínimo (fase 1, [BAR-18](funcionalidades/red.md#bar-18)); falta la lectura semanal |
 
 ### 1. Elegir
 
@@ -252,7 +252,20 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 
 Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje en producción (17/11/2026, PR #132).
 
-1. **Estado por persona y medición mínima del embudo**, sin cambiar comportamiento: da la línea base.
+1. ~~**Estado por persona y medición mínima del embudo**, sin cambiar comportamiento: da la línea base.~~ Hecho en la
+   rama `feat/outbound-comprador` ([BAR-18](funcionalidades/red.md#bar-18)), sin desplegar:
+   - `BuyerJourney`, un recorrido por comprador elegido: paso, ruta, próxima fecha, contadores, señales recibidas,
+     descanso con motivo, fecha de vuelta, intento y ángulo, y la salida con su motivo (definitiva o por regla).
+   - `BuyerTouch`, el registro que solo se añade: lo que hace el equipo (`saliente`), las señales de la persona
+     (`entrante`) y los cambios de estado, cada uno con su fuente.
+   - Se llena solo desde lo que ya pasa (clasificación, seguir, comentar, invitar, aceptar, comentarios en sus posts,
+     «Hecho, le escribí», inbox, oportunidades). La reconstrucción `manage.py comprador reconstruir` lo rellena desde
+     el historial y es idempotente.
+   - `GET /api/v1/resultados/embudo-comprador`: el acumulado y cada semana, con el paso de cada etapa a la siguiente,
+     las comparaciones (calentados, nota, ruta, señal antes de invitar) y los borradores pendientes frente a
+     enviados. Con menos de 30 invitaciones avisa «muestra chica».
+   - Las fases 2 a 6 escriben con `record`, `rest`, `retry` y `leave`, y leen `temperature` (señales con su edad, sin
+     pesos), `due` y `funnel`. Para desplegar: migración 0046 y luego `comprador reconstruir --seco` y sin `--seco`.
 2. **Calentamiento:** leer y comentar posts de compradores, e invitar tras el segundo comentario.
 3. **Primer mensaje al aceptar**, con la nota para calentados.
 4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
@@ -264,7 +277,7 @@ Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, u
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-17) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-18) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

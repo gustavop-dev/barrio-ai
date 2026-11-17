@@ -353,6 +353,66 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 - **Una sexta hoja sola con datos.** Aún no se vio: se lee como la de audiencia. Los nombres de las hojas quedan en `AnalyticsImport.sheets` para comprobarlo.
 - **Unir con la pieza** cuando LinkedIn enlaza un urn distinto del que guardamos.
 
+## Embudo del comprador
+
+`GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; un número fuera de rango da 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Sale de `comprador.funnel`, la fase 1 del sistema del comprador ([plan](../../../docs/plan-outbound.md), ficha [BAR-18](../../../docs/funcionalidades/red.md#bar-18)). Lee `BuyerJourney`: un recorrido por comprador elegido, calculado de su registro de toques.
+
+- **Código:** `src/team_backend/comprador.py`; `resultados_views.EmbudoComprador`; `management/commands/comprador.py`.
+- **Pruebas:** `tests/test_comprador.py` y `tests/test_comprador_e2e.py`.
+
+**Etapas** (LI-12-M001-K03), en este orden:
+
+| Etapa | Cuenta a quien… |
+| --- | --- |
+| `elegidos` | el equipo eligió como comprador |
+| `calentados` | tuvo al menos un comentario del equipo en un post suyo antes de su primera invitación |
+| `calentados_2` | tuvo dos o más |
+| `invitados` | recibió la invitación |
+| `aceptaron` | quedó conectado: aceptó la invitación o Gustavo aceptó la suya |
+| `recibieron_mensaje` | recibió un mensaje: «Hecho, le escribí» o un mensaje de Gustavo visto en el inbox |
+| `respondieron` | escribió después del primer mensaje de Gustavo |
+| `interesados` | respondió con interés. Fase 6: hasta entonces, 0 |
+| `reunion` | agendó la reunión. Fase 6: hasta entonces, 0 |
+
+Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
+
+**Bloque.** Cada embudo tiene esta forma:
+
+```json
+{ "personas": 0, "invitaciones": 0, "muestra_chica": true, "aviso": "Muestra chica: menos de 30 invitaciones; no se juzga.",
+  "etapas": [{ "etapa": "elegidos", "nombre": "Elegidos", "personas": 0, "desde_elegidos_pct": null, "paso_pct": null }] }
+```
+
+- `paso_pct`: de quienes llegaron a la etapa anterior, el porcentaje que llegó a esta. Es `null` en la primera etapa o si la anterior está vacía.
+- `desde_elegidos_pct`: el porcentaje de los elegidos que llegó a la etapa.
+- Con menos de 30 invitaciones (LI-12-M001-K04), `muestra_chica` es `true` y `aviso` lo dice.
+
+**Respuesta:**
+
+```json
+{ "generado", "zona_horaria", "definiciones": { "<clave>": "texto" },
+  "acumulado": Bloque,
+  "semanas": [{ "semana": "AAAA-MM-DD", "hasta": "AAAA-MM-DD", "cohorte": Bloque, "actividad": { … } }],
+  "comparaciones": { "ruta": { "sin_definir|comentarios|sin_posts": Bloque },
+                     "calentamiento": { "calentados": Bloque, "no_calentados": Bloque },
+                     "nota": { "con_nota": Bloque, "sin_nota": Bloque },
+                     "senal": { "con_senal": Bloque, "sin_senal": Bloque },
+                     "entrada": { "saliente": Bloque, "entrante": Bloque } },
+  "borradores": { "pendientes", "enviados", "no_enviados", "enviados_pct", "fuentes": ["mensaje_sugerido"] },
+  "estado_actual": { "elegido|calentando|…|reunion|descanso|salio": n },
+  "descanso": { "<motivo>": n }, "salidas": { "<motivo>": n } }
+```
+
+- **Semanas:** de la actual hacia atrás, de lunes a domingo en `OPERATOR_TIMEZONE`. `cohorte` agrupa a quienes se eligieron esa semana y cuenta hasta dónde llegaron. `actividad` cuenta lo que pasó en la semana: `elegidos`, `seguidos`, `invitados`, `aceptaron`, `recibieron_mensaje`, `respondieron`, `interesados`, `reunion`, `comentarios`, `mensajes_enviados`, `no_escribirle` y `senales_entrantes`.
+- **A quién cuenta:** solo a los compradores que eligió el equipo (`entry: saliente`). Quien llegó con su propia invitación va solo en `comparaciones.entrada.entrante`.
+- **Comparaciones:**
+  - `nota`: una invitación sin dato de nota (anterior al registro de notas) no cuenta en ninguno de los dos.
+  - `senal`: `con_senal` es una señal de la persona antes de su primera invitación: comentó un post de Gustavo, respondió un comentario del equipo, lo invitó o le escribió.
+- **Borradores:** hoy el único es el «Mensaje sugerido» ([RSP-07](../../../docs/funcionalidades/respuestas.md#rsp-07)). Está pendiente mientras su tarjeta espera en Tu turno, enviado con «Hecho, le escribí» y no enviado con «No escribirle».
+- **Comando:**
+  - `manage.py comprador embudo --semanas N` imprime lo mismo en JSON.
+  - `manage.py comprador reconstruir [--cuenta ID] [--seco]` rellena los recorridos desde el historial. Es idempotente y cada persona se guarda por separado.
+
 ## Configuración
 
 | Variable | Por defecto | Qué hace |
@@ -362,6 +422,7 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 | `METRICS_POSTS_LIMIT` | 20 | Cuántos posts propios recientes se leen por vuelta (1 a 100). |
 | `METRICS_PROFILE_VIEWS_DAYS` | 28 | Ventana de las visitas al perfil: 14, 28, 90 o 365. |
 | `METRICS_READ_CAPS` | — | Topes diarios de lectura, por ejemplo `posts=12,post=20,comments=20,profile=3,views=3`. |
+| `BUYER_RECORD_ENABLED` | true | Ganchos pasivos del recorrido del comprador. Con `false` nada se registra al ocurrir; `comprador reconstruir` lo recupera después. |
 
 ## Pendiente
 
