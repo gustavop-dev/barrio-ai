@@ -331,6 +331,9 @@ class Contact(models.Model):
     connected_at=models.DateTimeField(null=True,blank=True)
     discovered_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
+    # Phase 5 (sin_posts.py): this person is the bridge («puente») to the buyer of that journey, a colleague at the
+    # same company who does post. Its own contact with its own role, never a second buyer. Null for everyone else.
+    bridge_for=models.ForeignKey('BuyerJourney',on_delete=models.SET_NULL,null=True,blank=True,related_name='bridges')
     class Meta:
         ordering=['-updated_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_contact_per_account')]
@@ -1672,6 +1675,8 @@ class BuyerTouch(models.Model):
         OPPORTUNITY='oportunidad','Oportunidad registrada'
         INTERESTED='interesado','Respuesta con interés'
         REFERRED='referido','Llegó referido por otra persona (su mensaje 3)'
+        BRIDGE='puente','Puente por otra persona de su empresa (fase 5)'
+        RECHECK='reverificacion','Reverificación de sus señales de compra al terminar un descanso (fase 5)'
         # saliente
         FOLLOW='seguir','Seguir (RED-01)'
         COMMENT='comentario','Comentario en un post suyo (INT-03)'
@@ -1692,6 +1697,7 @@ class BuyerTouch(models.Model):
         OPENED_CONVERSATION='abrio_conversacion','Le escribió primero'
         REPLIED_MESSAGE='respondio_mensaje','Respondió un mensaje'
         MEETING='reunion','Agendó una reunión'
+        BRIDGE_SIGNAL='senal_puente','Su colega (el puente) aceptó o interactuó'
     class Source(models.TextChoices):
         LIVE='en_vivo','Registrado al ocurrir'
         REBUILT='reconstruido','Reconstruido desde el historial'
