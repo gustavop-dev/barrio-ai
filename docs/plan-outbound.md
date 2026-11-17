@@ -40,7 +40,7 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 17/11/2026 | Los agentes siguen comentando ellos, con la revisión del líder: tienen una base de conocimiento amplia sobre nosotros. La advertencia del curso («nunca comentes con bots») no se adopta. |
 | 17/11/2026 | La rampa y los topes se quedan como están; los resultados se miran en un mes (hacia el 17/12/2026). |
 | 17/11/2026 | Carga aceptada: 20 a 30 mensajes por semana enviados por él. |
-| 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas. El puente entre las dos (qué pasa cuando responde, enlace de agenda, preguntas de calificación y nota del lead) se diseña a continuación. |
+| 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas, que se arma después del outbound, con su propia base de conocimiento y abierta a otras fuentes además de LinkedIn. Agenda con Cal.com. |
 
 ## Lo que ya funciona
 
@@ -89,7 +89,7 @@ su caso de evaluación y su lista de lectura del curso, como el primer mensaje
 | 3 | Invitar | Tras el 2.º comentario o a los 14 días. Nota solo a calentados con un hecho concreto | Nada (o aprueba, según la autonomía de red) | Existe invitar; hoy sale a las 48 h de seguir, sin contar comentarios |
 | 4 | Primer mensaje | Al aceptar, borrador de tres líneas con sus posts y los comentarios del equipo | Lo copia y lo envía | Existe solo tras una conversación en un post de Gustavo |
 | 5 | Secuencia | M2 a los 4 días, M3 a los 5, M4 a los 7. Si responde, se detiene todo | Envía cada uno | No existe |
-| 6 | Respuesta y puente | Clasifica la respuesta y prepara el siguiente paso hasta la reunión | Conversa y agenda | Por diseñar (sección siguiente) |
+| 6 | Respuesta y entrega | Clasifica la respuesta, prepara el borrador con el enlace de agenda y entrega el lead al agendar | Conversa y envía | No existe |
 | 7 | Medir | Embudo por etapa, semana contra semana | Lee una frase y un cambio por semana | No existe por etapa |
 
 ### 1. Elegir
@@ -172,18 +172,30 @@ El curso no lo trata. Ruta aprobada, medida aparte de los calentados con comenta
 - Con la secuencia de 4, en régimen son 20 a 30 mensajes por semana que envía Gustavo.
 - A ese volumen, 30 invitaciones a compradores se juntan en unas 2 semanas: antes de eso no se concluye nada.
 
-### El puente a ventas (por diseñar con Gustavo)
+### Dónde termina: la entrega a ventas
 
-La máquina de LinkedIn termina en la reunión agendada. Lo que Gustavo dejó planteado el 17/11/2026:
+Decisión de Gustavo (17/11/2026): la calificación del lead y lo que pasa después de la reunión **no** se construyen
+dentro de la máquina de LinkedIn. Son de la máquina de ventas, que debe poder recibir leads de varias fuentes (LinkedIn,
+otras redes, el recurso descargable) y que necesita su propia base de conocimiento, extraída como se hizo con este
+curso. Se arma después de terminar el outbound.
 
-- Cuando el comprador responde, el equipo debe entender su negocio antes de proponer nada, y la respuesta no puede
-  sonar a bot.
-- Primero asegurar la reunión con el enlace de agenda (el curso lo permite solo después de una respuesta).
-- Con la reunión agendada, preguntas de calificación y una nota del lead, para que llegue bien calificado a ventas.
+Lo que sí hace esta máquina cuando el comprador responde:
 
-Por definir: qué investiga el equipo del negocio y de dónde, qué respuesta prepara según el tipo de respuesta
-(interesado, pide información, no es el momento, no le interesa, lo ve otra persona; LI-11-M006-K01), cuándo va el
-enlace, qué preguntas de calificación, cómo se calcula la nota y qué recibe ventas.
+1. Detiene la secuencia y clasifica la respuesta (interesado, pide información, no es el momento, no le interesa, lo
+   ve otra persona; LI-11-M006-K01).
+2. Prepara un borrador de respuesta que nombra algo concreto de su negocio, con lo que el equipo ya sabe de la
+   persona (perfil, posts, verificación de ronda). Al interesado le lleva el enlace de agenda; el curso lo permite
+   solo después de una respuesta.
+3. «No es el momento» vuelve a los 90 días o en la fecha que diga; «no le interesa» se cierra y no se le vuelve a
+   escribir; «lo ve otra persona» hace entrar a esa persona, nombrando a quien la recomendó.
+4. Cuando agenda, entrega el lead y ahí termina.
+
+**Agenda:** Cal.com (no Google Calendar). Avisa sola cuando alguien reserva, reprograma o cancela, y su formulario
+admite preguntas propias, que es donde la máquina de ventas pondrá después las de calificación.
+
+**Entrega (igual para cualquier fuente):** quién es y su empresa, de dónde vino (fuente y recorrido: señal, toques,
+mensajes), la conversación resumida en tres líneas, la fecha de la reunión y lo que el equipo sabe del negocio con
+sus fuentes. Sin nota de calificación: esa la pone la máquina de ventas.
 
 ## La base actual y lo que hay que añadir (anotado el 14/11/2026)
 
@@ -230,10 +242,11 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 
 ## Decisiones abiertas (de Gustavo)
 
-1. El puente a ventas: respuesta, enlace de agenda, calificación y nota del lead (sección anterior).
-2. ¿Cuándo una conversación pasa a oportunidad?
-3. Umbral de seguidores, cuando haya datos.
-4. Primer mensaje a la comunidad (no compradores): por ahora no; se revisa con los datos del mes.
+1. ¿Cuándo una conversación pasa a oportunidad? Propuesta: al agendar la reunión.
+2. Umbral de seguidores, cuando haya datos.
+3. Primer mensaje a la comunidad (no compradores): por ahora no; se revisa con los datos del mes.
+4. La máquina de ventas (calificación, nota del lead, lo que sigue a la reunión): después del outbound, con su propia
+   base de conocimiento.
 
 ## Orden propuesto
 
@@ -244,7 +257,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
 3. **Primer mensaje al aceptar**, con la nota para calentados.
 4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
 5. **Ruta del que no publica.**
-6. **Respuesta y puente a ventas**, una vez diseñado.
+6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
 7. **Lectura semanal del embudo.**
 
 Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, umbral de seguidores, café virtual.
