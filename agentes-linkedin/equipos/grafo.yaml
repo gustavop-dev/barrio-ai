@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.15-respuesta-comprador",
+  "graph_version": "6.16-comprador-projectapp",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -185,6 +185,17 @@
       "LI-11-M006-K06",
       "LI-08-M003-K05",
       "LI-12-M001-K04"
+    ],
+    "operador.WHO_UNITS": [
+      "LI-08-M001-K05",
+      "LI-08-M004-K04",
+      "LI-08-M004-K05",
+      "LI-08-M004-K06",
+      "LI-08-M004-K01",
+      "LI-08-M004-K02",
+      "LI-08-V010-K02",
+      "LI-08-M001-K02",
+      "LI-08-M003-K05"
     ]
   },
   "budgets": {
@@ -1334,7 +1345,8 @@
         "biblioteca"
       ],
       "course_lists": [
-        "operador.REFERENTS_UNITS"
+        "operador.REFERENTS_UNITS",
+        "operador.WHO_UNITS"
       ],
       "course_units": [
         "LI-03-V009-K04",
@@ -1343,7 +1355,7 @@
         "LI-03-M005-K06",
         "LI-03-V020-K05"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con NETWORK_PROJECTAPP_BUYER_ENABLED (BAR-25) registra WHO_UNITS (clase 08, metodología activada con_quien) y las búsquedas rotan por audiencia (comprador de ProjectApp, comprador startup y partner; projectapp.next_search) dentro del mismo cupo diario de búsquedas: LinkedIn solo filtra por palabras clave, ubicación e idioma, así que el tamaño y la señal los juzgan el clasificador y la revisión web.",
       "model": null,
       "effort": null,
       "model_note": "Servicio determinista, humano o todavía planificado.",
@@ -1379,7 +1391,8 @@
         "biblioteca"
       ],
       "course_lists": [
-        "operador.NETWORK_UNITS"
+        "operador.NETWORK_UNITS",
+        "operador.WHO_UNITS"
       ],
       "course_units": [
         "LI-03-M005-K05",
@@ -1392,7 +1405,7 @@
         "LI-03-M006-K01",
         "LI-03-M006-K04"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con NETWORK_PROJECTAPP_BUYER_ENABLED (BAR-25, comprador de ProjectApp) suma WHO_UNITS (clase 08, metodología activada con_quien): dos líneas de comprador (ProjectApp: empresa tradicional de 20 a 200 personas en EE. UU., dueño o líder de tecnología; startup: la de antes), el partner (agencia que subcontrata desarrollo), el segmento de la prueba, el tamaño de la empresa y, en la revisión web, las señales con fuente y fecha (contrata desarrolladores primero). La señal ordena a quién se invita primero; no crea campañas.",
       "model": "NETWORK_CLASSIFIER_MODEL (claude-sonnet-5-5)",
       "effort": "medium",
       "model_note": null,

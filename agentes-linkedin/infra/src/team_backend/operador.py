@@ -66,6 +66,12 @@ SEQUENCE_UNITS=list(METODOLOGIAS_ACTIVAS['secuencia_mensajes']['unidades'])
 # it classifies, by Relaciones when it drafts the reply and by the lead when it reviews it.
 # Baseline: docs/linea-base-respuesta-comprador.md.
 BUYER_REPLY_UNITS=list(METODOLOGIAS_ACTIVAS['respuesta_comprador']['unidades'])
+# BIB-08-con-quien (class 08, activated in METODOLOGIAS_ACTIVAS; BAR-25, the ProjectApp buyer): to whom in each company
+# (pain and power; decides, influences, uses; one card per papel) and with what dated signal (hiring developers first).
+# Loaded whole, only with the methodology named and only with NETWORK_PROJECTAPP_BUYER_ENABLED, by the classifier
+# (red.classify_units) and recorded by discovery, whose searches rotate by audience (projectapp.next_search).
+# Baseline: docs/linea-base-comprador-projectapp.md.
+WHO_UNITS=list(METODOLOGIAS_ACTIVAS['con_quien']['unidades'])
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'
@@ -560,6 +566,10 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
         from . import sin_posts
         account.refresh_from_db(fields=['paused'])
         if sin_posts.active() and not account.paused:summary['puentes']=sin_posts.read(account,connector)  # phase 5: bridges
+        from . import projectapp
+        account.refresh_from_db(fields=['paused'])
+        if projectapp.enabled() and not account.paused:  # BAR-25: the partners' posts, after the buyers, in their cap
+            summary['partners']=projectapp.read_partner_posts(account,connector)
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
         from .notificaciones import avisar

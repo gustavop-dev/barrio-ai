@@ -227,9 +227,10 @@ def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
     people=red.classification_people(contacts)
     message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
-    units,missing,_=run.context(red.NETWORK_UNITS)
+    unit_ids,methodology=red.classify_units()  # BAR-25: the same prompt, schema and units as red.classify today
+    units,missing,_=run.context(unit_ids,metodologia=methodology)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
-    return {'system':red.CLASSIFY_SYSTEM,'message':message,'max_tokens':16000,'output_schema':red.CLASSIFY_SCHEMA,'effort':'medium',
+    return {'system':red.classify_system(),'message':message,'max_tokens':16000,'output_schema':red.classify_schema(),'effort':'medium',
             'context':operador.course_block(units)}
 
 def lead_request(post,text,orientation):
@@ -375,11 +376,13 @@ class Run:
             return ids,f'catalogo:{self.catalog}'
         return catalogo.units_for(shelf,fallback)
 
-    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False):
-        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does."""
-        key=(tuple(unit_ids),budget,warm)
+    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False,metodologia=None):
+        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does.
+        `metodologia`: the activated methodology the units belong to (the classifier's con_quien, BAR-25)."""
+        key=(tuple(unit_ids),budget,warm,metodologia)
         if key not in self._units:
-            self._units[key]=operador.warmup_units(list(unit_ids),budget) if warm else operador.course_context(list(unit_ids),budget)
+            self._units[key]=(operador.warmup_units(list(unit_ids),budget) if warm else
+                              operador.course_context(list(unit_ids),budget,metodologia))
         return self._units[key]
 
     def guard(self,worst):
@@ -618,7 +621,7 @@ def run_classifier(run,cases,model,results):
         try:data=run.claude('clasificador',classify_request(run,[c['contact'] for c in batch]),model)
         except ValueError as exc:
             results+=[{'id':c['id'],'etiqueta':c['label'],'error':str(exc)[:300]} for c in batch];continue
-        errors=schema_errors(data,red.CLASSIFY_SCHEMA)[:3]
+        errors=schema_errors(data,red.classify_schema())[:3]
         found={str(r.get('id')):r for r in data.get('contacts',[]) if isinstance(r,dict)}
         for case in batch:
             result=found.get(case['id']);confidence=_confidence(result.get('confidence')) if result else 0.0
@@ -1310,6 +1313,25 @@ COURSE_CASES={
         'variants':{'flujo':['LI-11-M006-K01','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],'P':['LI-11-M006-K01','LI-12-M001-K04'],
                     'N1':['LI-11-M006-K03','LI-08-M003-K05'],'N2':['LI-11-M006-K03'],'X':['LI-08-M003-K05'],'O':['LI-11-M006-K02'],
                     'B':['LI-11-M006-K01'],'E':['LI-11-M006-K01'],'I':['LI-11-M006-K01']}},
+    # BAR-25 (class 08, activated methodology con_quien): to whom in each company and with what signal, for the ProjectApp
+    # buyer and the partner. The input is PROJECTAPP_CASE (eight synthetic people); tests/test_comprador_projectapp.py
+    # runs it through red.classify, red.check_stages and red.plan with fake models and grades the result here.
+    # Baseline with NETWORK_PROJECTAPP_BUYER_ENABLED=false (docs/linea-base-comprador-projectapp.md): 2/8 right, P4 kept,
+    # P5 out, no line, no segment, no papel and the ProjectApp order P1, P4, P2, P3.
+    'con_quien':{'id':'BIB-08-con-quien',
+        'units':operador.WHO_UNITS,
+        'input':{'caso':PROJECTAPP_CASE['id'],'personas':{v:c['label'] for v,c in PROJECTAPP_CASE['variants'].items()},
+                 'interruptor':'NETWORK_PROJECTAPP_BUYER_ENABLED'},
+        'expected':{'aciertos':'8/8','P1_linea':'projectapp','P1_papel':'lider_tecnologia','P1_segmento':'retail_ecommerce',
+                    'P1_senal':'contrata_desarrolladores','P2_segmento':'educacion_en_linea','P2_tambien':['duenos_latinos_eeuu'],
+                    'P2_papel':'dueno','P3_puntaje':'bajo','P4_fuera_por':'tamano','P5_rol':'partner','P5_recorrido':False,
+                    'P6_rol':'par','P7_linea':'startup','orden':['P1','P2','P3'],'linea_base_apagado':'2/8'},
+        'required':['LI-08-M001-K05','LI-08-M004-K04','LI-08-M004-K05','LI-08-M004-K06','LI-08-M004-K01',
+                    'LI-08-M004-K02','LI-08-V010-K02','LI-08-M001-K02','LI-08-M003-K05'],
+        'variants':{'P1':['LI-08-M001-K05','LI-08-M004-K05','LI-08-M004-K01','LI-08-V010-K02'],
+                    'P2':['LI-08-M004-K06','LI-08-M001-K02'],'P3':['LI-08-M004-K04','LI-08-M004-K02'],
+                    'P4':['LI-08-M001-K02'],'P5':['LI-08-M001-K05'],'P6':['LI-08-M001-K05'],'P7':['LI-08-M004-K06'],
+                    'reevaluacion':['LI-08-M003-K05']}},
 }
 
 def case_methodology(role):
