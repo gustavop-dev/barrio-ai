@@ -1,4 +1,4 @@
-"""Soft weekly shares of the invitations by role (BAR-18, Gustavo 17/11/2026).
+"""Soft weekly shares of the invitations by role (BAR-24, Gustavo 17/11/2026).
 
 Gustavo: the distribution of roles «debería ser construido», but «estamos cortando con una misma tijera a todos; ...no
 ser tan rígidos». Measured in production on 17/11/2026: par 53 %, aliado 26 %, comprador 9 %, divulgador 6 %,

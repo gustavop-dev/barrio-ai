@@ -1,0 +1,134 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "relaciones",
+  "metodologia": "nota_invitacion",
+  "evaluacion": "BIB-09-nota-invitacion",
+  "fecha": "2026-11-16",
+  "metodo": "Lectura con SELECT de units.original en la biblioteca local (barrio-biblioteca-db), sin escribir en ella. hash = units.sha256 (sha256 del JSON canónico de la unidad, knowledge.ingest.canonical); source_path, pointer y fuentes de units y unit_evidence.",
+  "alcance": {
+    "unidades_leidas_completas": 3,
+    "por_clase": {
+      "09": 3
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 3 unidades de la clase 09, no de toda la clase ni de las clases 07–12. Solo estas 3 unidades (y las de las otras metodologías activadas) están abiertas a los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS)."
+  },
+  "roles": [
+    "relaciones_comunidad",
+    "lider_jev"
+  ],
+  "lista": "operador.INVITE_NOTE_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-09-M002-K06",
+      "clase": 9,
+      "titulo": "La nota es un caballo de Troya: no puede oler a venta (ejemplos así no / así sí)",
+      "hash": "da422c70959fceeccd587899c82a12bd6dde32c066977d5e5cf5dcef2ef42d0e",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "La nota se ancla en algo puntual y verificable de la persona (el tema de un post suyo, algo en común, una señal) y propone conectar con una razón ligada a eso. Así no: «me gustaría que fueras parte de mi red», «Me encanta lo que escribes. ¡Conectemos!», «Ayudo a empresas como la tuya…». Sin algo concreto, la invitación va sin nota.",
+      "limites_y_excepciones": [
+        "La «autoridad» (por ejemplo, fama) que el docente acepta como alternativa a un hecho concreto no se usa: la nota del comprador exige siempre un hecho suyo que el equipo vio (su post comentado, su respuesta, una señal con fuente).",
+        "El evento en común («Expo West en marzo») es un ejemplo válido del curso, pero el equipo no tiene hoy fuente de eventos: solo citan hechos que están en el recorrido.",
+        "La metáfora no significa engañar: el docente aclara que no debe sonar a estafa."
+      ],
+      "uso": {
+        "regla_fija": "mensajes_comprador.note_text_issues: sin «parte de mi red» (respuestas.DM_FORMULAS), sin elogio genérico (NOTE_PRAISE), sin venta ni «empresas como la tuya» (autopiloto.PITCH, respuestas.SELL, NOTE_SELL) y el hecho declarado presente en el texto",
+        "pregunta_del_lider": "nota_hecho (mín. 0,7), nota_generica (máx. 0,2) y nota_pitch (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/95",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p011",
+        "09:d68888515e0f53845f66:p012",
+        "09:d68888515e0f53845f66:p014"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-V008-K04",
+      "clase": 9,
+      "titulo": "La nota de conexión como «caballo de Troya»: qué no escribir, qué sí y cuándo no usar nota",
+      "hash": "4a1808dccc6e445171718d5faf608273786dcc8ab3c3723389d533ed38a56f50",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "«Su único trabajo: que te acepten. No vende, ni lo insinúa.» Las razones que funcionan: algo que publicó, algo en común, una señal; nombrarla con precisión («¿sobre qué?»: no «tu post», sino el post sobre la rotación de mandos medios) y cerrar con una invitación a conectar ligada a ella. Si no hay nada concreto que decir, sin nota.",
+      "limites_y_excepciones": [
+        "Todo esto rige la nota de conexión, no el primer mensaje después de aceptar (que sigue la metodología primer_mensaje).",
+        "La prueba A/B que el docente propone a continuación (20 invitaciones con nota A, 20 con nota B y 20 sin nota) no se implementa en esta fase: con 3 notas al mes no hay volumen para compararla. El embudo compara con nota frente a sin nota con datos reales (comprador.funnel, comparaciones.nota).",
+        "La ronda de práctica en el chat (p014) se omitió en clase por tiempo y no aporta criterio adicional."
+      ],
+      "uso": {
+        "regla_fija": "mensajes_comprador.note_text_issues: el hecho declarado (anchor) existe en los hechos del recorrido y comparte una palabra de contenido con la nota; sin hecho no se redacta (stopped_by «hecho»)",
+        "pregunta_del_lider": "nota_aceptar (mín. 0,6): su único trabajo es que acepte; nota_hecho (mín. 0,7): nombra el hecho con precisión"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/32",
+      "fuentes_con_prefijo_de_clase": [
+        "09:05cc5247c75f4a91d610:p001",
+        "09:d68888515e0f53845f66:p012",
+        "09:d68888515e0f53845f66:p014",
+        "09:qt00128",
+        "09:qt00136",
+        "09:qt00185",
+        "09:qt00187",
+        "09:qt00218",
+        "09:qt00219",
+        "09:qt00220",
+        "09:qt00221",
+        "09:qt00222",
+        "09:qt00223",
+        "09:qt00224",
+        "09:qt00225",
+        "09:qt00226",
+        "09:qt00227",
+        "09:qt00229",
+        "09:qt00234",
+        "09:qt00235",
+        "09:qt00236",
+        "09:qt00237"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M002-K01",
+      "clase": 9,
+      "titulo": "Cuánto deja escribir LinkedIn: límites de caracteres y de notas, y la recomendación de escribir la nota en menos de 200 caracteres",
+      "hash": "07655d3bfde877385e320a5184ea5a600ff4b9e172b7f92e8d9eb05b2c06f245",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "La nota en menos de 200 caracteres sirve con cualquier cuenta; los caracteres de más suelen ser relleno («espero te encuentres muy bien»). Con cuenta gratis hay 3 notas al mes: se gastan «de forma muy estratégica» con personas muy concretas y con un motivo fuerte; el resto de invitaciones va sin nota.",
+      "limites_y_excepciones": [
+        "El límite real de LinkedIn oscila entre 200 y 300: la regla fija toma el menor de note_policy()['max_chars'] y 200.",
+        "Los motivos que el curso da para gastar una nota (evento con fecha, referido, algo de qué hablar) se reducen hoy a algo de qué hablar que el equipo vio: no hay fuente de eventos ni de referidos.",
+        "El cupo es el de la cuenta (LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT, red.note_room); esta fase no lo sube."
+      ],
+      "uso": {
+        "regla_fija": "mensajes_comprador.note_text_issues: ≤ 200 caracteres; mensajes_comprador.prepare: solo compradores calentados, por temperatura, mientras quede cupo (stopped_by «cupo» si no queda)",
+        "pregunta_del_lider": "ninguna: el largo y el cupo son reglas de código"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/90",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p007",
+        "09:d68888515e0f53845f66:p014"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "Gustavo, 17/11/2026: las 3 notas del mes se reservan a compradores calentados con un hecho concreto. Se redactan al invitar, con los comentarios del calentamiento y las señales como contexto, y van primero a los de mayor temperatura (comprador.temperature).",
+    "La nota va en el idioma de la persona (idioma.mismatch contra lo que ella escribió), no siempre en inglés.",
+    "Sin mensajes privados automáticos (INB-08): la nota acompaña una invitación (RED-02) que pasa por la compuerta de siempre; el primer mensaje después de aceptar lo envía Gustavo a mano.",
+    "Sin cambios de la rampa de RED-02 ni del cupo de notas: una nota parada (reglas, líder, sin hecho, sin cupo) nunca frena la invitación; sale sin nota.",
+    "Una nota sin revisión del líder (Gustavo confirmó a la persona o el líder está apagado) sale sin la nota en vez de dejar la invitación bloqueada hasta caducar (red.send_invitation, NOTE_UNREVIEWED)."
+  ],
+  "no_convertido_en_regla": [
+    "la prueba A/B del curso (20 con nota A, 20 con nota B, 20 sin nota): no implementada; con 3 notas al mes no hay volumen. Queda la comparación con nota frente a sin nota del embudo",
+    "la «autoridad» (fama) como sustituto de un hecho concreto",
+    "el evento en común y el referido como motivos: no hay fuente de eventos ni de referidos en el recorrido",
+    "notas de 250–300 caracteres con Premium: rige el menor de 200 y el límite de la cuenta"
+  ],
+  "siguiente_paso": "Fase 4 del plan outbound: seguimiento después del primer mensaje (mensajes 2–4 como borradores que Gustavo envía). Medir antes la aceptación con nota frente a sin nota con datos reales."
+}

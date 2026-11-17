@@ -500,3 +500,78 @@ class FullSummaryTests(SlackBase):
                      '• IA: 0,00 USD hoy; 0,00 de 100,00 USD en el mes','• Trabajos fallidos o interrumpidos: 1',
                      'Cupos del día (usado/tope):','• Lecturas respuestas.comments: 3/100'):
             self.assertIn(line,text)
+
+
+class BuyerSequenceAlertTests(SlackBase):
+    """Fase 4 (BAR-21, BUYER_SEQUENCE_ENABLED): los seguimientos que vencen hoy (un mensaje agrupado por la mañana), un
+    comprador que respondió (una vez por respuesta, sin su texto) y la secuencia detenida sin inbox (una vez al día)."""
+
+    def setUp(self):
+        super().setUp()
+        env=patch.dict('os.environ',{'BUYER_SEQUENCE_ENABLED':'true','BUYER_FIRST_MESSAGE_ENABLED':'true'})
+        env.start();self.addCleanup(env.stop)
+
+    def buyer(self,name,step='mensaje_1',next_at=None,sent=1):
+        from team_backend.models import BuyerJourney
+        self.people+=1
+        contact=Contact.objects.create(account=self.account,provider_user_id=f'seq-{self.people}',display_name=name,source='manual')
+        BuyerJourney.objects.create(contact=contact,chosen_at=at(8,0,-30),step=step,next_at=next_at,messages_sent=sent)
+        return contact
+
+    def ready(self,contact,number,when):
+        from team_backend.models import BuyerDraft
+        return BuyerDraft.objects.create(contact=contact,kind='mensaje',number=number,attempt=1,state='listo',text='Texto privado del seguimiento',
+                                         decided_at=when,show_at=when)
+
+    def test_follow_ups_due_today_go_together_once_in_the_morning(self):
+        ana=self.buyer('Ana Hoy',step='mensaje_1')
+        self.ready(ana,2,at(6,30))
+        self.buyer('Bea Tarde',step='mensaje_2',next_at=at(16),sent=2)  # due this afternoon: counted in the morning
+        self.buyer('Cris Mañana',step='mensaje_3',next_at=at(9,0,1),sent=3)  # tomorrow: not today
+        self.buyer('Dani Fuera',step='respondio',next_at=at(10),sent=2)  # she replied: never
+        self.watch(at(6,55))  # before the window: nothing
+        self.watch(at(7,5));self.watch(at(12))
+        texts=[t for t in self.texts() if 'seguimiento' in t]
+        self.assertEqual(texts,['Barrio · 2 seguimientos de compradores para hoy: Ana Hoy (seguimiento 2 de 4), Bea Tarde '
+                                '(seguimiento 3 de 4). Están en Tu turno (o llegan al vencer, si no respondieron): los envías tú '
+                                'desde LinkedIn y marcas «Hecho, le escribí».'])
+        self.assertNotIn('Texto privado',' '.join(self.texts()))
+        self.watch(at(7,5,1))  # the next morning: Cris, and Ana's card still waits
+        self.assertIn('Cris Mañana (seguimiento 4 de 4)',self.texts()[-1])
+        with patch.dict('os.environ',{'BUYER_SEQUENCE_ENABLED':'false'}):
+            self.watch(at(7,5,2))
+        self.assertEqual(len([t for t in self.texts() if 'seguimiento' in t]),2)
+
+    def test_a_buyer_who_replied_once_per_reply_without_her_text(self):
+        bea=self.buyer('Bea Respondió',step='respondio',sent=2)
+        AuditEvent.objects.create(action='buyer.sequence_replied',target=str(bea.pk),created_at=at(10),
+                                  metadata={'intento':1,'numero':2,'cancelados':[3],'at':at(9,50).isoformat()})
+        self.watch(at(10,5));self.watch(at(11));self.watch(at(9,0,1))
+        self.assertEqual([t for t in self.texts() if 'respondió' in t],
+                         ['Barrio · Bea Respondió respondió después de tu mensaje 2 de 4. La secuencia se detuvo y se cancelaron '
+                          'los seguimientos pendientes. Respóndele tú desde LinkedIn; el equipo no responde mensajes.'])
+
+    def test_the_sequence_stopped_without_the_inbox_once_a_day(self):
+        AuditEvent.objects.create(action='buyer.sequence_waiting',target=str(self.account.id),created_at=at(9),
+                                  metadata={'motivo':'el inbox está apagado (INBOX_ENABLED=false)','personas':3})
+        self.watch(at(8))  # before it happened: nothing
+        self.watch(at(9,5));self.watch(at(15))
+        self.assertEqual([t for t in self.texts() if 'detenida' in t],
+                         ['Barrio · La secuencia de compradores está detenida: el inbox está apagado (INBOX_ENABLED=false). 3 '
+                          'seguimiento(s) vencido(s) esperan: sin leer el inbox no se sabe si respondieron y no se prepara ninguno. '
+                          'Enciende INBOX_ENABLED o revisa la cuenta y sus cupos de lectura.'])
+        self.watch(at(9,5,1))  # the next day without a new notice: nothing
+        self.assertEqual(len([t for t in self.texts() if 'detenida' in t]),1)
+
+    def test_the_daily_summary_counts_the_journey_messages(self):
+        from team_backend.models import BuyerDraft
+        ana=self.buyer('Ana Uno');bea=self.buyer('Bea Dos',step='mensaje_2',sent=2)
+        self.ready(ana,2,at(9))
+        BuyerDraft.objects.create(contact=bea,kind='mensaje',number=1,attempt=1,state='enviado',decided_at=at(8,0,-6),closed_at=at(8,0,-5))
+        BuyerDraft.objects.create(contact=bea,kind='mensaje',number=2,attempt=1,state='enviado',decided_at=at(9),closed_at=at(10))
+        BuyerDraft.objects.create(contact=bea,kind='mensaje',number=3,attempt=1,state='cancelado',decided_at=at(9),closed_at=at(11))
+        self.watch(at(21))
+        self.assertIn('• Compradores: 1 mensajes esperan en Tu turno (0 primeros, 1 seguimientos); hoy enviaste 1 (0 primeros, '
+                      '1 seguimientos); 1 seguimientos cancelados porque respondieron',self.texts()[-1])
+        with patch.dict('os.environ',{'BUYER_SEQUENCE_ENABLED':'false','BUYER_FIRST_MESSAGE_ENABLED':'false'}):
+            self.assertFalse([l for l in alertas_slack.activity_lines(at(21)) if 'Compradores' in l])

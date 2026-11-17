@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.11-primer-mensaje` · SHA-256 `45d131dc6bc068f3a5eef581e22de0fa43e0cf6c20b0ea4100e0515810286aaa`.
+Versión `6.15-respuesta-comprador` · SHA-256 `646d7d4efcfca43e815ca9adf90afc12ce918ac77d93f1feefe9fdd162737f3a`.
 
 46 nodos (46 activos), 74 aristas y 17 ciclos.
 
@@ -254,6 +254,7 @@ Estado: `active`. Orquestador: `relaciones_comunidad`.
 - `propose_comment`: Tick 60 s, hasta un borrador por tick y cupo disponible.
 - `read_own_comments`: REPLIES_FRESH_EVERY_MINUTES (120 min) en las primeras 72 h de cada post propio; REPLIES_LATE_EVERY_MINUTES (720 min) hasta el día 7.
 - `propose_reply`: Tick 60 s, un borrador pagado a la vez por comentario pendiente y cupo INT-04.
+- `prepare_buyer_draft`: Tick 60 s, antes del plan de red; con BUYER_FIRST_MESSAGE_ENABLED y el líder encendido, un borrador pagado a la vez: la nota de un comprador calentado que se va a invitar o el primer mensaje de uno que aceptó, cuando toca; con BUYER_SEQUENCE_ENABLED e INBOX_ENABLED, también los mensajes 2 a 4 a quien no respondió (4, 5 y 7 días después del «Hecho» del anterior, lunes a viernes, con el inbox leído en las últimas 3 h); con BUYER_REPLY_ENABLED, la clasificación y la contestación a quien respondió (kind respuesta, una por mensaje suyo, hasta 5 por intento).
 - `execute_action`: Tick 60 s; aprobación y capacidad disponible.
 - `reconcile_action`: Hasta 3 por tick; bucket de una hora.
 

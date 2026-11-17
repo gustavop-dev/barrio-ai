@@ -435,9 +435,11 @@ class FirstMessageActivationTests(SimpleTestCase):
         from pathlib import Path
         source = Path(operador.__file__).parent
         naming = {p.name for p in source.glob('*.py') if "metodologia='primer_mensaje'" in p.read_text(encoding='utf-8')}
-        self.assertEqual(naming, {'respuestas.py', 'lider.py'})  # relaciones_comunidad y lider_jev
+        # relaciones_comunidad (RSP-07 en respuestas, y desde la fase 3 el primer mensaje del recorrido en
+        # mensajes_comprador) y lider_jev.
+        self.assertEqual(naming, {'respuestas.py', 'lider.py', 'mensajes_comprador.py'})
         using = {p.name for p in source.glob('*.py') if 'FIRST_MESSAGE_UNITS' in p.read_text(encoding='utf-8')}
-        self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py'})
+        self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py', 'mensajes_comprador.py'})
 
 
 class FirstMessageRegistryTests(FirstMessageBase):
@@ -454,21 +456,26 @@ class FirstMessageRegistryTests(FirstMessageBase):
         self.assertTrue(grade['passed'], grade['errors'])
         self.assertEqual(list(grade['units']), operador.FIRST_MESSAGE_UNITS)
         self.assertEqual(set(grade['units'].values()), {'fixture-hash'})
-        self.assertEqual(grade['corpus']['por_clase']['09'], 7)
-        self.assertNotIn('10', grade['corpus']['por_clase'])
+        # The synthetic corpus seeds every activated list of class 09: the first message (7), the note (3) and the
+        # sequence's (4).
+        class_09 = {uid for uid in operador.FIRST_MESSAGE_UNITS + operador.INVITE_NOTE_UNITS + operador.SEQUENCE_UNITS if uid.startswith('LI-09-')}
+        self.assertEqual(grade['corpus']['por_clase']['09'], len(class_09))
+        # Class 11 holds only the activated units of the buyer's reply (phase 6): four of BUYER_REPLY_UNITS.
+        self.assertEqual(grade['corpus']['por_clase']['11'], sum(1 for uid in operador.BUYER_REPLY_UNITS if uid.startswith('LI-11-')))
         self.assertRegex(grade['corpus']['sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual(evaluaciones.case_drift(grade, self.grade()), [])
 
     def test_a_growing_corpus_warns_to_grade_again_without_failing_the_case(self):
         before = self.grade()
+        seeded = before['corpus']['por_clase'].get('11', 0)  # the activated units of class 11 the base seeds
         with db.connect() as c:
             c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
-                VALUES('LI-10-M001-K01',10,'Clase 10','{}','fixture-hash','fixture','/units/0','{}')''')
+                VALUES('LI-11-M001-K01',11,'Clase 11','{}','fixture-hash','fixture','/units/0','{}')''')
         after = self.grade()
         self.assertTrue(after['passed'], after['errors'])
         self.assertEqual(after['units'], before['units'])
         self.assertEqual(evaluaciones.case_drift(before, after),
-                         ['La biblioteca cambió (10: 0 → 1): vuelve a calificar el caso.'])
+                         [f'La biblioteca cambió (11: {seeded} → {seeded + 1}): vuelve a calificar el caso.'])
 
     def test_a_changed_unit_of_the_case_is_named(self):
         before = self.grade()

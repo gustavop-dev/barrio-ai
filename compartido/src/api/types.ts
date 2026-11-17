@@ -269,7 +269,7 @@ export interface ContactClassification {
   region?: string;
   /** A deterministic rule that overrode the model's verdict («Evidencia en contra: no es comprador…»). */
   rule?: string;
-  /** The web looks for the stage of a buyer's company and sets its level; it holds no action (BAR-18). */
+  /** The web looks for the stage of a buyer's company and sets its level; it holds no action (BAR-24). */
   stage_check?: ContactStageCheck;
   /** Gustavo said the person fits after a doubt of the lead: the lead no longer reviews their actions. */
   confirmed_by_gustavo?: { at: string; by: string };
@@ -279,7 +279,7 @@ export interface ContactStageCheck {
   state: 'pending' | 'ok' | 'failed';
   attempts?: number;
   next_at?: string;
-  /** BAR-18 levels; checks finished before 17/11/2026 keep the old verdicts. */
+  /** BAR-24 levels; checks finished before 17/11/2026 keep the old verdicts. */
   verdict?: BuyerLevel | 'semilla_o_mas' | 'presemilla' | 'sin_evidencia';
   evidence?: string;
   sources?: string[];
@@ -295,7 +295,7 @@ export interface BuyerScorePart {
   why: string;
 }
 
-/** BAR-18: a buyer's level and explainable score (0–100; the breakdown adds up to it). Null for other roles. */
+/** BAR-24: a buyer's level and explainable score (0–100; the breakdown adds up to it). Null for other roles. */
 export interface ContactBuyer {
   level: BuyerLevel;
   profile: '' | 'startup_financiada' | 'bootstrapped' | 'stealth' | 'ejecutivo';
@@ -307,8 +307,8 @@ export interface ContactBuyer {
   warnings: string[];
   evidence: string;
   sources: string[];
-  /** The level and score the buyer entered with, kept once. */
-  entry?: { level: BuyerLevel; score: number | null; version: string; profile: string; at: string } | null;
+  /** The level and score the team went after the buyer with (BuyerJourney), fixed by the first follow or invitation; null without a journey. */
+  entry?: { level: BuyerLevel; score: number | null; version: string; at: string } | null;
 }
 
 /** What the profile says about the person's reach and moment; a missing key was not given (never zero). */
@@ -399,7 +399,7 @@ export interface Contact extends ContactBrief {
   signals?: ContactSignals;
   region?: 'us' | 'latam' | 'otro' | null;
   lead_doubt?: ContactLeadDoubt | null;
-  /** BAR-18 (absent on older backends). */
+  /** BAR-24 (absent on older backends). */
   buyer?: ContactBuyer | null;
 }
 
@@ -1001,6 +1001,19 @@ export interface TurnoMessage {
   piece_id: string;
   /** The thesis of the post they talked about. */
   topic: string;
+  /**
+   * The first message of the buyer's journey (BUYER_FIRST_MESSAGE_ENABLED, phase 3) cites a fact that is not always a
+   * comment on his post: `comment` may be her post (and `reply` the team's comment on it) or a buying signal. These
+   * labels name them; absent (the conversation on his post), the card keeps its usual labels.
+   */
+  comment_label?: string;
+  reply_label?: string;
+  /**
+   * The label of `text`: «Seguimiento 2 de 4»… for a follow-up of the buyer's sequence (BUYER_SEQUENCE_ENABLED, phase 4),
+   * where `comment` is the message Gustavo sent her last. Absent: «Mensaje sugerido».
+   */
+  text_label?: string;
+  origin?: 'recorrido';
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
 }
 

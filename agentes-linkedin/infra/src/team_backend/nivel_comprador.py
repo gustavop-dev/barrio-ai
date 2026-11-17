@@ -1,4 +1,4 @@
-"""The buyer of the neighborhood: what kind of buyer, how much evidence there is, and an explainable score (BAR-18).
+"""The buyer of the neighborhood: what kind of buyer, how much evidence there is, and an explainable score (BAR-24).
 
 Gustavo, 17/11/2026: «Siento que puede ser demasiado estricto, o que el verificador hace una pregunta demasiado rígida y
 no deja pasar a nadie»; «estamos cortando con una misma tijera a todos; podríamos cambiar las preguntas dependiendo del
@@ -11,10 +11,12 @@ delante»). What changes is that the absence of public evidence is no longer evi
 - level (LEVELS): confirmado, probable, por_confirmar or no_encaja. Only no_encaja leaves the neighborhood; the others
   stay, in that order.
 - score (score(), SCORE_VERSION): 0–100, a sum of visible components. It orders the buyers inside their market tier
-  (red.prioritized) and never excludes anyone. A thin profile never loses points: missing data takes the middle value of
-  its component and only raises a notice.
-- entry (record_entry): the level and score a buyer entered with, kept once and never overwritten, to compare later
-  whether the «por confirmar» accept and answer like the confirmed ones (entry_funnel)."""
+  (red.prioritized, with the outbound temperature: priority()) and never excludes anyone. A thin profile never loses
+  points: missing data takes the middle value of its component and only raises a notice.
+- entry (entry_of): the level and score the team went after a buyer with, on BuyerJourney (entry_level, entry_score).
+  comprador keeps them in step with her level while she is only chosen and fixes them at the first follow or
+  invitation; never overwritten after. They compare whether the «por confirmar» accept and answer like the confirmed
+  ones (entry_funnel, inside comprador.funnel)."""
 import re
 import unicodedata
 
@@ -27,7 +29,6 @@ LEVEL_RANK={level:n for n,level in enumerate(LEVELS)}
 # Verdicts of the web check until 17/11/2026: «sin_evidencia» was the absence of evidence, now por_confirmar.
 LEGACY_VERDICTS={'semilla_o_mas':'confirmado','presemilla':'no_encaja','sin_evidencia':'por_confirmar'}
 THIN_NOTICE='perfil con poca información'
-ENTRY_ACTION='network.buyer_entered'
 
 # The question that applies to each kind of buyer: `web` is the public search (English, no private data; research.
 # safe_question still filters it), `juez` is what the judge of the stage weighs. Same research call and same searches
@@ -192,43 +193,46 @@ def with_score(contact,buyer):
     return dict(buyer,score=result.get('score'),score_breakdown=result.get('breakdown'),score_version=SCORE_VERSION,
                 warnings=result.get('warnings',[]))
 
-# --------------------------------------------------------------------------- entry, kept once
+# --------------------------------------------------------------------------- with the temperature of the outbound
 
-def record_entry(contact,now=None):
-    """The level and score the buyer entered the neighborhood with: one audit event per person, never overwritten (a
-    reclassification keeps the first). Returns the entry, which classify copies into the buyer block."""
-    from .models import AuditEvent
-    from . import operador
-    event=AuditEvent.objects.filter(action=ENTRY_ACTION,target=str(contact.pk)).order_by('created_at','id').first()
-    if event:return {k:event.metadata.get(k) for k in ('level','score','version','profile','at')}
-    buyer=_buyer(contact);now=now or timezone.now()
-    entry={'level':buyer.get('level'),'score':buyer.get('score'),'version':SCORE_VERSION,'profile':buyer.get('profile',''),
-           'at':now.isoformat()}
-    operador._audit(None,ENTRY_ACTION,contact.pk,**entry)
-    return entry
+# priority = score + TEMPERATURE_POINTS × min(weight, TEMPERATURE_CAP). The score says who the person is (evidence,
+# market, role, fit); the temperature (calentamiento.weigh: Máxima 5, Alta 3, Media 1, buying signals 2, half after
+# 30 days) says what she did back. One Alta signal (+15) is worth about one level (17 points); the weight counts up to
+# 8 (+40), so what a person does can lift her over a stronger profile, never without limit.
+TEMPERATURE_POINTS=5
+TEMPERATURE_CAP=8
+
+def priority(score_value,weight=0):
+    return (score_value or 0)+TEMPERATURE_POINTS*min(max(float(weight or 0),0.0),TEMPERATURE_CAP)
+
+# --------------------------------------------------------------------------- entry, fixed by the first follow or invitation
+
+def entry_of(contact):
+    """The entry fields of the buyer's journey for her current level and score (comprador._project), or {}."""
+    result=score(contact)
+    if not result:return {}
+    return {'entry_level':result['level'],'entry_score':result['score'],'entry_score_version':result['version']}
 
 BANDS=((80,'80-100'),(60,'60-79'),(40,'40-59'),(0,'0-39'))
 
 def band(value):
     return next(label for floor,label in BANDS if (value or 0)>=floor)
 
-def entry_funnel(account=None):
-    """Read only: the buyers by the level and the score band they entered with, and how many were followed, invited and
-    accepted since. The whole funnel (warm-up, messages, answers) lives in the outbound branch."""
-    from .models import AuditEvent, Contact
-    entries={e.target:e.metadata for e in AuditEvent.objects.filter(action=ENTRY_ACTION).order_by('created_at','id')}
-    contacts=Contact.objects.filter(pk__in=list(entries))
-    if account is not None:contacts=contacts.filter(account=account)
-    empty=lambda:{'entraron':0,'seguidos':0,'invitados':0,'aceptaron':0}
-    out={'por_nivel':{level:empty() for level in LEVELS if level!='no_encaja'},'por_puntaje':{label:empty() for _,label in reversed(BANDS)},
-         'version':SCORE_VERSION}
-    for contact in contacts:
-        entry=entries.get(str(contact.pk)) or {}
-        rows=[out['por_nivel'].setdefault(entry.get('level') or 'sin_nivel',empty()),out['por_puntaje'][band(entry.get('score'))]]
-        for row in rows:
-            row['entraron']+=1;row['seguidos']+=bool(contact.followed_at);row['invitados']+=bool(contact.invited_at)
-            row['aceptaron']+=bool(contact.connected_at)
-    return out
+ENTRY_STAGES=(('elegidos',lambda j:True),('seguidos',lambda j:j.warming_at is not None),
+              ('calentados',lambda j:j.comments_before_invite>=1),('invitados',lambda j:j.invited_at is not None),
+              ('aceptaron',lambda j:j.accepted_at is not None),('respondieron',lambda j:j.replied_at is not None))
+
+def entry_funnel(journeys):
+    """Read only, for comprador.funnel: the journeys by the level and the score band they entered with, and how many of
+    each were followed, warmed (a comment before the invitation), invited, accepted and answered."""
+    def counts(group):
+        return {name:sum(1 for j in group if reached(j)) for name,reached in ENTRY_STAGES}
+    journeys=list(journeys)
+    levels=[*[level for level in LEVELS if level!='no_encaja'],'no_encaja','sin_nivel']
+    by_level={level:counts([j for j in journeys if (j.entry_level or 'sin_nivel')==level]) for level in levels}
+    by_band={label:counts([j for j in journeys if j.entry_score is not None and band(j.entry_score)==label]) for _,label in BANDS}
+    by_band['sin_puntaje']=counts([j for j in journeys if j.entry_score is None])
+    return {'por_nivel':by_level,'por_puntaje':by_band,'version':SCORE_VERSION}
 
 # --------------------------------------------------------------------------- who left before 17/11/2026
 
@@ -282,7 +286,7 @@ def reevaluate(user,account,confirm=False,now=None):
     and leaves an audit event; running it again finds nobody (idempotent). Restoring and completing spend nothing;
     whoever is sent back to the classifier is judged by the normal classify job, in its batches and budget."""
     from django.db import transaction
-    from . import operador, red
+    from . import comprador, operador, red
     from .evidencia import record_classification
     from .models import Contact
     from .permissions import require
@@ -329,10 +333,9 @@ def reevaluate(user,account,confirm=False,now=None):
                     stage='fit' if contact.stage=='discarded' else contact.stage
                     red._stage(contact,stage,'reevaluated','Vuelve al barrio por confirmar (17/11/2026): solo la evidencia en '
                                'contra saca a un comprador.')
-                if contact.classification:
-                    contact.classification['buyer']['entry']=record_entry(contact,now)
                 contact.save()
                 if contact.classification:record_classification(contact,observed_at=now)
                 operador._audit(user,REEVALUATED,contact.pk,group=group,step=ACTIONS[group],score=row['score'])
                 applied+=1
+            comprador.on_contact(contact,'reevaluacion')  # the journey (and its entry) of whoever is a buyer again
     return {'found':found,'total':len(rows),'applied':applied,'people':rows}

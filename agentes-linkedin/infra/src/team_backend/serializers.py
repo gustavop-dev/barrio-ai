@@ -186,15 +186,20 @@ class ContactOutput(serializers.ModelSerializer):
     lead_doubt=serializers.SerializerMethodField()
     buyer=serializers.SerializerMethodField()
     def get_buyer(self,obj):
-        """BAR-18: a buyer's level, profile, score (0–100, its breakdown adds up to it) and the entry kept once; null for
-        someone who is not a buyer."""
+        """BAR-24: a buyer's level, profile, score (0–100, its breakdown adds up to it) and her entry (the level and score
+        the team went after her with); null for someone who is not a buyer."""
         from . import red
         result=red.buyer_score(obj)
         if not result:return None
         stored=(obj.classification or {}).get('buyer') or {}
+        from .models import BuyerJourney
+        journey=(BuyerJourney.objects.filter(contact=obj).values('entry_level','entry_score','entry_score_version','chosen_at').first()
+                 or {})
+        entry=({'level':journey['entry_level'],'score':journey['entry_score'],'version':journey['entry_score_version'],
+                'at':serializers.DateTimeField().to_representation(journey['chosen_at'])} if journey.get('entry_level') else None)
         return {'level':result['level'],'profile':stored.get('profile') or '','us_market':bool(stored.get('us_market')),
                 'score':result['score'],'breakdown':result['breakdown'],'version':result['version'],'warnings':result['warnings'],
-                'evidence':stored.get('evidence') or '','sources':stored.get('sources') or [],'entry':stored.get('entry')}
+                'evidence':stored.get('evidence') or '','sources':stored.get('sources') or [],'entry':entry}
     def get_region(self,obj):
         from . import ubicacion
         return ubicacion.region(obj.location)

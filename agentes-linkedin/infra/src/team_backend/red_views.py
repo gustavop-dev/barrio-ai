@@ -58,6 +58,17 @@ class ContactNotes(APIView):
         contact.save(update_fields=['notes'])
         return Response(ContactOutput(contact).data,status=201)
 
+class OldInvitations(APIView):
+    """GET /api/v1/red/invitaciones-pendientes?dias=21: invitations still pending after `dias` (1–365), oldest first,
+    for Gustavo to withdraw by hand if he wants (phase 2, calentamiento.old_invitations). Read-only, never calls
+    LinkedIn; the team never withdraws nor sends one again."""
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        from . import calentamiento
+        account=request.query_params.get('account')
+        return Response(calentamiento.old_invitations(request.query_params.get('dias','21'),
+                                                      get_or_404(ConnectorAccount,id=account) if account else None))
+
 class Summary(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')

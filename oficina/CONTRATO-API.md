@@ -261,7 +261,87 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
 - `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
 - `reads_today.execution` cuenta las lecturas de las ejecuciones de red: la comprobación previa, la relectura y la conciliación. No tiene tope (no aparece en `read_caps`), porque ninguna escritura sale sin su comprobación previa.
 
+### Invitaciones pendientes viejas (fase 2 del comprador)
+
+GET `/api/v1/red/invitaciones-pendientes?dias=21` (permiso `operate_linkedin`; `dias` entre 1 y 365, por defecto 21; fuera de rango, 400 con `detail`; `account` opcional, 404 si no existe). Solo lectura y nunca llama a LinkedIn. Lista las invitaciones de Gustavo que siguen pendientes después de `dias`, la más vieja primero, para que él decida si retira alguna a mano en LinkedIn: el equipo nunca retira una invitación ni vuelve a invitar mientras siga pendiente.
+```json
+{ "generado": "ISO", "dias": 21, "total": 1,
+  "invitaciones": [ { "persona": "uuid", "nombre": "Ana Buyer", "titular": "…", "perfil": "https://www.linkedin.com/in/…",
+                      "invitada": "ISO", "dias": 25, "papel": "comprador",
+                      "recorrido": { "paso": "descanso", "comentarios": 2, "intento": 1, "descanso_hasta": "ISO|null" } } ],
+  "nota": "Retirar una invitación es manual, en LinkedIn. …" }
+```
+`recorrido` es `null` para quien no tiene recorrido de comprador (pares, recomendadores…). Con `BUYER_WARMUP_ENABLED=true`, un comprador con dos comentarios que no aceptó en `BUYER_REST_AFTER_DAYS` (21) pasa a `paso: "descanso"` con su fecha de fin. La PWA todavía no lo muestra.
+
 La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente al tope de seguridad diario del equipo y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
+
+### Primer mensaje al aceptar y nota para calentados (fase 3 del comprador)
+
+Con `BUYER_FIRST_MESSAGE_ENABLED=true` (por defecto `false`) y el líder encendido (ficha BAR-20). Apagado, nada de esto aparece.
+
+- **Tu turno.** `tasks.mensajes` suma, después de las de RSP-07, las tarjetas `mensaje` del recorrido del comprador: `id: "dm:<borrador>"`, `title: "{persona} aceptó tu invitación"`, prioridad `importante`, `agent: "relaciones_comunidad"`, `created_at` igual a la hora en que se muestra (una hora después de aceptar como pronto). Mismas acciones que RSP-07 («Abrir su perfil», «Hecho, le escribí» `{how: "enviado"}`, «No escribirle» `{how: "no"}` con nota opcional) contra el mismo endpoint, con el id del borrador. `message` trae los campos de siempre (`piece_id` y `topic` vacíos) más tres opcionales: `comment_label` y `reply_label` (qué son `comment` y `reply`: «Su post» y «Lo que comentó el equipo», «Lo que comentó en tu post»…; `reply_label` vacío si no hay `reply`) y `origin: "recorrido"`. Sin esos campos, la tarjeta es la de RSP-07 y la PWA y la app usan sus etiquetas de siempre. Una tarjeta por persona: si hay una de RSP-07, no hay otra del recorrido. `recent` suma «Mensaje sugerido para {persona}» con `how` «Le escribiste» o «No le escribiste».
+- **`POST /api/v1/respuestas/<id>/mensaje`** `{how: "enviado" | "no", note?}` acepta también el id de un borrador del recorrido. Devuelve `{ "id": "uuid", "closed": { "how": "enviado" | "no", "at": "ISO", "note": "…" } }`; repetirlo devuelve el mismo cierre. «No escribirle» saca a la persona del recorrido (`descartado_por_gustavo`). 409 si el borrador ya no está en Tu turno; 404 si el id no es ni un comentario ni un borrador de mensaje. La app nunca envía el mensaje.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma en `borradores` (acumulado): `fuentes: ["mensaje_sugerido", "recorrido"]`, `recorrido: { preparados, pendientes, enviados, no_enviados, parados: { reglas, juez, hecho, cupo, conversacion } }` y `notas: { preparadas, con_invitacion, enviadas, parados: { … } }`. `pendientes` y `enviados` cuentan las dos fuentes.
+
+### Seguimientos 2 a 4 del comprador (fase 4)
+
+Con `BUYER_SEQUENCE_ENABLED=true` (por defecto `false`), la fase 3, el líder y el inbox encendidos (ficha BAR-21). Apagado, nada de esto aparece.
+
+- **Tu turno.** `tasks.mensajes` suma, después de las de la fase 3, las tarjetas `mensaje` de los seguimientos: `id: "dm:<borrador>"`, `title: "Seguimiento {n} de 4 para {persona}"`, prioridad `importante`, `agent: "relaciones_comunidad"`. Mismas acciones y mismo endpoint que el primer mensaje. `message` trae un campo opcional nuevo, `text_label: "Seguimiento {n} de 4"` (la etiqueta del texto sugerido; sin él, la PWA y la app ponen «Mensaje sugerido»), `comment` con el último mensaje que Gustavo le envió y `comment_label: "Tu mensaje {n-1} (hace X días)"`, `reply` y `reply_label` vacíos y `origin: "recorrido"`. La tarjeta no aparece si ella respondió ni si el inbox no se leyó en las últimas 24 h. `recent` dice «Seguimiento {n} de 4 para {persona}».
+- **`POST /api/v1/respuestas/<id>/mensaje`** acepta el id de un seguimiento. «Hecho, le escribí» registra el mensaje n y empieza a contar el plazo del siguiente; «No escribirle», salida definitiva. 409 si se canceló porque ella respondió.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma `secuencia: { recibieron: {"1".."4"}, respondieron_tras: {"1".."4"}, comprobacion: { curso, respuestas, tras_2_o_3, tras_2_o_3_pct, muestra_chica }, descansan, activa }` y, en `borradores`, `por_numero: {"1".."4": { preparados, pendientes, enviados, no_enviados, cancelados, parados }}`. `borradores.recorrido` sigue contando solo el primer mensaje; `pendientes` suma los seguimientos listos con el interruptor encendido. `descanso` puede traer `secuencia_sin_respuesta`.
+
+### La ruta del comprador que no publica (fase 5)
+
+Con `BUYER_NO_POSTS_ROUTE_ENABLED=true` (por defecto `false`) y el calentamiento encendido (ficha BAR-22). Apagado, nada de esto aparece. Sin endpoints nuevos.
+
+- **Personas y red.** Un colega de un comprador que no publica entra como contacto con `classification.role: "puente"` (y `classification.puente: { comprador, recorrido, empresa, cargo, cargo_comprador }`), etapa `fit` → `followed` → `invited` → `connected` como cualquier otro. La PWA y la app lo etiquetan «Puente» («Puentes» en los chips); un cliente que no conoce el papel muestra su nombre tal cual.
+- **Tu turno.** La tarjeta del primer mensaje (fase 3) puede traer `comment_label: "Su colega (el puente)"` cuando el mensaje cita lo que hizo el puente; mismos campos y acciones.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma `ruta_sin_posts: { activa, definiciones, comparacion: { con_puente, sin_puente }, puentes: { pedidos, busquedas, encontrados, sin_puente: { "<motivo>": n }, seguidos, invitados, aceptaron, compradores_con_senal_del_puente, compradores_con_interaccion_del_puente }, donde_comenta: { disponible: false, motivo }, visitas: { disponible: false, motivo }, reintentos: { por_angulo }, reverificaciones: { pedidas, hechas, con_senal_nueva, vencidas } }`. `descanso` puede traer `invitacion_no_aceptada` también para quien fue invitado con menos de dos comentarios.
+
+### Comprador: su respuesta, la reunión y la entrega del lead (fase 6)
+
+Con `BUYER_REPLY_ENABLED=true` (por defecto `false`), la fase 4, el líder y el inbox encendidos (ficha BAR-23). Apagado, las tarjetas, la entrega y la lectura no aparecen; el webhook responde 202 sin guardar nada (con la firma buena) y los endpoints de abajo contestan como siempre, pero nada los alimenta. La máquina de LinkedIn termina en la reunión agendada: ninguno de estos datos califica al lead.
+
+- **Tu turno, `tasks.mensajes`.** Después de los seguimientos, una tarjeta por cada respuesta de un comprador, la más vieja primero, con `id: "respuesta:<borrador>"`, prioridad `importante`, `agent: "relaciones_comunidad"` y `created_at` igual a la hora en que se clasificó. Su conversación del inbox no sale dos veces.
+  - **Con borrador** (`kind: "mensaje"`). `title` según el tipo: «{persona} quiere hablar», «{persona} pide información», «{persona}: ahora no es el momento», «{persona}: no le interesa», «{persona} te dice que lo ve otra persona». `message` trae `text` (el borrador; en `interesado` y `pide_informacion` termina en una línea aparte con el enlace de agenda), `text_label` («Respuesta sugerida · con tu agenda», «… · sin insistir», «… · cierre», «… · agradece»), `comment` (lo que ella escribió) con `comment_label: "Lo que te respondió"`, `reply` (lo que falta confirmar, separado por «; ») con `reply_label: "Falta confirmar"` o vacío, `origin: "respuesta"` y `person: { id, display_name, headline, profile_url, role }`.
+  - **Sin borrador** (`kind: "conversacion"`). Para «otro» (poca confianza), sin `CALCOM_BOOKING_URL` o sin un borrador que pasara las reglas y el líder: `title: "{persona} te respondió: necesita tu respuesta"`, `conversation` como en «Conversaciones e inbox» más `person`, `reply_kind` (el tipo) y `origin: "respuesta"`. `body` dice por qué no hay borrador.
+  - **Acciones.** «Abrir la conversación» (`href`, la principal); «Hecho, le escribí» `{how: "enviado"}` y «No escribirle» `{how: "no"}` con nota opcional, las dos a `POST /api/v1/respuestas/<borrador>/mensaje` (el mismo endpoint de RSP-07: con el id de una respuesta la cierra; «enviado» suma `respuesta_enviada` al recorrido, «no» no cambia nada más y nunca es una salida). En `interesado` y `pide_informacion`, también «Agendó» (nota opcional con la fecha). En `otra_persona` sin perfil, también «Pegar su perfil» (nota obligatoria).
+  - `recent` suma «Respuesta para {persona}» con `how` «Le escribiste» o «No le escribiste».
+- **Tu turno, `tasks.comprador`** (la clave solo aparece si hay tarjetas). Todas son `kind: "aviso"` de `relaciones_comunidad`, prioridad `importante`.
+  - **«Reunión agendada con {persona}».** `id: "entrega:<id>"`, `handoff: { id, contacto }`. Acciones: «Crear la oportunidad» (o «Vincular su oportunidad» si ya tiene una abierta) a `POST /api/v1/comprador/entregas/<id>/oportunidad` sin cuerpo, y «Ver la persona» (`href: "/personas/<contacto>"`).
+  - **«Reserva de Cal.com sin emparejar».** `id: "reserva:<id>"`, `booking: { id, inicio }`. Acciones: un «Es {persona}» por cada comprador que recibió el enlace (`{recorrido: "<id>"}`) y «No es de un comprador» (`{descartar: true}`), las dos a `POST /api/v1/comprador/reservas/<id>/emparejar`.
+  - Una PWA o app que no conoce la clave `comprador` no la muestra. Las acciones son las genéricas (`endpoint`, `body`, `note_optional`, `note_required`), así que no piden cambios en los clientes.
+- **`POST /api/v1/comprador/calcom/webhook`.** Público (sin sesión ni CSRF): la única credencial es la cabecera `X-Cal-Signature-256`, el HMAC-SHA256 en hexadecimal del cuerpo exacto con `CALCOM_WEBHOOK_SECRET`. Lee `BOOKING_CREATED`, `BOOKING_RESCHEDULED` y `BOOKING_CANCELLED`. Del cuerpo usa `payload.uid`, `payload.rescheduleUid` (o `fromReschedule`), `payload.startTime`, `payload.endTime`, `payload.metadata.barrio` y el primer `payload.attendees[] { name, email }`, solo para emparejar; nada del cuerpo se ejecuta ni se muestra como instrucción.
+  - Respuestas: 413 si el cuerpo pasa de 64 KB; 403 sin secreto configurado («Webhook sin configurar.») o con la firma mala («Firma inválida.»), auditados una vez por hora y sin guardar nada; 202 `{ignorado: "BUYER_REPLY_ENABLED apagado"}` con la fase apagada; 400 con un JSON inválido o sin `uid`; 200 `{ignorado: "<evento>"}` para otros eventos (el «Ping» incluido); 200 `{repetido: true}` si ese mismo cuerpo ya llegó; 200 `{reserva, estado, emparejada_por}` en lo demás.
+  - Empareja por el identificador del enlace (`metadata.barrio`), la reserva que reprograma, el correo de ella en la conversación o su nombre exacto; si nada coincide, queda «sin emparejar» y aparece en Tu turno.
+- **`POST /api/v1/comprador/respuestas/<borrador>/agendo`** `{note?}`: «Agendó» a mano. La nota puede traer la fecha (`dd/mm/aaaa [hh:mm]`, por defecto a las 9:00 locales, o ISO). Devuelve `{reserva, estado, inicio}`; un segundo toque no cambia nada. Con sesión humana; 404 si el borrador no es una respuesta.
+- **`POST /api/v1/comprador/respuestas/<borrador>/referido`** `{note}`: el perfil (`linkedin.com/in/…`) de la persona que ella nombró. 400 si la nota no trae un perfil; 409 si la respuesta no es `otra_persona`. Devuelve `{id, referido: { nombre, perfil, estado, … }}`.
+- **`POST /api/v1/comprador/reservas/<id>/emparejar`** `{recorrido}` o `{descartar: true}`. Devuelve `{reserva, estado, emparejada_por, recorrido}`; 400 sin uno de los dos; 409 si la reserva ya estaba emparejada.
+- **`GET /api/v1/comprador/entregas?estado=lista|confirmada|cancelada&fuente=linkedin`** → `{ items: [entrega] }`, las 100 más nuevas; **`GET /api/v1/comprador/entregas/<id>`** → una. Solo lectura, con el permiso `operate_linkedin`; 400 con un `estado` o una `fuente` desconocidos. Es lo que leerá la máquina de ventas, neutra a la fuente:
+
+```json
+{ "id": "uuid", "fuente": "linkedin", "estado": "lista|confirmada|cancelada",
+  "persona": { "contacto": "uuid", "nombre": "…", "titular": "…", "perfil": "https://www.linkedin.com/in/…", "ubicacion": "…" },
+  "empresa": { "nombre": "…", "fuente": "…" },
+  "recorrido": { "senal_de_entrada": { "entrada": "outbound", "ruta": "…", "elegida": "ISO", "motivo": "…", "senal": "…" },
+                 "toques": { "total": 9, "por_tipo": { "comentario": 2, "…": 1 }, "comentarios": 2, "visitas": 0 },
+                 "mensajes_enviados": [ { "numero": 1, "texto": "…", "enviado": "ISO", "tipo": "…" } ],
+                 "respondio_a": 1, "respuesta": { "tipo": "interesado", "texto": "…", "fecha": "ISO" },
+                 "puente": null, "referido_por": null, "intento": 1 },
+  "conversacion": [ "Gustavo le escribió el …: «…»", "Ella respondió el … (interesado): «…»", "Agendó la reunión por Cal.com para el …." ],
+  "reunion": { "inicio": "ISO", "fin": "ISO", "proveedor": "calcom|manual", "reserva": "…", "emparejada_por": "enlace|reserva_anterior|correo|nombre|gustavo|manual", "correo": "…", "nombre": "…" },
+  "negocio": [ { "hecho": "…", "fuente": "…" } ],
+  "oportunidad": { "id": "uuid", "etapa": "reunion" } | null,
+  "recorrido_id": "uuid", "conversacion_id": "uuid" | null,
+  "creada": "ISO", "actualizada": "ISO", "confirmada": "ISO" | null }
+```
+
+  Sin calificación (presupuesto, autoridad, necesidad o plazo): eso es de la máquina de ventas. `conversacion` es la conversación en tres líneas armadas sin modelo (su primer mensaje, la respuesta de ella, la reserva); `negocio`, solo hechos con su fuente.
+- **`POST /api/v1/comprador/entregas/<id>/oportunidad`** (sin cuerpo, sesión humana): «Crear la oportunidad», el toque de Gustavo (PRS-09: el equipo nunca la crea solo). Crea la oportunidad en etapa `reunion` (canal `linkedin`, con la empresa y la próxima acción en la fecha de la reunión) o vincula la que ella ya tenía abierta, y la enlaza con la conversación y el recorrido. Devuelve la entrega con `estado: "confirmada"`; repetirlo devuelve lo mismo; 409 si la reunión se canceló.
+- **`GET /api/v1/comprador/lectura-semanal`** (solo lectura, `operate_linkedin`): `{ generado, semana, muestra_chica, invitaciones, tabla: [ { etapa, sintoma, causa, cambio, fuente_umbral, n, de, valor_pct, umbral_pct, umbral: "mínimo|máximo", rota } ], se_rompe, causa, cambio, semana_actual, semana_anterior, borradores: { pendientes, enviados }, regla, lineas: [≤5], activa }`. Con menos de 30 invitaciones, `muestra_chica: true` y `se_rompe: null`.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador`: `interesados` y `reunion` cuentan con datos reales. Suma `respuestas: { activa, clasificadas, por_tipo: { interesado, pide_informacion, no_es_el_momento, no_le_interesa, otra_persona, otro }, borradores: { preparados, pendientes, sin_borrador, enviados, no_enviados, parados }, reuniones, horas_respuesta_a_reunion: { mediana, personas } }` y, en `borradores`, `respuestas: { preparados, pendientes, sin_borrador, enviados, no_enviados, parados: { … } }`. `pendientes` y `sin_borrador` son 0 con el interruptor apagado.
+- **Resumen semanal.** `GET /api/v1/resultados/resumen-semanal` suma `comprador` con la lectura de esa semana (o `{ disponible: false, motivo }` con la fase apagada).
 
 ### Trabajos y roles (escena de la oficina)
 
@@ -370,6 +450,8 @@ Reglas para la PWA:
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
 **Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
+
+**Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, señal de compra con fuente, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes

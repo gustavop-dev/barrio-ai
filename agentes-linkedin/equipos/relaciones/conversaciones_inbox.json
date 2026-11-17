@@ -315,7 +315,7 @@
     {
       "id": "CHAT-03",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Sin inventar disponibilidad, presupuesto ni compromisos; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responde sin comprometer, mantiene la conversación y escala por CHAT-09."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Sin inventar disponibilidad, presupuesto ni compromisos; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responde sin comprometer, mantiene la conversación y escala por CHAT-09. La respuesta a un comprador del recorrido (BAR-23, BUYER_REPLY_ENABLED) no es de este rol: la clasifica y la redacta relaciones_comunidad (respuesta_comprador) como borrador que Gustavo envía a mano."
     },
     {
       "id": "CHAT-03",
@@ -325,7 +325,7 @@
     {
       "id": "CHAT-04",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia. La secuencia del comprador del recorrido (BAR-21) no es de este rol: la redacta relaciones_comunidad como borradores que Gustavo envía a mano."
     },
     {
       "id": "CHAT-04",
@@ -345,7 +345,7 @@
     {
       "id": "CHAT-07",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Proponer conversación y confirmar una franja solo dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer horarios; una reunión no compromete condiciones; agenda opcional no conectada."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Proponer conversación y confirmar una franja solo dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer horarios; una reunión no compromete condiciones; agenda opcional no conectada. Para el comprador del recorrido (BAR-23) la reunión se agenda con el enlace de Cal.com de Gustavo, que solo lleva el borrador de relaciones_comunidad, y la reserva llega por su webhook."
     },
     {
       "id": "CHAT-08",
@@ -355,7 +355,7 @@
     {
       "id": "CHAT-09",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Registro interno de nivel A; la decisión sobre la oportunidad (salario, tarifas, dedicación, oferta, contrato o alianza) es nivel C: el sistema prepara los hechos, alerta a Gustavo y mantiene la conversación sin comprometer."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Registro interno de nivel A; la decisión sobre la oportunidad (salario, tarifas, dedicación, oferta, contrato o alianza) es nivel C: el sistema prepara los hechos, alerta a Gustavo y mantiene la conversación sin comprometer. En el recorrido del comprador (BAR-23) la reunión agendada deja una entrega del lead, neutra a la fuente y sin calificar; la oportunidad la crea o la vincula Gustavo con un toque (PRS-09)."
     },
     {
       "id": "CHAT-09",

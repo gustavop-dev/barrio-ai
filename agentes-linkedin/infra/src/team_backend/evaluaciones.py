@@ -205,18 +205,22 @@ def selection_request(run,piece,panel=True):
 def comment_request(run,post,revision=None):
     """operador._draft_comment without reading LinkedIn (existing_comments stays empty): instructions, voice and course
     units in cached system blocks; `revision` makes it the redraft after a rule violation."""
-    units,missing,_=run.context(run.units('comentar',operador.COMMENT_UNITS)[0])
-    if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
+    from . import calentamiento
+    warm=calentamiento.warmup_post(post)
+    units,missing,_=run.context(run.units('comentar',operador.COMMENT_UNITS)[0],warm=warm)
+    if missing:raise ValueError('Biblioteca no disponible para el comentario de calentamiento.' if warm else
+                                'Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
     from . import experimentos
     inputs['referent_evidence']=experimentos.signals(post)
     inputs['comment_language']=operador.COMMENT_LANGUAGE
+    if warm:inputs['calentamiento']=calentamiento.draft_inputs(post)
     # What production would have shown then: his comments before this post was observed, never the one on this post.
     inputs['recent_own_comments']=operador.recent_own_comments(post.account,before=post.observed_at,exclude_post=post)
     if revision:inputs['revision']=revision
-    return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
+    return {'system':operador.comment_system(warm),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
 
 def classify_request(run,contacts):
@@ -371,9 +375,11 @@ class Run:
             return ids,f'catalogo:{self.catalog}'
         return catalogo.units_for(shelf,fallback)
 
-    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET):
-        key=(tuple(unit_ids),budget)
-        if key not in self._units:self._units[key]=operador.course_context(list(unit_ids),budget)
+    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False):
+        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does."""
+        key=(tuple(unit_ids),budget,warm)
+        if key not in self._units:
+            self._units[key]=operador.warmup_units(list(unit_ids),budget) if warm else operador.course_context(list(unit_ids),budget)
         return self._units[key]
 
     def guard(self,worst):
@@ -832,7 +838,7 @@ def grade_referents_case(dossier):
     return {'case':REFERENTS_CASE['id'],'passed':not errors,'errors':errors}
 
 
-# BAR-18: the buyers of the neighborhood (Gustavo, 17/11/2026: «puede ser demasiado estricto … no deja pasar a nadie»).
+# BAR-24: the buyers of the neighborhood (Gustavo, 17/11/2026: «puede ser demasiado estricto … no deja pasar a nadie»).
 # Seven synthetic people built from the verdicts measured in production on 17/11/2026 (anonymized: no real name, company
 # or profile). Each variant keeps two answers of the classifier: `antes`, what the production model answered with the
 # prompt of 12/11/2026 for that kind of profile, and `despues`, what the prompt of 17/11/2026 asks for. `web` is what the
@@ -841,7 +847,7 @@ def grade_referents_case(dossier):
 # The fakes prove what the code does with those answers; whether the real model answers like `despues` is only measured
 # with a paid run. Nobody is invited, followed or written to outside the fake connector.
 BUYERS_CASE={
-    'id':'BAR-18-compradores',
+    'id':'BAR-24-compradores',
     'variants':{
         'C1':{'label':'stealth con salida previa','name':'Cora Stealth','location':'New York, New York, United States',
               'headline':'Co-founder & CTO · building a consumer AI company in stealth with a small team · previously '
@@ -985,13 +991,208 @@ COURSE_CASES={
         # Unidades que debe reflejar cada variante (BIB-09): qué criterio del curso la decide.
         'variants':{'P1':['LI-09-M003-K02','LI-09-M003-K03'],'P2':['LI-09-M002-K04','LI-09-M003-K04'],
                     'P3':['LI-09-M003-K04','LI-09-M004-K02'],'P4':['LI-09-M003-K02','LI-09-M003-K03'],'P5':['LI-09-M002-K05']}},
+    # Segunda metodología de outbound (clases 07 y 10): el comentario de calentamiento en el post de un comprador que se
+    # calienta antes de invitarlo (fase 2 de docs/plan-outbound.md). El autopiloto lee sus posts y propone; Relaciones
+    # redacta, las reglas y el líder deciden, y el operador escribe. «flujo»: si se lee y se propone; C1–C6: qué para
+    # cada comentario («reglas» o «juez»); R: el mismo texto sin pregunta en el post de un referente sigue saliendo,
+    # porque la metodología solo rige el calentamiento de compradores.
+    'comentario_calentamiento':{'id':'BIB-09-comentario-calentamiento',
+        'units':operador.WARMUP_COMMENT_UNITS,
+        'input':{
+            'post':('We replaced our 40-field signup form with three questions and a 15-minute onboarding call. Activation '
+                    'went from 22% to 41%, but the calls now take half of my week. Next quarter we decide what to automate first.'),
+            'C1':{'comentario':'A three-question form plus a call usually hides which answer predicts activation. Logging those '
+                               'answers for a month and comparing them with who activated tells you what to automate first. '
+                               'Which question do your best accounts answer differently?'},
+            'C2':{'comentario':'Great post! 👏👏 Love how openly you share the numbers, congrats to the whole team on the '
+                               'activation jump. Huge milestone, keep it up! What is next for the team?'},
+            'C3':{'comentario':"Calls that eat half of a founder's week are the usual sign that onboarding needs software. Our "
+                               "team builds exactly that for startups like yours, DM me and I'll show you. Which step takes the longest?"},
+            'C4':{'comentario':'A three-question form plus a call usually hides which answer predicts activation, because the '
+                               'call smooths over the differences between accounts. Logging those answers for a month and '
+                               'comparing them with who activated tells you what to automate first and which part of the call '
+                               'is really doing the selling. Which question do your best accounts answer differently?'},
+            'C5':{'comentario':'A three-question form plus a call usually hides which answer predicts activation. Logging those '
+                               'answers for a month and comparing them with who activated is the cheapest way to see what to '
+                               'automate first.'},
+            'C6':{'comentario':'Going from 22% to 41% activation with three questions is a big jump, and the calls clearly '
+                               'matter. How are you deciding which parts of the onboarding call to automate first next quarter?'},
+            'R':{'comentario':'C5','post':'referente'}},
+        'expected':{'leido':True,'propuesto':True,'borrador_con_metodologia':True,'C1_publicado':True,
+                    'C2_publicado':False,'C2_stopped_by':'reglas','C3_publicado':False,'C3_stopped_by':'reglas',
+                    'C4_publicado':False,'C4_stopped_by':'reglas','C5_publicado':False,'C5_stopped_by':'reglas',
+                    'C6_publicado':False,'C6_stopped_by':'juez','R_publicado':True,'mensajes_enviados':0},
+        'required':['LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K07','LI-10-V009-K01'],
+        # Unidades que debe reflejar cada variante: qué criterio del curso la decide.
+        'variants':{'flujo':['LI-07-M005-K07','LI-10-V009-K01','LI-07-M004-K03','LI-07-M005-K04'],
+                    'C1':['LI-07-M005-K05','LI-07-M001-K04'],'C2':['LI-07-M005-K05','LI-07-M001-K04'],'C3':['LI-07-M001-K04'],
+                    'C4':['LI-07-M001-K04'],'C5':['LI-07-M005-K05','LI-07-M001-K04'],'C6':['LI-07-M005-K05'],
+                    'R':['LI-07-M005-K07']}},
+    # Fase 3 del comprador (docs/plan-outbound.md): el primer mensaje a un comprador calentado que acepta. Caso hermano de
+    # BIB-09-primer-mensaje, con la misma metodología activada (`metodologia`): el origen es el recorrido, no una
+    # conversación en un post de Gustavo. M1: ya interactuó (respondió un comentario del equipo): borrador en el mismo ciclo
+    # de la aceptación, citando esa interacción. M2: no interactuó: nada antes de los N días, un toque más de calentamiento
+    # y después el borrador. M3: nada real que citar: ningún mensaje ni llamada pagada. M4: el borrador rompe una regla fija
+    # también tras la única reescritura. M5: el líder lo rechaza. M6: conversó en un post de Gustavo y tiene recorrido: una
+    # sola tarjeta, la de la conversación (RSP-07). En ninguna el equipo envía un mensaje.
+    'primer_mensaje_comprador':{'id':'BIB-09-primer-mensaje-comprador','metodologia':'primer_mensaje',
+        'units':operador.FIRST_MESSAGE_UNITS,
+        'input':{
+            'M1':{'interaccion':'respondio_comentario',
+                  'mensaje':'Hi Ana, your answer about the spreadsheet solving a real reporting pain stayed with me. Which report '
+                            'do your clients open first each week?'},
+            'M2':{'interaccion':None,'dias':7,
+                  'mensaje':'Hi Ana, your post about moving the pilot to a real product stayed with me. Which manual step is the '
+                            'first one you are automating?'},
+            'M3':{'interaccion':None,'posts':0,'senales_de_compra':0},
+            'M4':{'mensaje':'Thanks for connecting! Do you have 15 minutes this week? https://cal.com/gustavo'},
+            'M5':{'mensaje':'Hi Ana, great to be connected. How are you thinking about growth these days?'},
+            'M6':{'conversacion_en_su_post':True,'recorrido':True}},
+        'expected':{'borrador_con_metodologia':True,'M1_mismo_ciclo':True,'M1_tarjeta':True,'M1_cita':'respondio_comentario',
+                    'M2_antes_de_tiempo':False,'M2_toque':True,'M2_tarjeta':True,'M3_tarjeta':False,'M3_stopped_by':'hecho',
+                    'M3_pagado':False,'M4_tarjeta':False,'M4_stopped_by':'reglas','M5_tarjeta':False,'M5_stopped_by':'juez',
+                    'M6_tarjetas':1,'M6_origen':'conversacion','mensajes_enviados':0},
+        'required':['LI-09-M002-K05','LI-09-M003-K02','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'],
+        'variants':{'flujo':['LI-09-M002-K05'],'M1':['LI-09-M002-K05','LI-09-M003-K02'],'M2':['LI-09-M002-K05'],
+                    'M3':['LI-09-M003-K02'],'M4':['LI-09-M003-K04','LI-09-M004-K02'],'M5':['LI-09-M003-K02','LI-09-M003-K03'],
+                    'M6':['LI-09-M002-K05']}},
+    # Tercera metodología de outbound (clase 09): la nota de invitación, reservada a compradores calentados con un hecho
+    # concreto (Gustavo, 17/11/2026). Se redacta al invitar, con los comentarios del calentamiento y las señales como
+    # contexto; su único trabajo es que acepte (LI-09-M002-K06). N1: una nota concreta sale con la invitación. N2–N6: la
+    # paran las reglas fijas («ser parte de mi red», elogio genérico, pitch, más de 200 caracteres, otro idioma) y la
+    # invitación sale sin nota. N7: el líder la rechaza. N8: sin hecho concreto no se redacta. N9: sin cupo de notas en el
+    # mes, la invitación sale sin nota. G: Gustavo confirmó a la persona: la nota ya no la deja bloqueada.
+    'nota_invitacion':{'id':'BIB-09-nota-invitacion',
+        # The three activated class 09 units, plus the note unit the classifier already cites (LI-03-M006-K01, class 03).
+        'units':operador.INVITE_NOTE_UNITS+['LI-03-M006-K01'],
+        'input':{
+            'N1':{'nota':'Ana, your post on moving a paid pilot off a spreadsheet stayed with me. Connecting to keep reading you.'},
+            'N2':{'nota':'Hi Ana, I would like you to be part of my network.'},
+            'N3':{'nota':'Ana, I love what you write. Let us connect!'},
+            'N4':{'nota':'Ana, I help companies like yours build product teams. Shall we talk?'},
+            'N5':{'nota':('Ana, your post on moving a paid pilot off a spreadsheet stayed with me, and the part about the client '
+                          'paying before the product existed even more so. Connecting to keep reading you and learn how it ends.')},
+            'N6':{'nota':'Ana, tu post sobre pasar el piloto de una hoja de cálculo a producto me dejó pensando. Conectemos.'},
+            'N7':{'nota':'Ana, your post on moving the pilot off a spreadsheet is exactly the kind of problem my team solves. '
+                         'Connecting.'},
+            'N8':{'calentado':False,'senales_de_compra':0},
+            'N9':{'cupo_de_notas':0},
+            'G':{'confirmado_por_gustavo':True}},
+        'expected':{'redactada_al_invitar':True,'nota_con_metodologia':True,'N1_con_nota':True,'N2_con_nota':False,
+                    'N2_stopped_by':'reglas','N3_con_nota':False,'N3_stopped_by':'reglas','N4_con_nota':False,
+                    'N4_stopped_by':'reglas','N5_con_nota':False,'N5_stopped_by':'reglas','N6_con_nota':False,
+                    'N6_stopped_by':'reglas','N7_con_nota':False,'N7_stopped_by':'juez','N8_con_nota':False,
+                    'N8_stopped_by':'hecho','N9_con_nota':False,'N9_stopped_by':'cupo','G_invitada':True,
+                    'invitaciones_sin_salir':0},
+        'required':['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01','LI-03-M006-K01'],
+        'variants':{'flujo':['LI-09-M002-K06','LI-09-M002-K01'],'N1':['LI-09-M002-K06','LI-09-V008-K04'],
+                    'N2':['LI-09-M002-K06'],'N3':['LI-09-M002-K06','LI-09-V008-K04'],'N4':['LI-09-M002-K06','LI-03-M006-K01'],
+                    'N5':['LI-09-M002-K01'],'N6':['LI-03-M006-K01'],'N7':['LI-09-V008-K04'],'N8':['LI-09-V008-K04'],
+                    'N9':['LI-09-M002-K01'],'G':['LI-09-M002-K01']}},
+    # Cuarta metodología de outbound (clase 09, con las reglas de detención de la clase 10): la secuencia de mensajes 2 a 4
+    # después del primero (Gustavo, 17/11/2026: el seguimiento es la secuencia del curso, siempre en borradores que él
+    # copia y envía; la app nunca envía). M2 a los 4 días del «Hecho» del M1: el mismo dolor contado de otra forma, con una
+    # historia corta, sin repetir el M1 ni disculparse. M3 a los 5 días del «Hecho» del M2: «¿no eres la persona
+    # indicada?», busca un referido. M4 a los 7 días del «Hecho» del M3: cierra con elegancia, sin rogar ni pedir nada.
+    # Si responde, se detiene todo; sin respuesta tras el M4, descanso de 90 días.
+    # flujo: los tres seguimientos a tiempo y el descanso. S2: responde con el M3 en Tu turno: se cancela, sin M4. S3:
+    # Gustavo no envió el M2: no hay M3. S4: inbox apagado: ningún seguimiento y un aviso. S5–S8: las reglas fijas por número
+    # (M2 que repite el M1, M2 que se disculpa, M3 sin la pregunta de la persona indicada, M4 que pide algo). S9: el líder
+    # rechaza un M3 que repite el dolor. S10: «No escribirle» en el M3 es una salida definitiva. S11: interruptor apagado.
+    'secuencia_mensajes':{'id':'BIB-09-secuencia-mensajes',
+        'units':operador.SEQUENCE_UNITS,
+        'input':{
+            'flujo':{'mensaje_2':('Ana, a pattern that shows up after a spreadsheet pilot: the fifth client asks for the same weekly '
+                                  'report and somebody ends up copying numbers between tabs every Friday night. That is usually '
+                                  'the week the reporting pain stops being small.'),
+                     'mensaje_3':('Ana, maybe you are not the right person for this. Who on your side owns the weekly numbers now '
+                                  'that the pilot became a product?'),
+                     'mensaje_4':('Ana, I will leave it here: it may not be the moment, or you already have the weekly numbers '
+                                  'solved. Thanks for your time, and good luck with the onboarding work.'),
+                     'dias':[4,5,7],'descanso_dias':90},
+            'S2':{'responde':'con el M3 en Tu turno','respuesta':'Good timing: the weekly numbers are a mess right now. What would you look at first?'},
+            'S3':{'no_envia':2},
+            'S4':{'inbox':False},
+            'S5':{'mensaje_2':('Ana, your answer about the spreadsheet solving a real reporting pain stayed with me. Which report do '
+                               'your clients open first each week?')},
+            'S6':{'mensaje_2':('Sorry to bother you again, Ana. The fifth client asking for the same weekly report is usually when '
+                               'copying numbers between tabs every Friday stops being small.')},
+            'S7':{'mensaje_3':('Ana, the weekly numbers usually move to a dashboard right after the pilot becomes a product. Which '
+                               'dashboard did your clients ask for first?')},
+            'S8':{'mensaje_4':'Ana, I will leave it here, but could you please just let me know if this is useful at all? Thanks.'},
+            'S9':{'mensaje_3':('Ana, the spreadsheet behind the weekly report keeps coming back: every client asks for it and someone '
+                               'copies the numbers on Fridays. Maybe you are not the right person, so who owns that report on your side?')},
+            'S10':{'no_escribirle':3},
+            'S11':{'interruptor':False}},
+        'expected':{'borrador_con_metodologia':True,'flujo_numeros':[2,3,4],'flujo_dias':[4,5,7],'flujo_antes_de_tiempo':False,
+                    'flujo_descanso':'secuencia_sin_respuesta','flujo_descanso_dias':90,
+                    'S2_paso':'respondio','S2_numeros':[2,3],'S2_cancelados':[3],'S2_respondio_tras':2,
+                    'S3_numeros':[2],'S4_numeros':[],'S4_aviso':True,
+                    'S5_stopped_by':'reglas','S6_stopped_by':'reglas','S7_stopped_by':'reglas','S8_stopped_by':'reglas',
+                    'S9_stopped_by':'juez','tarjetas_paradas':0,
+                    'S10_salida':'descartado_por_gustavo','S10_numeros':[2,3],'S11_numeros':[],'mensajes_enviados':0},
+        'required':['LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03','LI-10-V013-K02','LI-10-M001-K08'],
+        'variants':{'flujo':['LI-09-M003-K05','LI-09-V014-K01'],'S2':['LI-09-M003-K05','LI-10-V013-K02','LI-10-M001-K08'],
+                    'S3':['LI-09-M003-K05'],'S4':['LI-10-V013-K02'],'S5':['LI-09-V014-K02'],'S6':['LI-09-V014-K02'],
+                    'S7':['LI-09-V014-K02'],'S8':['LI-09-V014-K03'],'S9':['LI-09-V014-K02'],'S10':['LI-09-M003-K05'],
+                    'S11':['LI-09-M003-K05']}},
+    # Quinta metodología de outbound (clase 11, con la clase 08 y la tabla de diagnóstico de la clase 12): la respuesta
+    # del comprador (Gustavo, 17/11/2026: la máquina de LinkedIn termina en la reunión agendada, con Cal.com; los mensajes
+    # siempre son borradores que él copia y envía). Se clasifica su respuesta leyendo la conversación entera (cinco tipos y
+    # «otro» si no hay confianza), se redacta la respuesta según el tipo (el enlace de agenda solo para interesado y pide
+    # información), la reserva de Cal.com pasa el recorrido a «reunion» y se entrega el lead.
+    # flujo: interesado → borrador con su enlace → «Hecho» → reserva → reunión → entrega → oportunidad con un toque. P: pide
+    # información (lo que falta lo completa Gustavo). N1: no es el momento, con fecha. N2: sin fecha, 90 días. X: no le
+    # interesa, salida definitiva y nada más. O: otra persona, entra como contacto nuevo referido. B: poca confianza →
+    # «otro», sin borrador. E: sin enlace de agenda, sin borrador y con aviso. I: interruptor apagado.
+    'respuesta_comprador':{'id':'BIB-11-respuesta-comprador',
+        'units':operador.BUYER_REPLY_UNITS,
+        'input':{
+            'flujo':{'respuesta':'Good timing: the weekly report is still a spreadsheet every Friday. Happy to talk about how others solved it.',
+                     'borrador':('Ana, the Friday spreadsheet behind the weekly report is the part worth looking at first. Pick any slot '
+                                 'that suits you and we go through it.')},
+            'P':{'respuesta':'What exactly would you do with the reports, and how much does it cost?',
+                 'borrador':('Bea, I would start from the weekly report your clients ask for and map which numbers can come straight '
+                             'from the product. Pick a slot below and we look at it with your numbers.'),
+                 'faltan':['Precio: no hay un hecho confirmado; dalo tú si quieres.']},
+            'N1':{'respuesta':'Not the right moment, we are closing the round. Write me after January.',
+                  'borrador':'Cris, makes sense with the round closing. Thanks for telling me; I will write again after January.'},
+            'N2':{'respuesta':'Not now: too much going on with the launch this quarter.',
+                  'borrador':'Dani, understood, a launch eats everything. Thanks for the honest answer.'},
+            'X':{'respuesta':'Thanks, but we are not interested.','borrador':'Eva, thanks for letting me know. All the best with the reports.',
+                 'despues':'Please remove me from your list.'},
+            'O':{'respuesta':'I am not the right person for this. Talk to Bruno Ruiz (linkedin.com/in/bruno-globex), he owns the reports.',
+                 'borrador':'Fer, thanks for pointing me to Bruno, I will reach out to him.','referido':'Bruno Ruiz'},
+            'B':{'respuesta':'Hmm, maybe. Who are you again?'},
+            'E':{'respuesta':'Good timing, happy to talk about the reports.','calcom_booking_url':''},
+            'I':{'interruptor':False}},
+        'expected':{'clasificacion_con_metodologia':True,'borrador_con_metodologia':True,
+                    'flujo_tipo':'interesado','flujo_paso':'interesado','flujo_enlace':True,'flujo_reunion':True,'flujo_entrega':True,
+                    'flujo_oportunidad':'reunion',
+                    'P_tipo':'pide_informacion','P_enlace':True,'P_faltan':True,
+                    'N1_tipo':'no_es_el_momento','N1_descanso':'no_es_el_momento','N1_hasta_lo_que_dijo':True,'N1_enlace':False,
+                    'N2_tipo':'no_es_el_momento','N2_descanso_dias':90,
+                    'X_tipo':'no_le_interesa','X_salida':'no_le_interesa','X_enlace':False,'X_despues':0,
+                    'O_tipo':'otra_persona','O_referido':True,'O_enlace':False,
+                    'B_tipo':'otro','B_borrador':False,'B_tarjeta':True,
+                    'E_borrador':False,'E_aviso':True,'I_clasificadas':0,'mensajes_enviados':0},
+        'required':['LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],
+        'variants':{'flujo':['LI-11-M006-K01','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],'P':['LI-11-M006-K01','LI-12-M001-K04'],
+                    'N1':['LI-11-M006-K03','LI-08-M003-K05'],'N2':['LI-11-M006-K03'],'X':['LI-08-M003-K05'],'O':['LI-11-M006-K02'],
+                    'B':['LI-11-M006-K01'],'E':['LI-11-M006-K01'],'I':['LI-11-M006-K01']}},
 }
+
+def case_methodology(role):
+    """The activated methodology a case reads: its own key, or the one a sibling case names (`metodologia`)."""
+    case=COURSE_CASES[role]
+    key=case.get('metodologia',role)
+    return key if key in METODOLOGIAS_ACTIVAS else None
 
 
 def course_case_context(role):
     """The case's units as its role loads them; an activated outbound methodology unlocks only its own units."""
     case=COURSE_CASES[role]
-    return operador.role_context(role,case['units'],metodologia=role if role in METODOLOGIAS_ACTIVAS else None)
+    return operador.role_context(role,case['units'],metodologia=case_methodology(role))
 
 
 def corpus_fingerprint():
@@ -1037,7 +1238,7 @@ def grade_course_case(role,result,grounding):
     if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
     # La biblioteca guarda más clases de las que leen los agentes (knowledge.clases): citar una que no leen es un fallo.
     # Un caso de una metodología activada puede citar solo las unidades de esa metodología, además de 01–06.
-    metodologia=role if role in METODOLOGIAS_ACTIVAS else None
+    metodologia=case_methodology(role)
     if any(not legible_por_agentes(uid,metodologia) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)

@@ -166,6 +166,7 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
   1. **Dado** una persona sin oportunidad, **cuando** abre su ficha, **entonces** ve «Marcar como oportunidad»; con una oportunidad, no.
   2. **Dado** el botón, **cuando** lo pulsa, **entonces** se abre el formulario con la persona ya elegida y nada se guarda hasta pulsar el botón de guardar.
   3. **Dado** «Marcar como oportunidad» en una tarjeta de conversación, **cuando** lo pulsa, **entonces** el formulario llega con la modalidad leída, canal LinkedIn y la nota «Detectada por el equipo en una conversación de LinkedIn.» ([INB-05](inbox.md#inb-05)).
+- **Desde la entrega de un lead ([BAR-23](red.md#bar-23), con `BUYER_REPLY_ENABLED`):** cuando un comprador agenda por Cal.com, Tu turno muestra «Reunión agendada con …» con «Crear la oportunidad»: un toque de Gustavo la crea en «Reunión», canal LinkedIn, con la reunión como siguiente acción y la empresa de su titular (`POST /api/v1/comprador/entregas/<id>/oportunidad`); si ya tiene una oportunidad abierta, «Vincular su oportunidad» la enlaza. La entrega une la oportunidad con su conversación y su recorrido. Una oportunidad registrada a mano para una persona con la entrega lista también la enlaza. El equipo nunca la crea solo.
 - **Brechas código/docs:** desde Tu turno, la app abre una hoja reducida («Nueva oportunidad», Modalidad, Canal, Notas) que siempre crea la oportunidad en «Conversación» y avisa «Oportunidad creada»; la PWA abre el formulario completo.
 - **Cobertura QA:** pendiente
 

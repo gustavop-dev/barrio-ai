@@ -308,6 +308,8 @@ def _store(account,piece,post_id,data,thread=''):
                                        state=PostComment.State.OWN if fields['own'] else PostComment.State.NEW,**fields)
         if not row.own:
             row.contact=_person(account,row,piece);row.save(update_fields=['contact'])
+            from . import comprador
+            comprador.on_contact(row.contact,'comentario_en_tu_post')  # a signal of a buyer: passive record only
         return row,True
     row.text=fields['text'] or row.text;row.author_name=fields['author_name'] or row.author_name;row.updated_at=timezone.now()
     row.save(update_fields=['text','author_name','updated_at'])
@@ -912,6 +914,8 @@ def close_dm(user,comment_id,how,note_text=''):
             from .red import note
             contact=Contact.objects.select_for_update().get(pk=row.contact_id)
             note(contact,'dm',CLOSE_HOW[how]+(f' {note_text.strip()}' if note_text and note_text.strip() else ''));contact.save()
+            from . import comprador
+            comprador.on_contact(contact,'mensaje_sugerido')
         _audit(user,'replies.dm_closed',row.id,how=how)
     return row
 

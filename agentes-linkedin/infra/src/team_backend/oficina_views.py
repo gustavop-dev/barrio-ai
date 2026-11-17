@@ -108,7 +108,7 @@ class Overview(APIView):
             'today':{'proposals':proposals,'llm_spent_usd':str(autopiloto.llm_spent_today(now)),
                      'llm_daily_cap_usd':str(presupuesto.daily_fuse()),  # the team's daily safety fuse; no per-area caps
                      'drafts':ActionProposal.objects.filter(source='agent',created_at__gte=day).count(),
-                     'drafts_daily_cap':int(os.environ.get('OPERATOR_DAILY_PROPOSALS','6')),
+                     'drafts_daily_cap':autopiloto.daily_proposals(),
                      'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(presupuesto.daily_fuse())},
             'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':ObservedPost.objects.count(),
                       'uncertain':ActionExecution.objects.filter(state='uncertain').count()}})
@@ -139,7 +139,7 @@ ROLES=['posicionamiento','perfil','investigador_referentes','investigador_lider'
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.
 JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_referents':'investigador_lider','advance_experiments':'investigador_lider','observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
-           'read_own_comments':'relaciones_comunidad','propose_reply':'relaciones_comunidad',
+           'read_own_comments':'relaciones_comunidad','propose_reply':'relaciones_comunidad','prepare_buyer_draft':'relaciones_comunidad',
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
@@ -151,6 +151,7 @@ JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_
            'monthly_review':'analista_barrio_resultados'}
 DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_profile':'Preparando tu propuesta de perfil','review_referents':'Revisando referentes del mes','advance_experiments':'Midiendo el experimento de referentes','observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'read_own_comments':'Leyendo los comentarios de tus posts','propose_reply':'Redactando una respuesta en tu post',
+              'prepare_buyer_draft':'Preparando un primer mensaje o una nota para un posible cliente',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',

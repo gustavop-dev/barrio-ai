@@ -1,4 +1,4 @@
-"""BAR-18-compradores: who of the buyers stays in the neighborhood, with what level, and in what order they are invited.
+"""BAR-24-compradores: who of the buyers stays in the neighborhood, with what level, and in what order they are invited.
 
 The case (evaluaciones.BUYERS_CASE) has seven synthetic people built from the verdicts measured in production on
 17/11/2026. Each one goes through the production path: classification (red.classify, Claude faked), the web check of the
@@ -14,9 +14,10 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.core.management import call_command
+from django.utils import timezone
 
-from team_backend import evaluaciones, lider, nivel_comprador, red, reparto, research
-from team_backend.models import ActionProposal, AuditEvent, Contact
+from team_backend import comprador, evaluaciones, lider, nivel_comprador, red, reparto, research
+from team_backend.models import ActionProposal, AuditEvent, BuyerJourney, Contact
 from team_backend.tests.test_red import NetworkBase
 
 BOGOTA=ZoneInfo('America/Bogota')
@@ -24,6 +25,9 @@ CASE=evaluaciones.BUYERS_CASE
 MONDAY=datetime(2026,11,16,10,tzinfo=BOGOTA)
 # A search that ran and found nothing citable (it has usage).
 NOTHING=research.ResearchResult('q','unavailable','2026-11-16T15:00:00+00:00',usage={'model':'claude-sonnet-5-5'})
+# The outbound of PR #135, each phase behind its switch.
+BUYER_SWITCHES=('BUYER_RECORD_ENABLED','BUYER_WARMUP_ENABLED','BUYER_FIRST_MESSAGE_ENABLED','BUYER_SEQUENCE_ENABLED',
+                'BUYER_NO_POSTS_ROUTE_ENABLED','BUYER_REPLY_ENABLED')
 
 
 class BuyersCase(NetworkBase):
@@ -96,6 +100,15 @@ class BuyersCase(NetworkBase):
         outcomes,invited=self.run_case()
         grade=evaluaciones.grade_buyers_case(outcomes,invited)
         self.assertTrue(grade['passed'],(grade,outcomes,invited))
+        kept={CASE['variants'][vid]['name'] for vid,row in outcomes.items() if row['kept']}
+        self.assertEqual(set(BuyerJourney.objects.values_list('contact__display_name',flat=True)),kept)  # every kept buyer has a journey
+
+    def test_with_every_buyer_switch_off_the_case_is_the_same_and_nothing_is_recorded(self):
+        with patch.dict(os.environ,{name:'false' for name in BUYER_SWITCHES}):
+            outcomes,invited=self.run_case()
+        grade=evaluaciones.grade_buyers_case(outcomes,invited)
+        self.assertTrue(grade['passed'],(grade,outcomes,invited))
+        self.assertFalse(BuyerJourney.objects.exists())
 
 
 class BuyerBase(NetworkBase):
@@ -151,9 +164,10 @@ class LevelTests(BuyerBase):
         self.assertEqual((buyer['level'],buyer['profile'],buyer['us_market'],buyer['basis'],buyer['sources']),
                          ('por_confirmar','stealth',True,'perfil',['https://linkedin.example/in/cora']))
         self.assertEqual((buyer['score'],buyer['score_version']),(red.buyer_score(cora)['score'],'buyer_score_v1'))
-        self.assertEqual((buyer['entry']['level'],buyer['entry']['score']),('por_confirmar',buyer['score']))
+        journey=comprador.journey(cora)  # the journey keeps the level and score she entered with
+        self.assertEqual((journey.entry_level,journey.entry_score,journey.entry_score_version),('por_confirmar',buyer['score'],'buyer_score_v1'))
         self.assertEqual((gabi.stage,gabi.classification['fit'],gabi.classification['rule']),('discarded',False,red.NO_FIT_RULE))
-        self.assertFalse(AuditEvent.objects.filter(action=nivel_comprador.ENTRY_ACTION,target=str(gabi.pk)).exists())
+        self.assertIsNone(comprador.journey(gabi))
 
     def test_each_profile_asks_its_own_public_question(self):
         questions={}
@@ -230,7 +244,8 @@ class ScoreTests(BuyerBase):
     def test_buyers_go_by_market_tier_then_score_and_a_low_score_is_still_invited(self):
         people=[self.buyer('o-latam','LatAm Probable',level='probable',location='Bogotá, Colombia',stage='followed'),
                 self.buyer('o-pc','US Por Confirmar',level='por_confirmar',stage='followed'),
-                self.buyer('o-usm','LatAm Con Negocio',level='por_confirmar',location='Lima, Peru',us_market=True,stage='followed'),
+                # Probable and selling in the US scores above «US Por Confirmar» (76 > 65): the region still goes first.
+                self.buyer('o-usm','LatAm Con Negocio',level='probable',location='Lima, Peru',us_market=True,stage='followed'),
                 self.buyer('o-conf','US Confirmado',level='confirmado',stage='followed'),
                 self.buyer('o-prob','US Probable',level='probable',stage='followed',headline='Founder @Lumora')]
         order=[c.display_name for c in red.prioritized(people)]
@@ -239,31 +254,52 @@ class ScoreTests(BuyerBase):
         invited=list(ActionProposal.objects.filter(capability='RED-02').order_by('created_at').values_list('contact__display_name',flat=True))
         self.assertEqual(invited,order)  # nobody is left out for a low score
 
-    def test_a_level_up_recomputes_the_score_and_the_entry_stays_the_first(self):
-        contact=self.buyer('s-sube','Ana Sube',level='por_confirmar',stage='candidate')
-        first=nivel_comprador.record_entry(contact,MONDAY)
-        contact.classification['buyer']['entry']=first;contact.save()
+    def test_the_temperature_adds_to_the_score_only_with_the_warm_up_on_and_never_jumps_a_region(self):
+        cold=self.buyer('t-cold','US Confirmado Frio',level='confirmado',stage='followed')
+        warm=self.buyer('t-warm','US Por Confirmar Caliente',level='por_confirmar',stage='followed')
+        latam=self.buyer('t-latam','LatAm Caliente',level='confirmado',location='Bogotá, Colombia',stage='followed')
+        heat={cold.pk:0,warm.pk:20,latam.pk:20}
+        names=lambda:[c.display_name for c in red.prioritized([latam,warm,cold])]
+        with patch('team_backend.calentamiento.heats',return_value=heat):
+            self.assertEqual(names(),['US Confirmado Frio','US Por Confirmar Caliente','LatAm Caliente'])
+            with patch.dict(os.environ,{'BUYER_WARMUP_ENABLED':'true'}):
+                self.assertEqual(names(),['US Por Confirmar Caliente','US Confirmado Frio','LatAm Caliente'])
+        self.assertEqual((nivel_comprador.priority(65,20),nivel_comprador.priority(65,1),nivel_comprador.priority(None)),(105,70,0))
+
+    def test_a_level_up_recomputes_the_score_and_the_entry_is_fixed_by_the_follow(self):
+        chosen=self.buyer('s-elegida','Ana Elegida',level='por_confirmar')
+        followed=self.buyer('s-seguido','Beto Seguido',level='por_confirmar',stage='followed')
+        before={c.pk:comprador.update(c) for c in (chosen,followed)}  # chosen with a pending check: a journey each
+        self.assertEqual({j.entry_level for j in before.values()},{'por_confirmar'})
         with patch('team_backend.research.research',return_value=self.found()),self.judge('confirmado'):
             red.check_stages(self.bot,self.account)
-        contact.refresh_from_db();buyer=contact.classification['buyer']
-        self.assertEqual((buyer['level'],buyer['score']),('confirmado',red.buyer_score(contact)['score']))
-        self.assertGreater(buyer['score'],first['score'] or 0)
-        self.assertEqual(buyer['entry'],first)
-        self.assertEqual(nivel_comprador.record_entry(contact,MONDAY+timedelta(days=2)),first)
-        self.assertEqual(AuditEvent.objects.filter(action=nivel_comprador.ENTRY_ACTION,target=str(contact.pk)).count(),1)
+        for contact in (chosen,followed):
+            contact.refresh_from_db();buyer=contact.classification['buyer']
+            self.assertEqual((buyer['level'],buyer['score']),('confirmado',red.buyer_score(contact)['score']))
+            self.assertGreater(buyer['score'],before[contact.pk].entry_score)
+        # Nobody had acted on Ana yet: she is gone after as confirmed. Beto was already followed: he stays as he came.
+        ana,beto=comprador.journey(chosen),comprador.journey(followed)
+        self.assertEqual((ana.entry_level,ana.entry_score),('confirmado',chosen.classification['buyer']['score']))
+        self.assertEqual((beto.pk,beto.entry_level,beto.entry_score),(before[followed.pk].pk,'por_confirmar',before[followed.pk].entry_score))
 
-    def test_the_contact_api_and_the_summary_show_the_score_and_the_entry_funnel(self):
+    def test_the_contact_api_shows_the_score_and_the_buyer_funnel_splits_by_entry(self):
         contact=self.buyer('s-api','Ana Api',level='probable',stage='followed')
-        contact.classification['buyer']['entry']=nivel_comprador.record_entry(contact,MONDAY);contact.save()
+        contact.followed_at=timezone.now()-timedelta(days=3);contact.save()
+        other=self.buyer('s-api2','Beto Api',level='por_confirmar',headline='Founder @Lumora')
+        for person in (contact,other):comprador.update(person)
         peer=self.contact('s-par','Par Api');peer.classification=dict(peer.classification,role='par');peer.save()
         body=self.human.get(f'/api/v1/red/contacts/{contact.pk}').json()
         self.assertEqual((body['buyer']['level'],body['buyer']['score']),('probable',red.buyer_score(contact)['score']))
         self.assertEqual(sum(part['points'] for part in body['buyer']['breakdown'].values()),body['buyer']['score'])
-        self.assertEqual(body['buyer']['entry']['level'],'probable')
+        self.assertEqual((body['buyer']['entry']['level'],body['buyer']['entry']['score']),('probable',body['buyer']['score']))
         self.assertIsNone(self.human.get(f'/api/v1/red/contacts/{peer.pk}').json()['buyer'])
-        funnel=self.human.get('/api/v1/red/summary').json()['buyers']
-        self.assertEqual(funnel['por_nivel']['probable'],{'entraron':1,'seguidos':1,'invitados':0,'aceptaron':0})
-        self.assertEqual(sum(row['entraron'] for row in funnel['por_puntaje'].values()),1)
+        entry=self.human.get('/api/v1/resultados/embudo-comprador').json()['entrada_comprador']
+        self.assertEqual(entry['por_nivel']['probable'],{'elegidos':1,'seguidos':1,'calentados':0,'invitados':0,'aceptaron':0,'respondieron':0})
+        self.assertEqual((entry['por_nivel']['por_confirmar']['elegidos'],entry['por_nivel']['por_confirmar']['seguidos']),(1,0))
+        expected={}
+        for person in (contact,other):
+            label=nivel_comprador.band(red.buyer_score(person)['score']);expected[label]=expected.get(label,0)+1
+        self.assertEqual({label:row['elegidos'] for label,row in entry['por_puntaje'].items() if row['elegidos']},expected)
 
 
 class QuotaTests(BuyerBase):
@@ -360,7 +396,8 @@ class ReevaluationTests(BuyerBase):
         for contact in (self.region,self.web,self.followed):
             with self.subTest(contact.display_name):
                 buyer=contact.classification['buyer']
-                self.assertEqual((buyer['level'],buyer['entry']['level'],buyer['score']),('por_confirmar','por_confirmar',red.buyer_score(contact)['score']))
+                self.assertEqual((buyer['level'],comprador.journey(contact).entry_level,buyer['score']),
+                                 ('por_confirmar','por_confirmar',red.buyer_score(contact)['score']))
         self.assertEqual((self.absent.stage,self.absent.classification),('candidate',{}))
         self.assertEqual((self.against.stage,self.vetoed.stage,self.invited.stage,self.followed.stage),('discarded','discarded','invited','followed'))
         self.assertEqual(AuditEvent.objects.filter(action=nivel_comprador.REEVALUATED).count(),4)
