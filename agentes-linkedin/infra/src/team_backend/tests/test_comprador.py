@@ -419,7 +419,10 @@ class FunnelTests(BuyerBase):
         beto,b=self.buyer('beto','Beto',stage='followed',followed_at=now-10*D)
         carla,c=self.buyer('carla','Carla')
         self.buyer('dora','Dora',source='incoming',stage='incoming')  # came with her invitation: only in comparaciones.entrada
-        BuyerJourney.objects.filter(pk=c.pk).update(chosen_at=now-15*D)
+        # Carla, chosen early in the week three weeks back: alone in her cohort whatever the weekday (Ana and Beto follow
+        # 10 days ago, which on a Tuesday or Wednesday falls in the week of «15 days ago»).
+        _,week=operador.period_starts(now)
+        BuyerJourney.objects.filter(pk=c.pk).update(chosen_at=week-timedelta(days=21)+timedelta(hours=1))
         for i,at in enumerate((now-9*D,now-8*D)):comprador.record(a,'comentario',at=at,key=f'c{i}')
         comprador.record(a,'invitacion',at=now-7*D,key='ia',detail={'con_nota':True})
         comprador.record(a,'acepto_invitacion',at=now-6*D,key='aa')
@@ -442,10 +445,8 @@ class FunnelTests(BuyerBase):
         self.assertEqual({s['etapa']:s['personas'] for s in compare['senal']['con_senal']['etapas']}['invitados'],1)
         self.assertEqual((people(compare['entrada']['saliente']),people(compare['entrada']['entrante'])),(3,1))
         self.assertEqual((funnel['estado_actual']['respondio'],funnel['estado_actual']['invitado'],funnel['estado_actual']['elegido']),(1,1,1))
-        # Cohorts: the week each person was chosen; Carla's is two or three weeks back depending on the weekday.
-        _,week=operador.period_starts(now)
-        index=next(i for i in range(4) if week-timedelta(days=7*i)<=now-15*D<week-timedelta(days=7*i-7))
-        self.assertEqual(funnel['semanas'][index]['cohorte']['personas'],1)
+        # Cohorts: the week each person was chosen; Carla's is the oldest of the four.
+        self.assertEqual(funnel['semanas'][3]['cohorte']['personas'],1)
         self.assertEqual(sum(w['cohorte']['personas'] for w in funnel['semanas']),3)
         self.assertEqual(sum(w['actividad']['comentarios'] for w in funnel['semanas']),3)
         self.assertEqual(sum(w['actividad']['mensajes_enviados'] for w in funnel['semanas']),1)
