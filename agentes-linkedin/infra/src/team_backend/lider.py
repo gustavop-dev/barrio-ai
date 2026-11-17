@@ -578,8 +578,8 @@ def review_buyer_draft(draft):
         # BAR-25: a case of ProjectApp only with what Gustavo confirmed, and only to a buyer of its segment (case_for).
         case=(draft.inputs or {}).get('caso_projectapp') or {}
         state['caso_confirmado']={'caso':case.get('caso',''),'hechos':case.get('hechos',{})} if case else {}
-        text_key=next(k for k in ('respuesta','seguimiento','primer_mensaje','nota') if k in state)
-        questions['caso_inventa']=_noul(f'¿`{text_key}.texto` menciona un proyecto, un cliente o un caso de ProjectApp con nombres, '
+        text_key=next((k+'.texto' for k in ('respuesta','seguimiento','primer_mensaje','nota') if k in state),'el texto')
+        questions['caso_inventa']=_noul(f'¿`{text_key}` menciona un proyecto, un cliente o un caso de ProjectApp con nombres, '
                                         'cifras, plazos o resultados que no están en `caso_confirmado.hechos`, o menciona un caso '
                                         'cuando `caso_confirmado` está vacío?',
                                         'Nombra un cliente, una cifra, un plazo o un resultado del caso que no está en los hechos, o '

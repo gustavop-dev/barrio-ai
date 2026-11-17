@@ -358,11 +358,13 @@ def case_facts(segment):
     from knowledge import memory
     from . import posicionamiento
     facts={'caso':posicionamiento.CASES[segment]}
-    wanted={case_key(segment,what):what for what,*_ in CASE_QUESTIONS}
+    wanted={case_key(segment,what):(what,question.format(case=CASE_LABELS[segment])) for what,question,*_ in CASE_QUESTIONS}
     for row in memory.latest(True):
-        what=wanted.get(row['key']);value=row['value']
+        what,question=wanted.get(row['key'],(None,''));value=row['value']
         if what is None or memory.retired(value) or not memory.publishable(value):continue
         text=str(value.get('texto') or '').strip()
+        # preguntas.answer keeps the question with the answer («<question> <answer>»): the fact is the answer.
+        if text.startswith(question):text=text[len(question):].strip()
         if what=='cliente' and _plain(text).strip(' .') in ('no','no se puede','no se puede nombrar'):continue
         if text:facts[what]=text[:600]
     return facts
