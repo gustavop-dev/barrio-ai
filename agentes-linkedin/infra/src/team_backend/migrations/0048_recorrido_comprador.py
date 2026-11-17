@@ -10,7 +10,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('team_backend', '0045_biblioteca_clases_01_12'),
+        ('team_backend', '0047_analisis_posts_referentes'),
     ]
 
     operations = [

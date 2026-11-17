@@ -18,6 +18,7 @@ Hoy `operador.observe` lee los posts de `Referent.active=True`; los referentes l
 | [OBS-04](#obs-04) | Experimentos de participación con resultado medible | PWA · app · backend | funciona |
 | [OBS-05](#obs-05) | Referentes de industria con criterios verificables | app · backend | funciona |
 | [OBS-06](#obs-06) | Modelos de crecimiento: lo que les funciona, sin copiar texto | backend | funciona |
+| [OBS-07](#obs-07) | Qué les funciona y qué no: posts por partes, contra su autor, duradero o pasajero | backend | funciona |
 
 ## Datos disponibles y límites de los conectores <a id="datos-conectores"></a>
 
@@ -83,7 +84,7 @@ Fuentes locales: [linkedin_directo/cliente.py](../../agentes-linkedin/infra/src/
   11. **Dado** Gustavo autenticado en Personas › Referentes o Tu turno, **cuando** ejecuta explícitamente mover, reemplazar, proteger o desproteger, **entonces** ve el efecto concreto sobre main/variables y guarda con validación transaccional de capacidad y versión. Registra quién cambió qué, cuándo y desde dónde; conserva evidencias/historial, sin unfollow ni otra escritura LinkedIn. Un agente no puede originar esa propuesta ni aprobarla en su nombre.
   12. **Dado** una protección cambiada por Gustavo mientras existe un lote pendiente, **cuando** intenta aplicarse ese lote, **entonces** revalida el conjunto vigente y bloquea las propuestas incompatibles, incluida una baja de quien ahora es main. No rellena main vacantes ni revierte la decisión humana por mantener el número inicial de cinco; no reutiliza una aprobación antigua.
 - **Brechas código/docs:** implementación entregada en fase 5; ejecución de CI/QA delegada a Claude, sin pruebas locales. Conservar los límites observacionales de OBS-03.
-- **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
+- **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md). El botón «Gestionar protección de …» de cada tarjeta (solo para Gustavo, en main y variables) salía en blanco en la app (17/11/2026: su etiqueta llegaba al botón como varios textos sueltos y la build release no los dibujaba); lo cubren `Button.test.tsx`, `Personas.test.tsx` (app y PWA) y el flujo `13-referentes-proteccion.yaml`, que lo busca por su texto.
 
 ### OBS-03 · Evidencia de audiencia y encaje por referente <a id="obs-03"></a>
 
@@ -132,10 +133,10 @@ Fuentes locales: [linkedin_directo/cliente.py](../../agentes-linkedin/infra/src/
 - **Estado:** funciona
 - **Qué hace para Gustavo:** le propone voces grandes de su industria que venden lo mismo que él en EE. UU., cada una con seis criterios comprobables, para que decida quién entra. Pedido del 14/11/2026; [plan y umbrales](../plan-referentes-industria.md).
 - **Responsable:** `investigador_lider` dentro del ciclo `referentes_mensuales` (mismas aristas y presupuesto). Gustavo decide cada alta.
-- **Cadencia:** a mano, como mucho una búsqueda de industria por cuenta y mes: `operador referentes-industria --cuenta <id>` imprime el peor caso y solo encola con `--confirmar`.
+- **Cadencia:** a mano: `operador referentes-industria --cuenta <id> [--empresas "A,B"] [--perfiles url1,url2]` imprime el peor caso y las búsquedas que hará y solo encola con `--confirmar`; `--informe` imprime el embudo del mes. Una búsqueda por cuenta y mes, más otro intento (hasta 3) si todas las del mes terminaron sin propuestas. Un referente de industria añadido a mano entra con `operador referente … --industria`; `operador referente-tipo … --tipo industria|nicho [--confirmar]` corrige el de uno existente, auditado y sin tocar la revisión de la lista ([el tipo importa](../plan-referentes-industria.md#tipo)).
 - **Tu turno:** tarjeta «Alta de industria: …» con los seis criterios (Cumple · No cumple · Sin medir), sus datos y fuentes; 14 días para decidir y nunca se aplica por silencio. Rechazar con nota hace que no se vuelva a proponer.
-- **Datos necesarios y disponibilidad:** lecturas de LinkedIn de la cuenta conectada (búsqueda de personas, perfil, posts y comentarios del mejor post) e investigación web solo de los candidatos que pasan lo medible. `Referent.kind`, `ReferentReview.kind` y el dossier `industria` (criterios, descartados, reservas y gasto).
-- **Código:** `referentes_industria.py` (criterios, guarda, coste, lecturas, selección y verificación), `referentes_research.run`, `referentes.publish/decide/close`; migración `0041_referentes_industria`.
+- **Datos necesarios y disponibilidad:** lecturas de LinkedIn de la cuenta conectada (búsqueda de personas, perfil, posts y comentarios del mejor post) e investigación web solo de los candidatos que pasan lo medible. La búsqueda del conector directo no trae titular ni seguidores (solo ids, y el identificador público de los primeros ~3): el prefiltro gratis usa el titular de los contactos conocidos y, para el resto, el del perfil antes de leer posts. `Referent.kind`, `ReferentReview.kind`/`attempt` y el dossier `industria` (criterios, descartados con el paso en que cayó cada uno, embudo, búsquedas, reservas y gasto).
+- **Código:** `referentes_industria.py` (búsquedas `QUERIES`, semillas, `prefilter`, criterios, guarda e intentos `retry_issue`/`supersede`, coste, lecturas, selección, verificación e `report_lines`), `referentes_research.run`, `referentes.publish/decide/close`; migraciones `0041_referentes_industria` y `0046_referentes_industria_intentos`.
 - **Criterios de aceptación:**
   1. **Dado** un candidato con 24.000 seguidores, mediana 140 en 12 posts, 9 posts en 30 días, perfil en EE. UU. y dos pruebas de autoridad de tipos distintos verificadas en fuentes que lo nombran, **cuando** termina la búsqueda, **entonces** la tarjeta muestra cada criterio con su dato y el criterio de audiencia sin medir como «Sin medir (no cuenta como cumplido)».
   2. **Dado** un candidato cuyos comentaristas clasificados encajan menos que el umbral, **cuando** se mide, **entonces** se descarta antes de pagar investigación web y no se vuelve a proponer durante 90 días.
@@ -143,8 +144,11 @@ Fuentes locales: [linkedin_directo/cliente.py](../../agentes-linkedin/infra/src/
   4. **Dado** una propuesta de industria sin respuesta, **cuando** llega el cierre del día 5 o vence su plazo, **entonces** no se aplica: solo entra con la decisión explícita de Gustavo.
   5. **Dado** un tope que no alcanza, una búsqueda de industria ya hecha este mes, ninguna plaza variable libre o la cuenta de publicación oficial, **cuando** se pide la búsqueda, **entonces** no se encola nada y se dice por qué.
   6. **Dado** una edición que cambia el perfil propuesto, **cuando** se guarda, **entonces** la evaluación de industria se quita porque correspondía a otra persona.
-- **Límites:** leer un perfil con el conector directo registra una visita. El formato del post (imagen, video) no se conoce. Los umbrales son punto de partida y se recalibran con datos.
-- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` (búsqueda completa con conector falso, guarda, coste, criterios, decisión explícita) y en `ReferentDecision.test.tsx`; pendientes de CI. No se ejecutaron tests locales.
+  7. **Dado** un contacto grande cuyo titular dice coach o go-to-market, **cuando** se arma el pool, **entonces** cae en el prefiltro sin gastar lectura de perfil, y un dueño de agencia de software se mide primero.
+  8. **Dado** que la búsqueda del mes terminó sin propuestas, **cuando** Gustavo la lanza otra vez, **entonces** corre como intento 2 en su propia revisión, cierra la anterior con auditoría y no cambia el costo máximo; con una propuesta por decidir, se niega.
+  9. **Dado** un candidato descartado, **cuando** se lee el dossier o `--informe`, **entonces** dice en qué paso cayó (prefiltro, tamaño, actividad, servicios, autoridad, EE. UU.) y qué lecturas costó.
+- **Límites:** leer un perfil con el conector directo registra una visita. El tipo de medio del post solo se conoce cuando el conector lo reconoce (sin verificar contra LinkedIn real). Los umbrales son punto de partida y se recalibran con datos. Las búsquedas con `OR`/paréntesis no se probaron contra LinkedIn real.
+- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` (búsqueda completa con conector falso, filas sin identificador como las del conector directo, prefiltro, semillas, intentos, guarda, coste, criterios, decisión explícita, alta como industria y corrección del tipo), de punta a punta en `test_e2e_referentes.py` (semillas desde el comando → prefiltro → medición → criterios → tarjeta de la Bandeja → aprobación de Gustavo por la API → referente de industria) y en `ReferentDecision.test.tsx`. Pruebas de estos archivos ejecutadas en local el 17/11/2026 con mutaciones; la suite completa, en CI.
 
 ### OBS-06 · Modelos de crecimiento: lo que les funciona, sin copiar texto <a id="obs-06"></a>
 
@@ -164,6 +168,25 @@ Fuentes locales: [linkedin_directo/cliente.py](../../agentes-linkedin/infra/src/
   5. **Dado** un anuncio de vacantes o una promoción viral, **cuando** se ordenan modelos, **entonces** se excluye.
   6. **Dado** comentarios de atípicos con preguntas y objeciones, **cuando** se piden las dudas de la audiencia, **entonces** se agrupan por tema con número de posts y referentes.
 - **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` y `test_estrategia.py` (`GrowthModelSourceTests`); pendientes de CI.
+
+### OBS-07 · Qué les funciona y qué no: posts por partes, contra su autor, duradero o pasajero <a id="obs-07"></a>
+
+- **Dónde:** backend (`GET /api/v1/referentes/analisis`); la app y la Oficina aún no lo muestran.
+- **Estado:** funciona
+- **Qué hace para Gustavo:** «analizar sus posts, qué les funciona y qué no, cómo lo hacen, qué estructura usan; descomponer sus temas y su estructura» (17/11/2026). Cada post de sus referentes de industria por partes (recurso visual, gancho, cuerpo con tema y formato, cierre, longitud), cada contador comparado con la mediana de su propio autor (el valor, la mediana, cuántas veces), y lo que funciona en varios posts, autores y semanas separado de lo que solo es noticia. [Plan y umbrales](../plan-referentes-industria.md#analisis).
+- **Responsable:** ninguno nuevo: lo calcula el backend sobre lo que `operador.observe` ya leyó; el editorial lo recibe en la estrategia semanal y el director.
+- **Cadencia:** al pedirlo (endpoint) y cada vez que la estrategia arma sus señales; la descomposición se guarda una vez por texto y medio.
+- **Tu turno:** ninguna tarjeta.
+- **Datos necesarios y disponibilidad:** `ObservedPost` (reacciones, comentarios, compartidos desde `0047`, medio cuando el conector lo reconoce, `analysis`). Sin vistas de posts ajenos (LinkedIn no las da). Sin lecturas nuevas de LinkedIn ni llamadas pagadas: 0 USD al día.
+- **Código:** `analisis_referentes.decompose/cached/performance/report/editorial_signals`, `estrategia.audience_signals` (`REFERENTES_ANALISIS`, apagado por defecto), `referentes_views.Analysis`, `linkedin_directo.lectura.media`; migración `0047_analisis_posts_referentes`.
+- **Criterios de aceptación:**
+  1. **Dado** un post con 300 reacciones y 40 comentarios de un autor cuya mediana es 40 y 5, **cuando** se analiza, **entonces** muestra 300 · 40 · 7,5× y 40 · 5 · 8×, y «funcionó» por la regla de los modelos; con menos de 6 posts de base, «sin juicio».
+  2. **Dado** un post con ≤ 0,5 × la mediana de su autor, **cuando** se analiza, **entonces** queda «no funcionó» y su estructura cuenta entre las que rinden por debajo.
+  3. **Dado** tres posts con la misma estructura que funcionaron, de dos autores y en tres semanas, sin noticia detrás, **cuando** se agregan, **entonces** es «estructura sostenida»; con uno solo es «hipótesis» y dice qué falta.
+  4. **Dado** un post que funcionó y habla de un lanzamiento que otro referente nombró la misma semana, **cuando** se agrega, **entonces** es de coyuntura: no cuenta como estructura sostenida y su tema sale «en tendencia» con su fecha de caducidad.
+  5. **Dado** `REFERENTES_ANALISIS=true`, **cuando** el editorial pide señales, **entonces** recibe aparte `estructura_sostenida` y `tema_en_tendencia`, sin ninguna frase de un referente; apagado, recibe exactamente lo de antes.
+- **Límites:** si una imagen es foto, gráfico, captura o infografía exigiría leer la imagen: no se hace. El reconocimiento del medio no se probó contra respuestas reales de LinkedIn. Temas de una taxonomía fija; la coyuntura se detecta por reglas.
+- **Cobertura QA:** `test_analisis_referentes.py` (descomposición, caché, contra su autor con muestra mínima, agregados, duradero y pasajero, señales con el interruptor, endpoint) y `test_e2e_referentes.py` (observar → descomponer → comparar → agregar → editorial → endpoint), con seis mutaciones el 17/11/2026; la suite completa, en CI.
 
 ## Retiradas
 

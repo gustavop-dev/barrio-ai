@@ -352,6 +352,31 @@ describe('Personas · Referentes', () => {
     expect(api.find('PATCH', '/api/v1/operador/referents/r-1')[1]!.body).toEqual({ active: true });
   });
 
+  it('shows Gustavo «Gestionar protección de …» with its text on main and variable cards, and only to him', async () => {
+    const api = server({
+      'GET /api/v1/operador/accounts': { body: [accountFixture()] },
+      'GET /api/v1/operador/referents': page([
+        referentFixture('r-1', { protected: true, position: 1, revision: 3, can_manage_protected: true }),
+        referentFixture('r-2', { display_name: 'Inés Ejemplo', kind: 'industria', revision: 2, can_manage_protected: true }),
+        referentFixture('r-3', { display_name: 'Tomás Demo', can_manage_protected: false }),
+      ]),
+      'PATCH /api/v1/operador/referents/r-2': ({ body }) => ({ body: referentFixture('r-2', { display_name: 'Inés Ejemplo', ...(body as object) }) }),
+    });
+    renderApp('/personas?pestana=referentes');
+    const list = within(await screen.findByRole('list', { name: 'Referentes' }));
+    const main = list.getByRole('button', { name: 'Gestionar protección de Elena Prueba' });
+    expect(main).toHaveTextContent('Gestionar protección de Elena Prueba');
+    expect(list.queryByRole('button', { name: 'Quitar a Elena Prueba' })).not.toBeInTheDocument();
+    expect(list.getByText('Industria')).toBeInTheDocument();
+    expect(list.queryByRole('button', { name: /Gestionar protección de Tomás/ })).not.toBeInTheDocument();
+    await userEvent.click(list.getByRole('button', { name: 'Gestionar protección de Inés Ejemplo' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Gestionar a Inés Ejemplo' }));
+    expect(dialog.getByText('Variable → Variable; activo; posición 0 → 0.')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'Guardar decisión' }));
+    await waitFor(() => expect(api.find('PATCH', '/api/v1/operador/referents/r-2')).toHaveLength(1));
+    expect(api.find('PATCH', '/api/v1/operador/referents/r-2')[0]!.body).toEqual({ version: 2, source: 'personas', protected: false, active: true, position: 0 });
+  });
+
   it('removes a referent after confirming', async () => {
     const api = server({
       'GET /api/v1/operador/accounts': { body: [accountFixture()] },

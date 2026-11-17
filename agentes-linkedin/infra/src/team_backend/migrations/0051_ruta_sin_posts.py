@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('team_backend', '0048_secuencia_comprador'),
+        ('team_backend', '0050_secuencia_comprador'),
     ]
 
     operations = [

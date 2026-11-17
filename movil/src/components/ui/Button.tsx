@@ -35,6 +35,19 @@ const FILL: Record<ButtonVariant, { bg: string; fg: string; border: string }> = 
 };
 
 /**
+ * The label as one string when the children are only text: `Descargar {name}` compiles to an array of strings, and
+ * an array rendered straight into the Pressable is raw text outside a <Text>. In a release build (Fabric) that text
+ * is never drawn: the button showed blank, with no accessible name either (Personas › Referentes, 17/11/2026).
+ */
+function plainText(node: ReactNode): string | null {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (!Array.isArray(node)) return null;
+  const parts = node.filter((part) => part !== null && part !== undefined && typeof part !== 'boolean');
+  if (!parts.length || !parts.every((part) => typeof part === 'string' || typeof part === 'number')) return null;
+  return parts.join('');
+}
+
+/**
  * The design's buttons (48 px, radius 12): primary 0ff1ce, secondary outlined, danger alerta, ghost link.
  * MovMicro: pressed, they give way to 0.97 on a stiff spring and come back on FIRM when released.
  */
@@ -61,13 +74,14 @@ export function Button({
   const muted = disabled && !loading && variant !== 'ghost';
   const fg = muted ? colors.inkSoft : variant === 'ghost' && quiet ? colors.inkSoft : fill.fg;
   const label = loading && loadingLabel ? loadingLabel : children;
+  const text = plainText(label);
 
   return (
     <Animated.View style={[block ? styles.block : null, animated, style]}>
       <Pressable
         testID={testID}
         accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? (typeof label === 'string' ? label : undefined)}
+        accessibilityLabel={accessibilityLabel ?? text ?? undefined}
         accessibilityHint={accessibilityHint}
         accessibilityState={{ disabled: inactive, busy: Boolean(loading) }}
         disabled={inactive}
@@ -89,9 +103,9 @@ export function Button({
         ]}
       >
         {loading ? <ActivityIndicator size="small" color={fg} /> : icon ? <View>{icon}</View> : null}
-        {typeof label === 'string' ? (
+        {text !== null ? (
           <T color={fg} center numberOfLines={2} style={variant === 'ghost' ? styles.ghostText : null}>
-            {label}
+            {text}
           </T>
         ) : (
           label

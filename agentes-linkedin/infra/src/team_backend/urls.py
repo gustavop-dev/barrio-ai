@@ -19,6 +19,7 @@ from .comunidad_views import Community, WithdrawSource
 from . import estrategia_views as es
 urlpatterns=[
  path('referentes/revisiones',refs.Reviews.as_view()),
+ path('referentes/analisis',refs.Analysis.as_view()),
  path('referentes/main-inicial',refs.InitialMain.as_view()),
  path('referentes/cambios/<uuid:cid>/decidir',refs.ChangeDecision.as_view()),
  path('referentes/experimentos/<uuid:eid>/decidir',refs.ExperimentDecision.as_view()),

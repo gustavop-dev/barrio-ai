@@ -92,7 +92,7 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - cuatro fotos generadas para los posts (la app ya no tiene Galería; la PWA sí) y una foto de perfil sintética (función 03) en Ajustes › Fotos de perfil;
 - unos 100 días de audiencia, trabajos y sincronizaciones de red para Resultados, el resumen semanal y filas de gasto.
 
-Algunos flujos piden un escenario más (`correr-maestro.sh` pasa la opción solo a ese flujo): `--perfil-capturas` (`18-perfil`), `--referentes-mensual` (`19-referentes-mensual`) y `--analitica` (`08-resultados-linkedin`), que añade una cuenta «directo» inventada con 400 días de analítica de LinkedIn, sus rangos exactos de 7, 14 y 28 días, seguidores, público y ocho publicaciones. Sin esa opción no hay cuenta «directo», como hoy en producción.
+Algunos flujos piden un escenario más (`correr-maestro.sh` pasa la opción solo a ese flujo): `--perfil-capturas` (`18-perfil`), `--referentes-mensual` (`19-referentes-mensual` y `13-referentes-proteccion`) y `--analitica` (`08-resultados-linkedin`), que añade una cuenta «directo» inventada con 400 días de analítica de LinkedIn, sus rangos exactos de 7, 14 y 28 días, seguidores, público y ocho publicaciones. Sin esa opción no hay cuenta «directo», como hoy en producción.
 
 Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con los mismos ids y textos. Por eso **se niega a correr** si no está `QA_SEED=permitido`, si hay un interruptor `LIVE_*` activado o si la base tiene una cuenta real de LinkedIn. La prueba `team_backend/tests/test_seed_qa.py` lo cubre en el CI normal.
 
@@ -126,6 +126,7 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `11-ajustes` | de Máquina a Captura: parada total y reanudar, pausar la cuenta simulada, orientación (descartar y guardar), Autonomía, Gasto, «Conectar LinkedIn» abre la oficina web, micrófono y edición con IA |
 | `12-oportunidades` | el tablero por etapas, mover con el selector y «Deshacer», que el cambio se guarde, «Cerradas sin acuerdo»; nueva oportunidad (obligatorios, «De Personas», fuera de la red, fecha inválida), editar y eliminar |
 | `13-referentes` | la lista, «Observar ahora», desactivar con «Deshacer» y reactivar, la validación al añadir, un perfil que LinkedIn no conoce, «Referente añadido», quitar con confirmación y una cuenta sin referentes |
+| `13-referentes-proteccion` | con `seed_qa --referentes-mensual`: el botón «Gestionar protección de …» se lee en una tarjeta main y en una variable de industria (con «Industria»), y desactivar desde su hoja deja la tarjeta «Inactivo» con «Reactivar» |
 | `14-fichas` | la conversación de Sofía, la oportunidad y la nota de Andrés, descartar a Pedro (abierto desde su enlace: no es una conexión) con motivo y el enlace a una persona que no existe |
 | `15-ajustes-sesion` | un tipo de aviso apagado y encendido, cerrar la sesión del Pixel 7, «Lo que el equipo sabe de ti», `?ancla=autonomia` y cerrar sesión (vuelve a entrar al final) |
 

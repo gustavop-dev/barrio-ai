@@ -1,3 +1,5 @@
+import uuid
+
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -114,3 +116,20 @@ def cards(user, card, now):
                 'starts_at': exp.starts_at, 'focus_at': exp.focus_at, 'followup_at': exp.followup_at, 'ends_at': exp.ends_at,
                 'can_decide': human, 'endpoint': endpoint, 'results': exp.results}))
     return out
+
+
+class Analysis(APIView):
+    """«Qué les funciona y qué no» to the industry referents (analisis_referentes.report): read-only, no LinkedIn read and
+    no paid call. `?account=<uuid>` narrows it to one account, `?dias=` (7-365) changes the window."""
+    def get(self, request):
+        from . import analisis_referentes
+        require(request.user, 'operate_linkedin')
+        try:
+            account_id = uuid.UUID(request.query_params['account']) if request.query_params.get('account') else None
+            days = int(request.query_params.get('dias') or 0) or None
+        except ValueError:
+            return Response({'detail': 'account debe ser un uuid y dias un número de días'}, status=400)
+        account = get_or_404(ConnectorAccount, pk=account_id) if account_id else None
+        if days is not None and not 7 <= days <= 365:
+            return Response({'detail': 'dias va de 7 a 365'}, status=400)
+        return Response(analisis_referentes.report(account, days=days))

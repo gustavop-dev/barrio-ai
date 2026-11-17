@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUpdateReferent } from '@compartido/api/hooks';
 import type { Referent } from '@compartido/api/types';
+import { referentName } from '@compartido/logic/barrio';
 import { Button, ErrorRetry, Field, Sheet, T } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
 
@@ -13,12 +14,12 @@ export function ProtectedReferent({ referent, candidates }: { referent: Referent
   const update = useUpdateReferent();
   if (!referent.can_manage_protected) return null;
   return <>
-    <Button size="small" onPress={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(String(referent.position ?? 0)); setReplacement(''); setOpen(true); }} testID={`protect-${referent.id}`}>Gestionar protección de {referent.display_name}</Button>
+    <Button size="small" onPress={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(String(referent.position ?? 0)); setReplacement(''); setOpen(true); }} testID={`protect-${referent.id}`}>{`Gestionar protección de ${referentName(referent)}`}</Button>
     {open ? <Sheet label={`Gestionar a ${referent.display_name}`} onClose={() => setOpen(false)} suspended={update.isPending} testID="referent-protection">
       <T>Solo Gustavo. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</T>
-      <Select label="Protección" value={protectedFlag ? 'main' : 'variable'} onChange={v => setProtected(v === 'main')}
+      <Select label="Protección" testID="protection-protected" value={protectedFlag ? 'main' : 'variable'} onChange={v => setProtected(v === 'main')}
         options={[{ value: 'main', label: 'Main protegido' }, { value: 'variable', label: 'Variable' }]} />
-      <Select label="Actividad" value={active ? 'active' : 'inactive'} onChange={v => setActive(v === 'active')}
+      <Select label="Actividad" testID="protection-active" value={active ? 'active' : 'inactive'} onChange={v => setActive(v === 'active')}
         options={[{ value: 'active', label: 'Activo' }, { value: 'inactive', label: 'Inactivo' }]} />
       <Field label="Posición" value={position} onChangeText={setPosition} keyboardType="number-pad" />
       <Select label="Reemplazar por" value={replacement} onChange={setReplacement} options={[{ value: '', label: 'Conservar este perfil' },

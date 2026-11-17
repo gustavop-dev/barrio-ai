@@ -11,7 +11,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('team_backend', '0046_recorrido_comprador'),
+        ('team_backend', '0048_recorrido_comprador'),
     ]
 
     operations = [
