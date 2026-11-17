@@ -455,7 +455,7 @@ class FirstMessageRegistryTests(FirstMessageBase):
         self.assertEqual(list(grade['units']), operador.FIRST_MESSAGE_UNITS)
         self.assertEqual(set(grade['units'].values()), {'fixture-hash'})
         self.assertEqual(grade['corpus']['por_clase']['09'], 7)
-        self.assertNotIn('10', grade['corpus']['por_clase'])
+        self.assertNotIn('11', grade['corpus']['por_clase'])
         self.assertRegex(grade['corpus']['sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual(evaluaciones.case_drift(grade, self.grade()), [])
 
@@ -463,12 +463,12 @@ class FirstMessageRegistryTests(FirstMessageBase):
         before = self.grade()
         with db.connect() as c:
             c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
-                VALUES('LI-10-M001-K01',10,'Clase 10','{}','fixture-hash','fixture','/units/0','{}')''')
+                VALUES('LI-11-M001-K01',11,'Clase 11','{}','fixture-hash','fixture','/units/0','{}')''')
         after = self.grade()
         self.assertTrue(after['passed'], after['errors'])
         self.assertEqual(after['units'], before['units'])
         self.assertEqual(evaluaciones.case_drift(before, after),
-                         ['La biblioteca cambió (10: 0 → 1): vuelve a calificar el caso.'])
+                         ['La biblioteca cambió (11: 0 → 1): vuelve a calificar el caso.'])
 
     def test_a_changed_unit_of_the_case_is_named(self):
         before = self.grade()

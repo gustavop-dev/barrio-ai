@@ -896,6 +896,43 @@ COURSE_CASES={
         # Unidades que debe reflejar cada variante (BIB-09): qué criterio del curso la decide.
         'variants':{'P1':['LI-09-M003-K02','LI-09-M003-K03'],'P2':['LI-09-M002-K04','LI-09-M003-K04'],
                     'P3':['LI-09-M003-K04','LI-09-M004-K02'],'P4':['LI-09-M003-K02','LI-09-M003-K03'],'P5':['LI-09-M002-K05']}},
+    # Segunda metodología de outbound (clases 07 y 10): el comentario de calentamiento en el post de un comprador que se
+    # calienta antes de invitarlo (fase 2 de docs/plan-outbound.md). El autopiloto lee sus posts y propone; Relaciones
+    # redacta, las reglas y el líder deciden, y el operador escribe. «flujo»: si se lee y se propone; C1–C6: qué para
+    # cada comentario («reglas» o «juez»); R: el mismo texto sin pregunta en el post de un referente sigue saliendo,
+    # porque la metodología solo rige el calentamiento de compradores.
+    'comentario_calentamiento':{'id':'BIB-09-comentario-calentamiento',
+        'units':operador.WARMUP_COMMENT_UNITS,
+        'input':{
+            'post':('We replaced our 40-field signup form with three questions and a 15-minute onboarding call. Activation '
+                    'went from 22% to 41%, but the calls now take half of my week. Next quarter we decide what to automate first.'),
+            'C1':{'comentario':'A three-question form plus a call usually hides which answer predicts activation. Logging those '
+                               'answers for a month and comparing them with who activated tells you what to automate first. '
+                               'Which question do your best accounts answer differently?'},
+            'C2':{'comentario':'Great post! 👏👏 Love how openly you share the numbers, congrats to the whole team on the '
+                               'activation jump. Huge milestone, keep it up! What is next for the team?'},
+            'C3':{'comentario':"Calls that eat half of a founder's week are the usual sign that onboarding needs software. Our "
+                               "team builds exactly that for startups like yours, DM me and I'll show you. Which step takes the longest?"},
+            'C4':{'comentario':'A three-question form plus a call usually hides which answer predicts activation, because the '
+                               'call smooths over the differences between accounts. Logging those answers for a month and '
+                               'comparing them with who activated tells you what to automate first and which part of the call '
+                               'is really doing the selling. Which question do your best accounts answer differently?'},
+            'C5':{'comentario':'A three-question form plus a call usually hides which answer predicts activation. Logging those '
+                               'answers for a month and comparing them with who activated is the cheapest way to see what to '
+                               'automate first.'},
+            'C6':{'comentario':'Going from 22% to 41% activation with three questions is a big jump, and the calls clearly '
+                               'matter. How are you deciding which parts of the onboarding call to automate first next quarter?'},
+            'R':{'comentario':'C5','post':'referente'}},
+        'expected':{'leido':True,'propuesto':True,'borrador_con_metodologia':True,'C1_publicado':True,
+                    'C2_publicado':False,'C2_stopped_by':'reglas','C3_publicado':False,'C3_stopped_by':'reglas',
+                    'C4_publicado':False,'C4_stopped_by':'reglas','C5_publicado':False,'C5_stopped_by':'reglas',
+                    'C6_publicado':False,'C6_stopped_by':'juez','R_publicado':True,'mensajes_enviados':0},
+        'required':['LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K07','LI-10-V009-K01'],
+        # Unidades que debe reflejar cada variante: qué criterio del curso la decide.
+        'variants':{'flujo':['LI-07-M005-K07','LI-10-V009-K01','LI-07-M004-K03','LI-07-M005-K04'],
+                    'C1':['LI-07-M005-K05','LI-07-M001-K04'],'C2':['LI-07-M005-K05','LI-07-M001-K04'],'C3':['LI-07-M001-K04'],
+                    'C4':['LI-07-M001-K04'],'C5':['LI-07-M005-K05','LI-07-M001-K04'],'C6':['LI-07-M005-K05'],
+                    'R':['LI-07-M005-K07']}},
 }
 
 

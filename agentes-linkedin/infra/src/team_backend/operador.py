@@ -49,6 +49,9 @@ LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04',
 # BIB-09-primer-mensaje (class 09, activated in knowledge.clases.METODOLOGIAS_ACTIVAS): loaded whole, only with
 # the methodology named, by Relaciones when a second reply closes and by the lead when it judges that first message.
 FIRST_MESSAGE_UNITS=list(METODOLOGIAS_ACTIVAS['primer_mensaje']['unidades'])
+# BIB-09-comentario-calentamiento (classes 07 and 10): the warm-up comment on a buyer's post. Not activated yet: its
+# baseline is measured first (docs/linea-base-comentario-calentamiento.md); no agent can load these units today.
+WARMUP_COMMENT_UNITS=['LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K04','LI-07-M005-K07','LI-07-M004-K03','LI-10-V009-K01']
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'
