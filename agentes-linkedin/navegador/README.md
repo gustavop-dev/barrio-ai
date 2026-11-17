@@ -184,10 +184,18 @@ llamadas de cada operación en `linkedin_directo/cliente.py`.
 | Descubrir (DESC-05) | cada 6 h | `/me`, hasta 5 posts de referentes y 2 búsquedas | 32 (+3 una vez: la ubicación) | `red.discover`, `red.search_location` |
 | Sincronizar la red | cada 6 h | 2: invitaciones recibidas y enviadas | 8 | `red.sync` |
 | Métricas (APRE-01) | cada 3 h, si toca | posts propios, post, comentarios, audiencia, visitas | ~15; tope 66 | `metricas.collect` y sus topes |
-| Comentarios en posts propios | cada 2 h los 3 primeros días del post, luego cada 12 h hasta el día 7 | `/me`, comentarios e hilos | ~45; tope 112 | `respuestas.read` y sus topes |
+| Comentarios en posts propios | el más nuevo cada 2 h; otro de menos de 72 h cada 2 h si trae comentarios, hasta cada 4 h si no; luego cada 12 h hasta el día 7 | `/me`, comentarios e hilos | ~30 con 8 posts; tope 152 | `respuestas.read`, `respuestas.reading_room` y sus topes |
 | Analítica | una vez al día | 5 exportaciones: 14 días y 7, 28, 90 y 365 | 5 | `analitica.run` |
 | Prueba diaria | una vez al día; si no pudo correr, otra vez a la hora (hasta 3) | 16 | 16 (hasta 48) | `team_backend/canario.py`, `linkedin_directo/canario.py` |
 | Conciliación | solo escrituras sin confirmar | 1 o 2 | ~10 | `operador.reconcile` |
+
+**Ventana de lecturas (16/11/2026).** Todos estos trabajos, salvo la conciliación, se encolan solo dentro de
+`READ_WINDOW` (07:00-21:00 de America/Bogota): de noche no se lee nada en segundo plano. Las lecturas de cada
+escritura (antes y después) y lo que Gustavo pide desde la app no esperan. Lo que esperaba la noche se encola al abrir:
+la primera hora (07:00-08:00) junta referentes, descubrir, clasificar, métricas, bandeja, la prueba diaria y la
+primera vuelta de comentarios; según esta tabla, unas 100 lecturas (estimación del código, sin medir), por debajo de las
+150 por hora del servicio. Los comentarios en posts propios reparten su tope (`comments=100` desde el 16/11/2026) a lo
+largo de la ventana: el máximo del día sube 40 llamadas (hasta unas 920), pero un día normal lee menos que antes.
 
 **Perfiles.** Leer un perfil son 2 llamadas (el perfil y su tarjeta). Las lecturas de perfil de seguir, invitar,
 aceptar, clasificar (`red._enrich`, 10 personas cada 30 min), sincronizar y referentes comparten un tope de 80

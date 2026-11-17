@@ -1,8 +1,13 @@
 """INT-04: the team answers the comments people leave on Gustavo's own posts (design approved by Gustavo on 12/11/2026).
 
 Flow:
-1. read (job read_own_comments, queued by autopiloto._replies): the comments of each recent own post (a published piece),
-   every REPLIES_FRESH_EVERY_MINUTES (120) during its first 72 h and every REPLIES_LATE_EVERY_MINUTES (720) until day 7.
+1. read (job read_own_comments, queued by autopiloto._replies inside READ_WINDOW): the comments of each recent own post
+   (a published piece), every REPLIES_FRESH_EVERY_MINUTES (120) during its first 72 h and every
+   REPLIES_LATE_EVERY_MINUTES (720) until day 7. The newest post goes first and keeps 120 during its first
+   REPLIES_NEWEST_HOURS; another recent post whose reads bring nothing new waits longer (2 h → 4 h, up to
+   REPLIES_IDLE_MAX_MINUTES) until a new comment brings it back to 120. The day's «comments» cap is spent along the read
+   window, always leaving the newest post its reads until the window closes (reading_room, 16/11/2026: the cap ran out
+   at 12:30 every day and an afternoon comment waited until the next day).
    Each comment is kept with its thread (PostComment), the commenter enters Personas (Contact, source own_post) and the
    cheap part of the triage runs without a model: Gustavo's own replies, threads he already answered or is talking in,
    the 72 h window counted from that comment, the two public replies per person and thread, and a short congratulation,
@@ -21,9 +26,11 @@ Flow:
 
 Comments, profiles and posts of other people are third-party data: shown and judged as data, never instructions."""
 import json
+import math
 import os
 import re
 from datetime import timedelta
+from typing import NamedTuple
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -37,7 +44,10 @@ from .permissions import require
 PROVIDERS=('fake','directo')
 REPLY=ActionProposal.Capability.REPLY
 REACT=ActionProposal.Capability.REACT
-READ_CAPS={'posts':6,'comments':30,'threads':40,'people_posts':6}  # per local day; the autopilot reads about every 30 min
+# Per local day. «comments» is one read of one post: 100 is margin (Gustavo, 16/11/2026), not pace; the pace is the
+# cadence and the share of the read window (reading_room). A day with 8 recent posts spends about 30.
+READ_CAPS={'posts':6,'comments':100,'threads':40,'people_posts':6}
+PACE_AHEAD=timedelta(hours=1)  # the share of the window runs this far ahead: the opening reads the morning's posts
 MAX_TURNS=2  # public replies per person and thread
 THREAD_PAGE=50  # replies one thread read asks for
 MAX_DRAFTS=3  # paid drafts per comment: the first, one after Gustavo's answer, one retry after a provider failure
@@ -101,6 +111,17 @@ def fresh_every():
 def late_every():
     return _minutes('REPLIES_LATE_EVERY_MINUTES','720')
 
+def newest_hours():
+    """The newest own post keeps the fresh cadence during its first REPLIES_NEWEST_HOURS (48)."""
+    return timedelta(hours=max(0,int(setting('REPLIES_NEWEST_HOURS','48'))))
+
+def idle_max():
+    """The longest wait of a post under 72 h whose reads bring nothing new (REPLIES_IDLE_MAX_MINUTES, 240)."""
+    return _minutes('REPLIES_IDLE_MAX_MINUTES','240')
+
+def pieces_per_run():
+    return max(1,int(setting('REPLIES_PIECES_PER_RUN','4')))
+
 def window():
     """72 h counted from the comment being answered (reparto-acciones v1, OPERATOR_MAX_POST_AGE_HOURS for INT-04)."""
     return timedelta(hours=int(setting('REPLIES_WINDOW_HOURS','72')))
@@ -132,8 +153,8 @@ def reads_today(account,kind,now=None):
 
 def _read(account,kind,now=None):
     """Count a read before making it; a spent cap stops the read."""
-    now=now or timezone.now();cap=read_caps()[kind]
-    if reads_today(account,kind,now)>=cap:raise ReadCapReached(f'Tope diario de lecturas «{kind}» de respuestas alcanzado ({cap}).')
+    now=now or timezone.now();cap=read_caps()[kind];used=reads_today(account,kind,now)
+    if used>=cap:raise ReadCapReached(f'Tope diario de lecturas «{kind}» de respuestas alcanzado ({cap}).')
     AuditEvent.objects.create(action='replies.read',target=str(account.id),metadata={'kind':kind},created_at=now)
 
 def reader_account():
@@ -149,22 +170,97 @@ def publications(now=None):
           proposal__piece__isnull=False,started_at__gte=now-timedelta(days=7)).order_by('started_at'))
     return [(e,e.proposal.piece) for e in rows]
 
-def cadence(age):
-    return fresh_every() if age<timedelta(hours=72) else late_every()
+def cadence(age,idle=0,newest=False):
+    """How long an own post waits between reads. Under 72 h: REPLIES_FRESH_EVERY_MINUTES (120), doubled for each latest
+    read in a row that brought no new comment, up to REPLIES_IDLE_MAX_MINUTES; the newest post keeps 120 during its first
+    REPLIES_NEWEST_HOURS. From 72 h to day 7: REPLIES_LATE_EVERY_MINUTES (720)."""
+    if age>=timedelta(hours=72):return late_every()
+    fresh=fresh_every()
+    if newest and age<newest_hours():return fresh
+    return min(fresh*2**min(idle,10),max(fresh,idle_max()))
 
 def last_scan(piece):
     return AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id)).order_by('-created_at').values_list('created_at',flat=True).first()
 
+def _scanned(piece,now,**metadata):
+    """The read of one post, at the read's clock; `new` counts the comments it brought (the cadence reads it back)."""
+    AuditEvent.objects.create(action='replies.scanned',target=str(piece.id),metadata=metadata,created_at=now)
+
+def _idle(scans):
+    """Latest reads in a row that brought no new comment. A read without the count (not found, or from before it was
+    kept) ends the run."""
+    count=0
+    for metadata in scans:
+        if (metadata or {}).get('new')!=0:break
+        count+=1
+    return count
+
+class Scan(NamedTuple):
+    execution:ActionExecution
+    piece:object
+    newest:bool  # the latest own publication
+    active:bool  # its latest read brought new comments, or it was never read
+    every:timedelta
+    due:bool
+    last:object=None  # when it was last read (None: never)
+
+def plan(now=None):
+    """Every recent own post with its cadence, in reading order: the newest first, then those whose latest read brought
+    new comments, then the rest from the most recent; old posts without activity go last."""
+    now=now or timezone.now();rows=[]
+    published=publications(now)
+    newest=published[-1][1].pk if published else None
+    for execution,piece in published:
+        scans=list(AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id)).order_by('-created_at')
+                   .values_list('created_at','metadata')[:12])
+        every=cadence(now-execution.started_at,_idle([m for _,m in scans]),piece.pk==newest)
+        active=not scans or ((scans[0][1] or {}).get('new') or 0)>0
+        rows.append(Scan(execution,piece,piece.pk==newest,active,every,not scans or now-scans[0][0]>=every,
+                         scans[0][0] if scans else None))
+    rows.sort(key=lambda r:(not r.newest,not r.active,-r.execution.started_at.timestamp()))
+    return rows
+
 def due_pieces(now=None):
-    now=now or timezone.now();due=[]
-    for execution,piece in publications(now):
-        last=last_scan(piece)
-        if last is None or now-last>=cadence(now-execution.started_at):due.append((execution,piece))
-    return due
+    """(execution, piece) of the posts whose read is due, in reading order."""
+    return [(r.execution,r.piece) for r in plan(now) if r.due]
+
+def reading_room(account,rows,now=None):
+    """(newest, others): «comments» reads that may still be spent now. The newest post only needs the daily cap. The
+    others share a line that grows along the read window, cap × (elapsed + PACE_AHEAD) / window, so the cap lasts until
+    the window closes, and always leave the newest post its reads until then at its cadence."""
+    now=now or timezone.now();cap=read_caps()['comments'];used=reads_today(account,'comments',now)
+    start,end=operador.read_bounds(now)
+    span=max((end-start).total_seconds(),1.0)
+    paced=math.ceil(cap*min(max((now-start).total_seconds(),0)+PACE_AHEAD.total_seconds(),span)/span)
+    newest=next((r for r in rows if r.newest),None)
+    reserve=math.ceil(max((end-now).total_seconds(),0)/newest.every.total_seconds()) if newest else 0
+    return cap-used,min(paced,cap-reserve)-used
+
+def to_read(account,now=None,rows=None):
+    """(execution, piece) of the due posts this run reads: in reading order, within reading_room, at most
+    REPLIES_PIECES_PER_RUN."""
+    now=now or timezone.now();rows=plan(now) if rows is None else rows
+    newest,others=reading_room(account,rows,now);chosen=[]
+    for row in rows:
+        if len(chosen)>=pieces_per_run():break
+        if not row.due or (newest if row.newest else others)<=0:continue
+        chosen.append((row.execution,row.piece));newest-=1;others-=1
+    return chosen
 
 def reading_due(account,now=None):
+    """What the autopilot's read would read now ([] when nothing): a post is due and the day's share leaves room for it.
+    With the cap spent it records that once a day (replies.read_cap_reached) and waits for the next day: it no longer
+    queues a read every 30 min that only records the stop."""
     reader=reader_account()
-    return bool(reader and reader.pk==account.pk and not account.paused and due_pieces(now))
+    if not (reader and reader.pk==account.pk and not account.paused):return []
+    now=now or timezone.now();rows=plan(now);chosen=to_read(account,now,rows)
+    if chosen:return chosen
+    if any(r.due for r in rows) and reads_today(account,'comments',now)>=read_caps()['comments']:
+        day,_=operador.period_starts(now)
+        if not AuditEvent.objects.filter(action='replies.read_cap_reached',target=str(account.id),created_at__gte=day).exists():
+            AuditEvent.objects.create(action='replies.read_cap_reached',target=str(account.id),created_at=now,
+                                      metadata={'kind':'comments','cap':read_caps()['comments']})
+    return []
 
 def _post_id(account,connector,execution,piece,now):
     """The connector's id of the own post: the one metrics, an earlier scan or the write found (metricas._known_id), or
@@ -225,16 +321,16 @@ def read(user,account,now=None,origin_job=''):
     if account.provider not in PROVIDERS:raise ValueError('Los comentarios de tus posts se leen con la cuenta de LinkedIn directo.')
     now=now or timezone.now();connector=get_connector(account)
     summary={'pieces':0,'new':0,'threads':0,'not_found':0,'errors':0,'stopped':''}
-    for execution,piece in due_pieces(now)[:int(setting('REPLIES_PIECES_PER_RUN','4'))]:
+    for execution,piece in to_read(account,now):
         try:
             post_id=_post_id(account,connector,execution,piece,now)
             if not post_id:
-                summary['not_found']+=1;_audit(None,'replies.scanned',piece.id,found=False);continue
+                summary['not_found']+=1;_scanned(piece,now,found=False);continue
             _read(account,'comments',now)
-            threads=[]
+            threads=[];new=0
             for data in connector.list_comments(post_id,limit=50):
                 row,created=_store(account,piece,post_id,data)
-                summary['new']+=int(created and not row.own)
+                new+=int(created and not row.own);summary['new']+=int(created and not row.own)
                 counter=data.get('reply_counter') or 0
                 if not row.thread_id and counter>(row.reply_count or 0):threads.append((row,counter))
             for root,counter in threads:
@@ -242,13 +338,13 @@ def read(user,account,now=None,origin_job=''):
                 replies=connector.list_comment_thread(post_id,root.provider_comment_id,limit=THREAD_PAGE)
                 for data in replies:
                     row,created=_store(account,piece,post_id,data,thread=root.provider_comment_id)
-                    summary['new']+=int(created and not row.own)
+                    new+=int(created and not row.own);summary['new']+=int(created and not row.own)
                 # Counted only as far as the read went: an empty or short answer is read again on the next scan (a full
                 # page is all one read brings).
                 got=len(replies)
                 PostComment.objects.filter(pk=root.pk).update(reply_count=counter if got>=min(counter,THREAD_PAGE) else got)
                 summary['threads']+=1
-            _audit(None,'replies.scanned',piece.id,found=True,post_id=post_id)
+            _scanned(piece,now,found=True,post_id=post_id,new=new)
             summary['pieces']+=1
         except ReadCapReached as exc:
             summary['stopped']=str(exc);break
