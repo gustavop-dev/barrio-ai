@@ -330,7 +330,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      las comparaciones (calentados, nota, ruta, señal antes de invitar) y los borradores pendientes frente a
      enviados. Con menos de 30 invitaciones avisa «muestra chica».
    - Las fases 2 a 6 escriben con `record`, `rest`, `retry` y `leave`, y leen `temperature` (señales con su edad, sin
-     pesos), `due` y `funnel`. Para desplegar: migración 0046 y luego `comprador reconstruir --seco` y sin `--seco`.
+     pesos), `due` y `funnel`. Para desplegar: migración 0048 y luego `comprador reconstruir --seco` y sin `--seco`.
 2. ~~**Calentamiento:** leer y comentar posts de compradores, e invitar tras el segundo comentario.~~ Hecho en la
    misma rama ([BAR-19](funcionalidades/red.md#bar-19), [COM-13](funcionalidades/comentarios-y-lider.md#com-13),
    [BIB-11](funcionalidades/biblioteca-equipos.md#bib-11)), sin desplegar y detrás de `BUYER_WARMUP_ENABLED`
@@ -372,7 +372,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
    - Corregido (también apagado): una invitación con nota a una persona que Gustavo confirmó, o con el líder apagado,
      sale sin la nota en vez de quedar bloqueada hasta caducar.
    - El recorrido muestra cada borrador; el embudo separa los del recorrido y las notas (preparados, enviados, parados
-     por motivo). Para desplegar: migración 0047 y la clase 09 cargada.
+     por motivo). Para desplegar: migración 0049 y la clase 09 cargada.
 4. ~~**Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.~~ Hecho en la misma rama
    ([BAR-21](funcionalidades/red.md#bar-21), [BIB-13](funcionalidades/biblioteca-equipos.md#bib-13)), sin desplegar y
    detrás de `BUYER_SEQUENCE_ENABLED` (apagado por defecto; apagado, el recorrido termina en el primer mensaje):
@@ -388,7 +388,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
    - Después del M4: 7 días sin respuesta y descanso de 90 días (`secuencia_sin_respuesta`); una señal suya la despierta.
    - Para la fase 6: `REPLY_HANDLERS` (qué hacer cuando responde) y `link_referral` (el referido del M3).
    - Embudo: cuántos recibieron M1 a M4, tras qué mensaje respondieron y los borradores por número. Para desplegar:
-     migración 0048 y el inbox encendido.
+     migración 0050 y el inbox encendido.
 5. ~~**Ruta del que no publica.**~~ Hecho en la misma rama ([BAR-22](funcionalidades/red.md#bar-22)), sin desplegar y
    detrás de `BUYER_NO_POSTS_ROUTE_ENABLED` (apagado por defecto; apagado, todo es como en las fases 2 a 4):
    - Seguir sí; la visita al perfil y «comentar donde él comenta» no: el conector no registra una visita visible ni lee
@@ -403,7 +403,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      el puente; cada reintento guarda su ángulo (señal nueva, puente, otro tema); tres intentos y un año; una
      reverificación web de sus señales al terminar cada descanso, dentro del cupo diario de verificaciones.
    - Embudo `ruta_sin_posts`: con y sin puente, puentes encontrados y aceptados, reintentos por ángulo. Para
-     desplegar: migración 0049 y el calentamiento encendido.
+     desplegar: migración 0051 y el calentamiento encendido.
 6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
 7. **Lectura semanal del embudo.**
 
