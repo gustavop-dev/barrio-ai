@@ -419,10 +419,13 @@ def set_paused(user,account,paused,reason=''):
     _audit(user,'operator.account_'+('paused' if paused else 'resumed'),account.id,reason=reason)
     return account
 
-def add_referent(user,account,identifier,reason):
+def add_referent(user,account,identifier,reason,kind='nicho'):
+    """`kind` 'industria': a big voice of his own industry (docs/plan-referentes-industria.md); its outliers become growth
+    models for the weekly strategy. An existing referent keeps its kind: set_referent_kind changes it, audited."""
     require(user,'operate_linkedin')
     from . import referentes
     if not reason.strip():raise ValueError('Explica por qué esta persona es pertinente')
+    if kind not in Referent.Kind.values:raise ValueError('Tipo de referente desconocido')
     slug=public_identifier(identifier)
 
     def store(profile=None):
@@ -443,9 +446,10 @@ def add_referent(user,account,identifier,reason):
                 raise ValueError('No hay una plaza variable libre; usa una sustitución.')
             if profile is None:return None
             referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
-                display_name=profile['display_name'],profile_url=profile['profile_url'],reason=reason.strip(),created_by=user)
+                display_name=profile['display_name'],profile_url=profile['profile_url'],reason=reason.strip(),created_by=user,
+                kind=kind)
             referentes.changed(control,user,referent,{},'personas','Añadir referente')
-            _audit(user,'operator.referent_added',referent.id,public_identifier=slug)
+            _audit(user,'operator.referent_added',referent.id,public_identifier=slug,kind=kind)
             return referent,True
 
     existing=store()
@@ -455,6 +459,32 @@ def add_referent(user,account,identifier,reason):
     reserve_profile_read(account,'referent')
     profile=get_connector(account).get_user(slug)
     return store(profile)  # rechecks capacity and duplicates under the account lock
+
+def set_referent_kind(user,account,identifier,kind,reason,confirm=False):
+    """Correct whether an existing referent is a niche voice or an industry referent. The kind decides whether its
+    outliers are growth models for the weekly strategy and the editorial (modelos_crecimiento.growth_models,
+    audience_questions), whether new outliers get their comments read (after_observe) and whether a first observation
+    reads 20 posts (read_limit). It does not change who is a referent, so the list revision (and every review that
+    waits on it) is untouched; the referent's own revision moves and the change is audited with before and after, as
+    'referents.changed' so it shows in the referent's history. Returns (referent, previous kind, changed). Without
+    `confirm` nothing is written. A main referent needs Gustavo, as any other change to it (referentes.manage)."""
+    require(user,'operate_linkedin')
+    from . import referentes
+    if kind not in Referent.Kind.values:raise ValueError('Tipo de referente desconocido')
+    if not reason.strip():raise ValueError('Explica por qué cambia el tipo')
+    slug=public_identifier(identifier)
+    with transaction.atomic():
+        referentes.lock(account)
+        referent=Referent.objects.select_for_update().filter(account=account,public_identifier=slug).first()
+        if referent is None:raise ValueError('No es referente de esta cuenta; añádelo con «referente».')
+        previous=referent.kind
+        if previous==kind or not confirm:return referent,previous,False
+        if referent.protected:referentes.require_gustavo(user)
+        before=referentes.snapshot(referent)
+        referent.kind=kind;referent.revision+=1;referent.save(update_fields=['kind','revision'])
+        _audit(user,'referents.changed',referent.id,source='operador',reason=f'Tipo {previous} → {kind}: {reason.strip()[:300]}',
+               before=before,after=referentes.snapshot(referent),kind_change={'from':previous,'to':kind})
+        return referent,previous,True
 
 def observe(user,account,referent_ids=None,limit=5):
     """DESC-04: read recent posts of active referents. Read-only; deduplicated by post id."""

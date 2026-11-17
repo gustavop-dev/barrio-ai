@@ -13,8 +13,9 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 
-from team_backend import evidencia, modelos_crecimiento as mc, referentes as refs, referentes_industria as ind, research
+from team_backend import evidencia, modelos_crecimiento as mc, operador, referentes as refs, referentes_industria as ind, research
 from team_backend.connectors import FakeConnector
 from team_backend.models import (AuditEvent, ConnectorAccount, Contact, CycleLedger, Job, ObservedPost, Referent,
                                  ReferentChange, ReferentControl, ReferentNotice, ReferentReview)
@@ -327,6 +328,80 @@ class GrowthModelTests(IndustryMixin, TestCase):
         self.assertEqual(mc.read_limit(fresh, 5), 20)
         self.assertEqual(mc.read_limit(self.lia, 5), 5)
         self.assertEqual(mc.read_limit(self.referent('nicho-test', kind='nicho'), 5), 5)
+
+
+@override_settings(REFERENTS_GUSTAVO_USERNAME='gustavo')
+class ReferentKindTests(IndustryMixin, TestCase):
+    """The kind decides whether a referent's outliers are growth models (and get their comments read): Gustavo's
+    manual industry referents came in as niche ones. `referente --industria` and `referente-tipo` fix that."""
+
+    def setUp(self):
+        self.set_up_industry()
+        env = patch.dict(os.environ, {'OPERATOR_ALLOW_FAKE': 'true', 'LIVE_PROVIDERS': 'false'})
+        env.start()
+        self.addCleanup(env.stop)
+        FakeConnector.reset()
+        self.addCleanup(FakeConnector.reset)
+        fake = FakeConnector(self.account.external_account_id)
+        for slug in ('voz-agencia-test', 'voz-nicho-test'):
+            fake.seed_user(slug, slug.title(), posts=['Synthetic post'])
+
+    def cmd(self, *args):
+        out = StringIO()
+        call_command('operador', '--usuario', 'gustavo', *args, '--cuenta', str(self.account.id), stdout=out)
+        return out.getvalue()
+
+    def test_a_referent_added_as_industry_keeps_that_kind_and_one_added_without_the_option_is_a_niche_voice(self):
+        out = self.cmd('referente', '--perfil', 'https://www.linkedin.com/in/voz-agencia-test/', '--motivo', 'Agencia en EE. UU.', '--industria')
+        agency = Referent.objects.get(public_identifier='voz-agencia-test')
+        self.assertEqual(agency.kind, 'industria')
+        self.assertIn('tipo industria', out)
+        self.assertEqual(AuditEvent.objects.get(action='operator.referent_added', target=str(agency.pk)).metadata['kind'], 'industria')
+        again = self.cmd('referente', '--perfil', 'voz-agencia-test', '--motivo', 'Otra vez')
+        self.assertIn('Ya existía', again)
+        self.assertIn('referente-tipo --tipo nicho', again)
+        agency.refresh_from_db()
+        self.assertEqual(agency.kind, 'industria')
+        self.cmd('referente', '--perfil', 'voz-nicho-test', '--motivo', 'Voz del nicho')
+        self.assertEqual(Referent.objects.get(public_identifier='voz-nicho-test').kind, 'nicho')
+
+    def test_correcting_the_kind_is_a_dry_run_without_confirmation_audited_and_leaves_the_list_revision_alone(self):
+        manual = self.referent('voz-nicho-test', kind='nicho')
+        for d in range(10, 16):
+            self.post(manual, d, 10)
+        viral = self.post(manual, 3, 280, 20, POST_TEXT)
+        mc.refresh(self.account, now=self.now)
+        self.assertEqual(mc.growth_models(self.account, now=self.now), [])
+        list_revision = ReferentControl.objects.get(account=self.account).revision
+        args = ('referente-tipo', '--perfil', 'https://www.linkedin.com/in/voz-nicho-test/', '--tipo', 'industria',
+                '--motivo', 'Lo añadimos como nicho por error')
+        self.assertIn('Sin --confirmar no se cambia nada', self.cmd(*args))
+        manual.refresh_from_db()
+        self.assertEqual((manual.kind, manual.revision), ('nicho', 1))
+        self.assertFalse(AuditEvent.objects.filter(target=str(manual.pk)).exists())
+        self.assertIn('nicho → industria', self.cmd(*args, '--confirmar'))
+        manual.refresh_from_db()
+        self.assertEqual((manual.kind, manual.revision), ('industria', 2))
+        self.assertEqual(ReferentControl.objects.get(account=self.account).revision, list_revision)
+        event = AuditEvent.objects.get(action='referents.changed', target=str(manual.pk))
+        self.assertEqual((event.metadata['before']['kind'], event.metadata['after']['kind']), ('nicho', 'industria'))
+        self.assertIn('por error', event.metadata['reason'])
+        self.assertEqual(len(refs.history(manual)), 1)
+        self.assertEqual([m['post_id'] for m in mc.growth_models(self.account, now=self.now)], [str(viral.pk)])
+        self.assertIn('ya es industria', self.cmd(*args, '--confirmar'))
+        self.assertEqual(AuditEvent.objects.filter(target=str(manual.pk)).count(), 1)
+        with self.assertRaisesMessage(CommandError, 'No es referente de esta cuenta'):
+            self.cmd('referente-tipo', '--perfil', 'quien-no-es-test', '--tipo', 'industria', '--motivo', 'x', '--confirmar')
+
+    def test_a_main_referent_changes_kind_only_by_gustavo(self):
+        operator = get_user_model().objects.create_user('operador-test', is_superuser=True)
+        main = self.main[0]
+        with self.assertRaisesMessage(PermissionDenied, 'Solo Gustavo'):
+            operador.set_referent_kind(operator, self.account, main.public_identifier, 'industria', 'Prueba', confirm=True)
+        main.refresh_from_db()
+        self.assertEqual(main.kind, 'nicho')
+        _, previous, changed = operador.set_referent_kind(self.user, self.account, main.public_identifier, 'industria', 'Prueba', confirm=True)
+        self.assertEqual((previous, changed), ('nicho', True))
 
 
 @override_settings(REFERENTS_GUSTAVO_USERNAME='gustavo')

@@ -15,6 +15,11 @@ class Command(BaseCommand):
         sub.add_parser('comprobar').add_argument('--cuenta',required=True)
         ref=sub.add_parser('referente');ref.add_argument('--cuenta',required=True);ref.add_argument('--perfil',required=True,help='URL linkedin.com/in/... o identificador público')
         ref.add_argument('--motivo',required=True)
+        ref.add_argument('--industria',action='store_true',help='Lo da de alta como referente de industria (sus posts atípicos pasan a modelos de crecimiento); sin la opción, voz del nicho')
+        tipo=sub.add_parser('referente-tipo',help='Corrige si un referente existente es de industria o del nicho (auditado; sin --confirmar solo muestra el cambio)')
+        tipo.add_argument('--cuenta',required=True);tipo.add_argument('--perfil',required=True,help='URL linkedin.com/in/... o identificador público')
+        tipo.add_argument('--tipo',required=True,choices=['industria','nicho']);tipo.add_argument('--motivo',required=True)
+        tipo.add_argument('--confirmar',action='store_true')
         obs=sub.add_parser('observar');obs.add_argument('--cuenta',required=True);obs.add_argument('--limite',type=int,default=5)
         sub.add_parser('referentes-extraordinaria',help='Revisión de referentes fuera del calendario mensual (decisión explícita)').add_argument('--cuenta',required=True)
         cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
@@ -43,8 +48,16 @@ class Command(BaseCommand):
                 account=operador.check_account(account,user)
                 self.stdout.write(f'Estado {account.status}; bloqueada={account.is_locked}; pausa={account.paused} {account.paused_reason}')
             elif o['accion']=='referente':
-                referent,created=operador.add_referent(user,account,o['perfil'],o['motivo'])
-                self.stdout.write(('Añadido: ' if created else 'Ya existía: ')+f'{referent.display_name} ({referent.id})')
+                kind='industria' if o['industria'] else 'nicho'
+                referent,created=operador.add_referent(user,account,o['perfil'],o['motivo'],kind=kind)
+                self.stdout.write(('Añadido: ' if created else 'Ya existía: ')+f'{referent.display_name} ({referent.id}), tipo {referent.kind}')
+                if not created and referent.kind!=kind:
+                    self.stdout.write(f'El tipo no cambia al volver a añadirlo; usa «referente-tipo --tipo {kind}» para corregirlo.')
+            elif o['accion']=='referente-tipo':
+                referent,previous,changed=operador.set_referent_kind(user,account,o['perfil'],o['tipo'],o['motivo'],confirm=o['confirmar'])
+                if previous==o['tipo']:self.stdout.write(f'{referent.display_name} ya es {previous}; nada que cambiar.')
+                elif changed:self.stdout.write(f'{referent.display_name}: {previous} → {referent.kind} (auditado, revisión {referent.revision}).')
+                else:self.stdout.write(f'{referent.display_name}: {previous} → {o["tipo"]}. Sin --confirmar no se cambia nada.')
             elif o['accion']=='referentes-extraordinaria':
                 from team_backend import referentes
                 job=referentes.extraordinary(user,account)
