@@ -556,6 +556,44 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
   - `ReferentOutput` añade `contacts_count`: las personas del barrio que salieron de sus posts.
   - `PATCH /api/v1/operador/referents/<id>` recibe `{ "active": false, "reason": "…" }` para desactivar, reactivar o cambiar el motivo.
   - `DELETE /api/v1/operador/referents/<id>` lo quita y devuelve 204.
+  - `ReferentOutput.kind`: `nicho` o `industria`. La PWA y la app muestran «Industria» en la tarjeta.
+  - <a id="referentes-analisis"></a>`GET /api/v1/referentes/analisis?account=<uuid>&dias=<7-365>` (solo lectura; `operate_linkedin`; 400 con parámetros inválidos, 404 con una cuenta que no existe). «Qué les funciona y qué no» a los referentes de industria ([plan](../docs/plan-referentes-industria.md#analisis)): sin lecturas de LinkedIn ni llamadas pagadas. Solo etiquetas, cifras, fechas y el enlace de cada post; ninguna frase de un post.
+
+```json
+{ "activo": false, "regla": "analisis-v1",
+  "umbrales": { "base": "mediana de los otros posts originales del mismo autor con ≥48 h, de los últimos 120 días; sin contar el post juzgado",
+                "funciono": "≥2x su mediana de interacciones, z robusto ≥3 y ≥20 interacciones", "no_funciono": "≤0.5x su mediana de interacciones",
+                "min_posts_base": 6, "sostenida": "…", "tendencia": "…" },
+  "muestra": { "posts": 42, "referentes": 6, "dias": 120, "desde": "iso", "hasta": "iso" },
+  "referentes": [{ "id": "uuid", "nombre": "…", "tipo": "industria", "posts": 15, "funciono": 2, "normal": 9, "no_funciono": 2, "sin_juicio": 2,
+                   "mediana_interacciones": 45, "muestra_pequena": false,
+                   "temas": [{ "valor": "mvp_alcance", "posts": 4, "con_juicio": 3, "funciono": 2, "no_funciono": 0, "veces_mediana": 7.5, "muestra_pequena": false }],
+                   "estructuras": [{ "valor": "lista_anunciada·lista·pregunta", "…": "igual que temas" }] }],
+  "destacados": [{ "post_id": "uuid", "url": "https://www.linkedin.com/feed/update/…", "publicado": "iso", "referente": { "id": "uuid", "nombre": "…" },
+                   "veredicto": "funciono | no_funciono",
+                   "metricas": { "interacciones": { "valor": 340, "mediana_autor": 45, "veces": 7.56, "muestra": 13 },
+                                 "reacciones": { "valor": 300, "mediana_autor": 40, "veces": 7.5, "muestra": 13 },
+                                 "comentarios": { "…": "igual" }, "compartidos": { "valor": null, "mediana_autor": null, "veces": null, "muestra": 0 } },
+                   "partes": { "recurso_visual": { "tipo": "imagen | imagenes | video | documento | carrusel | encuesta | enlace | evento | otro | desconocido", "detalle": "no_disponible" },
+                               "gancho": { "tipo": "pregunta | lista_anunciada | historia | cifra | contraste | primera_persona | afirmacion", "palabras": 8, "linea_propia": true },
+                               "cuerpo": { "tema": "mvp_alcance", "formato": "lista | historia | opinion_contraria | caso | tutorial | datos | pregunta_abierta | opinion",
+                                           "angulo": "…", "esquema": ["gancho", "lista"], "items_lista": 5 },
+                               "cierre": { "tipo": "pregunta | llamado | enlace | resumen | afirmacion", "cta": true },
+                               "longitud": { "banda": "corto | medio | largo", "palabras": 41, "lineas": 8, "lineas_cortas_pct": 100 } },
+                   "firma": "lista_anunciada·lista·pregunta", "pilar": "business_to_product | applied_ai | architecture_delivery | otro",
+                   "coyuntura": { "flag": false, "senales": ["menciona_noticia", "menciona_fecha", "menciona_lanzamiento", "varios_referentes_misma_semana"], "referentes_misma_semana": null },
+                   "apto_como_modelo": true }],
+  "por_parte": { "tema": [], "recurso_visual": [], "gancho": [], "formato": [], "cierre": [], "longitud": [] },
+  "estructuras_sostenidas": [{ "id": "estructura:lista_anunciada·lista·pregunta", "firma": "…", "gancho": "…", "formato": "…", "cierre": "…",
+                               "etiqueta": "Lista anunciada · Lista · Pregunta", "posts": 7, "con_juicio": 3, "veces_mediana": 7.5,
+                               "posts_que_funcionaron": 3, "autores": 2, "semanas": 3, "estado": "sostenida | hipotesis", "faltan": [] }],
+  "estructuras_por_debajo": [{ "id": "estructura:…", "etiqueta": "…", "posts": 2, "con_juicio": 2, "no_funciono": 2, "veces_mediana": 0.22, "muestra_pequena": true }],
+  "temas_en_tendencia": [{ "id": "tendencia:nombre:devday", "tema": "devday", "tipo": "nombre | tema", "por": "varios_referentes_misma_semana | coyuntura_que_funciono",
+                           "posts": 2, "autores": 2, "funcionaron": 1, "ultimo_post": "iso", "expira": "iso" }],
+  "limites": ["…"] }
+```
+
+  `activo` dice si el editorial recibe estas señales (`REFERENTES_ANALISIS`); el endpoint responde igual con el interruptor apagado. Cada `por_parte.*` tiene la forma de `referentes[].temas`.
 
 ### Ajustes
 

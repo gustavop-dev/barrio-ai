@@ -15,6 +15,8 @@ son la fuente de verdad de cada función; este plan explica los criterios, sus u
 | 14/11/2026 | «Copiar» es copiar estructura y ángulo de lo que les funciona. **Nunca su texto.** |
 | 14/11/2026 | «Todo se enfoca en la audiencia… no se trata de mí, se trata de la audiencia»: se mide si su audiencia es la de Gustavo y qué pregunta esa audiencia. |
 | 17/11/2026 | La primera búsqueda no propuso a nadie (ver [primera corrida](#primera-corrida)). Gustavo puede dar empresas o perfiles semilla, y si la búsqueda del mes terminó sin propuestas se puede repetir. |
+| 17/11/2026 | «Analizar sus posts, qué les funciona y qué no, cómo lo hacen, qué estructura usan; descomponer sus temas y su estructura». Con cifras (el post, la mediana del autor, cuántas veces), por partes, y separando lo **duradero** de lo **pasajero** (ver [qué les funciona y qué no](#analisis)). |
+| 17/11/2026 | Los referentes de industria que añadió a mano entraron como «nicho»: `operador referente --industria` y `operador referente-tipo` (ver [tipo](#tipo)). |
 
 ## Qué es un referente de industria
 
@@ -24,6 +26,20 @@ observa sus posts, descubre personas en sus comentarios y el autopiloto puede co
 - Entra solo con la decisión explícita de Gustavo (tarjeta «Alta de industria: …», 14 días para decidir). No se aplica
   al cierre del día 5 ni por ningún vencimiento; los recordatorios del día 4 son solo del lote mensual.
 - Sus posts atípicos se convierten en **modelos de crecimiento** para la estrategia semanal ([OBS-06](funcionalidades/observatorio-referentes.md#obs-06)).
+
+### El tipo importa <a id="tipo"></a>
+
+`kind` decide tres cosas: los atípicos de un referente de industria son modelos de crecimiento para la estrategia y el
+editorial (`modelos_crecimiento.growth_models` y `audience_questions`, con `kinds=('industria',)`); de sus atípicos nuevos
+se leen los comentarios (`after_observe`); y su primera observación lee 20 posts para tener base (`read_limit`). Uno de
+«nicho» solo alimenta el respaldo `estrategia.observed_outliers` mientras no haya modelos de industria.
+
+- Alta: `python manage.py operador --usuario <u> referente --cuenta <id> --perfil <url> --motivo "…" --industria`. Sin la
+  opción sigue entrando como nicho; si ya existía, conserva su tipo y el comando lo dice.
+- Corrección: `python manage.py operador --usuario <u> referente-tipo --cuenta <id> --perfil <url> --tipo industria --motivo "…"`
+  solo muestra el cambio; con `--confirmar` lo aplica. Sube la revisión del referente, deja `referents.changed` con
+  antes y después (visible en su historial) y **no** toca la revisión de la lista: las revisiones mensuales pendientes
+  no entran en conflicto. Un main sigue necesitando a Gustavo.
 
 ## Criterios (regla `industria-v1`)
 
@@ -179,6 +195,56 @@ historias ni ejemplos».
 encajan, cuántos están en EE. UU. y con qué papel (`PersonEvidence` de tipo `referent_comment` cruzado con `Contact`).
 Para atípicos nuevos de referentes de industria se leen como mucho 4 hilos de comentarios al día
 (`MODELOS_LECTURAS_DIA`), dentro del tope diario compartido de lecturas de contenido.
+
+## Qué les funciona y qué no (regla `analisis-v1`) <a id="analisis"></a>
+
+`analisis_referentes.py`, sin llamadas pagadas ni lecturas nuevas de LinkedIn: trabaja sobre lo que `operador.observe`
+ya guardó (su ventana y sus topes). Costo: 0 USD al día con 11 o 15 referentes. Lo ve Gustavo (o quien opere) en
+`GET /api/v1/referentes/analisis` ([contrato](../oficina/CONTRATO-API.md#referentes-analisis)); la app aún no lo muestra.
+
+**Cada post, por partes** (`ObservedPost.analysis`, guardado una vez por texto y medio, solo etiquetas):
+
+| Parte | Qué se guarda |
+| --- | --- |
+| Recurso visual | Tipo cuando el conector lo reconoce (`imagen`, `imagenes`, `video`, `documento` = carrusel PDF, `encuesta`, `enlace`…; `desconocido` si no). Si es foto, gráfico, captura o infografía exigiría leer la imagen: no se hace. |
+| Gancho | Tipo (pregunta, lista anunciada, historia, cifra, contraste, primera persona, afirmación), palabras, si va solo. |
+| Cuerpo | Tema de la taxonomía fija (los 10 temas de la audiencia, cada uno bajo un pilar de Gustavo: negocio→producto, IA aplicada, arquitectura y entrega), formato (lista, historia, opinión contraria, caso, tutorial, datos, pregunta abierta, opinión), ángulo y esquema. |
+| Cierre | Tipo (pregunta, llamado, enlace, resumen, afirmación) y si es llamado a la acción. |
+| Longitud | Banda (corto < 600 caracteres, medio, largo > 1300), palabras, líneas, % de líneas cortas. |
+
+La **firma** de su estructura es `gancho·formato·cierre` (p. ej. `lista_anunciada·lista·pregunta`).
+
+**Contra su propio autor**, contador por contador (reacciones, comentarios, compartidos; las vistas de posts ajenos no
+las da LinkedIn): el valor del post, la mediana de los otros posts originales del mismo autor con ≥ 48 h de los últimos
+120 días (sin contar el propio) y cuántas veces es. Veredicto sobre las interacciones (reacciones + comentarios):
+
+- **Funcionó**: la regla de los modelos (`atipico-v1`: ≥ 2 × su mediana, z robusto ≥ 3, ≥ 20 interacciones).
+- **No funcionó**: ≤ 0,5 × su mediana (`REFERENTES_ANALISIS_VECES_BAJO`).
+- **Normal** entre medias. **Sin juicio** con menos de 6 posts de base, < 48 h o sin contadores.
+
+**Duradero o pasajero.** Un post que funcionó es **de coyuntura** si habla de una noticia (anunció, lanzó, adquirió…),
+nombra una fecha («esta semana», «March 12», «Q3 2026») o un lanzamiento (GPT-5, DevDay…), o si nombra lo mismo que
+otro referente la misma semana (nombres propios compartidos; una línea en Title Case no cuenta como nombres).
+
+- **Estructuras sostenidas**: firmas con ≥ 3 posts que funcionaron **sin coyuntura**, de ≥ 2 autores, en ≥ 2 semanas
+  distintas (`REFERENTES_ANALISIS_MIN_POSTS`, `_MIN_AUTORES`, `_MIN_SEMANAS`). Por debajo es **hipótesis** y dice qué
+  falta. También salen las que rinden por debajo (≥ 2 posts con juicio, la mitad o más «no funcionó»).
+- **Temas en tendencia**: un nombre que usan ≥ 2 referentes la misma semana, o el tema de un post de coyuntura que
+  funcionó, en los últimos 14 días; cada uno con su fecha de caducidad (`REFERENTES_ANALISIS_DIAS_TENDENCIA`,
+  `_AUTORES_TENDENCIA`).
+- Por referente y en total, cada parte (tema, recurso visual, gancho, formato, cierre, longitud) con sus posts, cuántos
+  funcionaron o no, la mediana de «veces» y `muestra_pequena` cuando hay menos de 3 con juicio.
+
+**Al editorial**, solo con `REFERENTES_ANALISIS=true` (apagado por defecto: lee exactamente lo de antes), dos señales
+aparte en `estrategia.audience_signals`, no citables como evidencia: `estructura_sostenida` (hasta 5 estructuras, las
+sostenidas primero y las hipótesis marcadas, con la advertencia de reutilizar la estructura y nunca el texto) y
+`tema_en_tendencia` (hasta 5 temas con su caducidad). Ninguna frase de un referente: etiquetas, cifras, fechas y los
+nombres compartidos.
+
+**No se hizo:** una sección en el resumen semanal (es una llamada pagada con validación de cifras y su validador corta
+toda frase causal sobre «referentes»: añadirla exige cambiar su prompt y su validador); un modelo para el tipo de imagen
+(habría que descargar cada imagen: lecturas nuevas y ≈ 0,001–0,002 USD por imagen con un modelo pequeño de visión,
+menos de 0,05 USD al día con 15 referentes, pero requiere su visto bueno) ni para temas libres.
 
 ## Interfaz para la estrategia semanal
 
