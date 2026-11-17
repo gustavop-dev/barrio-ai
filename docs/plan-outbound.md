@@ -307,7 +307,8 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 
 ## Decisiones abiertas (de Gustavo)
 
-1. ¿Cuándo una conversación pasa a oportunidad? Propuesta: al agendar la reunión.
+1. ~~¿Cuándo una conversación pasa a oportunidad?~~ Al agendar la reunión, con un toque de Gustavo en la entrega del
+   lead (fase 6; PRS-09: el equipo no la crea solo).
 2. Umbral de seguidores, cuando haya datos.
 3. Primer mensaje a la comunidad (no compradores): por ahora no; se revisa con los datos del mes.
 4. La máquina de ventas (calificación, nota del lead, lo que sigue a la reunión): después del outbound, con su propia
@@ -404,14 +405,77 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      reverificación web de sus señales al terminar cada descanso, dentro del cupo diario de verificaciones.
    - Embudo `ruta_sin_posts`: con y sin puente, puentes encontrados y aceptados, reintentos por ángulo. Para
      desplegar: migración 0051 y el calentamiento encendido.
-6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
-7. **Lectura semanal del embudo.**
+6. ~~**Respuesta, enlace de agenda (Cal.com) y entrega del lead.**~~ Hecho en la misma rama
+   ([BAR-23](funcionalidades/red.md#bar-23), [BIB-14](funcionalidades/biblioteca-equipos.md#bib-14)), sin desplegar y
+   detrás de `BUYER_REPLY_ENABLED` (apagado por defecto; apagado, todo es como en las fases 1 a 5):
+   - Clasificar: Jev lee toda la conversación y da una probabilidad por tipo (interesado, pide información, no es el
+     momento, no le interesa, otra persona); el código elige con umbral (0,7) y margen (0,2), si no «otro».
+   - Contestar: un borrador por tipo que Gustavo copia y envía, con reglas fijas (su idioma, corto, sin vender, precios,
+     promesas ni presión), una reescritura y el líder. El único enlace es el de su agenda y solo para el interesado y
+     quien pide información; lo agrega el código con su identificador. «No es el momento» descansa hasta su fecha o 90
+     días y vuelve con lo que dijo; «no le interesa» sale para siempre; «otra persona» entra como contacto con su propio
+     recorrido; «otro» es una tarjeta sin borrador. Sin `CALCOM_BOOKING_URL`, sin borrador y con aviso.
+   - Cal.com: webhook firmado (sin secreto rechaza todo), idempotente, empareja por el identificador del enlace, la
+     reserva que reprograma, el correo o el nombre exacto; si no, Gustavo lo empareja en Tu turno. También «Agendó» a
+     mano. Reserva → `reunion` con su fecha; cancelación → `interesado`; reprogramación → nueva fecha.
+   - Entrega: neutra a la fuente y sin calificación (`GET /api/v1/comprador/entregas`); Gustavo crea la oportunidad con
+     un toque y queda enlazada con la conversación y el recorrido.
+   - Embudo: `interesados` y `reunion` con datos reales, las respuestas por tipo y las horas de su respuesta a la reunión.
+     Para desplegar: migración 0052, `CALCOM_BOOKING_URL`, `CALCOM_WEBHOOK_SECRET` y el webhook en Cal.com.
+7. ~~**Lectura semanal del embudo.**~~ Hecho con la fase 6: determinista, la tabla de LI-12-M001-K04, la primera etapa
+   que se rompe con su causa y un solo cambio, «muestra chica» bajo 30 invitaciones, la semana frente a la anterior y los
+   borradores pendientes frente a enviados; los lunes en Slack (canal de resúmenes) y en el resumen semanal.
 
 Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, umbral de seguidores, café virtual.
 
+## Orden de encendido <a id="orden-de-encendido"></a>
+
+Todo el sistema del comprador está en la rama `feat/outbound-comprador`, sin desplegar, con cada fase detrás de su
+interruptor y apagada por defecto. Se enciende de a una, en este orden, mirando un día de datos antes de la siguiente.
+Apagar cualquiera devuelve el comportamiento de la fase anterior; nada se borra.
+
+| Fase | Interruptor (por defecto) | Necesita | Variables propias |
+| --- | --- | --- | --- |
+| 1. Recorrido y embudo ([BAR-18](funcionalidades/red.md#bar-18)) | `BUYER_RECORD_ENABLED` (`true`: es el freno de los ganchos) | migración 0048; `NETWORK_BUYER_REGION=us` y `NETWORK_STAGE_CHECK=true` (ya en producción) | — |
+| 2. Calentamiento ([BAR-19](funcionalidades/red.md#bar-19)) | `BUYER_WARMUP_ENABLED` (`false`) | clases 07 y 10 en la base; el autopiloto y el líder comentando (INT-03) | `BUYER_WARMUP_COMMENTS`, `BUYER_WARMUP_MAX_DAYS`, `BUYER_POST_MAX_AGE_HOURS`, `BUYER_POSTS_READ_DAILY_LIMIT`, `BUYER_POSTS_REREAD_HOURS`, `BUYER_NO_POSTS_READS`, `BUYER_REST_AFTER_DAYS`, `BUYER_REST_DAYS`, `BUYER_COMMENT_SHARE` |
+| 3. Primer mensaje y nota ([BAR-20](funcionalidades/red.md#bar-20)) | `BUYER_FIRST_MESSAGE_ENABLED` (`false`) | migración 0049; clase 09; `LEAD_ENABLED=true` | `BUYER_FIRST_MESSAGE_AFTER_DAYS` |
+| 4. Secuencia M2–M4 ([BAR-21](funcionalidades/red.md#bar-21)) | `BUYER_SEQUENCE_ENABLED` (`false`) | migración 0050; la fase 3; `INBOX_ENABLED=true` y el inbox leyendo | `BUYER_SEQUENCE_DAYS`, `BUYER_SEQUENCE_REST_AFTER_DAYS`, `BUYER_SEQUENCE_REST_DAYS`, `BUYER_SEQUENCE_INBOX_FRESH_HOURS`, `BUYER_SEQUENCE_MAX_LATE_DAYS` |
+| 5. El que no publica ([BAR-22](funcionalidades/red.md#bar-22)) | `BUYER_NO_POSTS_ROUTE_ENABLED` (`false`) | migración 0051; la fase 2 (y la 3 para la nota y el mensaje) | `BUYER_BRIDGE_SEARCHES_PER_DAY`, `BUYER_BRIDGE_PROFILES_PER_SEARCH`, `BUYER_BRIDGE_WAIT_DAYS`, `BUYER_SIGNAL_RECENT_DAYS` |
+| 6. Respuesta, reunión y entrega ([BAR-23](funcionalidades/red.md#bar-23)) | `BUYER_REPLY_ENABLED` (`false`) | migración 0052; clases 08, 11 y 12; la fase 4; el webhook en Cal.com | `BUYER_REPLY_MIN`, `BUYER_REPLY_MARGIN`, `CALCOM_BOOKING_URL`, `CALCOM_WEBHOOK_SECRET` |
+
+Orden en producción:
+
+1. **Desplegar con todo apagado.** `manage.py migrate` aplica 0048 a 0052 en orden. Comprobar que las clases 07 a 12
+   están en la base (1.656 unidades al 17/11/2026) y que Caddy ya publica `/api/*` (el webhook no pide cambios).
+2. **Fase 1.** `BUYER_RECORD_ENABLED` queda en `true`. `manage.py comprador reconstruir --seco`, revisar, y sin `--seco`.
+   Mirar `GET /api/v1/resultados/embudo-comprador`.
+3. **Fase 2.** `BUYER_WARMUP_ENABLED=true`; reiniciar el worker y el autopiloto. Al día siguiente: `buyer.read`,
+   comentarios INT-03 a compradores y `calentados_2` en el embudo.
+4. **Fase 3.** Con `LEAD_ENABLED=true`, `BUYER_FIRST_MESSAGE_ENABLED=true`; reiniciar. Mirar `buyer.drafted`,
+   `buyer.draft_stopped` y las tarjetas «Mensaje sugerido».
+5. **Fase 4.** Con `INBOX_ENABLED=true` y una lectura del inbox en las últimas 3 h, `BUYER_SEQUENCE_ENABLED=true`;
+   reiniciar. Mirar `buyer.sequence_replied`, `buyer.sequence_waiting` y `secuencia` del embudo.
+6. **Fase 5.** `BUYER_NO_POSTS_ROUTE_ENABLED=true`; reiniciar. Mirar `buyer.bridge_*` y `ruta_sin_posts`.
+7. **Fase 6.**
+   1. En Cal.com (Settings → Developer → Webhooks → New): Subscriber URL
+      `https://<dominio>/api/v1/comprador/calcom/webhook`; eventos Booking Created, Booking Rescheduled y Booking
+      Cancelled; un secreto propio (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) en «Secret»; el
+      formato del cuerpo por defecto (una plantilla propia cambiaría los campos que se leen).
+   2. En el `.env` de producción: ese secreto en `CALCOM_WEBHOOK_SECRET` y la página de reserva de Gustavo (https) en
+      `CALCOM_BOOKING_URL`; reiniciar la API. El «Ping» del webhook en Cal.com debería recibir 202 (firma buena, fase
+      apagada); un 403 «Firma inválida» es un secreto distinto. Sin verificar que el «Ping» venga firmado: si recibe 403
+      con el secreto bien copiado, la prueba es la reserva del paso 3.
+   3. `BUYER_REPLY_ENABLED=true`; reiniciar el worker, el autopiloto y la API. Una reserva de prueba de Gustavo en su
+      propia página queda «sin emparejar» en Tu turno: «No es de un comprador» la descarta.
+   4. Mirar `buyer.reply_classified`, `buyer.reply_no_link`, `calcom.event`, `calcom.rejected`, `buyer.meeting_booked`,
+      `lead.handoff_ready` y `respuestas` del embudo. Los lunes llega la lectura semanal al canal de resúmenes.
+
+Sin verificar contra Cal.com real: que el enlace de reserva conserve `metadata[barrio]` y que una reprogramación lo
+mantenga; si no llega, la reserva se empareja por el correo o el nombre, o la empareja Gustavo.
+
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-22) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-23) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

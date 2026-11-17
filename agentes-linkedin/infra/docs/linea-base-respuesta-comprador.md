@@ -66,6 +66,49 @@ entonces. `ReplyRulesTests` falla con `ImportError`: no hay reglas fijas de la r
 
 ## Cómo quedan marcadas las pruebas
 
-Las tres llevan `@expectedFailure` con su motivo. Se quitan cuando su motivo desaparece: la activación de
+Las tres llevaban `@expectedFailure` con su motivo. Se quitaron cuando su motivo desaparece: la activación de
 `respuesta_comprador` (fuentes y carga de unidades), las reglas fijas de la respuesta (`respuesta_comprador.text_issues`)
 y la fase 6 completa detrás de `BUYER_REPLY_ENABLED`.
+
+## Después de activar (fase 6, 17/11/2026)
+
+Misma rama, con `respuesta_comprador` activada (`637d93b`) y la fase 6 detrás de `BUYER_REPLY_ENABLED`. Mismo entorno y
+mismos ajustes del arnés; el caso corre con `BUYER_REPLY_ENABLED=true`, `CALCOM_BOOKING_URL` y `CALCOM_WEBHOOK_SECRET` de
+prueba (la variante I lo apaga y la E vacía el enlace). Sin marcadores de fallo esperado.
+
+- **Caso completo:** pasa. Una corrida en serie, 30,9 s.
+- **`test_respuesta_comprador.py`:** 26 pruebas, todas pasan (31,9 s con `--parallel 2`), entre ellas las reglas fijas,
+  la decisión con umbral y margen, las fechas de «no es el momento», la firma y la recepción del webhook, el pliegue de la
+  reunión y la lectura semanal.
+- **Camino completo:** `test_comprador_e2e.ReplyBuyerPathTests`, 15 pruebas, todas pasan (73,5 s): el camino entero hasta
+  la entrega y las variantes 1 a 11 de la fase.
+
+| Variante | Antes | Después |
+| --- | --- | --- |
+| Flujo | sin tipo, `respondio`, sin enlace, 404 | `interesado`, borrador con su enlace e identificador, «Hecho», reserva por el webhook emparejada por el enlace, `reunion`, entrega completa sin calificación, oportunidad en `reunion` con un toque |
+| P | nada | `pide_informacion`, con enlace, la tarjeta dice qué falta confirmar |
+| N1 | sin descanso | `no_es_el_momento`, descanso hasta el 1 de febrero (lo que dijo), sin enlace |
+| N2 | sin descanso | `no_es_el_momento`, 90 días |
+| X | sin salida | `no_le_interesa`, salida definitiva; vuelve a escribir y no se prepara nada (0) |
+| O | nadie la crea | `otra_persona`, Bruno entra como contacto referido con su propio recorrido |
+| B | sin tipo | `otro`, sin borrador, tarjeta «necesita tu respuesta» |
+| E | sin aviso | sin borrador y `buyer.reply_no_link` |
+| I | pasa | pasa: con el interruptor apagado, 0 clasificadas |
+| Todas | 0 enviados | 0 enviados por el equipo; el enlace solo en Flujo y P |
+
+```
+passed: True
+errors: []
+result: I_clasificadas=0, flujo_tipo=interesado, flujo_paso=interesado (antes de la reserva), flujo_enlace=True,
+        flujo_reunion=True, flujo_entrega=True, flujo_oportunidad=reunion, P_tipo=pide_informacion, P_enlace=True,
+        P_faltan=True, N1_tipo=no_es_el_momento, N1_descanso=no_es_el_momento, N1_hasta_lo_que_dijo=True,
+        N1_enlace=False, N2_tipo=no_es_el_momento, N2_descanso_dias=90, X_tipo=no_le_interesa,
+        X_salida=no_le_interesa, X_despues=0, X_enlace=False, O_tipo=otra_persona, O_referido=True, O_enlace=False,
+        B_tipo=otro, B_borrador=False, B_tarjeta=True, E_borrador=False, E_aviso=True, mensajes_enviados=0,
+        clasificacion_con_metodologia=True, borrador_con_metodologia=True,
+        course_citations=[LI-03-V020-K02, LI-03-M006-K01, LI-03-M005-K06, LI-06-M001-K04, LI-06-M001-K07,
+                          LI-11-M006-K01, LI-11-M006-K02, LI-11-M006-K03, LI-11-M006-K06, LI-08-M003-K05, LI-12-M001-K04]
+```
+
+Los tres marcadores de fallo esperado ya no están: las fuentes cargan desde `637d93b`, las reglas fijas existen
+(`respuesta_comprador.text_issues`, `link_issues`) y la fase 6 está completa.
