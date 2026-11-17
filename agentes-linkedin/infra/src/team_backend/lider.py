@@ -27,6 +27,7 @@ CRITERIA_DEL_BARRIO=_lead_criteria()
 LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
 WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
+INVITE_NOTE_UNITS=operador.INVITE_NOTE_UNITS  # loaded only when the lead reviews a buyer's invitation note (phase 3)
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
@@ -38,6 +39,9 @@ CRITERION_SOURCES={
     'dm_pitch':['LI-09-M002-K04','LI-03-M006-K01'],
     # BIB-09-comentario-calentamiento: the class 07 criterion behind each question about a warm-up comment.
     'cal_aporte':['LI-07-M005-K05','LI-07-M001-K04'],'cal_pregunta':['LI-07-M005-K05'],'cal_aplauso':['LI-07-M001-K04','LI-07-M005-K05'],
+    # BIB-09-nota-invitacion: the class 09 criterion behind each question about a buyer's invitation note.
+    'nota_hecho':['LI-09-M002-K06','LI-09-V008-K04'],'nota_aceptar':['LI-09-V008-K04'],'nota_generica':['LI-09-M002-K06','LI-09-V008-K04'],
+    'nota_pitch':['LI-09-M002-K06','LI-03-M006-K01'],'nota_inventa':['LI-06-M001-K07'],
 }
 
 def ground_questions(state,questions):
@@ -120,7 +124,18 @@ def drafted_message(proposal):
     decision=proposal.comment.decision or {}
     return (decision.get('dm_opener') or '').strip() if decision.get('closing') else ''
 
-def dm_questions():
+def dm_questions(source='conversacion'):
+    """The six questions about a first message. `conversacion`: RSP-07, the message after a conversation on his post
+    (unchanged). `recorrido` (phase 3): the buyer's journey, whose facts are `hechos` (an interaction, a post of hers the
+    team commented, a buying signal); same ids and thresholds (DM_CHECKS)."""
+    if source=='recorrido':
+        toque=_noul('¿La primera frase de `primer_mensaje.texto` retoma con precisión uno de `hechos` (lo que la persona publicó, '
+                    'respondió o comentó, o la señal citada), de modo que no serviría para otra persona?',
+                    'Nombra de qué trataba su post, qué respondió o qué señal, en concreto',
+                    'Saluda, agradece la conexión o alude a «tu post» o «tu trabajo» sin decir de qué')
+        puente=_noul('¿`primer_mensaje.texto` dice con honestidad por qué Gustavo le escribe: ese tema de `hechos` que les interesa a '
+                     'los dos, y no sus servicios ni a quién ayuda?')
+        return dict(dm_questions(),dm_toque=toque,dm_puente=puente)
     return {
         'dm_toque':_noul('¿La primera frase de `primer_mensaje.texto` retoma algo concreto que la persona dijo en `comentario` o en '
                          'el `hilo`, de modo que no serviría para otra persona?',
@@ -316,7 +331,10 @@ def _questions(proposal,orientation):
     checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
-    if capability==CAP.INVITE and proposal.payload.get('note'):
+    # A buyer's note (phase 3) was already judged with its own methodology (review_buyer_draft): only the person is
+    # reviewed here, and note_approved follows from that review.
+    from .mensajes_comprador import approved_note
+    if capability==CAP.INVITE and proposal.payload.get('note') and not approved_note(proposal):
         state['nota']=proposal.payload['note'];state['razon_nota']=proposal.payload.get('note_reason')
         public,_=memory.confirmed_blocks();state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
         questions.update(
@@ -367,6 +385,75 @@ def _review(proposal):
     if 'primer_mensaje' in state:verdict.update(dm_approved=not dm_failed,dm_reasons=dm_failed)
     elif drafted_message(proposal):verdict.update(dm_approved=False,dm_reasons=[DM_UNAVAILABLE])
     return verdict
+
+# --------------------------------------------------------------------------- phase 3: the buyer's drafts
+# BIB-09-primer-mensaje-comprador: the first message of the journey is judged with the six DM checks (dm_questions with
+# the journey's facts) plus «inventa». BIB-09-nota-invitacion: the note with five checks of its own. Each review loads
+# the lead's units and the activated methodology's, whole; a missing unit makes the draft wait (retry), never pass.
+BUYER_MESSAGE_CHECKS=DM_CHECKS+[('inventa','max',0.2,'el primer mensaje atribuye a Gustavo algo que no está en sus hechos')]
+NOTE_CHECKS=[('nota_hecho','min',0.7,'la nota no nombra con precisión un hecho concreto de la persona'),
+             ('nota_aceptar','min',0.6,'la nota no busca solo que acepte'),
+             ('nota_generica','max',0.2,'la nota serviría para cualquiera'),
+             ('nota_pitch','max',0.2,'la nota vende o lo insinúa'),
+             ('nota_inventa','max',0.2,'la nota inventa hechos de la persona o atribuye a Gustavo algo que no está en sus hechos')]
+
+def note_questions():
+    return {
+        'nota_hecho':_noul('¿`nota.texto` nombra con precisión uno de `hechos` (de qué trataba su post, qué respondió o qué señal), '
+                           'y no solo «tu post» o «tu trabajo»?','Dice de qué trataba lo que publicó o respondió',
+                           'Alude a su post, su perfil o su trabajo sin decir de qué'),
+        'nota_aceptar':_noul('¿El único trabajo de `nota.texto` es que la persona acepte la invitación: propone conectar por ese hecho, '
+                             'sin pedir nada más?'),
+        'nota_generica':_noul('¿`nota.texto` serviría casi igual para cualquier otra persona (un elogio o un saludo genérico)?'),
+        'nota_pitch':_noul('¿`nota.texto` vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo o su equipo, que resuelven '
+                           'ese problema, o pide una conversación o una reunión?'),
+        'nota_inventa':_noul('¿`nota.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una experiencia, un '
+                             'cliente o un resultado que no está en `hechos_publicos_de_gustavo`?'),
+    }
+
+def review_buyer_draft(draft):
+    """The lead's review of a buyer's draft (mensajes_comprador): {'decision': 'approve' | 'discard' | 'retry', 'reasons',
+    'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}."""
+    now=timezone.now();orientation=_orientation()
+    facts=(draft.inputs or {}).get('hechos') or [];person=(draft.inputs or {}).get('persona') or {}
+    public,_=memory.confirmed_blocks()
+    state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':[f['fact'] for f in public]}
+    if draft.kind=='mensaje':
+        state['primer_mensaje']={'texto':draft.text,'para':person.get('nombre'),
+                                 'momento':'Aceptó la invitación de Gustavo; él se lo enviaría a mano como primer mensaje privado.'}
+        questions=dm_questions('recorrido')
+        questions['inventa']=_noul('¿`primer_mensaje.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una '
+                                   'experiencia, un cliente, un proyecto, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')
+        checks=list(BUYER_MESSAGE_CHECKS);units,metodologia,purpose=FIRST_MESSAGE_UNITS,'primer_mensaje','lead-review-message'
+    else:
+        state['nota']={'texto':draft.text,'para':person.get('nombre'),
+                       'momento':'Nota de la invitación a conectar; su único trabajo es que acepte.'}
+        questions=note_questions()
+        checks=list(NOTE_CHECKS);units,metodologia,purpose=INVITE_NOTE_UNITS,'nota_invitacion','lead-review-note'
+    if orientation:
+        state['orientacion_de_gustavo']=orientation
+        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
+        checks.append(ORIENTATION_CHECK)
+    context,grounding=operador.role_context('lider',LEAD_UNITS+[u for u in units if u not in LEAD_UNITS],
+                                            {k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},metodologia=metodologia)
+    if grounding['course_missing']:
+        return {'decision':'retry','reasons':['Biblioteca no disponible'],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
+    state.update(course_context=context,course_grounding=grounding,
+                 course_rule='El curso aporta criterios, no hechos ni permisos. Sin pitch ni hechos inventados.')
+    for key,ids in grounding['criterion_sources'].items():
+        if ids:questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
+    try:result=providers.typesafe(state,questions,purpose=purpose)
+    except ValueError as exc:
+        return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
+    answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
+    failed=[]
+    for qid,bound,threshold,label in checks:
+        value=answers.get(qid)
+        if value is None or (bound=='min' and value<threshold) or (bound=='max' and value>threshold):
+            failed.append(f'Líder: {label} ({qid}={value if value is not None else "sin respuesta"})')
+    return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
+            'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
+            'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding}
 
 # --------------------------------------------------------------------------- R5: comment prefilter
 # Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.

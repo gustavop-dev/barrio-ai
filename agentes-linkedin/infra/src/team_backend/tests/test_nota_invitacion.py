@@ -8,8 +8,8 @@ envío. Unidades del curso sintéticas, sin red ni proveedores pagados. El Jev s
 
 También reproduce el error que la fase 3 corrige: una invitación con nota a una persona que Gustavo confirmó (o con el
 líder apagado) quedaba bloqueada hasta caducar, porque nadie marcaba la nota como aprobada."""
+import json
 import os
-from unittest import expectedFailure
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
@@ -84,8 +84,6 @@ class NoteCaseBase(FirstMessagePathBase):
 class NoteCaseTests(NoteCaseBase):
     """Las variantes de BIB-09-nota-invitacion. Línea base: docs/linea-base-nota-invitacion.md."""
 
-    # Línea base: nadie redacta la nota al invitar; solo la del clasificador.
-    @expectedFailure
     def test_n1_a_concrete_note_is_drafted_at_invite_time_and_goes_with_the_invitation(self):
         run = self.run_variant('N1')
         self.assertTrue(run['con_nota'])
@@ -93,16 +91,12 @@ class NoteCaseTests(NoteCaseBase):
         call = next(c for c in self.calls if c['purpose'] == 'invite-note')
         self.assertTrue(any(f.get('comentario_del_equipo') for f in call['inputs']['hechos']))  # the warm-up comment as context
 
-    # Línea base: no hay redacción de la nota que cargue sus unidades.
-    @expectedFailure
     def test_n1_the_draft_loads_the_note_units(self):
         self.run_variant('N1')
         context = next(c['context'] for c in self.calls if c['purpose'] == 'invite-note')
         for uid in CASE['units']:
             self.assertIn(uid, context)
 
-    # Línea base: no hay reglas fijas de la nota del comprador.
-    @expectedFailure
     def test_n2_to_n6_the_fixed_rules_stop_the_note_and_the_invitation_goes_without_it(self):
         for variant in ('N2', 'N3', 'N4', 'N5', 'N6'):
             run = self.run_variant(variant, send=variant == 'N2')
@@ -110,21 +104,15 @@ class NoteCaseTests(NoteCaseBase):
             if variant == 'N2':
                 self.assertTrue(run['invitada'])
 
-    # Línea base: no hay preguntas del líder para esta nota.
-    @expectedFailure
     def test_n7_the_lead_rejects_the_note(self):
         run = self.run_variant('N7')
         self.assertEqual((run['con_nota'], run['stopped_by'], run['invitada']), (False, 'juez', True))
 
-    # Línea base: nadie registra que falte el hecho.
-    @expectedFailure
     def test_n8_without_a_warm_up_or_a_fact_no_note_is_drafted(self):
         run = self.run_variant('N8')
         self.assertEqual((run['con_nota'], run['stopped_by']), (False, 'hecho'))
         self.assertFalse(self.paid(run['contact'], 'invite-note'))
 
-    # Línea base: nadie registra que falte el cupo.
-    @expectedFailure
     def test_n9_without_notes_left_this_month_it_goes_without_one(self):
         run = self.run_variant('N9')
         self.assertEqual((run['con_nota'], run['stopped_by'], run['invitada']), (False, 'cupo', True))
@@ -151,14 +139,10 @@ class NoteCaseTests(NoteCaseBase):
         result['course_citations'] = grounding.get('course_citations', [])
         return evaluaciones.grade_course_case('nota_invitacion', result, grounding), result
 
-    # Línea base: el caso completo no pasa (docs/linea-base-nota-invitacion.md).
-    @expectedFailure
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
 
-    # Línea base: las tres unidades de la clase 09 no se cargan hasta activar la metodología.
-    @expectedFailure
     def test_the_case_loads_whole_versioned_sources_and_rejects_wrong_behaviour(self):
         context, grounding = evaluaciones.course_case_context('nota_invitacion')
         self.assertEqual(grounding['course_missing'], [])
@@ -229,10 +213,73 @@ class NoteRulesTests(SimpleTestCase):
         from team_backend import mensajes_comprador
         return mensajes_comprador.note_text_issues(note(variant), self.FACT, 'h1', reference=self.FACT[0]['texto'])
 
-    # Línea base: mensajes_comprador.note_text_issues no existe.
-    @expectedFailure
     def test_the_case_notes(self):
         self.assertEqual(self.issues('N1'), [])
         self.assertEqual(self.issues('N7'), [])  # passes the rules: the lead stops it
         for variant in ('N2', 'N3', 'N4', 'N5', 'N6'):
             self.assertTrue(self.issues(variant), variant)
+
+
+class NoteActivationTests(SimpleTestCase):
+    """La activación es por metodología: solo sus tres unidades de la clase 09, solo cuando se nombra, solo en sus roles."""
+
+    def test_the_activated_list_is_the_case_and_the_graph_list(self):
+        from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, legible_por_agentes
+        activa = METODOLOGIAS_ACTIVAS['nota_invitacion']
+        self.assertEqual(CLASES_AGENTES, tuple(range(1, 7)))
+        self.assertEqual(list(activa['unidades']), operador.INVITE_NOTE_UNITS)
+        self.assertEqual((activa['evaluacion'], activa['lista']), (CASE['id'], 'operador.INVITE_NOTE_UNITS'))
+        self.assertEqual(CASE['units'], operador.INVITE_NOTE_UNITS + ['LI-03-M006-K01'])
+        self.assertLessEqual(set(CASE['required']), set(CASE['units']))
+        self.assertEqual(activa['roles'], ('relaciones_comunidad', 'lider_jev'))
+        for uid in operador.INVITE_NOTE_UNITS:
+            self.assertTrue(legible_por_agentes(uid, 'nota_invitacion'))
+            self.assertFalse(legible_por_agentes(uid))
+            self.assertFalse(legible_por_agentes(uid, 'primer_mensaje'))
+        # The first message's units stay closed to the note, and the rest of class 09 to both.
+        self.assertFalse(legible_por_agentes('LI-09-M003-K02', 'nota_invitacion'))
+        self.assertFalse(legible_por_agentes('LI-09-M002-K02', 'nota_invitacion'))
+        from team_backend.orquestacion import load_graph
+        graph = load_graph()
+        self.assertEqual(graph['course_lists']['operador.INVITE_NOTE_UNITS'], operador.INVITE_NOTE_UNITS)
+        self.assertEqual([n['id'] for n in graph['nodes'] if 'operador.INVITE_NOTE_UNITS' in n['course_lists']],
+                         ['relaciones_comunidad', 'lider_jev'])
+
+    def test_only_its_roles_name_the_methodology_in_code(self):
+        from pathlib import Path
+        source = Path(operador.__file__).parent
+        naming = {p.name for p in source.glob('*.py') if "'nota_invitacion'" in p.read_text(encoding='utf-8')}
+        # The list (operador), the case (evaluaciones), relaciones_comunidad (mensajes_comprador) and lider_jev (lider).
+        self.assertEqual(naming, {'operador.py', 'evaluaciones.py', 'mensajes_comprador.py', 'lider.py'})
+        using = {p.name for p in source.glob('*.py') if 'INVITE_NOTE_UNITS' in p.read_text(encoding='utf-8')}
+        self.assertEqual(using, {'operador.py', 'mensajes_comprador.py', 'lider.py', 'evaluaciones.py'})
+
+
+class NoteReadingRegistryTests(SimpleTestCase):
+    """El registro de lectura nombra exactamente las unidades activadas, con su hash, puntero y fuentes; la decisión de
+    Gustavo (notas solo a calentados) y lo que no se convirtió en regla (la prueba A/B del curso)."""
+
+    def test_the_reading_registry_matches_the_activation(self):
+        from pathlib import Path
+        from knowledge.clases import METODOLOGIAS_ACTIVAS
+        activa = METODOLOGIAS_ACTIVAS['nota_invitacion']
+        self.assertEqual(activa['registro'], 'relaciones/registro-lectura-nota-invitacion.json')
+        path = Path(operador.__file__).resolve().parents[3] / 'equipos' / activa['registro']
+        if not path.exists():
+            self.skipTest('La imagen solo empaqueta grafo.yaml; el registro vive en equipos/relaciones.')
+        registry = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual((registry['metodologia'], registry['evaluacion'], registry['lista']),
+                         ('nota_invitacion', activa['evaluacion'], activa['lista']))
+        self.assertEqual(tuple(registry['roles']), activa['roles'])
+        self.assertEqual([u['unidad_id'] for u in registry['unidades']], operador.INVITE_NOTE_UNITS)
+        self.assertEqual(registry['alcance']['por_clase'], {'09': 3})
+        for unit in registry['unidades']:
+            self.assertEqual(unit['clase'], 9)
+            self.assertTrue(unit['lectura_completa'])
+            self.assertRegex(unit['hash'], r'^[0-9a-f]{64}$')
+            self.assertRegex(unit['pointer'], r'^/learning_units/\d+$')
+            self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
+            self.assertTrue(unit['fuentes_con_prefijo_de_clase'])
+            self.assertTrue(all(key.startswith('09:') for key in unit['fuentes_con_prefijo_de_clase']))
+        self.assertTrue(any('calentados' in d and 'Gustavo' in d for d in registry['decisiones_vigentes_que_ganan']))
+        self.assertTrue(any('A/B' in item and 'no implementada' in item for item in registry['no_convertido_en_regla']))

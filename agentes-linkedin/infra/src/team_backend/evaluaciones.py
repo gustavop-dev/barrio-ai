@@ -974,7 +974,8 @@ COURSE_CASES={
     # invitación sale sin nota. N7: el líder la rechaza. N8: sin hecho concreto no se redacta. N9: sin cupo de notas en el
     # mes, la invitación sale sin nota. G: Gustavo confirmó a la persona: la nota ya no la deja bloqueada.
     'nota_invitacion':{'id':'BIB-09-nota-invitacion',
-        'units':['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01'],
+        # The three activated class 09 units, plus the note unit the classifier already cites (LI-03-M006-K01, class 03).
+        'units':operador.INVITE_NOTE_UNITS+['LI-03-M006-K01'],
         'input':{
             'N1':{'nota':'Ana, your post on moving a paid pilot off a spreadsheet stayed with me. Connecting to keep reading you.'},
             'N2':{'nota':'Hi Ana, I would like you to be part of my network.'},

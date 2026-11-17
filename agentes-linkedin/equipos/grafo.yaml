@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.12-comentario-calentamiento",
+  "graph_version": "6.13-primer-mensaje-comprador-y-nota",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -164,6 +164,11 @@
       "LI-07-M005-K07",
       "LI-07-M004-K03",
       "LI-10-V009-K01"
+    ],
+    "operador.INVITE_NOTE_UNITS": [
+      "LI-09-M002-K06",
+      "LI-09-V008-K04",
+      "LI-09-M002-K01"
     ]
   },
   "budgets": {
@@ -1413,7 +1418,8 @@
         "operador.COMMENT_UNITS",
         "operador.REPLY_UNITS",
         "operador.FIRST_MESSAGE_UNITS",
-        "operador.WARMUP_COMMENT_UNITS"
+        "operador.WARMUP_COMMENT_UNITS",
+        "operador.INVITE_NOTE_UNITS"
       ],
       "course_units": [
         "LI-03-M006-K02",
@@ -1423,7 +1429,7 @@
         "LI-06-M002-K09",
         "LI-06-M002-K10"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS; el cierre del segundo turno suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) para redactar el primer mensaje; con BUYER_WARMUP_ENABLED, el comentario en el post de un comprador que se calienta suma WARMUP_COMMENT_UNITS (clases 07 y 10, metodología activada comentario_calentamiento).",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS; el cierre del segundo turno suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) para redactar el primer mensaje; con BUYER_WARMUP_ENABLED, el comentario en el post de un comprador que se calienta suma WARMUP_COMMENT_UNITS (clases 07 y 10, metodología activada comentario_calentamiento). Con BUYER_FIRST_MESSAGE_ENABLED (fase 3, mensajes_comprador): el primer mensaje al comprador que acepta carga FIRST_MESSAGE_UNITS (metodología primer_mensaje) y la nota de la invitación a un comprador calentado, INVITE_NOTE_UNITS (clase 09, metodología activada nota_invitacion) más LI-03-M006-K01.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": "medium",
       "model_note": null,
@@ -1440,7 +1446,8 @@
         "job_kinds": [
           "propose_comment",
           "read_own_comments",
-          "propose_reply"
+          "propose_reply",
+          "prepare_buyer_draft"
         ],
         "event_roles": [
           "relaciones_comunidad"
@@ -1729,7 +1736,8 @@
       "course_lists": [
         "operador.LEAD_UNITS",
         "operador.FIRST_MESSAGE_UNITS",
-        "operador.WARMUP_COMMENT_UNITS"
+        "operador.WARMUP_COMMENT_UNITS",
+        "operador.INVITE_NOTE_UNITS"
       ],
       "course_units": [
         "LI-03-V020-K02",
@@ -1738,7 +1746,7 @@
         "LI-06-M001-K04",
         "LI-06-M001-K07"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con un primer mensaje que juzgar (respuesta de cierre de INT-04) suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) en la misma revisión; con un comentario de calentamiento (post de un comprador, BUYER_WARMUP_ENABLED) suma WARMUP_COMMENT_UNITS (metodología comentario_calentamiento) y sus tres preguntas cal_*.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con un primer mensaje que juzgar (respuesta de cierre de INT-04) suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) en la misma revisión; con un comentario de calentamiento (post de un comprador, BUYER_WARMUP_ENABLED) suma WARMUP_COMMENT_UNITS (metodología comentario_calentamiento) y sus tres preguntas cal_*. Con BUYER_FIRST_MESSAGE_ENABLED revisa los borradores del comprador (review_buyer_draft): el primer mensaje con las seis preguntas dm_* sobre sus hechos y la nota con INVITE_NOTE_UNITS (metodología nota_invitacion) y sus cinco preguntas nota_*.",
       "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
       "effort": null,
       "model_note": null,
@@ -4378,6 +4386,12 @@
           "deduplication": "IDs deterministas del job por comentario; una propuesta abierta por comentario (one_open_action_per_comment)."
         },
         {
+          "kind": "prepare_buyer_draft",
+          "cadence": "Tick 60 s, antes del plan de red; con BUYER_FIRST_MESSAGE_ENABLED y el líder encendido, un borrador pagado a la vez: la nota de un comprador calentado que se va a invitar o el primer mensaje de uno que aceptó, cuando toca.",
+          "binding": "team_backend.autopiloto._buyer_drafts",
+          "deduplication": "IDs deterministas del job por persona, tipo, intento y número de intento (hasta 3); una decisión por persona, tipo e intento (one_buyer_draft_per_step); _pending impide dos a la vez."
+        },
+        {
           "kind": "execute_action",
           "cadence": "Tick 60 s; aprobación y capacidad disponible.",
           "binding": "team_backend.autopiloto._execute",
@@ -5159,7 +5173,8 @@
       "community_study": "analista_barrio_resultados",
       "prepare_profile_assets": "perfil",
       "plan_week": "director_editorial",
-      "monthly_review": "analista_barrio_resultados"
+      "monthly_review": "analista_barrio_resultados",
+      "prepare_buyer_draft": "relaciones_comunidad"
     },
     "stage_roles": {
       "director": [
@@ -5201,6 +5216,7 @@
       "import_analytics",
       "observe",
       "plan_network",
+      "prepare_buyer_draft",
       "prepare_piece",
       "propose_comment",
       "propose_reply",

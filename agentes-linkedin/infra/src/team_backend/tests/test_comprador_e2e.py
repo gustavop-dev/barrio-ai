@@ -759,7 +759,10 @@ class FirstMessagePathBase(WarmupPathBase):
 
     def invite(self,contact,now=None,auto=False):
         """The plan proposes the invitation; Gustavo approves it (approval, as today) or, with `auto`, the autopilot's gate
-        (RED-02 autonomous, the lead) approves it; the operator sends it. Returns the proposal."""
+        (RED-02 autonomous, the lead) approves it; the operator sends it. Returns the proposal. As in the autopilot's
+        tick, the buyer-draft step runs first: a warmed buyer's note is decided before the plan (red.plan holds her
+        while it is not)."""
+        self.prepare(now)
         self.plan(now)
         proposal=ActionProposal.objects.filter(contact=contact,capability='RED-02').order_by('-created_at').first()
         if proposal is None:return None
@@ -776,3 +779,323 @@ class FirstMessagePathBase(WarmupPathBase):
         contact=self.step_accept(contact)
         self.assertEqual(self.journey(contact).step,'acepto')
         return contact
+
+
+def case_text(case,variant):
+    from team_backend import evaluaciones
+    field='nota' if case=='nota_invitacion' else 'mensaje'
+    return evaluaciones.COURSE_CASES[case]['input'][variant][field]
+
+
+LATER=timedelta(hours=2)  # Tu turno read two hours after the acceptance: an interacted buyer's card shows one hour after
+
+
+class FirstMessageBuyerPathTests(FirstMessagePathBase):
+    """Phase 3 end to end (BAR-20): the note at invite time and the first message on acceptance, with the journey, Tu
+    turno and the funnel after each step. The variants 1–10 of the brief; the case modules (test_primer_mensaje_comprador,
+    test_nota_invitacion) grade the same functions against their baselines."""
+
+    def write(self,contact,note=None,message=None):
+        if note is not None:self.texts[('invite-note',contact.display_name)]=note
+        if message is not None:self.texts[('buyer-message',contact.display_name)]=message
+
+    def test_chosen_warmed_invited_with_a_note_accepts_draft_lead_card_done_message_1(self):
+        # 1–3. Chosen, followed, one warm-up comment and her answer to it: warmed, ready to be invited.
+        ana=self.answered('ana-acme','Ana Acme')
+        self.write(ana,note=case_text('nota_invitacion','N1'),message=case_text('primer_mensaje_comprador','M1'))
+
+        # 4. The plan holds her while her note is decided; the autopilot's step drafts it (one paid call, the note's
+        # methodology, the warm-up comment as context), the lead reviews it with its five questions.
+        with self.lead():
+            held=self.plan(timezone.now())
+        self.assertEqual((held['nota_en_espera'],self.invite_proposed(ana)),(1,False))
+        invite=self.invite(ana)
+        self.assertEqual(invite.state,'confirmed',invite.risks)
+        note=self.drafts_of(ana,'nota')[-1]
+        self.assertEqual((note.state,note.proposal_id,note.text,note.anchor['tipo']),('enviado',invite.pk,case_text('nota_invitacion','N1'),'respondio_comentario'))
+        call=next(c for c in self.calls if c['purpose']=='invite-note')
+        for uid in operador.INVITE_NOTE_UNITS:self.assertIn(uid,call['context'])
+        self.assertEqual(call['inputs']['hechos'][0]['comentario_del_equipo'],WARM_1)
+        review=next(c for c in self.jev if c['purpose']=='lead-review-note')
+        self.assertEqual(set(review['questions'])-{'orientacion'},{'nota_hecho','nota_aceptar','nota_generica','nota_pitch','nota_inventa'})
+        self.assertEqual(note.review['course_methodology'],'nota_invitacion')
+        self.assertEqual(self.sent_invitation(ana)['message'],case_text('nota_invitacion','N1'))
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.invite_note),('invitado',True))
+        self.assertEqual(journey.touches.get(kind='borrador').detail,{'tipo':'nota','numero':1,'intento':1,'resultado':'listo','por':''})
+
+        # 5. She accepts. The same cycle prepares the first message (she interacted): the methodology's units, her facts,
+        # the lead's six DM questions; the card waits an hour.
+        ana=self.accepted(ana)
+        self.prepare()
+        message=self.drafts_of(ana,'mensaje')[-1]
+        accepted=self.journey(ana).accepted_at
+        self.assertEqual((message.state,message.show_at),('listo',accepted+timedelta(hours=1)))
+        context=next(c['context'] for c in self.calls if c['purpose']=='buyer-message')
+        for uid in operador.FIRST_MESSAGE_UNITS:self.assertIn(uid,context)
+        review=next(c for c in self.jev if c['purpose']=='lead-review-message')
+        self.assertLessEqual({'dm_toque','dm_puente','dm_pregunta','dm_un_tema','dm_en_persona','dm_pitch','inventa'},set(review['questions']))
+        self.assertEqual(review['state']['primer_mensaje']['texto'],case_text('primer_mensaje_comprador','M1'))
+        self.assertEqual(message.review['course_methodology'],'primer_mensaje')
+        self.assertEqual(self.cards_of(ana),[])  # never the minute she accepted
+
+        # 6. Tu turno an hour later: one «Mensaje sugerido» card, Gustavo's three buttons, what it cites.
+        cards=self.cards_of(ana,LATER)
+        self.assertEqual(len(cards),1)
+        card=cards[0]
+        self.assertEqual([a['label'] for a in card['actions']],['Abrir su perfil','Hecho, le escribí','No escribirle'])
+        self.assertEqual((card['message']['text'],card['message']['origin'],card['message']['comment']),
+                         (case_text('primer_mensaje_comprador','M1'),'recorrido',BUYER_POST))
+        self.assertEqual((card['message']['comment_label'],card['message']['reply']),('Su post',WARM_1))
+        drafts=self.funnel()['borradores']
+        self.assertEqual((drafts['pendientes'],drafts['enviados'],drafts['recorrido']['pendientes']),(1,0,1))
+
+        # 7. «Hecho, le escribí»: mensaje_1, from the journey's draft. The team never sent a private message.
+        self.close(card,'enviado')
+        journey=self.journey(ana)
+        sent=journey.touches.get(kind='mensaje')
+        self.assertEqual((sent.direction,sent.detail),('saliente',{'fuente':'recorrido','numero':1}))
+        self.assertEqual((journey.step,journey.messages_sent,journey.first_message_at),('mensaje_1',1,sent.at))
+        self.assertEqual([k for k,_ in self.kinds(ana)],['elegido','seguir','comentario','respondio_comentario','borrador','invitacion',
+                                                         'acepto_invitacion','borrador','mensaje'])
+        self.assertEqual(self.cards_of(ana,LATER),[])
+        self.assertIn('Mensaje sugerido para Ana Acme',[r['title'] for r in self.turn_payload(LATER)['recent']])
+
+        # The funnel: received a message, the drafts sent, the invitation with a note.
+        funnel=self.funnel()
+        total=self.stages(funnel['acumulado'])
+        self.assertEqual({k:total[k] for k in ('invitados','aceptaron','recibieron_mensaje')},{'invitados':1,'aceptaron':1,'recibieron_mensaje':1})
+        drafts=funnel['borradores']
+        self.assertEqual((drafts['pendientes'],drafts['enviados'],drafts['enviados_pct']),(0,1,100.0))
+        self.assertEqual({k:drafts['recorrido'][k] for k in ('preparados','pendientes','enviados')},{'preparados':1,'pendientes':0,'enviados':1})
+        self.assertEqual({k:drafts['notas'][k] for k in ('preparadas','con_invitacion','enviadas')},{'preparadas':1,'con_invitacion':1,'enviadas':1})
+        self.assertEqual((funnel['comparaciones']['nota']['con_nota']['personas'],funnel['comparaciones']['nota']['sin_nota']['personas']),(1,0))
+        self.assertEqual((self.fake.state['writes'],self.messages_sent()),(3,0))  # follow, comment, invitation
+        self.assertEqual(comprador.rebuild()['toques_nuevos'],0)
+        self.assertFalse(AuditEvent.objects.filter(action__in=['buyer.record_failed','buyer.draft_stopped']).exists())
+
+    def turn_payload(self,later=timedelta(0)):
+        from rest_framework.test import APIClient
+        client=APIClient();client.force_authenticate(self.gustavo)
+        with patch('django.utils.timezone.now',return_value=timezone.now()+later):
+            return client.get('/api/v1/tu-turno').json()
+
+    def test_1_she_interacted_the_draft_is_prepared_in_the_cycle_that_sees_the_acceptance(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.write(ana,message=case_text('primer_mensaje_comprador','M1'))
+        self.invite(ana)
+        ana=self.accepted(ana)
+        self.assertEqual(self.journey(ana).next_at,self.journey(ana).accepted_at)  # due at the acceptance
+        self.prepare()
+        self.assertEqual(self.drafts_of(ana,'mensaje')[-1].state,'listo')
+        self.assertEqual(len(self.cards_of(ana,LATER)),1)
+
+    def test_2_no_interaction_a_touch_after_accepting_then_the_draft_n_days_later(self):
+        ana,second=self.two_comments('ana-acme','Ana Acme')
+        self.write(ana,note=case_text('nota_invitacion','N1'),message=case_text('primer_mensaje_comprador','M2'))
+        self.invite(ana)
+        ana=self.accepted(ana)
+        accepted=self.journey(ana).accepted_at
+        self.assertEqual(self.journey(ana).next_at,accepted+timedelta(days=21))  # no touch yet: at the latest in 21 days
+        self.prepare()
+        self.assertEqual(self.drafts_of(ana,'mensaje'),[])
+        self.assertEqual([j.pk for j in calentamiento.second_touch(self.account)],[self.journey(ana).pk])
+        # Calentamiento 2: a new post of hers is read and commented with the warm-up rules.
+        self.their_new_post(ana,AFTER_POST,suffix='p3',hours_ago=1)
+        self.observe(later=True)
+        self.a_day_later(second)
+        third=self.autopilot_comment(WARM_3)
+        self.assertEqual(third.state,'confirmed',third.risks)
+        journey=self.journey(ana)
+        touch=journey.touches.filter(kind='comentario',at__gt=accepted).get()
+        self.assertEqual(journey.next_at,accepted+timedelta(days=7))
+        self.assertEqual(calentamiento.second_touch(self.account),[])
+        self.prepare(accepted+timedelta(days=6,hours=23))
+        self.assertEqual(self.drafts_of(ana,'mensaje'),[])  # never before the N days
+        self.prepare(accepted+timedelta(days=7,minutes=1))
+        message=self.drafts_of(ana,'mensaje')[-1]
+        self.assertEqual((message.state,message.anchor['tipo']),('listo','comentario_en_su_post'))
+        self.assertEqual(message.anchor['comentario_del_equipo'],WARM_3)  # the newest commented post first
+        self.assertEqual(len(self.cards_of(ana,timedelta(days=7,hours=1))),1)
+        self.assertGreater(message.decided_at,touch.at)
+        self.assertEqual([k for k,_ in self.kinds(ana)][-3:],['acepto_invitacion','comentario','borrador'])
+
+    def test_3_nothing_real_to_cite_no_message_no_paid_call_and_the_reason_kept(self):
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        self.write(ana,message=case_text('primer_mensaje_comprador','M2'))
+        self.invite(ana,at)
+        ana=self.accepted(ana)
+        # The job itself, asked before the step decides (a stale queue): nothing real, so no paid call either.
+        from team_backend import mensajes_comprador
+        with self.writer(),self.lead():
+            result=mensajes_comprador.prepare(self.bot,{'contact':str(ana.pk),'kind':'mensaje'})
+        self.assertEqual((result['decision'],result['stopped_by']),('sin_borrador','hecho'))
+        later=self.journey(ana).accepted_at+timedelta(days=7,minutes=1)  # the route without posts: no touch to wait for
+        self.prepare(later)
+        draft=self.drafts_of(ana,'mensaje')[-1]
+        self.assertEqual((draft.state,draft.stopped_by,draft.text),('sin_borrador','hecho',''))
+        self.assertFalse(self.paid(ana,'buyer-message'))
+        self.assertEqual(self.cards_of(ana,timedelta(days=8)),[])
+        journey=self.journey(ana)
+        self.assertEqual(journey.touches.filter(kind='borrador').order_by('at').last().detail['por'],'hecho')
+        self.assertIsNone(journey.next_at)
+        stopped=self.funnel()['borradores']['recorrido']['parados']
+        self.assertEqual(stopped['hecho'],1)
+
+    def test_4_a_draft_the_rules_or_the_lead_reject_is_discarded_audited_and_never_shown(self):
+        rules=self.answered('ana-acme','Ana Acme')
+        lead=self.answered('bea-acme','Bea Acme')
+        self.write(rules,message=case_text('primer_mensaje_comprador','M4'))
+        self.write(lead,message=case_text('primer_mensaje_comprador','M5'))
+        for contact in (rules,lead):self.invite(contact)
+        rules=self.accepted(rules);lead=self.accepted(lead)
+        self.prepare()
+        self.assertEqual([c['purpose'] for c in self.calls if c['inputs']['persona']['nombre']=='Ana Acme' and c['purpose']=='buyer-message'],
+                         ['buyer-message','buyer-message'])  # one redraft
+        for contact,by in ((rules,'reglas'),(lead,'juez')):
+            draft=self.drafts_of(contact,'mensaje')[-1]
+            self.assertEqual((draft.state,draft.stopped_by),('descartado',by))
+            self.assertEqual(self.stopped(contact,'mensaje'),by)
+            self.assertEqual(self.cards_of(contact,LATER),[])
+        self.assertEqual(self.drafts_of(lead,'mensaje')[-1].review['decision'],'discard')
+        self.assertEqual(self.funnel()['borradores']['pendientes'],0)
+
+    def test_5_no_escribirle_is_a_definitive_exit(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.write(ana,message=case_text('primer_mensaje_comprador','M1'))
+        self.invite(ana)
+        ana=self.accepted(ana)
+        self.prepare()
+        card=self.cards_of(ana,LATER)[0]
+        response=self.human.post(next(a for a in card['actions'] if a['label']=='No escribirle')['endpoint'],
+                                 {'how':'no','note':'Ya la conozco por otro lado.'},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        self.assertEqual(response.json()['closed']['how'],'no')
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.exit_reason,journey.first_message_at),('salio','descartado_por_gustavo',None))
+        self.assertEqual(journey.touches.get(kind='no_escribirle').detail,{'fuente':'recorrido','numero':1})
+        self.assertEqual(self.drafts_of(ana,'mensaje')[-1].state,'no_enviado')
+        self.assertEqual(self.cards_of(ana,LATER),[])
+        self.assertEqual(self.prepare(),0)  # nothing more for her
+        funnel=self.funnel()
+        self.assertEqual((funnel['salidas']['descartado_por_gustavo'],self.stages(funnel['acumulado'])['recibieron_mensaje']),(1,0))
+        self.assertEqual(funnel['borradores']['no_enviados'],1)
+        again=self.human.post(card['actions'][1]['endpoint'],{'how':'enviado'},format='json')  # already closed: same answer
+        self.assertEqual((again.status_code,again.json()['closed']['how']),(200,'no'))
+
+    def test_6_without_notes_left_this_month_the_invitation_goes_without_one(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.write(ana,note=case_text('nota_invitacion','N1'))
+        with patch.dict(os.environ,{'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT':'0'}):
+            invite=self.invite(ana)
+        self.assertEqual(invite.state,'confirmed')
+        self.assertEqual(self.sent_invitation(ana)['message'],'')
+        self.assertFalse(self.paid(ana,'invite-note'))
+        self.assertEqual(self.stopped(ana,'nota'),'cupo')
+        self.assertIs(self.journey(ana).invite_note,False)
+        notes=self.funnel()['borradores']['notas']
+        self.assertEqual((notes['enviadas'],notes['parados']['cupo']),(0,1))
+
+    def test_7_a_person_gustavo_confirmed_is_invited_with_the_note_the_lead_reviewed(self):
+        ana=self.answered('ana-acme','Ana Acme',note='Ana, your answer on the spreadsheet pilot stayed with me. Would love to connect.')
+        red.confirm_fit(self.gustavo,ana.pk)
+        self.write(ana,note=case_text('nota_invitacion','N1'))
+        invite=self.invite(ana,auto=True)
+        self.assertEqual(invite.state,'confirmed',invite.risks)
+        self.assertEqual(self.sent_invitation(ana)['message'],case_text('nota_invitacion','N1'))  # the buyer's note, not the classifier's
+        self.assertFalse(AuditEvent.objects.filter(action='network.note_omitted').exists())
+        self.assertEqual(ActionProposal.objects.filter(capability='RED-02',state='approved').count(),0)
+
+    def test_9_a_conversation_on_his_post_and_a_journey_one_card_and_no_second_message(self):
+        _,pid=self.publish()
+        sara=self.fake.seed_person('sara-seis','Sara Seis',headline='Founder & CEO at Seis',location='Austin, Texas')
+        root=self.fake.comment_on_own_post(pid,sara['id'],QUESTION,at=timezone.now()-timedelta(minutes=20))
+        self.read();first=PostComment.objects.get()
+        self.propose(first,draft());self.execute_proposal(ActionProposal.objects.get(capability='INT-04'))
+        contact=Contact.objects.get(pk=first.contact_id)
+        checked={'state':'ok','checked_at':timezone.now().isoformat()}
+        Contact.objects.filter(pk=contact.pk).update(classification={'fit':True,'role':'comprador','confidence':0.9,'region':'us','stage_check':checked},
+                                                     stage='followed',followed_at=timezone.now()-timedelta(hours=1),location='Austin, Texas')
+        self.fake.comment_on_own_post(pid,sara['id'],FOLLOW_UP,thread=root,at=timezone.now()+timedelta(seconds=5))
+        self.rescan()
+        second=PostComment.objects.get(text=FOLLOW_UP)
+        self.propose(second,draft(reply=CLOSING,dm_opener='Hi Sara, I kept thinking about your golden datasets going stale. How are you versioning them now?'))
+        with self.lead():self.execute_proposal(ActionProposal.objects.get(capability='INT-04',comment=second))
+        contact=Contact.objects.get(pk=contact.pk)
+        self.write(contact,message=case_text('primer_mensaje_comprador','M1'))
+        self.invite(contact)
+        contact=self.accepted(contact)
+        self.prepare()
+        cards=self.cards_of(contact,LATER)
+        self.assertEqual(len(cards),1)
+        self.assertNotEqual(cards[0]['message'].get('origin'),'recorrido')  # RSP-07's card wins
+        self.assertEqual(self.drafts_of(contact,'mensaje'),[])
+        self.close(cards[0],'enviado')
+        self.prepare(timezone.now()+timedelta(days=22))
+        self.assertEqual(self.drafts_of(contact,'mensaje'),[])  # she got her first message: no second one
+        self.assertEqual(self.cards_of(contact,timedelta(days=22)),[])
+        self.assertEqual(self.journey(contact).step,'mensaje_1')
+
+    def test_9_a_conversation_after_the_journey_card_hides_it_and_its_message_retires_the_draft(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.write(ana,message=case_text('primer_mensaje_comprador','M1'))
+        self.invite(ana)
+        ana=self.accepted(ana)
+        self.prepare()
+        self.assertEqual([c['message']['origin'] for c in self.cards_of(ana,LATER)],['recorrido'])
+        # Before Gustavo writes, she talks with the team on his post and the closing reply drafts RSP-07's message.
+        _,pid=self.publish()
+        root=self.fake.comment_on_own_post(pid,ana.provider_user_id,QUESTION,at=timezone.now()-timedelta(minutes=20))
+        self.read();first=PostComment.objects.get()
+        self.assertEqual(first.contact_id,ana.pk)
+        self.propose(first,draft());self.execute_proposal(ActionProposal.objects.get(capability='INT-04'))
+        self.fake.comment_on_own_post(pid,ana.provider_user_id,FOLLOW_UP,thread=root,at=timezone.now()+timedelta(seconds=5))
+        self.rescan()
+        second=PostComment.objects.get(text=FOLLOW_UP)
+        self.propose(second,draft(reply=CLOSING,dm_opener='Hi Ana, I kept thinking about your golden datasets going stale. How are you versioning them now?'))
+        with self.lead():self.execute_proposal(ActionProposal.objects.get(capability='INT-04',comment=second))
+        cards=self.cards_of(ana,LATER)
+        self.assertEqual(len(cards),1)  # one card per person: the conversation's wins
+        self.assertNotEqual(cards[0]['message'].get('origin'),'recorrido')
+        self.close(cards[0],'enviado')
+        self.prepare()
+        self.assertEqual(self.drafts_of(ana,'mensaje')[-1].state,'reemplazado')  # she got her first message: the draft retires
+        self.assertEqual(self.cards_of(ana,LATER),[])
+        self.assertEqual(self.journey(ana).messages_sent,1)
+
+    def test_10_peers_and_recommenders_keep_todays_rule(self):
+        par=self.contact('par-luis','Luis Par',stage='followed',followed_hours=49)
+        rec=self.contact('rec-rosa','Rosa Rec',stage='followed',followed_hours=47)
+        for row,role in ((par,'par'),(rec,'recomendador')):
+            Contact.objects.filter(pk=row.pk).update(classification=dict(row.classification,role=role))
+        self.assertEqual(self.prepare(),0)
+        with self.lead():summary=self.plan(timezone.now())  # the switch and the lead on: nobody is held for a note
+        self.assertEqual(summary.get('nota_en_espera',0),0)
+        self.assertTrue(self.invite_proposed(par))
+        self.assertFalse(self.invite_proposed(rec))
+        self.assertFalse(ActionProposal.objects.get(contact=par,capability='RED-02').payload.get('note'))
+        self.assertFalse(BuyerJourney.objects.exists())
+        self.assertFalse(Job.objects.filter(kind='prepare_buyer_draft').exists())
+        self.assertEqual(self.calls,[])
+
+
+class FirstMessageSwitchOffPathTests(FirstMessagePathBase):
+    def test_8_with_the_switch_off_the_path_is_todays_and_rsp07_intact(self):
+        with patch.dict(os.environ,{'BUYER_FIRST_MESSAGE_ENABLED':'false'}):
+            ana=self.answered('ana-acme','Ana Acme',note='Ana, your answer on the spreadsheet pilot stayed with me. Would love to connect.')
+            self.texts[('invite-note','Ana Acme')]=case_text('nota_invitacion','N1')
+            self.texts[('buyer-message','Ana Acme')]=case_text('primer_mensaje_comprador','M1')
+            with self.lead():summary=self.plan(timezone.now())
+            self.assertNotIn('nota_en_espera',{k for k,v in summary.items() if v})
+            invite=self.invite(ana,auto=True)
+            self.assertEqual(invite.payload.get('note'),'Ana, your answer on the spreadsheet pilot stayed with me. Would love to connect.')
+            ana=self.accepted(ana)
+            self.assertIsNone(self.journey(ana).next_at)  # nothing due after the acceptance, as before phase 3
+            self.assertEqual(self.prepare(timezone.now()+timedelta(days=22)),0)
+            self.assertEqual(calentamiento.second_touch(self.account),[])
+            self.assertEqual((self.calls,self.cards_of(ana,timedelta(days=22))),([],[]))
+            self.assertFalse(Job.objects.filter(kind='prepare_buyer_draft').exists())
+            from team_backend.models import BuyerDraft
+            self.assertFalse(BuyerDraft.objects.exists())
+            drafts=self.funnel()['borradores']
+            self.assertEqual((drafts['recorrido']['preparados'],drafts['notas']['preparadas']),(0,0))

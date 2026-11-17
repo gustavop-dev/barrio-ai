@@ -1665,6 +1665,7 @@ class BuyerTouch(models.Model):
         REOPENED='reabierto','Vuelve al recorrido'
         ALREADY_CONNECTED='ya_conectados','Ya eran conexión'
         NO_MESSAGE='no_escribirle','Gustavo decidió no escribirle'
+        DRAFT='borrador','Borrador preparado o descartado (fase 3)'
         OPPORTUNITY='oportunidad','Oportunidad registrada'
         INTERESTED='interesado','Respuesta con interés'
         # saliente
@@ -1715,3 +1716,55 @@ class BuyerTouch(models.Model):
         super().save(*args,**kwargs)
     def delete(self,*args,**kwargs):raise ValueError('El registro del comprador solo se añade; no se borra.')
     def __str__(self):return f'{self.kind} · {self.at:%Y-%m-%d}'
+
+class BuyerDraft(models.Model):
+    """A text the team prepared for a buyer (phase 3, mensajes_comprador.py): the first message after the acceptance, which
+    Gustavo sends himself from LinkedIn (INB-08: the app never sends one), or the note of an invitation. One decision per
+    person, kind, number and attempt, including the decision not to write (sin_borrador) and the reason. Phase 4 adds
+    messages 2–4 with `number`. It hangs from the Contact, so it outlives a rebuilt journey."""
+    class Kind(models.TextChoices):
+        MESSAGE='mensaje','Primer mensaje (después de aceptar)'
+        NOTE='nota','Nota de la invitación'
+    class State(models.TextChoices):
+        REVIEWING='en_revision','Esperando la revisión del líder'
+        READY='listo','Listo: en Tu turno (mensaje) o esperando la invitación (nota)'
+        USED='usada','Nota puesta en una invitación'
+        SENT='enviado','Enviado (Gustavo le escribió o la nota salió con la invitación)'
+        NOT_SENT='no_enviado','No enviado (Gustavo decidió no escribirle o la invitación salió sin la nota)'
+        DISCARDED='descartado','Descartado por las reglas fijas o el líder'
+        NONE='sin_borrador','Sin borrador: nada real que citar, sin cupo de notas o ya hay conversación'
+        EXPIRED='caducado','Caducado sin usar'
+        REPLACED='reemplazado','Reemplazado: ya hubo otro primer mensaje o la persona ya no está en ese paso'
+    class StoppedBy(models.TextChoices):
+        RULES='reglas','Reglas fijas'
+        JUDGE='juez','Líder (Jev)'
+        FACT='hecho','Nada real que citar'
+        QUOTA='cupo','Sin cupo de notas este mes'
+        CONVERSATION='conversacion','Ya hay una conversación'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    contact=models.ForeignKey(Contact,on_delete=models.CASCADE,related_name='buyer_drafts')
+    kind=models.CharField(max_length=8,choices=Kind.choices)
+    number=models.PositiveSmallIntegerField(default=1)  # 1: the first message; phase 4: 2–4
+    attempt=models.PositiveSmallIntegerField(default=1)  # the journey's attempt it belongs to
+    state=models.CharField(max_length=12,choices=State.choices,db_index=True)
+    stopped_by=models.CharField(max_length=12,choices=StoppedBy.choices,blank=True)
+    reason=models.TextField(blank=True)  # why it was written (its fact) or why it stopped
+    text=models.TextField(blank=True)
+    language=models.CharField(max_length=10,blank=True)
+    # The fact the first line (or the note) cites: {id, tipo, texto, fecha, fuente…}; every fact it was given in `inputs`.
+    anchor=models.JSONField(default=dict,blank=True)
+    inputs=models.JSONField(default=dict,blank=True)
+    citations=models.JSONField(default=list,blank=True)
+    issues=models.JSONField(default=list,blank=True)  # the fixed rules it broke (after the single redraft)
+    review=models.JSONField(default=dict,blank=True)  # the lead's verdict, with the course grounding it read
+    model=models.CharField(max_length=100,blank=True)
+    show_at=models.DateTimeField(null=True,blank=True)  # a message's card never shows the minute she accepted
+    proposal=models.ForeignKey(ActionProposal,on_delete=models.SET_NULL,null=True,blank=True,related_name='buyer_drafts')
+    created_at=models.DateTimeField(default=timezone.now)
+    decided_at=models.DateTimeField(null=True,blank=True)  # ready, discarded or not written
+    closed_at=models.DateTimeField(null=True,blank=True)  # sent, not sent, expired or replaced
+    closed_note=models.TextField(blank=True)
+    class Meta:
+        ordering=['-created_at']
+        constraints=[models.UniqueConstraint(fields=['contact','kind','number','attempt'],name='one_buyer_draft_per_step')]
+    def __str__(self):return f'{self.contact} · {self.kind} {self.number} · {self.state}'

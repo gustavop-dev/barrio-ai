@@ -40,6 +40,11 @@ METODOLOGIAS_ACTIVAS={
                                 'registro':'relaciones/registro-lectura-comentario-calentamiento.json',
                                 'unidades':('LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K04','LI-07-M005-K07',
                                             'LI-07-M004-K03','LI-10-V009-K01')},
+    # Fase 3 del comprador: la nota de invitación, reservada a compradores calentados con un hecho concreto.
+    'nota_invitacion':{'evaluacion':'BIB-09-nota-invitacion','lista':'operador.INVITE_NOTE_UNITS',
+                       'roles':('relaciones_comunidad','lider_jev'),
+                       'registro':'relaciones/registro-lectura-nota-invitacion.json',
+                       'unidades':('LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01')},
 }
 _DE_AGENTES=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
 

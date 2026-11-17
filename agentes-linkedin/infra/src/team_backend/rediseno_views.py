@@ -311,8 +311,8 @@ class TuTurno(APIView):
         monthly_cards=referent_cards(request.user,_card,now)
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
-        from . import respuestas, urgente
-        message_cards=respuestas.cards(_card,now)
+        from . import mensajes_comprador, respuestas, urgente
+        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)  # RSP-07 first; one card per person
         day_cards=urgente.cards(_card,now)
         tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'fechas':day_cards,'resumen':summary_cards,
                'referentes':monthly_cards}
@@ -332,7 +332,7 @@ class TuTurno(APIView):
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
                          'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
-                                   +urgente.recently_resolved(),
+                                   +mensajes_comprador.recently_resolved()+urgente.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
 class TuTurnoSeen(APIView):
@@ -362,15 +362,21 @@ class ConversationClose(APIView):
 
 class SuggestedMessageClose(APIView):
     """POST /api/v1/respuestas/<id>/mensaje {how: enviado | no, note?}: Gustavo closes the «Mensaje sugerido» card. The team
-    never sends it (INB-08): he sends it himself from LinkedIn and says so here."""
+    never sends it (INB-08): he sends it himself from LinkedIn and says so here. The id is the comment of a conversation
+    on his post (RSP-07) or, with BUYER_FIRST_MESSAGE_ENABLED, the first message of a buyer who accepted (BuyerDraft):
+    there «no» is a definitive exit of the journey."""
     def post(self,request,cid):
         human_session(request)
-        from . import respuestas
-        from .models import PostComment
+        from . import mensajes_comprador, respuestas
+        from .models import BuyerDraft, PostComment
         data=request.data if isinstance(request.data,dict) else {}
         note=data.get('note') or ''
         if data.get('how') not in respuestas.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
             raise ValidationError('how debe ser enviado o no; note, un texto de hasta 1000 caracteres')
+        if not PostComment.objects.filter(id=cid).exists() and BuyerDraft.objects.filter(id=cid,kind=BuyerDraft.Kind.MESSAGE).exists():
+            draft=mensajes_comprador.close(request.user,cid,data['how'],note)
+            return Response({'id':str(draft.id),'closed':{'how':'enviado' if draft.state==BuyerDraft.State.SENT else 'no',
+                                                          'at':draft.closed_at.isoformat() if draft.closed_at else None,'note':draft.closed_note}})
         get_or_404(PostComment,id=cid)
         row=respuestas.close_dm(request.user,cid,data['how'],note)
         return Response({'id':str(row.id),'closed':row.decision.get('dm_closed')})

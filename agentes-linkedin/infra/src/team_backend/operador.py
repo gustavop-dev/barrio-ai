@@ -53,6 +53,10 @@ FIRST_MESSAGE_UNITS=list(METODOLOGIAS_ACTIVAS['primer_mensaje']['unidades'])
 # post (phase 2, calentamiento.py). Loaded whole, only with the methodology named, by Relaciones when it drafts a comment
 # on a warming buyer's post and by the lead when it reviews one. Baseline: docs/linea-base-comentario-calentamiento.md.
 WARMUP_COMMENT_UNITS=list(METODOLOGIAS_ACTIVAS['comentario_calentamiento']['unidades'])
+# BIB-09-nota-invitacion (class 09, activated in METODOLOGIAS_ACTIVAS): the note of an invitation to a warmed buyer,
+# drafted at invite time (phase 3, mensajes_comprador.py). Loaded whole, only with the methodology named, by Relaciones
+# when it drafts the note and by the lead when it reviews it. Baseline: docs/linea-base-nota-invitacion.md.
+INVITE_NOTE_UNITS=list(METODOLOGIAS_ACTIVAS['nota_invitacion']['unidades'])
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'
@@ -1247,6 +1251,10 @@ def _run_job(job):
             from . import respuestas
             r=respuestas.propose(user,params['comment'],origin_job=str(job.id))
             return 'complete',r['decision'][:30],''
+        if job.kind=='prepare_buyer_draft':
+            from . import mensajes_comprador
+            r=mensajes_comprador.prepare(user,params,origin_job=str(job.id))
+            return 'complete',f"{params.get('kind')}:{r['decision']}"[:30],''
         if job.kind=='execute_action':
             execution=execute(user,params['proposal'])
             return ('complete' if execution.state!='failed' else 'failed'),execution.state,execution.note

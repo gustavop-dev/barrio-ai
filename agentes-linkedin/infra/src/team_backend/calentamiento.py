@@ -90,6 +90,13 @@ def warming(account):
     return (BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING)
             .exclude(route=Route.NO_POSTS).exclude(contact__provider_user_id=''))
 
+def second_touch(account):
+    """Phase 3 (calentamiento 2, BUYER_FIRST_MESSAGE_ENABLED): accepted buyers who did not interact and got no comment
+    since accepting: one more touch before the first message (LI-09-M002-K05). Same reads, rules, review and caps as
+    the warm-up; empty with the switch off."""
+    from . import mensajes_comprador
+    return mensajes_comprador.awaiting_touch(account)
+
 def buyer_ids(account):
     return set(BuyerJourney.objects.filter(contact__account=account).exclude(contact__provider_user_id='')
                .values_list('contact__provider_user_id',flat=True))
@@ -183,13 +190,15 @@ def _reserve(account,contact,now):
 
 def to_read(account,now=None):
     """Journeys whose posts are due for a read, warmest first: warming up (or chosen with the follow on its way), still
-    short of comments, not on the route without posts, not read in the last BUYER_POSTS_REREAD_HOURS."""
+    short of comments, not on the route without posts, not read in the last BUYER_POSTS_REREAD_HOURS; with phase 3, also
+    the accepted ones waiting for their touch before the first message (second_touch)."""
     now=now or timezone.now()
     recent=set(AuditEvent.objects.filter(action=POSTS_READ,created_at__gte=now-reread_after()).values_list('target',flat=True))
     following=ActionProposal.objects.filter(capability='RED-01',state__in=['proposed','approved','executing']).values('contact_id')
+    second={j.pk for j in second_touch(account)}
     rows=(BuyerJourney.objects.select_related('contact').filter(contact__account=account).exclude(route=Route.NO_POSTS)
-          .exclude(contact__provider_user_id='').filter(Q(step=Step.WARMING)|Q(step=Step.CHOSEN,contact_id__in=following)))
-    due=[j for j in rows if str(j.contact_id) not in recent and j.warm_comments<comments_needed()]
+          .exclude(contact__provider_user_id='').filter(Q(step=Step.WARMING)|Q(step=Step.CHOSEN,contact_id__in=following)|Q(pk__in=second)))
+    due=[j for j in rows if str(j.contact_id) not in recent and (j.pk in second or j.warm_comments<comments_needed())]
     weight=heats([j.contact for j in due],now)
     return sorted(due,key=lambda j:(-weight.get(j.contact_id,0),j.warming_at or j.chosen_at))
 
@@ -316,10 +325,14 @@ def open_comments(account):
 def buyer_posts(account,now,recent_authors=(),skips=()):
     """The buyers' posts that may get a comment now, warmest author first, then the newest: the author is warming up
     and still short of BUYER_WARMUP_COMMENTS (written and waiting), the post is recent, nobody commented it, and the
-    author got no comment within the author wait (autopiloto.author_cooldown)."""
+    author got no comment within the author wait (autopiloto.author_cooldown). Phase 3: an accepted buyer waiting for the
+    touch before the first message (second_touch) needs one comment, unless one is already on its way."""
     journeys={j.contact.provider_user_id:j for j in warming(account)}
     waiting=open_comments(account)
     need={uid for uid,j in journeys.items() if j.warm_comments+waiting.get(uid,0)<comments_needed()}
+    for j in second_touch(account):
+        uid=j.contact.provider_user_id
+        if not waiting.get(uid):journeys[uid]=j;need.add(uid)
     posts=list(ObservedPost.objects.filter(account=account,referent__isnull=True,is_repost=False,author_provider_id__in=list(need),
                                            posted_at__gte=now-post_max_age()).exclude(text='').exclude(proposals__capability='INT-03')
                .exclude(author_provider_id__in=list(recent_authors)).exclude(id__in=list(skips)))

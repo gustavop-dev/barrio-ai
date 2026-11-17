@@ -14,6 +14,7 @@ pre-check of each execution settles the person's stage. The autopilot only queue
 functions."""
 import json
 import hashlib
+import logging
 import os
 import re
 from datetime import datetime, timedelta
@@ -27,6 +28,8 @@ from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .models import OPEN_ACTION_STATES, ActionExecution, ActionProposal, AuditEvent, Contact, ObservedPost, Referent
 from .permissions import require
+
+logger=logging.getLogger(__name__)
 
 RED=ActionProposal.Capability
 NETWORK_CAPABILITIES=(RED.FOLLOW,RED.INVITE,RED.ACCEPT)
@@ -310,10 +313,21 @@ def reserve_note(proposal):
 
 
 def note_approved(proposal):
-    """The note was approved by the lead's review of this invitation (review.note_approved). Only an approved note is
-    ever sent: Gustavo's «Sí, encaja» (confirmed_by_gustavo) and LEAD_ENABLED=false skip that review, and their
-    invitation goes out without the note instead of staying blocked until it expires (docs/plan-outbound.md, fase 3)."""
-    return bool((proposal.review or {}).get('note_approved'))
+    """The note was approved by the lead's review of this invitation (review.note_approved), or it is a buyer's note the
+    lead approved in its own review (phase 3, mensajes_comprador.approved_note). Only an approved note is ever sent:
+    Gustavo's «Sí, encaja» (confirmed_by_gustavo) and LEAD_ENABLED=false skip the invitation's review, and a note nobody
+    approved goes out without it instead of staying blocked until it expires (docs/plan-outbound.md, fase 3)."""
+    if (proposal.review or {}).get('note_approved'):return True
+    from .mensajes_comprador import approved_note
+    return approved_note(proposal)
+
+def _note_outcome(proposal,sent):
+    """Phase 3: mark the buyer's note sent or not; never stops the invitation."""
+    from .mensajes_comprador import note_outcome
+    try:
+        with transaction.atomic():note_outcome(proposal,sent)
+    except Exception:  # noqa: BLE001 - the record of a draft never stops a send
+        logger.exception('No se pudo marcar la nota del comprador (%s)',proposal.pk)
 
 NOTE_UNREVIEWED='Nota sin aprobación del líder (Gustavo confirmó a la persona o el líder está apagado): sale sin nota, la alternativa aprobada'
 
@@ -341,9 +355,11 @@ def send_invitation(execution,proposal,connector,user):
             fallback.approved_hash=fallback.payload_hash;fallback.decided_by=proposal.decided_by;fallback.decided_at=proposal.decided_at
             fallback.review=dict(proposal.review,note_fallback_of=str(proposal.id));fallback.save()
             operador._audit(user,'network.note_fallback',fallback.id,intention=str(proposal.id),reason=exc.kind)
+        _note_outcome(proposal,False)
         operador.enqueue_execution(user,fallback)  # A later job runs every gate and the persisted spacing again.
         return finished
     if use_note:operador._audit(user,'network.note_sent',proposal.id,provider_consumption='accepted_request')
+    _note_outcome(proposal,use_note)
     return result
 
 
@@ -1019,21 +1035,38 @@ def plan(user,account,now=None):
         engaged=desenlaces.network_engaged([c.pk for c in candidates],days=30,now=now) if candidates else {}
         candidates=sorted(candidates,key=lambda c:c.pk not in engaged)
         if runtime:runtime.snapshot('network_engaged',lambda:[str(c.pk) for c in candidates if c.pk in engaged])
+        # Phase 3 (BUYER_FIRST_MESSAGE_ENABLED): the month's notes go to warmed buyers with a concrete fact, drafted at
+        # invite time (mensajes_comprador); the classifier's notes are no longer used. A warmed buyer whose note is not
+        # decided yet waits for it (NOTE_HOLD at most); a stopped note never stops the invitation.
+        from . import mensajes_comprador
+        buyer_notes=mensajes_comprador.enabled()
+        held=mensajes_comprador.note_hold(candidates,now) if buyer_notes else set()
+        ready=mensajes_comprador.ready_notes(candidates) if buyer_notes else {}
+        if held:summary['nota_en_espera']=len(held)
         # A scarce note goes first to someone who conversed with him on his post, with a slightly lower bar.
-        exceptions=sorted((c for c in candidates if c.classification.get('confidence',0)>=(0.8 if (c.evidence or {}).get('conversed') else 0.9) and
+        exceptions=[] if buyer_notes else sorted((c for c in candidates if c.classification.get('confidence',0)>=(0.8 if (c.evidence or {}).get('conversed') else 0.9) and
             c.classification.get('invitation_note') and c.classification.get('note_reason') and
             'LI-03-M006-K01' in c.classification.get('course_citations',[])),
             key=lambda c:(bool((c.evidence or {}).get('conversed')),c.classification['confidence']),reverse=True)
         note_ids={c.pk for c in exceptions[:note_room(now)]}
         for contact in candidates:
             if room(RED.INVITE)<=0:break
+            if contact.pk in held:continue
             if recipient_blocked(contact.provider_user_id) or invitation_reserved(contact.provider_user_id):continue
             payload={'user_id':contact.provider_user_id};c=contact.classification
-            if contact.pk in note_ids and note_room(now)>0:
+            draft=ready.get(contact.pk)
+            if draft is not None and note_room(now)>0:
+                payload.update(note=draft.text,note_reason=('Nota del comprador calentado: '+(draft.reason or ''))[:500],
+                               without_note_fallback=True)
+                try:operador.validate_payload(RED.INVITE,payload)
+                except ValueError:payload={'user_id':contact.provider_user_id}
+            elif contact.pk in note_ids and note_room(now)>0:
                 payload.update(note=c['invitation_note'],note_reason=c['note_reason'],without_note_fallback=True)
                 try:operador.validate_payload(RED.INVITE,payload)
                 except ValueError:payload={'user_id':contact.provider_user_id}
-            summary['invite']+=bool(_propose(user,contact,RED.INVITE,payload,grounding))
+            proposal=_propose(user,contact,RED.INVITE,payload,grounding)
+            if proposal is not None and draft is not None and payload.get('note')==draft.text:mensajes_comprador.use_note(draft,proposal)
+            summary['invite']+=bool(proposal)
     if autonomy(RED.FOLLOW)!='off':
         # Leaders are followed too (their posts are where the team comments); only invitations leave them out.
         for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).order_by('discovered_at')):

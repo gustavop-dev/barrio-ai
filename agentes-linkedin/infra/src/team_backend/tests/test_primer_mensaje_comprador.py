@@ -8,7 +8,6 @@ el paso de borradores del autopiloto y Tu turno. Unidades del curso sintéticas,
 
 El Jev simulado es un juez por rasgos del texto (test_comprador_e2e.judge_message), no una tabla de respuestas."""
 from datetime import timedelta
-from unittest import expectedFailure
 from unittest.mock import patch
 
 from django.utils import timezone
@@ -128,8 +127,6 @@ class FirstMessageCaseBase(FirstMessagePathBase):
 class FirstMessageCaseTests(FirstMessageCaseBase):
     """Las variantes de BIB-09-primer-mensaje-comprador. Línea base: docs/linea-base-primer-mensaje-comprador.md."""
 
-    # Línea base: nadie prepara un mensaje al aceptar (solo RSP-07 tras una conversación en su post).
-    @expectedFailure
     def test_m1_she_interacted_the_draft_is_prepared_in_the_same_cycle_and_cites_it(self):
         run = self.m1()
         self.assertTrue(run['mismo_ciclo'])
@@ -138,45 +135,33 @@ class FirstMessageCaseTests(FirstMessageCaseBase):
         self.assertEqual(run['cita'], 'respondio_comentario')
         self.assertEqual(self.messages_sent(), 0)
 
-    # Línea base: sin borrador al aceptar no hay tarjeta.
-    @expectedFailure
     def test_m1_the_card_never_shows_the_same_minute(self):
         run = self.m1()
         self.assertEqual(self.cards_of(run['contact']), [])
         self.assertEqual(len(self.cards_of(run['contact'], LATER)), 1)
 
-    # Línea base: nadie redacta el mensaje del recorrido: no hay llamada que cargue las unidades.
-    @expectedFailure
     def test_m1_the_draft_loads_the_first_message_units(self):
         self.m1()
         context = next(c['context'] for c in self.calls if c['purpose'] == 'buyer-message')
         for uid in CASE['units']:
             self.assertIn(uid, context)
 
-    # Línea base: después de aceptar nadie lee ni comenta sus posts, y no hay borrador a los N días.
-    @expectedFailure
     def test_m2_without_interaction_a_touch_first_and_the_draft_n_days_after(self):
         run = self.m2()
         self.assertFalse(run['antes_de_tiempo'])
         self.assertTrue(run['toque'])
         self.assertEqual(len(run['tarjetas']), 1)
 
-    # Línea base: no hay motivo registrado («hecho») porque nadie lo evalúa.
-    @expectedFailure
     def test_m3_nothing_real_to_cite_no_message_and_no_paid_call(self):
         run = self.m3()
         self.assertEqual(run['tarjetas'], [])
         self.assertEqual(run['stopped_by'], 'hecho')
         self.assertFalse(run['pagado'])
 
-    # Línea base: sin borrador no hay reglas que lo paren.
-    @expectedFailure
     def test_m4_a_draft_breaking_a_fixed_rule_after_the_redraft_shows_no_card(self):
         run = self.m4()
         self.assertEqual((run['tarjetas'], run['stopped_by']), ([], 'reglas'))
 
-    # Línea base: sin borrador no hay líder que lo pare.
-    @expectedFailure
     def test_m5_a_draft_the_lead_rejects_shows_no_card(self):
         run = self.m5()
         self.assertEqual((run['tarjetas'], run['stopped_by']), ([], 'juez'))
@@ -200,8 +185,6 @@ class FirstMessageCaseTests(FirstMessageCaseBase):
         result['course_citations'] = grounding.get('course_citations', [])
         return evaluaciones.grade_course_case('primer_mensaje_comprador', result, grounding), result
 
-    # Línea base: el caso completo no pasa (docs/linea-base-primer-mensaje-comprador.md).
-    @expectedFailure
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))

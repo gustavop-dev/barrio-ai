@@ -435,9 +435,11 @@ class FirstMessageActivationTests(SimpleTestCase):
         from pathlib import Path
         source = Path(operador.__file__).parent
         naming = {p.name for p in source.glob('*.py') if "metodologia='primer_mensaje'" in p.read_text(encoding='utf-8')}
-        self.assertEqual(naming, {'respuestas.py', 'lider.py'})  # relaciones_comunidad y lider_jev
+        # relaciones_comunidad (RSP-07 en respuestas, y desde la fase 3 el primer mensaje del recorrido en
+        # mensajes_comprador) y lider_jev.
+        self.assertEqual(naming, {'respuestas.py', 'lider.py', 'mensajes_comprador.py'})
         using = {p.name for p in source.glob('*.py') if 'FIRST_MESSAGE_UNITS' in p.read_text(encoding='utf-8')}
-        self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py'})
+        self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py', 'mensajes_comprador.py'})
 
 
 class FirstMessageRegistryTests(FirstMessageBase):
@@ -454,7 +456,8 @@ class FirstMessageRegistryTests(FirstMessageBase):
         self.assertTrue(grade['passed'], grade['errors'])
         self.assertEqual(list(grade['units']), operador.FIRST_MESSAGE_UNITS)
         self.assertEqual(set(grade['units'].values()), {'fixture-hash'})
-        self.assertEqual(grade['corpus']['por_clase']['09'], 7)
+        # The synthetic corpus seeds every activated class 09 list: the first message (7) and the note (3).
+        self.assertEqual(grade['corpus']['por_clase']['09'], len(operador.FIRST_MESSAGE_UNITS + operador.INVITE_NOTE_UNITS))
         self.assertNotIn('11', grade['corpus']['por_clase'])
         self.assertRegex(grade['corpus']['sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual(evaluaciones.case_drift(grade, self.grade()), [])

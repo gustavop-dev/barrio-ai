@@ -327,6 +327,10 @@ def tick(user,now=None):
         redrafted=_lead_redraft(user,account,now)  # before a new draft: it holds the one draft at a time
         if redrafted:report['lead_redraft']=report.get('lead_redraft',0)+redrafted
         report['propose']+=_propose(user,account,now)
+        try:  # phase 3: before the plan, so a warmed buyer's note is decided when the invitation is proposed
+            drafted=_buyer_drafts(user,account,now)
+            if drafted:report['buyer_drafts']=report.get('buyer_drafts',0)+drafted
+        except Exception as exc:report['buyer_drafts_error']=type(exc).__name__  # never stops the rest of the tick
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
@@ -528,7 +532,8 @@ def _lead_redraft(user,account,now):
     target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
     if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
         target|=Q(post__posted_at__gte=now-calentamiento.post_max_age(),post__referent__isnull=True,
-                  post__author_provider_id__in=[j.contact.provider_user_id for j in calentamiento.warming(account)])
+                  post__author_provider_id__in=[j.contact.provider_user_id for j in
+                                                [*calentamiento.warming(account),*calentamiento.second_touch(account)]])
     discarded=(ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
                                              decided_at__gte=now-timedelta(hours=24)).filter(target)
@@ -548,6 +553,23 @@ def _lead_redraft(user,account,now):
                                     request_id=_job_id('redraft',proposal.id))
         if created:return 1
     return 0
+
+def _buyer_drafts(user,account,now):
+    """Phase 3 (BUYER_FIRST_MESSAGE_ENABLED, with the lead on): the decisions that need no paid call (nothing real to cite,
+    no note left, a conversation already, drafts that no longer apply) and then one paid draft at a time
+    (prepare_buyer_draft): the note of a warmed buyer about to be invited, or the first message of an accepted one when
+    it is due. Never sends anything (INB-08). Returns the decisions plus the job queued."""
+    from . import mensajes_comprador
+    from knowledge import presupuesto
+    if not mensajes_comprador.active() or account.provider not in ('fake','directo'):return 0
+    if _pending('prepare_buyer_draft'):return 0
+    decided,item=mensajes_comprador.step(account,now)
+    if item is None or presupuesto.left(now)<=0:return decided
+    contact,kind,attempt=item
+    tries=mensajes_comprador.tries(contact,kind,attempt)
+    _,created=enqueue_operation(user,'prepare_buyer_draft',{'contact':str(contact.pk),'kind':kind,'attempt':attempt,'at':now.isoformat()},
+                                request_id=_job_id('buyer_draft',contact.pk,kind,attempt,tries))
+    return decided+int(created)
 
 def _every(name,default):
     return timedelta(minutes=int(setting(name,default)))

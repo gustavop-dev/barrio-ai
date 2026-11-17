@@ -25,8 +25,8 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from .models import (ActionExecution, ActionOutcome, AuditEvent, BuyerJourney, BuyerTouch, Contact, Conversation, EvidencePerson,
-                     ObservedPost, Opportunity, PostComment)
+from .models import (ActionExecution, ActionOutcome, AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation,
+                     EvidencePerson, ObservedPost, Opportunity, PostComment)
 
 log=logging.getLogger(__name__)
 Step=BuyerJourney.Step;Kind=BuyerTouch.Kind;Direction=BuyerTouch.Direction;Source=BuyerTouch.Source
@@ -38,7 +38,7 @@ STEPS=[Step.CHOSEN,Step.WARMING,Step.INVITED,Step.ACCEPTED,Step.MESSAGE_1,Step.M
 MESSAGE_STEPS=[Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4]
 OUT=Direction.OUT;IN=Direction.IN;STATE=Direction.STATE
 DIRECTION={Kind.CHOSEN:STATE,Kind.ROUTE:STATE,Kind.ANGLE:STATE,Kind.REST:STATE,Kind.RETRY:STATE,Kind.EXIT:STATE,Kind.REOPENED:STATE,
-           Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,
+           Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.DRAFT:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,
            Kind.FOLLOW:OUT,Kind.COMMENT:OUT,Kind.REACTION:OUT,Kind.THREAD_REPLY:OUT,Kind.VISIT:OUT,Kind.INVITATION:OUT,
            Kind.ACCEPTED_THEIRS:OUT,Kind.MESSAGE:OUT,Kind.MESSAGE_SEEN:OUT,
            Kind.REPLIED_COMMENT:IN,Kind.COMMENTED_POST:IN,Kind.REACTED_POST:IN,Kind.FOLLOWED_US:IN,Kind.INVITED_US:IN,
@@ -215,6 +215,21 @@ def _conversation_facts(contact,facts,known):
         out.append(_fact(kind,at,f'conversacion:{conversation.pk}:{message["id"]}',{},conversation=conversation))
     return out
 
+def _draft_facts(contact):
+    """Phase 3 (mensajes_comprador.py): each decided draft (ready, discarded or not written, with who stopped it) and what
+    Gustavo did with a first message of the journey («Hecho, le escribí» / «No escribirle»). The detail only holds what
+    never changes once decided."""
+    out=[];State=BuyerDraft.State
+    for d in BuyerDraft.objects.filter(contact=contact).exclude(decided_at__isnull=True).order_by('decided_at'):
+        out.append(_fact(Kind.DRAFT,d.decided_at,f'borrador:{d.pk}',{'tipo':d.kind,'numero':d.number,'intento':d.attempt,
+                         'resultado':'parado' if d.stopped_by else 'listo','por':d.stopped_by}))
+        if d.kind!=BuyerDraft.Kind.MESSAGE or not d.closed_at:continue
+        if d.state==State.SENT:
+            out.append(_fact(Kind.MESSAGE,d.closed_at,f'borrador:{d.pk}:enviado',{'fuente':'recorrido','numero':d.number}))
+        elif d.state==State.NOT_SENT:
+            out.append(_fact(Kind.NO_MESSAGE,d.closed_at,f'borrador:{d.pk}:no',{'fuente':'recorrido','numero':d.number}))
+    return out
+
 def _opportunity_facts(contact):
     return [_fact(Kind.OPPORTUNITY,o.created_at,f'oportunidad:{o.pk}',{'etapa':o.stage,'modalidad':o.modality},opportunity=o)
             for o in Opportunity.objects.filter(contact=contact).order_by('created_at')]
@@ -224,6 +239,7 @@ def facts(contact,known=()):
     out=_network_facts(contact)+_post_facts(contact)
     out+=_contact_facts(contact,out)
     out+=_evidence_facts(contact)+_own_post_facts(contact)+_outcome_facts(contact)
+    out+=_draft_facts(contact)
     out+=_conversation_facts(contact,out,known)+_opportunity_facts(contact)
     return [f for f in out if f['at']]
 
@@ -238,6 +254,7 @@ class _Fold:
         self.visits=0;self.comments=[];self.inbound=[];self.last_message=None;self._attempt()
     def _attempt(self):
         self.invited_at=None;self.messages=0;self.seen=self.replied=self.interested=self.meeting=False;self.attempt_comments=[]
+        self.drafted=False  # phase 3: the first message of this attempt was prepared, or the team decided not to write it
     def mark(self,name,at):
         if name not in self.first or at<self.first[name]:self.first[name]=at
     def wake(self):
@@ -274,6 +291,7 @@ class _Fold:
         elif kind==Kind.REPLIED_MESSAGE:self.mark('replied',at);self.replied=True
         elif kind==Kind.INTERESTED:self.mark('interested',at);self.interested=True
         elif kind==Kind.MEETING:self.mark('meeting',at);self.meeting=True
+        elif kind==Kind.DRAFT:self.drafted=self.drafted or d.get('tipo')==BuyerDraft.Kind.MESSAGE
         elif kind==Kind.ROUTE:self.route=d.get('ruta') or self.route
         elif kind==Kind.ANGLE:self.attempts[-1]['angulo']=d.get('angulo','')
         elif kind==Kind.REST:
@@ -313,9 +331,13 @@ def _fold(touches):
 def next_at(journey,state,contact):
     """When something is due. Phase 1 mirrors today's rule: a followed person may be invited NETWORK_INVITE_AFTER_HOURS
     after the follow (right away when they commented on his post); a rest ends at its date. Phase 2, with
-    BUYER_WARMUP_ENABLED: when the warm-up is done (calentamiento.invite_at). Each phase adds its own."""
+    BUYER_WARMUP_ENABLED: when the warm-up is done (calentamiento.invite_at). Phase 3, with BUYER_FIRST_MESSAGE_ENABLED:
+    when the first message is due after the acceptance (mensajes_comprador.message_at). Each phase adds its own."""
     step=state.step()
     if step==Step.RESTING:return state.rest[1]
+    if step==Step.ACCEPTED:
+        from . import mensajes_comprador
+        return mensajes_comprador.message_at(state) if mensajes_comprador.enabled() else None
     if step==Step.WARMING and 'warming' in state.first:
         if contact.source==Contact.Source.OWN_POST:return state.first['warming']
         from . import calentamiento
@@ -637,16 +659,31 @@ def due(now=None,steps=None):
 
 def drafts(journeys=None):
     """Messages drafted for buyers: pending (a card waiting in Tu turno), sent («Hecho, le escribí») and not sent («No
-    escribirle»). Today the only draft is the suggested first message after a conversation on his post (RSP-07); phases
-    3–4 add theirs here."""
+    escribirle»), from both sources: the suggested first message after a conversation on his post (RSP-07) and the
+    first message of the journey (phase 3, BuyerDraft). `recorrido` breaks the phase 3 drafts down (prepared, stopped and
+    by whom) and `notas` the invitation notes. Phase 4 adds messages 2–4 here."""
     from .respuestas import _dm_rows
     rows=list(journeys) if journeys is not None else list(BuyerJourney.objects.all())
     people={j.contact_id for j in rows};ids=[j.pk for j in rows]
-    pending=sum(1 for row in _dm_rows() if row.contact_id in people)
+    State=BuyerDraft.State
+    own=BuyerDraft.objects.filter(contact_id__in=people)
+    messages=own.filter(kind=BuyerDraft.Kind.MESSAGE);notes=own.filter(kind=BuyerDraft.Kind.NOTE)
+    from . import mensajes_comprador
+    ready=messages.filter(state=State.READY).count()
+    # A journey draft is pending only while its card can show (switch on); RSP-07's as before.
+    pending=sum(1 for row in _dm_rows() if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
     sent=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.MESSAGE).count()
     declined=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.NO_MESSAGE).count()
+    def stopped(q):
+        return {by:q.filter(stopped_by=by).count() for by in BuyerDraft.StoppedBy.values}
     return {'pendientes':pending,'enviados':sent,'no_enviados':declined,'enviados_pct':_pct(sent,sent+pending),
-            'fuentes':['mensaje_sugerido']}
+            'fuentes':['mensaje_sugerido','recorrido'],
+            'recorrido':{'preparados':messages.filter(stopped_by='',decided_at__isnull=False).count(),
+                         'pendientes':ready,'enviados':messages.filter(state=State.SENT).count(),
+                         'no_enviados':messages.filter(state=State.NOT_SENT).count(),'parados':stopped(messages)},
+            'notas':{'preparadas':notes.filter(stopped_by='',decided_at__isnull=False).count(),
+                     'con_invitacion':notes.filter(state__in=[State.USED,State.SENT,State.NOT_SENT]).count(),
+                     'enviadas':notes.filter(state=State.SENT).count(),'parados':stopped(notes)}}
 
 # --------------------------------------------------------------------------- the funnel (LI-12-M001-K03)
 

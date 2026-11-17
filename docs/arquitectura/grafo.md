@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.12-comentario-calentamiento` · SHA-256 `098d9b44387b067e1c75a61ff970d49f5fda27428c89324b88caf205a2d2b4ed`.
+Versión `6.13-primer-mensaje-comprador-y-nota` · SHA-256 `f7af11ad6ebcef399c83d707af56d26ae0cc0f2705f0571e15f8d8ae27786145`.
 
 46 nodos (46 activos), 74 aristas y 17 ciclos.
 
@@ -254,6 +254,7 @@ Estado: `active`. Orquestador: `relaciones_comunidad`.
 - `propose_comment`: Tick 60 s, hasta un borrador por tick y cupo disponible.
 - `read_own_comments`: REPLIES_FRESH_EVERY_MINUTES (120 min) en las primeras 72 h de cada post propio; REPLIES_LATE_EVERY_MINUTES (720 min) hasta el día 7.
 - `propose_reply`: Tick 60 s, un borrador pagado a la vez por comentario pendiente y cupo INT-04.
+- `prepare_buyer_draft`: Tick 60 s, antes del plan de red; con BUYER_FIRST_MESSAGE_ENABLED y el líder encendido, un borrador pagado a la vez: la nota de un comprador calentado que se va a invitar o el primer mensaje de uno que aceptó, cuando toca.
 - `execute_action`: Tick 60 s; aprobación y capacidad disponible.
 - `reconcile_action`: Hasta 3 por tick; bucket de una hora.
 
