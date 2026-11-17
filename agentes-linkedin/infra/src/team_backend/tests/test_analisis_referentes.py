@@ -88,7 +88,7 @@ class DecompositionTests(SimpleTestCase):
         self.assertEqual(parts['partes']['cierre'], {'tipo': 'pregunta', 'cta': True})
         self.assertEqual(parts['partes']['longitud']['banda'], 'corto')
         self.assertEqual((parts['senales_coyuntura'], parts['apto']), ([], True))
-        self.assertFalse(leaks({k: v for k, v in parts.items() if k != 'nombres'}))
+        self.assertEqual(leaks({k: v for k, v in parts.items() if k != 'nombres'}), [])
         self.assertLessEqual(set(an.PILLAR_OF.values()), set(posicionamiento.PILLARS))
         self.assertEqual(set(an.PILLAR_OF), set(mc.THEMES))
 
@@ -161,7 +161,7 @@ class ReportTests(AnalysisData, TestCase):
         formats = {g['valor']: g for g in data['por_parte']['formato']}
         # Seven list posts; only three with a verdict (the young one and Ciro's lack a base).
         self.assertEqual((formats['lista']['funciono'], formats['lista']['posts'], formats['lista']['con_juicio']), (3, 7, 3))
-        self.assertTrue(formats['opinion_contraria']['muestra_pequena'])
+        self.assertEqual((formats['opinion_contraria']['posts'], formats['opinion_contraria']['muestra_pequena']), (1, True))
         self.assertEqual({g['valor'] for g in data['por_parte']['recurso_visual']}, {'desconocido'})
 
     def test_a_topic_trends_while_several_referents_talk_about_it_and_then_expires(self):
@@ -169,8 +169,10 @@ class ReportTests(AnalysisData, TestCase):
         devday = trends['tendencia:nombre:devday']
         self.assertEqual((devday['autores'], devday['posts'], devday['por']), (2, 2, 'varios_referentes_misma_semana'))
         self.assertEqual(devday['expira'], (self.beto_news.posted_at + timedelta(days=14)).isoformat())  # its last post
-        self.assertNotIn('tendencia:nombre:acme summit', trends)  # 40 days ago: expired
-        self.assertTrue(any(key.startswith('tendencia:tema:') for key in trends))  # the news post that worked
+        # Acme Summit (40 days ago) expired; the topic of Beto's news post that worked is current.
+        self.assertEqual(set(trends), {'tendencia:nombre:devday', 'tendencia:tema:mvp_alcance'})
+        news = trends['tendencia:tema:mvp_alcance']
+        self.assertEqual((news['por'], news['posts'], news['autores'], news['funcionaron']), ('coyuntura_que_funciono', 1, 1, 1))
         later = an.report(self.account, now=self.now + timedelta(days=15))['temas_en_tendencia']
         self.assertNotIn('tendencia:nombre:devday', {r['id'] for r in later})
 
@@ -192,7 +194,9 @@ class ReportTests(AnalysisData, TestCase):
     def test_the_report_carries_labels_numbers_and_links_never_a_sentence_of_a_post(self):
         data = an.report(self.account, now=self.now)
         self.assertEqual(leaks(data), [])
-        self.assertTrue(all(s['url'].startswith('https://www.linkedin.com/feed/update/') for s in data['destacados']))
+        urls = {s['post_id']: s['url'] for s in data['destacados']}
+        self.assertEqual(urls[str(self.ana_list.pk)], self.ana_list.share_url)
+        self.assertEqual(urls, {str(p.pk): p.share_url for p in ObservedPost.objects.filter(pk__in=list(urls))})
 
 
 class EditorialSignalTests(AnalysisData, TestCase):
@@ -206,8 +210,8 @@ class EditorialSignalTests(AnalysisData, TestCase):
         self.assertEqual((structures[0]['id'], structures[0]['estado']), (f'estructura:{DURABLE}', 'sostenida'))
         self.assertIn('hipotesis', {s['estado'] for s in structures})
         self.assertIn('nunca frases', structures[0]['uso'])
-        self.assertIn('tendencia:nombre:devday', {t['id'] for t in trends})
-        self.assertTrue(all(t['expira'] for t in trends))
+        devday = next(t for t in trends if t['id'] == 'tendencia:nombre:devday')
+        self.assertEqual(devday['expira'], (self.beto_news.posted_at + timedelta(days=14)).isoformat())
         self.assertEqual(leaks([structures, trends]), [])
         self.assertNotIn('estructura_sostenida', estrategia.EVIDENCE_KINDS)
 

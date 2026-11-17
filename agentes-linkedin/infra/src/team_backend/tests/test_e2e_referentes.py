@@ -115,7 +115,7 @@ class AnalysisEndToEndTests(tri.IndustryMixin, TestCase):
         gustavo = APIClient()
         gustavo.force_login(self.user)
         data = gustavo.get('/api/v1/referentes/analisis', {'account': str(self.account.pk)}).json()
-        self.assertTrue(data['activo'])
+        self.assertIs(data['activo'], True)
         best = next(s for s in data['destacados'] if s['post_id'] == str(stored.pk))
         self.assertEqual(best['metricas']['reacciones'], {'valor': 300, 'mediana_autor': 40, 'veces': 7.5, 'muestra': 10})
         self.assertEqual(best['metricas']['compartidos']['veces'], 12.0)
