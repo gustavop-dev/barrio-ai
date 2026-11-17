@@ -172,6 +172,8 @@ ROLE_MEANING={
     'aliado':'aliado: ofrece a startups un servicio complementario al de Gustavo, no competidor',
     'divulgador':'divulgador: crea contenido con audiencia sobre los temas del barrio',
     'lider':'líder: dirige una empresa, una comunidad o un equipo en tecnología o negocio',
+    # Phase 5 (sin_posts.py): not a role of the classifier's table; a rule of Gustavo's route sets it.
+    'puente':'puente: colega, en la misma empresa, de un posible comprador que no publica; el equipo lo calienta para llegar a él',
 }
 
 def network_checks(capability,role=None):

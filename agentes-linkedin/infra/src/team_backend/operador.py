@@ -521,6 +521,9 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
     if calentamiento.enabled():
         account.refresh_from_db(fields=['paused'])  # a read error above may have paused it
         if not account.paused:summary['compradores']=calentamiento.read_posts(account,connector)  # phase 2: buyers warming up
+        from . import sin_posts
+        account.refresh_from_db(fields=['paused'])
+        if sin_posts.active() and not account.paused:summary['puentes']=sin_posts.read(account,connector)  # phase 5: bridges
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
         from .notificaciones import avisar

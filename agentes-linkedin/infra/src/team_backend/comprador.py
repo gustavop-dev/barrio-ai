@@ -39,10 +39,12 @@ MESSAGE_STEPS=[Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4]
 OUT=Direction.OUT;IN=Direction.IN;STATE=Direction.STATE
 DIRECTION={Kind.CHOSEN:STATE,Kind.ROUTE:STATE,Kind.ANGLE:STATE,Kind.REST:STATE,Kind.RETRY:STATE,Kind.EXIT:STATE,Kind.REOPENED:STATE,
            Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.DRAFT:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,Kind.REFERRED:STATE,
+           Kind.BRIDGE:STATE,Kind.RECHECK:STATE,
            Kind.FOLLOW:OUT,Kind.COMMENT:OUT,Kind.REACTION:OUT,Kind.THREAD_REPLY:OUT,Kind.VISIT:OUT,Kind.INVITATION:OUT,
            Kind.ACCEPTED_THEIRS:OUT,Kind.MESSAGE:OUT,Kind.MESSAGE_SEEN:OUT,
            Kind.REPLIED_COMMENT:IN,Kind.COMMENTED_POST:IN,Kind.REACTED_POST:IN,Kind.FOLLOWED_US:IN,Kind.INVITED_US:IN,
-           Kind.ACCEPTED_OURS:IN,Kind.OPENED_CONVERSATION:IN,Kind.REPLIED_MESSAGE:IN,Kind.MEETING:IN}
+           Kind.ACCEPTED_OURS:IN,Kind.OPENED_CONVERSATION:IN,Kind.REPLIED_MESSAGE:IN,Kind.MEETING:IN,
+           Kind.BRIDGE_SIGNAL:IN}  # phase 5: her colleague (the bridge) accepted or interacted (sin_posts.relayed)
 SIGNALS=[kind for kind,direction in DIRECTION.items() if direction==IN]
 CONNECTION=(Kind.ACCEPTED_OURS,Kind.ACCEPTED_THEIRS,Kind.ALREADY_CONNECTED)
 # Something the person did that brings a journey back from a rest or a closure by rule (never from a definitive exit).
@@ -234,6 +236,14 @@ def _opportunity_facts(contact):
     return [_fact(Kind.OPPORTUNITY,o.created_at,f'oportunidad:{o.pk}',{'etapa':o.stage,'modalidad':o.modality},opportunity=o)
             for o in Opportunity.objects.filter(contact=contact).order_by('created_at')]
 
+def _bridge_facts(contact):
+    """Phase 5 (BUYER_NO_POSTS_ROUTE_ENABLED): what her bridge did (accepted Gustavo's invitation, answered a comment,
+    commented on his post, invited or wrote to him), as signals of hers (senal_puente). Nothing with the switch off."""
+    from . import sin_posts
+    if not sin_posts.active():return []
+    journey=BuyerJourney.objects.filter(contact=contact).first()
+    return sin_posts.relayed(journey) if journey else []
+
 def facts(contact,known=()):
     """Every touch and signal Barrio's own rows show for this person, as {kind, at, key, detail, refs}; no state changes."""
     out=_network_facts(contact)+_post_facts(contact)
@@ -241,6 +251,7 @@ def facts(contact,known=()):
     out+=_evidence_facts(contact)+_own_post_facts(contact)+_outcome_facts(contact)
     out+=_draft_facts(contact)
     out+=_conversation_facts(contact,out,known)+_opportunity_facts(contact)
+    out+=_bridge_facts(contact)
     return [f for f in out if f['at']]
 
 # --------------------------------------------------------------------------- fold: the log, in order, into the journey
@@ -370,7 +381,8 @@ def _project(journey,state,contact,has_posts):
     journey.visits=state.visits
     journey.inbound_signals=len(state.inbound)
     journey.last_inbound_at=max((t.at for t in state.inbound),default=None)
-    journey.signal_before_invite=any(not invited or t.at<invited for t in state.inbound)
+    # Her own signals: what her bridge did (phase 5) warms her, but she did not do it.
+    journey.signal_before_invite=any(not invited or t.at<invited for t in state.inbound if t.kind!=Kind.BRIDGE_SIGNAL)
     journey.route=state.route or (Route.COMMENTS if state.comments or has_posts else Route.UNKNOWN)
     journey.attempt=state.attempt
     journey.attempts=[dict(a,desde=a['desde'].isoformat() if a['desde'] else None,hasta=a['hasta'].isoformat() if a['hasta'] else None)
@@ -452,7 +464,13 @@ def update(contact,source=Source.LIVE,now=None):
     if contact is None:return None
     journey=BuyerJourney.objects.select_for_update().filter(contact=contact).first()
     if journey is None:
-        if not was_chosen(contact):return None
+        if not was_chosen(contact):
+            # Phase 5: a bridge has no journey of its own; what it did is a signal of the buyer it leads to.
+            if contact.bridge_for_id:
+                from . import sin_posts
+                buyer=BuyerJourney.objects.filter(pk=contact.bridge_for_id).values_list('contact_id',flat=True).first()
+                if buyer and sin_posts.active():update(Contact(pk=buyer),source=source,now=now)
+            return None
         origin=BuyerJourney.Origin.REBUILT if source==Source.REBUILT else BuyerJourney.Origin.LIVE
         entry=BuyerJourney.Entry.INBOUND if contact.source==Contact.Source.INCOMING else BuyerJourney.Entry.OUTBOUND
         journey,_=BuyerJourney.objects.get_or_create(contact=contact,defaults={'chosen_at':now,'entry':entry,'origin':origin})
@@ -503,15 +521,18 @@ def rest(journey,reason,until,at=None,note=''):
                   {'motivo':reason,'hasta':until.isoformat(),'intento':journey.attempt,'nota':(note or '')[:300]})
 
 @transaction.atomic
-def retry(journey,angle,at=None,signal=False):
+def retry(journey,angle,at=None,signal=False,kind='',detail=None):
     """A new attempt once the rest is over, with the angle it will use. A follow and a connection carry over; the
     invitation, the messages and the reply of the earlier attempt do not. `signal`: the person gave a signal during the
-    rest, which wakes them before its date (plan: «Una señal durante el descanso lo despierta de inmediato»)."""
+    rest, which wakes them before its date (plan: «Una señal durante el descanso lo despierta de inmediato»). Phase 5:
+    `kind` names the angle's type (senal_en_descanso, senal_nueva, puente, otro_tema; sin_posts.ANGLES) so the next
+    attempt can change it, and `detail` keeps what it cites (the signal's source)."""
     at=at or timezone.now();journey=_locked(journey)
     if journey.step!=Step.RESTING:raise ValueError('Solo se reintenta desde el descanso.')
     if journey.rest_until and at<journey.rest_until and not signal:raise ValueError(f'El descanso termina el {journey.rest_until:%Y-%m-%d}.')
     if not (angle or '').strip():raise ValueError('Cada intento dice qué ángulo usa.')
-    detail={'numero':journey.attempt+1,'angulo':angle.strip()[:300],**({'por_senal':True} if signal else {})}
+    detail={**(detail or {}),'numero':journey.attempt+1,'angulo':angle.strip()[:300],**({'por_senal':True} if signal else {}),
+            **({'tipo':kind} if kind else {})}
     return _write(journey,Kind.RETRY,at,f'reintento:{journey.attempt+1}',detail)
 
 @transaction.atomic
@@ -599,7 +620,7 @@ def rebuild(account=None,dry_run=False,now=None):
     errores, seco, segundos}."""
     started=time.monotonic();now=now or timezone.now()
     summary={'personas':0,'recorridos':0,'nuevos':0,'toques_nuevos':0,'fallos':0,'errores':[],'seco':dry_run}
-    people=Contact.objects.filter(Q(classification__role='comprador')|Q(buyer_journey__isnull=False))
+    people=Contact.objects.filter(Q(classification__role='comprador')|Q(buyer_journey__isnull=False)|Q(bridge_for__isnull=False))
     if account is not None:people=people.filter(account=account)
     def run():
         before=set(BuyerJourney.objects.values_list('pk',flat=True))
@@ -794,7 +815,10 @@ def funnel(weeks=8,now=None,account=None):
     steps={s:0 for s in Step.values}
     for j in outbound:steps[j.step]+=1
     count=lambda field,values:{v:sum(1 for j in outbound if getattr(j,field)==v) for v in values}
-    return {'generado':now.isoformat(),'zona_horaria':str(operador.local_tz()),'definiciones':DEFINITIONS,
+    from . import sin_posts
+    route=sin_posts.funnel(outbound) if sin_posts.active() else None  # phase 5: only with its switch on
+    return {**({'ruta_sin_posts':route} if route else {}),
+            'generado':now.isoformat(),'zona_horaria':str(operador.local_tz()),'definiciones':DEFINITIONS,
             'acumulado':block(outbound),'semanas':weekly,
             'comparaciones':{
                 'ruta':{route:block(j for j in outbound if j.route==route) for route in Route.values},

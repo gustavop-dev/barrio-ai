@@ -22,6 +22,11 @@ journey's next_at says so, exactly as before. Caps and ramp are never touched: t
 - sweep (red.plan): rest whoever got the comments, was invited and did not accept in BUYER_REST_AFTER_DAYS
   (BUYER_REST_DAYS, a year from the third attempt on), wake whoever gave a signal during the rest and start a new
   attempt when the rest is over. A pending invitation is never sent again nor withdrawn: old_invitations lists them.
+
+With BUYER_NO_POSTS_ROUTE_ENABLED (phase 5, sin_posts.py, BAR-22) on top: the bridges of the buyers who do not post are
+read, commented and invited like a buyer (their own role, no journey); invited with fewer comments (or none) also
+rests; on the route without posts the bridge is tried before the rest; each retry records its angle and waits for one
+web re-check of the buying signals when the rest ends.
 """
 import logging
 import os
@@ -82,8 +87,11 @@ def journey_of(post):
 
 def warmup_post(post):
     """A comment on this post is a warm-up comment: the switch is on and the author is a buyer of the team (not a
-    referent's post). Its draft, rules and review follow the «comentario_calentamiento» methodology."""
-    return bool(post is not None and enabled() and journey_of(post) is not None)
+    referent's post), or (phase 5, sin_posts.bridge_of) the bridge to a buyer who does not post. Its draft, rules and
+    review follow the «comentario_calentamiento» methodology."""
+    if post is None or not enabled():return False
+    from . import sin_posts
+    return journey_of(post) is not None or sin_posts.bridge_of(post) is not None
 
 def warming(account):
     """Buyers in warm-up who may get a comment: step «calentando», not on the route without posts, not left or resting."""
@@ -98,8 +106,12 @@ def second_touch(account):
     return mensajes_comprador.awaiting_touch(account)
 
 def buyer_ids(account):
-    return set(BuyerJourney.objects.filter(contact__account=account).exclude(contact__provider_user_id='')
-               .values_list('contact__provider_user_id',flat=True))
+    """Authors whose posts belong to the buyers' share of the day: the buyers and (phase 5) their bridges."""
+    from . import sin_posts
+    ids=set(BuyerJourney.objects.filter(contact__account=account).exclude(contact__provider_user_id='')
+            .values_list('contact__provider_user_id',flat=True))
+    if sin_posts.active():ids|=set(sin_posts.bridges(account).exclude(provider_user_id='').values_list('provider_user_id',flat=True))
+    return ids
 
 def buyer_ids_all():
     return set(BuyerJourney.objects.exclude(contact__provider_user_id='').values_list('contact__provider_user_id',flat=True))
@@ -109,7 +121,8 @@ def buyer_ids_all():
 # The reciprocity table of docs/plan-outbound.md (17/11/2026): Máxima 5, Alta 3, Media 1. A conversation and a meeting
 # are at least as strong as an invitation from them. Weights are a starting point to tune with the month's data.
 WEIGHTS={Kind.INVITED_US:5,Kind.MEETING:5,Kind.REPLIED_MESSAGE:3,Kind.OPENED_CONVERSATION:3,Kind.REPLIED_COMMENT:3,
-         Kind.COMMENTED_POST:3,Kind.FOLLOWED_US:1,Kind.REACTED_POST:1,Kind.ACCEPTED_OURS:1}
+         Kind.COMMENTED_POST:3,Kind.FOLLOWED_US:1,Kind.REACTED_POST:1,Kind.ACCEPTED_OURS:1,
+         Kind.BRIDGE_SIGNAL:1}  # phase 5: her colleague (the bridge) accepted or interacted: Media, it was not her
 BUY_SIGNAL_WEIGHT=2  # class 08: «La señal no crea listas: ordena a quién primero» (LI-08-M004-K02)
 # Signals that end the warm-up at once: they answered a comment of the team or commented on Gustavo's post (Alta), or
 # they already invited him or wrote to him.
@@ -336,16 +349,25 @@ def buyer_posts(account,now,recent_authors=(),skips=()):
     for j in second_touch(account):
         uid=j.contact.provider_user_id
         if not waiting.get(uid):journeys[uid]=j;need.add(uid)
+    people={uid:j.contact for uid,j in journeys.items()}
+    from . import sin_posts
+    for bridge in sin_posts.warming(account):  # phase 5: the bridges, warmed with the same rules ([] with it off)
+        uid=bridge.provider_user_id
+        if sin_posts.comments_done(bridge)+waiting.get(uid,0)<comments_needed():people[uid]=bridge;need.add(uid)
     posts=list(ObservedPost.objects.filter(account=account,referent__isnull=True,is_repost=False,author_provider_id__in=list(need),
                                            posted_at__gte=now-post_max_age()).exclude(text='').exclude(proposals__capability='INT-03')
                .exclude(author_provider_id__in=list(recent_authors)).exclude(id__in=list(skips)))
-    weight=heats([journeys[uid].contact for uid in need],now)
-    by_author={uid:weight.get(journeys[uid].contact_id,0) for uid in need}
+    weight=heats([people[uid] for uid in need],now)
+    by_author={uid:weight.get(people[uid].pk,0) for uid in need}
     return sorted(posts,key=lambda p:(-by_author.get(p.author_provider_id,0),-p.posted_at.timestamp()))
 
 def draft_inputs(post):
     """What the drafter reads about the buyer besides the post (operador.propose_comment)."""
     journey=journey_of(post);contact=journey.contact if journey else None
+    if journey is None:
+        from . import sin_posts
+        bridge=sin_posts.bridge_of(post)
+        if bridge is not None:return sin_posts.draft_inputs(post,bridge)  # phase 5: the bridge's own purpose
     return {'autor':{'nombre':post.author_name,'titular':(contact.headline if contact else '')[:300]},
             'comentarios_del_equipo_en_sus_posts':journey.warm_comments if journey else 0,
             'para_que':'Posible cliente de Gustavo al que todavía no le escribió: el comentario es para que lo reconozca antes de '
@@ -382,9 +404,16 @@ def invitable(contacts,now=None):
     """red.plan: the invitation candidates. People without a buyer journey keep today's rule (48 h after the follow, or
     right away if they commented on his post); buyers with one wait for invite_ready."""
     from .red import invite_after
+    from . import sin_posts
     now=now or timezone.now()
-    others=contacts.filter(buyer_journey__isnull=True).filter(Q(followed_at__lte=now-invite_after())|Q(source=Contact.Source.OWN_POST))
-    ready=[c.pk for c in contacts.filter(buyer_journey__isnull=False) if invite_ready(c,now)]
+    others=contacts.filter(buyer_journey__isnull=True)
+    if sin_posts.active():
+        # Phase 5: a bridge is invited with the warm-up rule, not 48 h after the follow.
+        ready=[c.pk for c in others.filter(bridge_for__isnull=False) if sin_posts.invite_ready(c,now)]
+        others=others.filter(bridge_for__isnull=True)
+    else:ready=[]
+    others=others.filter(Q(followed_at__lte=now-invite_after())|Q(source=Contact.Source.OWN_POST))
+    ready+=[c.pk for c in contacts.filter(buyer_journey__isnull=False) if invite_ready(c,now)]
     return contacts.filter(Q(pk__in=others.values('pk'))|Q(pk__in=ready))
 
 # --------------------------------------------------------------------------- G. rest, wake and retry
@@ -396,13 +425,19 @@ def wake(journey,now=None):
     """A resting buyer: a signal of hers since the rest began wakes her (retry with that signal as the angle); the end of
     the rest, a new attempt with another post and topic. Returns 'despiertan', 'reintentos' or None. The warm-up's sweep
     and the sequence's rests (secuencia_comprador) use it."""
-    now=now or timezone.now()
+    from . import sin_posts
+    now=now or timezone.now();route=sin_posts.active()
     began=_last_rest(journey)
     signal=(journey.touches.filter(direction=BuyerTouch.Direction.IN,at__gt=began.at).order_by('at').first() if began else None)
     if signal:
-        comprador.retry(journey,f'Señal en el descanso: {Kind(signal.kind).label}',at=now,signal=True);return 'despiertan'
+        comprador.retry(journey,f'Señal en el descanso: {Kind(signal.kind).label}',at=now,signal=True,
+                        kind='senal_en_descanso' if route else '');return 'despiertan'
     if journey.rest_until and journey.rest_until<=now:
-        comprador.retry(journey,'Nuevo intento tras el descanso: otro post y otro tema',at=now);return 'reintentos'
+        if not route:
+            comprador.retry(journey,'Nuevo intento tras el descanso: otro post y otro tema',at=now);return 'reintentos'
+        # Phase 5: one web re-check of her buying signals first (6d), then an angle no earlier attempt used (6c).
+        if sin_posts.recheck_waiting(journey,now):return None
+        return sin_posts.retry(journey,now)
     return None
 
 def sweep(account,now=None):
@@ -410,7 +445,10 @@ def sweep(account,now=None):
     BUYER_REST_AFTER_DAYS (the invitation stays pending: never sent again, never withdrawn); wake a resting buyer who gave
     a signal since the rest began (retry with that signal as the angle); retry when the rest is over. Also refreshes the
     next_at of journeys folded before the switch. Each person on its own savepoint: one failure never stops the plan."""
+    from . import sin_posts
     now=now or timezone.now();out={'descanso':0,'despiertan':0,'reintentos':0,'proximo':0,'fallos':0}
+    route=sin_posts.active()
+    if route:out.update(puente_antes_del_descanso=0,puentes_pedidos=0)  # phase 5
     def guarded(fn,journey):
         try:
             with transaction.atomic():return fn(journey)
@@ -420,10 +458,21 @@ def sweep(account,now=None):
             AuditEvent.objects.create(action='buyer.warmup_failed',target=str(journey.pk),metadata={'error':type(exc).__name__,'detail':str(exc)[:300]})
             return None
     def rest(journey):
-        if journey.warm_comments<comments_needed():return False
+        # Phase 5 (6a): invited with fewer comments than the warm-up (or none, on the route without posts) rests too.
+        if journey.warm_comments<comments_needed() and not route:return False
         state=comprador._fold(comprador._touches(journey))
-        last=max([at for at in [state.invited_at,*state.attempt_comments] if at],default=None)
+        moments=[state.invited_at,*state.attempt_comments]
+        if route:
+            began=state.attempts[-1]['desde']
+            # What her bridge did in this attempt gives her more time; an invitation still pending from an earlier attempt
+            # (never sent again) counts from the start of this one.
+            moments+=[at for at in sin_posts.signal_times(state) if not began or at>=began]
+            if state.invited_at is None and began:moments.append(began)
+        last=max([at for at in moments if at],default=None)
         if last is None or now<last+rest_after():return False
+        # Phase 5 (6b): «no publica y la ruta alterna no dio resultado»: the bridge first, then the rest.
+        if route and journey.route==Route.NO_POSTS and sin_posts.hold_rest(journey,now):
+            out['puente_antes_del_descanso']+=1;return False
         until=now+(LONG_REST if journey.attempt>=MAX_ATTEMPTS else rest_days())
         comprador.rest(journey,RestReason.INVITE_NOT_ACCEPTED,until,at=now,
                        note=f'{journey.warm_comments} comentarios e invitación sin aceptar en {rest_after().days} días.')
@@ -435,6 +484,8 @@ def sweep(account,now=None):
         result=guarded(lambda j:wake(j,now),journey)
         if result:out[result]+=1
     for journey in BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING):
+        if route and journey.route==Route.NO_POSTS:  # phase 5: nothing real to cite → his bridge, right away
+            out['puentes_pedidos']+=guarded(lambda j:sin_posts.early(j,now),journey) or 0
         at=invite_at(comprador._fold(comprador._touches(journey)),journey.contact,now)
         if at!=journey.next_at:
             BuyerJourney.objects.filter(pk=journey.pk).update(next_at=at);out['proximo']+=1

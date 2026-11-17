@@ -131,6 +131,7 @@ FACT_LABELS={
     'comento_post':('Lo que comentó en tu post',''),
     'nos_invito':('Lo que te escribió al invitarte',''),
     'senal_de_compra':('Señal de compra de su empresa',''),
+    'puente':('Su colega (el puente)',''),  # phase 5 (sin_posts.fact)
 }
 OWN_WORDS=('respondio_comentario','comentario_en_su_post','comento_post','nos_invito')  # what she wrote: her language
 
@@ -173,6 +174,15 @@ def anchors(contact,journey=None,limit=6):
             add({'tipo':'comentario_en_su_post','texto':t.post.text[:600],
                  'comentario_del_equipo':((t.proposal.payload if t.proposal_id else None) or {}).get('text','')[:600],
                  'que_paso':'El equipo comentó este post suyo.','fecha':t.at.isoformat(),'fuente':t.post.share_url},t.post)
+    # Phase 5: what her bridge did (one fact per bridge: its newest interaction, else its acceptance).
+    bridge={}
+    for t in touches:
+        if t.kind!=Kind.BRIDGE_SIGNAL:continue
+        who=(t.detail or {}).get('puente');best=bridge.get(who)
+        if best is None or ((t.detail or {}).get('interaccion') and not (best.detail or {}).get('interaccion')):bridge[who]=t
+    if bridge:
+        from .sin_posts import fact as bridge_fact
+        for t in sorted(bridge.values(),key=lambda t:(not (t.detail or {}).get('interaccion'),-t.at.timestamp())):facts.append(bridge_fact(t))
     for s in calentamiento.buying_signals(contact):
         facts.append({'tipo':'senal_de_compra','texto':(s.get('evidencia') or s['tipo'])[:300],'senal':s['tipo'],
                       'que_paso':'Señal de compra de su empresa que citó la verificación web.','fecha':s.get('fecha') or '',
@@ -203,6 +213,19 @@ def _content(text):
     from .guardas import _evidence
     return _evidence(text)-{'organizacion'}  # «my team» is no evidence of a fact about her
 
+# Phase 5: «hablé con X de tu equipo» only after a real interaction (sin_posts.fact: `interaccion`).
+TALKED=re.compile(r"\b(?:habl[ée]|hablamos|convers[ée]|conversamos|charl[ée]|charlamos|talked|spoke|chatted|"
+                  r"been\s+(?:talking|chatting))\s+(?:con|with)\b",re.I)
+INTERACTION_FACTS=('respondio_comentario','comento_post','nos_invito')
+
+def talk_issues(text,facts):
+    """With BUYER_NO_POSTS_ROUTE_ENABLED: a text that says Gustavo talked with someone needs an interaction among its
+    facts (hers, or her bridge's with `interaccion`); a bridge that only accepted is no conversation. Pure."""
+    from . import sin_posts
+    if not sin_posts.enabled() or not TALKED.search(text or ''):return []
+    if any(f.get('interaccion') or f.get('tipo') in INTERACTION_FACTS for f in facts or []):return []
+    return ['Dice que habló con alguien sin una interacción real que lo respalde']
+
 def note_text_issues(text,facts,anchor,reference=''):
     """The note's fixed rules (BIB-09-nota-invitacion), checked in code before the lead: under 200 characters
     (LI-09-M002-K01); it does not sell or hint at it, nor ask for a talk (LI-09-M002-K06); no «ser parte de mi red» nor
@@ -228,7 +251,7 @@ def note_text_issues(text,facts,anchor,reference=''):
         issues.append('La nota no nombra el hecho que declara')
     expected=idioma.mismatch(text,reference)
     if expected:issues.append(f'Nota fuera del idioma de la persona ({expected})')
-    return issues
+    return issues+talk_issues(text,facts)
 
 def message_text_issues(text,facts,anchor,reference=''):
     """The first message's fixed rules: RSP-07's (respuestas.dm_text_issues: length, three lines, links, selling, asking
@@ -238,7 +261,7 @@ def message_text_issues(text,facts,anchor,reference=''):
     issues=dm_text_issues(text,reference)
     if (text or '').strip() and not any(f.get('id')==anchor for f in facts or []):
         issues.append('El primer mensaje no declara un hecho real de la persona')
-    return issues
+    return issues+talk_issues(text,facts)
 
 def text_issues(kind,text,facts,anchor,reference=''):
     if kind==MESSAGE:return message_text_issues(text,facts,anchor,reference)
@@ -291,6 +314,12 @@ invitación a conectar ligada a ese hecho («quiero seguir leyéndote»). Sin «
 para cualquiera («me encanta lo que escribes»), sin propuesta de valor («ayudo a empresas como la tuya»), sin preguntar si
 hablamos, sin enlaces ni hashtags. Si no hay nada concreto que decir, decision="none": la invitación sale sin nota.'''+COMMON_RULES
 
+# Phase 5: only added to the instructions when one of the facts is her bridge's (sin_posts.fact).
+BRIDGE_RULES='''
+Un hecho de tipo "puente" es lo que hizo un colega suyo de la misma empresa (el puente): aceptó la invitación de Gustavo o
+interactuó con el equipo. Puedes nombrarlo. Solo si "interaccion" es true puedes decir que Gustavo habló o conversó con esa
+persona; si es false, solo que conectaron. Nunca inventes una conversación ni lo que esa persona dijo.'''
+
 def _units(kind):
     """(units, missing): the activated methodology's units, loaded whole with its name."""
     if kind==MESSAGE:units,missing,omitted=operador.course_context(FIRST_MESSAGE_UNITS,metodologia='primer_mensaje')
@@ -321,6 +350,7 @@ def _write(kind,data,units,number=1):
         from . import secuencia_comprador
         system,schema,purpose=secuencia_comprador.system(number),MESSAGE_SCHEMA,secuencia_comprador.PURPOSE
     else:system,schema,purpose=(MESSAGE_SYSTEM,MESSAGE_SCHEMA,'buyer-message') if kind==MESSAGE else (NOTE_SYSTEM,NOTE_SCHEMA,'invite-note')
+    if any(f.get('tipo')=='puente' for f in data.get('hechos') or []):system+=BRIDGE_RULES
     answer=providers.claude(voz.with_voice(system),json.dumps(data,ensure_ascii=False,default=str),output_schema=schema,effort='medium',
                             purpose=purpose,context=operador.course_block(units))
     try:out=json.loads(answer['text'])
@@ -477,20 +507,32 @@ def _notes(account,now):
     """Buyers about to be invited without a note decision, warmest first: not warmed or nothing real → «hecho»; no note
     left this month (red.note_room, minus the notes ready or in review) → «cupo»; else the next one to draft."""
     from .red import note_room
+    from . import sin_posts
+    route=sin_posts.active()
     rows=(BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING,contact__stage='followed',
                                                                 contact__classification__fit=True))
     candidates=[j for j in rows if decision(j.contact,NOTE,j.attempt) is None and _ready_to_invite(j,now)]
     if not candidates:return 0,None
     heat=calentamiento.heats([j.contact for j in candidates],now)
-    candidates.sort(key=lambda j:(-heat.get(j.contact_id,0),j.warming_at or j.chosen_at))
+    if route:  # phase 5: the buyers warmed with comments first, then the route's by signal
+        hot={j.pk for j in candidates if warmed(j,now)}
+        candidates.sort(key=lambda j:(j.pk not in hot,-heat.get(j.contact_id,0),j.warming_at or j.chosen_at))
+    else:candidates.sort(key=lambda j:(-heat.get(j.contact_id,0),j.warming_at or j.chosen_at))
     room=note_room(now)-BuyerDraft.objects.filter(kind=NOTE,state__in=[State.READY,State.REVIEWING]).count()
+    reserved=sin_posts.warmed_waiting(account,now) if route else 0
     decided=0;item=None
     for journey in candidates:
-        if not warmed(journey,now) or not anchors(journey.contact,journey):
+        # Phase 5 (point 4): a buyer of the route without posts with a strong, recent, sourced signal (or his bridge's).
+        by_signal=route and journey.pk not in hot and sin_posts.note_by_route(journey,now)
+        if not (by_signal or warmed(journey,now)) or not anchors(journey.contact,journey):
             stop(journey.contact,journey,NOTE,StoppedBy.FACT,'Sin calentamiento ni un hecho concreto: la invitación sale sin nota.')
             decided+=1;continue
         if room<=0:
             stop(journey.contact,journey,NOTE,StoppedBy.QUOTA,'No quedan notas este mes: la invitación sale sin nota.')
+            decided+=1;continue
+        if by_signal and room-reserved<=0:
+            stop(journey.contact,journey,NOTE,StoppedBy.QUOTA,'Las notas que quedan van primero a quien el equipo calentó con '
+                 'comentarios: la invitación sale sin nota.')
             decided+=1;continue
         if item is None and tries(journey.contact,NOTE,journey.attempt)<MAX_TRIES:item=(journey.contact,NOTE,journey.attempt,1)
     return decided,item
@@ -589,13 +631,15 @@ def note_hold(contacts,now=None):
     NOTE_HOLD after they became ready (next_at). Nobody waits with the switch or the lead off, or without notes left."""
     if not active():return set()
     from .red import note_room
+    from . import sin_posts
     now=now or timezone.now()
     if note_room(now)<=0:return set()
     held=set()
     journeys={j.contact_id:j for j in BuyerJourney.objects.select_related('contact').filter(contact__in=[c.pk for c in contacts],step=Step.WARMING)}
     for contact in contacts:
         journey=journeys.get(contact.pk)
-        if journey is None or decision(contact,NOTE,journey.attempt) or not warmed(journey,now):continue
+        if journey is None or decision(contact,NOTE,journey.attempt):continue
+        if not warmed(journey,now) and not sin_posts.note_by_route(journey,now):continue  # phase 5: by signal too
         if now-(journey.next_at or now)<NOTE_HOLD:held.add(contact.pk)
     return held
 
@@ -634,7 +678,8 @@ def _card_body(anchor):
           'comento_post':'Comentó en un post tuyo y aceptó tu invitación.',
           'comentario_en_su_post':'El equipo comentó sus posts y aceptó tu invitación.',
           'nos_invito':'Te escribió al invitarte y ya son conexión.',
-          'senal_de_compra':'Su empresa muestra una señal de compra y aceptó tu invitación.'}.get(kind,'Aceptó tu invitación.')
+          'senal_de_compra':'Su empresa muestra una señal de compra y aceptó tu invitación.',
+          'puente':'Un colega suyo de su empresa (el puente) conectó con el equipo y ella aceptó tu invitación.'}.get(kind,'Aceptó tu invitación.')
     return lead+' El equipo te dejó un primer mensaje; lo envías tú desde LinkedIn. «No escribirle» la saca del recorrido.'
 
 def cards(card,now=None):

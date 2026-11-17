@@ -121,7 +121,9 @@ def comment_text_issues(proposal):
     if proposal.source=='agent' and proposal.post_id and idioma.english_on_spanish(text,proposal.post.text):
         issues.append('Está en inglés y la publicación está en español')  # Gustavo, 2026-11-12
     from . import calentamiento
-    if proposal.post_id and calentamiento.warmup_post(proposal.post):issues+=warmup_text_issues(text)
+    if proposal.post_id and calentamiento.warmup_post(proposal.post):
+        from . import sin_posts
+        issues+=warmup_text_issues(text)+sin_posts.repeat_issues(proposal)  # phase 5: never the same to two of a company
     public,private=guardas.blocks()
     return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
 
@@ -420,8 +422,9 @@ def _observe(user,account,now):
     bucket=int(now.timestamp()//every.total_seconds())
     if not referents_due:
         # Phase 2: the buyers warming up have their own reads; when only they are due, observe reads only them.
-        from . import calentamiento
-        if not (calentamiento.enabled() and calentamiento.reading_due(account,now)):return 0
+        from . import calentamiento, sin_posts
+        # Phase 5: a bridge search or a bridge's posts due count as the buyers' reads.
+        if not (calentamiento.enabled() and (calentamiento.reading_due(account,now) or sin_posts.reading_due(account,now))):return 0
         _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[],'solo_compradores':True},
                                     request_id=_job_id('observe-buyers',account.id,bucket))
         return int(created)
@@ -534,9 +537,11 @@ def _lead_redraft(user,account,now):
     warm=calentamiento.enabled()
     target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
     if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
+        from . import sin_posts
         target|=Q(post__posted_at__gte=now-calentamiento.post_max_age(),post__referent__isnull=True,
                   post__author_provider_id__in=[j.contact.provider_user_id for j in
-                                                [*calentamiento.warming(account),*calentamiento.second_touch(account)]])
+                                                [*calentamiento.warming(account),*calentamiento.second_touch(account)]]
+                  +[b.provider_user_id for b in sin_posts.warming(account)])
     discarded=(ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
                                              decided_at__gte=now-timedelta(hours=24)).filter(target)

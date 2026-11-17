@@ -773,7 +773,9 @@ def _stage_due(contact,now):
 def stage_pending(account,now=None):
     """A buyer's stage check is due and today's allowance has room (the autopilot queues the classify job for it)."""
     now=now or timezone.now()
-    if not (stage_check_enabled() and stage_checks_left(now)>0 and any(_stage_due(c,now) for c in _stage_queue(account))):return False
+    from . import sin_posts
+    if not (stage_check_enabled() and stage_checks_left(now)>0 and
+            (any(_stage_due(c,now) for c in _stage_queue(account)) or sin_posts.rechecks_due(account).exists())):return False
     # While the web research is silent the job runs once a day to record the pause, not on every classify tick.
     return not (research_silent(now) and _paused_on(account,operador.period_starts(now)[0]))
 
@@ -867,7 +869,28 @@ def check_stages(user,account,now=None,limit=3):
             if not passed:record_classification(contact,observed_at=now)
         comprador.on_contact(contact,'verificacion_etapa')
         summary['passed']+=int(passed)
+    if not summary.get('stopped'):_recheck_signals(account,now,day,summary,limit)
     return summary
+
+def _recheck_signals(account,now,day,summary,limit):
+    """Phase 5 (6d, BUYER_NO_POSTS_ROUTE_ENABLED): the one web re-check of a resting buyer's buying signals when her rest
+    ends (sin_posts.recheck_waiting asks for it), after the day's stage checks and inside the same allowance
+    (NETWORK_STAGE_CHECKS_PER_DAY, never raised) and the same limit per run. Only new signals with a source are added;
+    the verdict, the state and the fit stay. Research that did not run leaves it pending for the next run."""
+    from . import research, sin_posts
+    for contact in sin_posts.rechecks_due(account):
+        if summary['checked']>=limit or stage_checks_left(now)<=0 or budget_left(now)<=0:break
+        rest=contact.classification['stage_check']['recheck'].get('intento')
+        key=f'etapa:{contact.pk}:reverificacion:{rest}:{day:%Y%m%d}'
+        result=research.research(research.ResearchRequest(key=key,public_question=stage_question(contact),search=True))
+        if result.status in ('skipped','running') or (not result.findings and not result.usage):
+            summary['stopped']=(list(result.limitations) or ['Investigación web no disponible'])[0];break
+        verdict=None
+        if result.findings:
+            try:verdict=_judge_stage(contact,result,now)
+            except (ValueError,KeyError,TypeError,json.JSONDecodeError):verdict=None
+        summary['checked']+=1;summary['reverificadas']=summary.get('reverificadas',0)+1
+        sin_posts.recheck_done(contact,(verdict or {}).get('senales') or [],now)
 
 # --------------------------------------------------------------------------- RED-01/02/04: proposals
 
@@ -1069,7 +1092,9 @@ def plan(user,account,now=None):
             summary['invite']+=bool(proposal)
     if autonomy(RED.FOLLOW)!='off':
         # Leaders are followed too (their posts are where the team comments); only invitations leave them out.
-        for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).order_by('discovered_at')):
+        # Phase 5: a bridge whose buyer left the journey is not followed (no bridge exists with the switch off).
+        for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).exclude(bridge_for__step='salio')
+                                   .order_by('discovered_at')):
             if room(RED.FOLLOW)<=0:break
             summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id},grounding))
     if autonomy(RED.ACCEPT)!='off':
@@ -1371,7 +1396,8 @@ def confirmed_by_gustavo(proposal):
     contact=proposal.contact
     return bool(contact and proposal.capability in NETWORK_CAPABILITIES and (contact.classification or {}).get('confirmed_by_gustavo'))
 
-ROLE_LABELS={'par':'Par','recomendador':'Recomendador','lider':'Líder','comprador':'Comprador','divulgador':'Divulgador','aliado':'Aliado'}
+ROLE_LABELS={'par':'Par','recomendador':'Recomendador','lider':'Líder','comprador':'Comprador','divulgador':'Divulgador','aliado':'Aliado',
+             'puente':'Puente'}  # phase 5: a colleague of a buyer who does not post (sin_posts.py), not a role of the course table
 
 def notify_connection(contact,title):
     """Notificaciones: a new connection that fits (no push by default)."""
