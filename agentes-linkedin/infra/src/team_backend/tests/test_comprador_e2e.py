@@ -2172,7 +2172,8 @@ class ReplyBuyerPathTests(ReplyPathBase):
                                                                        'recibieron_mensaje','respondieron','interesados','reunion')})
         replies=funnel['respuestas']
         self.assertEqual((replies['activa'],replies['clasificadas'],replies['por_tipo']['interesado'],replies['reuniones']),(True,1,1,1))
-        self.assertEqual(replies['horas_respuesta_a_reunion'],{'mediana':round((booked-journey.replied_at)/HOUR,1),'personas':1})
+        self.assertEqual(journey.replied_at,at)  # her reply, a day before she booked
+        self.assertEqual(replies['horas_respuesta_a_reunion'],{'mediana':24.0,'personas':1})
         self.assertEqual(funnel['borradores']['respuestas']['enviados'],1)
         self.assertEqual(self.fake.state['writes'],writes)  # the team never wrote a message (INB-08)
         self.assertFalse(BuyerDraft.objects.filter(contact=ana,state__in=['listo','en_revision']).exists())

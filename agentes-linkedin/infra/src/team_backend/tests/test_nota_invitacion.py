@@ -188,10 +188,7 @@ class ConfirmedNoteBugTests(NoteCaseBase):
         with patch.dict(os.environ, {'OPERATOR_AUTONOMY': 'RED-02=auto', 'LEAD_ENABLED': 'false'}):
             proposal = autopiloto.policy_review(ActionProposal.objects.get(pk=proposal.pk))
             self.assertEqual(proposal.state, 'approved')
-            try:
-                operador.execute(self.gustavo, proposal.id)
-            except operador.OperatorBlocked:
-                pass
+            operador.execute(self.gustavo, proposal.id)  # nothing blocks it: an OperatorBlocked here is the bug
         proposal.refresh_from_db()
         self.assertEqual(proposal.state, 'confirmed')
         self.assertEqual(self.sent_invitation(contact)['message'], '')

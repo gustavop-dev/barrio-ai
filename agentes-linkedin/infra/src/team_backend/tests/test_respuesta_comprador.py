@@ -308,34 +308,46 @@ class WebhookSignatureTests(SimpleTestCase):
 
 class WebhookReceiveTests(TestCase):
     """agenda_calcom.receive: what is rejected, ignored, stored and processed once."""
+    NOW = datetime(2026, 11, 17, 12, 0, tzinfo=utc_tz.utc)
 
     def setUp(self):
         env = patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': SECRET, 'BUYER_REPLY_ENABLED': 'true'})
         env.start()
         self.addCleanup(env.stop)
+        # The audit rows are dated at NOW too (Django binds the default when the model loads).
+        dated = patch.object(AuditEvent._meta.get_field('created_at'), '_get_default', new=lambda: self.NOW)
+        dated.start()
+        self.addCleanup(dated.stop)
 
-    def test_rejections_store_nothing_and_audit_once_an_hour(self):
+    def test_rejections_store_nothing(self):
         raw = delivery()
-        now = timezone.now()
-        self.assertEqual(agenda_calcom.receive(b'x' * (64 * 1024 + 1), sign(b'x'), now)[0], 413)
-        self.assertEqual(agenda_calcom.receive(raw, 'f' * 64, now)[0], 403)
-        self.assertEqual(agenda_calcom.receive(raw, 'f' * 64, now)[0], 403)
+        self.assertEqual(agenda_calcom.receive(b'x' * (64 * 1024 + 1), sign(b'x'), self.NOW)[0], 413)
+        self.assertEqual(agenda_calcom.receive(raw, 'f' * 64, self.NOW), (403, {'detail': 'Firma inválida.'}))
         with patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': ''}):
-            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now), (403, {'detail': 'Webhook sin configurar.'}))
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), self.NOW), (403, {'detail': 'Webhook sin configurar.'}))
         with patch.dict(os.environ, {'BUYER_REPLY_ENABLED': 'false'}):
-            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now)[0], 202)
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), self.NOW)[0], 202)
         self.assertFalse(MeetingBooking.objects.exists())
-        self.assertEqual(sorted(AuditEvent.objects.filter(action='calcom.rejected').values_list('target', flat=True)), ['firma', 'sin_secreto'])
+
+    def test_a_rejection_is_audited_once_an_hour(self):
+        raw = delivery()
+        for minutes in (0, 1, 59):
+            agenda_calcom.receive(raw, 'f' * 64, self.NOW + timedelta(minutes=minutes))
+        with patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': ''}):
+            agenda_calcom.receive(raw, sign(raw), self.NOW)
+        rejected = AuditEvent.objects.filter(action='calcom.rejected')
+        self.assertEqual(sorted(rejected.values_list('target', flat=True)), ['firma', 'sin_secreto'])
+        agenda_calcom.receive(raw, 'f' * 64, self.NOW + timedelta(hours=1))
+        self.assertEqual(rejected.filter(target='firma').count(), 2)
 
     def test_malformed_or_foreign_deliveries(self):
-        now = timezone.now()
         for raw, status in ((b'not json', 400), (b'[1, 2]', 400), (delivery(uid=''), 400), (delivery('MEETING_ENDED'), 200)):
-            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now)[0], status, raw)
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), self.NOW)[0], status, raw)
         self.assertFalse(MeetingBooking.objects.exists())
 
     def test_a_booking_nobody_matches_is_stored_once(self):
         raw = delivery(metadata={'barrio': 'unknownREF123'})
-        now = timezone.now()
+        now = self.NOW
         status, body = agenda_calcom.receive(raw, sign(raw), now)
         self.assertEqual((status, body['emparejada_por'], body['estado']), (200, 'sin_emparejar', 'agendada'))
         self.assertEqual(agenda_calcom.receive(raw, sign(raw), now), (200, {'repetido': True}))
