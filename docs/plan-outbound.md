@@ -34,6 +34,13 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 12/11/2026 | **10 comentarios al día** (antes 5), y los comentarios son parte del outbound: calentar a los posibles compradores. |
 | Vigente | La app nunca envía mensajes en nombre de Gustavo ([INB-08](funcionalidades/inbox.md#inb-08)). Un primer mensaje solo se redacta para que él lo copie y lo envíe ([RSP-07](funcionalidades/respuestas.md#rsp-07)). Catálogo CHAT-04: no escribir automáticamente por cada aceptación; interés real, sin pitch encubierto ni secuencias de campaña. |
 | Vigente | En sus posts, el equipo responde solo, con el contexto del post, del hilo y del perfil; en el segundo turno puede proponer conectar y seguir por privado ([RSP-06](funcionalidades/respuestas.md#rsp-06)). |
+| 17/11/2026 | **Seguimiento: la secuencia de 4 mensajes del curso**, como borradores que él envía. La regla «sin secuencias de campaña» (CHAT-04, BIB-10) era para limitar el alcance en su momento; deja de regir para el comprador cuando esto se construya. |
+| 17/11/2026 | Las 3 notas de invitación del mes se reservan para compradores ya calentados, con un hecho concreto que citar. |
+| 17/11/2026 | El comprador que no publica tiene su propia ruta (abajo), incluida la entrada por el cofundador o alguien de su equipo. |
+| 17/11/2026 | Los agentes siguen comentando ellos, con la revisión del líder: tienen una base de conocimiento amplia sobre nosotros. La advertencia del curso («nunca comentes con bots») no se adopta. |
+| 17/11/2026 | La rampa y los topes se quedan como están; los resultados se miran en un mes (hacia el 17/12/2026). |
+| 17/11/2026 | Carga aceptada: 20 a 30 mensajes por semana enviados por él. |
+| 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas. El puente entre las dos (qué pasa cuando responde, enlace de agenda, preguntas de calificación y nota del lead) se diseña a continuación. |
 
 ## Lo que ya funciona
 
@@ -68,37 +75,115 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 - **No medimos el resultado:** sabemos cuánto se publica, comenta e invita, no si trae compradores, conversaciones o
   visitas al perfil.
 
-## Diseño propuesto del outbound (por aprobar)
+## El sistema del comprador (diseño aprobado el 17/11/2026)
 
-Un embudo por persona, con la red y los comentarios trabajando juntos:
+Un recorrido por persona, no campañas masivas: lemlist queda fuera y la app nunca envía mensajes. Sigue el método
+CITA del curso (con quién, visibilidad previa, conversación, aprendizaje medible; clases 07–12). Cada etapa entra con
+su caso de evaluación y su lista de lectura del curso, como el primer mensaje
+([BIB-10](funcionalidades/biblioteca-equipos.md#bib-10)).
 
-1. **Detectar** (ya existe): búsqueda, clasificador, verificación de ronda semilla y revisión del líder.
-2. **Seguir** (RED-01, ya existe).
-3. **Calentar** (nuevo): leer sus posts recientes y comentar 2 veces en 7 a 14 días, con las mismas reglas de los
-   comentarios (biblioteca, idioma, sin pitch, revisión del líder) y una persona a la vez cada 48 h.
-4. **Invitar** (RED-02, ya existe) después del segundo comentario, o a los 14 días como máximo; con nota cuando lo
-   permitan las notas reservadas ([BAR-16](funcionalidades/red.md#bar-16)).
-5. **Al aceptar** (nuevo): aparece en Conexiones y, si es comprador o hay un motivo concreto, la Bandeja trae un primer
-   mensaje redactado con el contexto (sus posts, los comentarios del equipo) para que Gustavo lo copie y lo envíe él,
-   como RSP-07. Nada se envía solo.
-6. **Conversación y oportunidad:** «Hecho, le escribí» registra el contacto; si avanza, pasa a Oportunidades
-   ([PRS-07](funcionalidades/personas-oportunidades.md#prs-07)).
+| # | Etapa | Qué hace el equipo | Qué hace Gustavo | Estado |
+| --- | --- | --- | --- | --- |
+| 1 | Elegir | Búsqueda, clasificación, EE. UU., ronda semilla. La señal de compra ordena a quién primero | Nada | Existe; falta guardar la señal (fuente y fecha) y usarla en la prioridad |
+| 2 | Calentar | Seguir, leer sus posts y comentar 2 veces en 7 a 14 días | Nada | Falta: leer posts de compradores, comentar a no referentes, estado por persona |
+| 3 | Invitar | Tras el 2.º comentario o a los 14 días. Nota solo a calentados con un hecho concreto | Nada (o aprueba, según la autonomía de red) | Existe invitar; hoy sale a las 48 h de seguir, sin contar comentarios |
+| 4 | Primer mensaje | Al aceptar, borrador de tres líneas con sus posts y los comentarios del equipo | Lo copia y lo envía | Existe solo tras una conversación en un post de Gustavo |
+| 5 | Secuencia | M2 a los 4 días, M3 a los 5, M4 a los 7. Si responde, se detiene todo | Envía cada uno | No existe |
+| 6 | Respuesta y puente | Clasifica la respuesta y prepara el siguiente paso hasta la reunión | Conversa y agenda | Por diseñar (sección siguiente) |
+| 7 | Medir | Embudo por etapa, semana contra semana | Lee una frase y un cambio por semana | No existe por etapa |
 
-**Reparto de los 10 comentarios del día (propuesta):** 6 para calentar compradores, 2 para comunidad (pares,
-recomendadores, difusores) y 2 para referentes y líderes, por visibilidad. Si un grupo no tiene posts ese día, sus
-cupos pasan al siguiente.
+### 1. Elegir
 
-**Costo:** pasar de 5 a 10 comentarios por día suma unos 15 USD al mes, más las lecturas de posts de compradores.
-El gasto sin evaluaciones ronda 30 USD al mes: queda dentro del límite general de 100 USD.
+Las señales no crean listas: deciden a quién se atiende primero (LI-08-M004-K02). Para founders bastan señales
+públicas (LI-08-V010-K02): anunció una ronda, abrió vacantes, se expandió, publicó sobre el problema, o ya
+interactuó con nosotros (la más fuerte). Cada señal se guarda con su fuente y su fecha; una señal sin fuente no
+cuenta. La prioridad queda: EE. UU. → comprador → señal reciente → confianza.
 
-**Medición semanal (nueva, en Resultados):**
+### 2. Calentar
 
-- invitaciones enviadas y aceptadas, por rol y región;
-- aceptación de los calentados frente a los no calentados;
-- comprobaciones de ronda semilla: cuántos pasan;
-- comentarios de calentamiento publicados y respuestas recibidas;
-- conversaciones abiertas y oportunidades;
-- gasto por comprador que aceptó.
+- Seguir (RED-01), leer sus posts recientes y comentar 2 veces en 7 a 14 días.
+- El comentario: un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir
+  (LI-07-M005-K05). Mismas reglas fijas, idioma y revisión del líder que los comentarios de hoy.
+- Una persona cada 48 h como mínimo; la espera se cuenta por autor del post, no por referente.
+- Con los topes actuales (10 comentarios al día, 50 a la semana) caben unos 15 compradores nuevos por semana. Se
+  mantiene así un mes.
+
+### 3. Invitar
+
+- Después del segundo comentario, o a los 14 días como máximo.
+- Sin nota por defecto. Las 3 notas del mes van a compradores calentados con un hecho concreto (algo que publicó,
+  algo en común o una señal), en menos de 200 caracteres, y su único trabajo es que acepte (LI-09-M002-K06). La nota
+  se redacta al invitar, con los comentarios del calentamiento como contexto, no al clasificar.
+- Retirar invitaciones viejas sigue bloqueado: el sistema solo le da la lista a Gustavo.
+- A corregir aquí: una invitación con nota a una persona confirmada por Gustavo queda bloqueada hasta caducar, porque
+  nadie marca la nota como aprobada.
+
+### 4. Primer mensaje
+
+- Cuándo (LI-09-M002-K05): si ya interactuó con nosotros, apenas acepte; si no, antes un toque más (un comentario o
+  una reacción) y el mensaje dentro de las 1 a 3 semanas siguientes. Nunca un minuto después de aceptar.
+- Qué: las tres líneas ya activadas (toque personal, puente honesto, pregunta fácil), con las reglas fijas y las seis
+  preguntas del líder. Busca una respuesta, no una reunión: sin enlace ni «15 minutos».
+- Tarjeta en la Bandeja con «Abrir su perfil», «Hecho, le escribí» y «No escribirle».
+
+### 5. Secuencia
+
+Cada mensaje tiene un solo trabajo (LI-09-M003-K05), y todos son borradores:
+
+| Mensaje | Cuándo | Trabajo |
+| --- | --- | --- |
+| M1 | Ver etapa 4 | Abrir con las tres líneas |
+| M2 | 4 días después | El mismo dolor contado de otra forma, con una historia corta |
+| M3 | 5 días después | «¿No eres la persona indicada?»: buscar un referido |
+| M4 | 7 días después | Cerrar con elegancia, sin rogar |
+
+- Los plazos corren desde que Gustavo marca «Hecho, le escribí», no desde que se redactó el borrador.
+- Regla de parada: si responde, se detiene todo. El equipo lee la conversación antes de preparar cada borrador; por
+  eso esta etapa necesita la lectura del inbox encendida.
+- Después del M4 sin respuesta: sale de la secuencia y queda como conexión. Puede volver a los 90 días con otro motivo.
+- Un referido conseguido con el M3 entra como persona nueva, y justifica una nota que nombre a quien lo recomendó.
+
+### El comprador que no publica
+
+El curso no lo trata. Ruta aprobada, medida aparte de los calentados con comentarios:
+
+1. Seguir y visitar el perfil dos veces en 10 días.
+2. Comentar donde él comenta, si comenta posts de otros.
+3. Entrar por un puente: calentar al cofundador o a alguien de su equipo que sí publique.
+4. Invitar a los 14 días. Con una señal fuerte y reciente, usar una de las 3 notas citando esa señal.
+5. Al aceptar, primer mensaje con la señal o algo en común como primera línea.
+
+### 7. Medir
+
+- Embudo (LI-12-M001-K03): elegidos → calentados → invitados → aceptaron → recibieron mensaje → respondieron →
+  interesados → reunión. Se lee el paso de una etapa a la siguiente, no los totales.
+- Se arregla una etapa a la vez, la primera que se rompe (LI-12-M001-K04), y no se juzga nada con menos de 30
+  invitaciones.
+- Métrica propia: borradores pendientes frente a enviados. La fuga típica aquí será un borrador que Gustavo no alcanzó
+  a mandar.
+- Comparaciones que importan: calentados frente a no calentados, con comentarios frente a la ruta del que no publica,
+  con nota frente a sin nota (solo como observación: 3 notas al mes no dan para concluir).
+- Referencias del curso, de campañas del propio instructor y no del mercado: aceptación sana desde 30 %; bajo 25 %,
+  revisar la lista o el perfil; respuesta bajo 20 %, revisar el mensaje.
+
+### Cuentas
+
+- 15 compradores nuevos por semana × 30 a 40 % de aceptación = 5 a 8 aceptaciones por semana.
+- Con la secuencia de 4, en régimen son 20 a 30 mensajes por semana que envía Gustavo.
+- A ese volumen, 30 invitaciones a compradores se juntan en unas 2 semanas: antes de eso no se concluye nada.
+
+### El puente a ventas (por diseñar con Gustavo)
+
+La máquina de LinkedIn termina en la reunión agendada. Lo que Gustavo dejó planteado el 17/11/2026:
+
+- Cuando el comprador responde, el equipo debe entender su negocio antes de proponer nada, y la respuesta no puede
+  sonar a bot.
+- Primero asegurar la reunión con el enlace de agenda (el curso lo permite solo después de una respuesta).
+- Con la reunión agendada, preguntas de calificación y una nota del lead, para que llegue bien calificado a ventas.
+
+Por definir: qué investiga el equipo del negocio y de dónde, qué respuesta prepara según el tipo de respuesta
+(interesado, pide información, no es el momento, no le interesa, lo ve otra persona; LI-11-M006-K01), cuándo va el
+enlace, qué preguntas de calificación, cómo se calcula la nota y qué recibe ventas.
 
 ## La base actual y lo que hay que añadir (anotado el 14/11/2026)
 
@@ -145,27 +230,24 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 
 ## Decisiones abiertas (de Gustavo)
 
-1. ¿El reparto 6 / 2 / 2 de los comentarios está bien?
-2. Un comprador que no publica: ¿se invita sin calentar o se espera?
-3. ¿Nota en la invitación a los calentados?
-4. Primer mensaje: ¿solo a compradores o también a la comunidad? (siempre como borrador que él envía).
-5. ¿Cuándo una conversación pasa a oportunidad?
-6. La información de la clase 07 que falta. Llegaron las clases 08–12 y la biblioteca ya admite 07–12 (los agentes
-   siguen leyendo 01–06); faltan cargarlas en producción y activar cada metodología con su evaluación. La primera
-   activada es el primer mensaje (siete unidades de la clase 09, BIB-10); la siguiente es la nota de invitación, que
-   ya está en producción (sin nota por defecto, hasta 3 al mes) y necesita su propia evaluación antes de tocarla.
-7. Umbral de seguidores, cuando haya datos.
+1. El puente a ventas: respuesta, enlace de agenda, calificación y nota del lead (sección anterior).
+2. ¿Cuándo una conversación pasa a oportunidad?
+3. Umbral de seguidores, cuando haya datos.
+4. Primer mensaje a la comunidad (no compradores): por ahora no; se revisa con los datos del mes.
 
 ## Orden propuesto
 
-1. **Hecho (12/11/2026):** 10 comentarios al día en producción.
-2. **Hasta el 19/11/2026 aprox.:** observar los datos de BAR-17 (invitaciones, aceptación, cuántos pasan la
-   verificación de semilla, dudas del líder) y decidir las propuestas de referentes en la Bandeja.
-3. **PR chico, independiente:** infografías con más contenido.
-4. **PR grande de outbound:** calentamiento, reparto de comentarios, primer mensaje en la Bandeja, medición semanal y
-   los valores por defecto (INT-03 10/50, borradores por día).
-5. **Después:** referentes por niveles (5 fijos, hasta 6 medianos rotativos, hasta 4 emergentes), umbral de
-   seguidores, café virtual.
+Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje en producción (17/11/2026, PR #132).
+
+1. **Estado por persona y medición mínima del embudo**, sin cambiar comportamiento: da la línea base.
+2. **Calentamiento:** leer y comentar posts de compradores, e invitar tras el segundo comentario.
+3. **Primer mensaje al aceptar**, con la nota para calentados.
+4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
+5. **Ruta del que no publica.**
+6. **Respuesta y puente a ventas**, una vez diseñado.
+7. **Lectura semanal del embudo.**
+
+Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, umbral de seguidores, café virtual.
 
 ## Fichas relacionadas
 
