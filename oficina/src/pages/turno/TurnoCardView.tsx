@@ -368,12 +368,12 @@ function MessageBody({ card }: { card: TurnoCard }) {
         </div>
       </div>
       <div className="turno-block">
-        <p className="turno-label">Lo que comentó en tu post</p>
+        <p className="turno-label">{message.comment_label || 'Lo que comentó en tu post'}</p>
         <blockquote className="quote">“{message.comment}”</blockquote>
       </div>
       {message.reply ? (
         <div className="turno-block">
-          <p className="turno-label">Lo que le respondió el equipo</p>
+          <p className="turno-label">{message.reply_label || 'Lo que le respondió el equipo'}</p>
           <blockquote className="quote">“{message.reply}”</blockquote>
         </div>
       ) : null}

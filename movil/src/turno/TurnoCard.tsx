@@ -361,13 +361,13 @@ function MessageDetails({ card }: { card: TurnoCardData }) {
       </View>
       <View style={styles.block}>
         <T variant="etiqueta" soft>
-          Lo que comentó en tu post
+          {message.comment_label || 'Lo que comentó en tu post'}
         </T>
         <Quote>{message.comment}</Quote>
         {message.reply ? (
           <>
             <T variant="etiqueta" soft>
-              Lo que le respondió el equipo
+              {message.reply_label || 'Lo que le respondió el equipo'}
             </T>
             <Quote>{message.reply}</Quote>
           </>
