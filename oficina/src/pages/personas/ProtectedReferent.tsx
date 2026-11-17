@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useUpdateReferent } from '../../api/hooks';
 import type { Referent } from '../../api/types';
+import { referentName } from '../../../../compartido/src/logic/barrio';
 import { Button, ErrorRetry, Modal } from '../../components/ui';
 
 export function ProtectedReferent({ referent, candidates }: { referent: Referent; candidates: Referent[] }) {
@@ -12,7 +13,7 @@ export function ProtectedReferent({ referent, candidates }: { referent: Referent
   const update = useUpdateReferent();
   if (!referent.can_manage_protected) return null;
   return <>
-    <Button size="small" onClick={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(referent.position ?? 0); setReplacement(''); setOpen(true); }}>Gestionar protección de {referent.display_name}</Button>
+    <Button size="small" onClick={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(referent.position ?? 0); setReplacement(''); setOpen(true); }}>{`Gestionar protección de ${referentName(referent)}`}</Button>
     {open ? <Modal title={`Gestionar a ${referent.display_name}`} onClose={() => setOpen(false)} busy={update.isPending}>
       <p>Solo Gustavo. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</p>
       <label className="field"><input type="checkbox" checked={protectedFlag} onChange={e => setProtected(e.target.checked)} />Main protegido</label>
