@@ -1047,6 +1047,50 @@ COURSE_CASES={
                     'S3':['LI-09-M003-K05'],'S4':['LI-10-V013-K02'],'S5':['LI-09-V014-K02'],'S6':['LI-09-V014-K02'],
                     'S7':['LI-09-V014-K02'],'S8':['LI-09-V014-K03'],'S9':['LI-09-V014-K02'],'S10':['LI-09-M003-K05'],
                     'S11':['LI-09-M003-K05']}},
+    # Quinta metodología de outbound (clase 11, con la clase 08 y la tabla de diagnóstico de la clase 12): la respuesta
+    # del comprador (Gustavo, 17/11/2026: la máquina de LinkedIn termina en la reunión agendada, con Cal.com; los mensajes
+    # siempre son borradores que él copia y envía). Se clasifica su respuesta leyendo la conversación entera (cinco tipos y
+    # «otro» si no hay confianza), se redacta la respuesta según el tipo (el enlace de agenda solo para interesado y pide
+    # información), la reserva de Cal.com pasa el recorrido a «reunion» y se entrega el lead.
+    # flujo: interesado → borrador con su enlace → «Hecho» → reserva → reunión → entrega → oportunidad con un toque. P: pide
+    # información (lo que falta lo completa Gustavo). N1: no es el momento, con fecha. N2: sin fecha, 90 días. X: no le
+    # interesa, salida definitiva y nada más. O: otra persona, entra como contacto nuevo referido. B: poca confianza →
+    # «otro», sin borrador. E: sin enlace de agenda, sin borrador y con aviso. I: interruptor apagado.
+    'respuesta_comprador':{'id':'BIB-11-respuesta-comprador',
+        'units':['LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],
+        'input':{
+            'flujo':{'respuesta':'Good timing: the weekly report is still a spreadsheet every Friday. Happy to talk about how others solved it.',
+                     'borrador':('Ana, the Friday spreadsheet behind the weekly report is the part worth looking at first. Pick any slot '
+                                 'that suits you and we go through it.')},
+            'P':{'respuesta':'What exactly would you do with the reports, and how much does it cost?',
+                 'borrador':('Bea, I would start from the weekly report your clients ask for and map which numbers can come straight '
+                             'from the product. Pick a slot below and we look at it with your numbers.'),
+                 'faltan':['Precio: no hay un hecho confirmado; dalo tú si quieres.']},
+            'N1':{'respuesta':'Not the right moment, we are closing the round. Write me after January.',
+                  'borrador':'Cris, makes sense with the round closing. Thanks for telling me; I will write again after January.'},
+            'N2':{'respuesta':'Not now: too much going on with the launch this quarter.',
+                  'borrador':'Dani, understood, a launch eats everything. Thanks for the honest answer.'},
+            'X':{'respuesta':'Thanks, but we are not interested.','borrador':'Eva, thanks for letting me know. All the best with the reports.',
+                 'despues':'Please remove me from your list.'},
+            'O':{'respuesta':'I am not the right person for this. Talk to Bruno Ruiz (linkedin.com/in/bruno-globex), he owns the reports.',
+                 'borrador':'Fer, thanks for pointing me to Bruno, I will reach out to him.','referido':'Bruno Ruiz'},
+            'B':{'respuesta':'Hmm, maybe. Who are you again?'},
+            'E':{'respuesta':'Good timing, happy to talk about the reports.','calcom_booking_url':''},
+            'I':{'interruptor':False}},
+        'expected':{'clasificacion_con_metodologia':True,'borrador_con_metodologia':True,
+                    'flujo_tipo':'interesado','flujo_paso':'interesado','flujo_enlace':True,'flujo_reunion':True,'flujo_entrega':True,
+                    'flujo_oportunidad':'reunion',
+                    'P_tipo':'pide_informacion','P_enlace':True,'P_faltan':True,
+                    'N1_tipo':'no_es_el_momento','N1_descanso':'no_es_el_momento','N1_hasta_lo_que_dijo':True,'N1_enlace':False,
+                    'N2_tipo':'no_es_el_momento','N2_descanso_dias':90,
+                    'X_tipo':'no_le_interesa','X_salida':'no_le_interesa','X_enlace':False,'X_despues':0,
+                    'O_tipo':'otra_persona','O_referido':True,'O_enlace':False,
+                    'B_tipo':'otro','B_borrador':False,'B_tarjeta':True,
+                    'E_borrador':False,'E_aviso':True,'I_clasificadas':0,'mensajes_enviados':0},
+        'required':['LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],
+        'variants':{'flujo':['LI-11-M006-K01','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],'P':['LI-11-M006-K01','LI-12-M001-K04'],
+                    'N1':['LI-11-M006-K03','LI-08-M003-K05'],'N2':['LI-11-M006-K03'],'X':['LI-08-M003-K05'],'O':['LI-11-M006-K02'],
+                    'B':['LI-11-M006-K01'],'E':['LI-11-M006-K01'],'I':['LI-11-M006-K01']}},
 }
 
 def case_methodology(role):

@@ -670,6 +670,8 @@ class FirstMessagePathBase(WarmupPathBase):
             elif purpose=='lead-review-sequence':
                 follow=state.get('seguimiento') or {}
                 scores=judge_sequence(follow.get('numero'),follow.get('texto'))
+            elif purpose=='buyer-reply-classify':scores=judge_reply_type((state.get('ultimo_mensaje') or {}).get('texto'))
+            elif purpose=='lead-review-reply':scores=judge_reply_draft(state.get('respuesta') or {})
             else:scores={}
             low=LOW|risks|{'dm_pitch'}  # RSP-07: the message drafted with a closing reply does not sell
             return {'answers':{q:{'noul':scores.get(q,0.05 if q in low else 0.9)} for q in questions},'model':'fake-jev','estimated_usd':0}
@@ -694,6 +696,10 @@ class FirstMessagePathBase(WarmupPathBase):
                 out.update(note=text,citations=['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01','LI-03-M006-K01'])
             elif purpose=='buyer-sequence':
                 out.update(message=text,citations=list(evaluaciones.COURSE_CASES['secuencia_mensajes']['units']))
+            elif purpose=='buyer-reply':  # phase 6: the reply to what she wrote, with what is missing and whom she named
+                extra=self.texts.get(('buyer-reply-extra',name),{})
+                out.update(message=text,faltan=list(extra.get('faltan',[])),referido_nombre=extra.get('referido_nombre',''),
+                           citations=list(evaluaciones.COURSE_CASES['respuesta_comprador']['units']))
             else:
                 out.update(message=text,citations=['LI-09-M002-K05','LI-09-M003-K02','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'])
             return {'text':json.dumps(out),'model':'claude-opus-5-5'}
@@ -755,9 +761,9 @@ class FirstMessagePathBase(WarmupPathBase):
         self.assertEqual(response.status_code,200,response.content)
         return response.json()
 
-    def answered(self,slug,name,note=''):
+    def answered(self,slug,name,note='',headline='Founder & CEO at Acme'):
         """Chosen, followed, one warm-up comment and her answer to it: warmed and ready to be invited (an accelerator)."""
-        contact=self.chosen_and_followed(slug,name,note=note)
+        contact=self.chosen_and_followed(slug,name,note=note,headline=headline)
         self.their_new_post(contact)
         self.observe()
         first=self.autopilot_comment(WARM_1)
@@ -1234,9 +1240,9 @@ class SequencePathBase(FirstMessagePathBase):
         return response.json()
 
     # -- steps
-    def messaged(self,slug,name,at=None):
+    def messaged(self,slug,name,at=None,headline='Founder & CEO at Acme'):
         """Chosen, warmed, invited, accepted and «Hecho, le escribí» on the first message of the journey (phase 3) at `at`."""
-        contact=self.answered(slug,name)
+        contact=self.answered(slug,name,headline=headline)
         self.texts[('buyer-message',name)]=case_text('primer_mensaje_comprador','M1')
         self.invite(contact)
         contact=self.accepted(contact)
@@ -1924,3 +1930,112 @@ class NoPostsSwitchOffTests(NoPostsPathBase):
             self.assertNotIn('Dice que habló con alguien sin una interacción real que lo respalde',
                              mensajes_comprador.message_text_issues(TALK_MESSAGE,facts,'h1'))
             self.assertFalse(BuyerTouch.objects.filter(kind__in=['puente','senal_puente','reverificacion']).exists())
+
+
+# --------------------------------------------------------------------------- phase 6: her reply, the meeting and the handoff (BAR-23)
+
+BOOKING_URL='https://cal.com/gustavo-barrio/intro'
+WEBHOOK_SECRET='calcom-test-secret'
+
+
+def reply_input(variant,field='respuesta'):
+    return evaluaciones.COURSE_CASES['respuesta_comprador']['input'].get(variant,{}).get(field)
+
+
+def judge_reply_type(text):
+    """Jev simulado para clasificar su respuesta (LI-11-M006-K01): una probabilidad por tipo, por palabras clave. Nada
+    claro (o dos tipos a la vez): todas bajas o empatadas, y el código decide «otro»."""
+    low=(text or '').lower()
+    keys={'interesado':('happy to talk','good timing','sounds good','let us talk',"let's talk",'me interesa','hablemos'),
+          'pide_informacion':('how much','what exactly','what would you','cuánto cuesta','qué harías'),
+          'no_es_el_momento':('not the right moment','not now','ahora no','no es el momento','más adelante'),
+          'no_le_interesa':('not interested','no me interesa','do not contact','please remove me'),
+          'otra_persona':('right person','talk to','habla con')}
+    return {kind:0.9 if any(k in low for k in words) else 0.05 for kind,words in keys.items()}
+
+
+def judge_reply_draft(reply):
+    """Jev simulado para la revisión del líder (fase 6): responde a lo que dijo, no vende, no presiona, no inventa; el
+    interesado tiene un paso fácil; el «no» no insiste; la redirección agradece."""
+    low=(reply.get('texto') or '').lower()
+    sells=any(k in low for k in ('our services','we help','discount','my team builds'))
+    presses=any(k in low for k in ('today only','last chance','before friday'))
+    return {'resp_responde':0.9,'resp_pitch':0.9 if sells else 0.05,'resp_presiona':0.9 if presses else 0.05,'resp_inventa':0.05,
+            'resp_paso_facil':0.9,'resp_insiste':0.9 if 'reconsider' in low else 0.05,'resp_agradece':0.9 if 'thank' in low else 0.2}
+
+
+class ReplyPathBase(SequencePathBase):
+    """The path with BUYER_REPLY_ENABLED (phase 6) on top of phases 3–4: her reply is classified (Jev simulated), the team
+    drafts the reply (Claude simulated) that Gustavo copies and sends, Cal.com's signed webhook books the meeting (the
+    test client posts it, signed with the test secret) and the lead is handed over. Before phase 6 the steps find nothing
+    to do and the endpoints do not exist: that is what the baseline measures."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'BUYER_REPLY_ENABLED':'true','CALCOM_BOOKING_URL':BOOKING_URL,'CALCOM_WEBHOOK_SECRET':WEBHOOK_SECRET,
+                                   'INBOX_THREADS_PER_RUN':'20','INBOX_READ_CAPS':'chats=200,messages=400'})
+        env.start();self.addCleanup(env.stop)
+
+    # -- steps (production code only)
+    def replied(self,slug,name,text,at=None,headline='Founder & CEO at Acme'):
+        """M1 «Hecho» at self.start, she answers a day later and the next cycle reads and classifies it."""
+        contact=self.messaged(slug,name,headline=headline)
+        at=at or self.start+DAY
+        self.she_replies(contact,text,at)
+        self.cycle(at+HOUR)
+        return Contact.objects.get(pk=contact.pk)
+
+    def write_reply(self,contact,text,faltan=(),referido=''):
+        """Claude simulado escribe, para esta persona, la respuesta (y lo que falta o a quién nombró)."""
+        self.texts[('buyer-reply',contact.display_name)]=text
+        self.texts[('buyer-reply-extra',contact.display_name)]={'faltan':list(faltan),'referido_nombre':referido}
+
+    def webhook(self,trigger,uid,start=None,ref='',name='',email='',previous='',secret=WEBHOOK_SECRET,at=None,body=None):
+        """Cal.com posts the booking (docs: cal.com/docs/developing/guides/automation/webhooks): anonymous, signed with
+        X-Cal-Signature-256 = HMAC-SHA256(secret, raw body) in hex."""
+        import hashlib
+        import hmac
+        from rest_framework.test import APIClient
+        start=start or (timezone.now()+timedelta(days=3)).replace(microsecond=0)
+        payload={'uid':uid,'bookingId':abs(hash(uid))%10**6,'title':'Intro con Gustavo','startTime':start.isoformat(),
+                 'endTime':(start+timedelta(minutes=30)).isoformat(),'attendees':[{'name':name,'email':email,'timeZone':'America/Chicago'}],
+                 'metadata':{'barrio':ref} if ref else {},'status':'CANCELLED' if trigger=='BOOKING_CANCELLED' else 'ACCEPTED'}
+        if previous:payload['rescheduleUid']=previous
+        raw=body if body is not None else json.dumps({'triggerEvent':trigger,'createdAt':timezone.now().isoformat(),'payload':payload}).encode()
+        signature=hmac.new(secret.encode(),raw,hashlib.sha256).hexdigest() if secret else 'no-secret-provided'
+        with self.clock(at or timezone.now()):
+            return APIClient().post('/api/v1/comprador/calcom/webhook',data=raw,content_type='application/json',
+                                    HTTP_X_CAL_SIGNATURE_256=signature)
+
+    # -- reads
+    def replies_of(self,contact):
+        return self.drafts_of(contact,'respuesta')
+
+    def reply(self,contact):
+        rows=self.replies_of(contact)
+        return rows[-1] if rows else None
+
+    def reply_cards(self,contact,at):
+        return [c for c in self.cards_at(contact,at) if (c.get('message') or {}).get('origin')=='respuesta' or c['id'].startswith('respuesta:')]
+
+    def booking_ref(self,contact):
+        return getattr(self.journey(contact),'booking_ref',None)
+
+    def handoffs(self,at=None):
+        """GET /api/v1/comprador/entregas (read only); [] before phase 6."""
+        with self.clock(at or timezone.now()):
+            response=self.gustavo_api().get('/api/v1/comprador/entregas')
+        return response.json().get('items',[]) if response.status_code==200 else []
+
+    def handoff_of(self,contact,at=None):
+        return next((h for h in self.handoffs(at) if (h.get('persona') or {}).get('contacto')==str(contact.pk)),None)
+
+    def confirm_opportunity(self,contact,at):
+        """Gustavo taps «Crear la oportunidad» on the handoff's card in Tu turno (PRS-09: only he creates it). Returns the
+        handoff's opportunity as the read endpoint shows it, or None when there is no such card."""
+        cards=[c for c in self.turn_at(at)['items'] if c['id'].startswith('entrega:') and (c.get('handoff') or {}).get('contacto')==str(contact.pk)]
+        if not cards:return None
+        action=next(a for a in cards[0]['actions'] if a.get('endpoint'))
+        with self.clock(at):
+            response=self.gustavo_api().post(action['endpoint'],action.get('body') or {},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        return (self.handoff_of(contact,at) or {}).get('oportunidad')
