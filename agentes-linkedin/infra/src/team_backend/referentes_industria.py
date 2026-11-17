@@ -9,10 +9,12 @@ audience nobody could measure says so instead of counting it as met.
 
 The search is started by hand (`operador … referentes-industria`): it prints its worst-case cost first and enqueues
 nothing without --confirmar. It runs inside the referentes_mensuales cycle (same edges and monthly budget bucket, so no
-new graph node) with its own hard cap (--tope-usd), at most once a month per account. Candidates come only from
-LinkedIn reads (contacts already known plus people searches in the United States); the web research only looks for
-evidence about the candidates that passed the measurable criteria, and the selection model only writes claims that the
-code then checks against the cited sources."""
+new graph node) with its own hard cap (--tope-usd). Once a month per account, plus another attempt when every earlier
+one of the month ended without a proposal (the first run, 17/11/2026, proposed nobody and burned the month). Candidates
+come only from LinkedIn reads: profiles and companies Gustavo names, people searches aimed at whoever sells each
+service, and contacts already known; a free headline prefilter drops who clearly sells something else before any read
+is spent. The web research only looks for evidence about the candidates that passed the measurable criteria, and the
+selection model only writes claims that the code then checks against the cited sources."""
 from copy import deepcopy
 from datetime import date, timedelta
 from decimal import ROUND_UP, Decimal
@@ -75,6 +77,66 @@ PROMPT_TOKENS = 2000           # system + public question of a research call, up
 SELECTION_MAX_TOKENS = 6000
 SELECTION_MAX_CHARS = 240000   # the selection request is refused above this (≈ 80k tokens at 3 chars a token)
 
+# Where candidates come from. The first run (17/11/2026) searched the bare service words («custom software development»,
+# «product development», «applied ai», «fractional cto») and LinkedIn answered with whoever writes about them; the
+# direct connector's search page carries no name, headline or followers, so those rows ranked below every known contact
+# and the six profiles read were big sales, growth and coaching voices. Now: a seller's role plus the service in quotes
+# (LinkedIn's people search matches the words anywhere in the profile and takes quotes, parentheses and uppercase OR,
+# as in its search box; terms from a web review of who sells these services, 17/11/2026). 'us' searches use
+# NETWORK_SEARCH_LOCATION (the United States); 'global' ones search everywhere, for nearshore teams in Latin America
+# that sell to the United States (the prefilter keeps them only when their headline says so). One per service first:
+# the default five cover the four services and Latin America.
+QUERIES = (
+    ('software_a_la_medida', '(founder OR CEO) "software development agency"', 'us'),
+    ('liderazgo_tecnico', '"fractional CTO" startups', 'us'),
+    ('producto', '("product studio" OR "venture studio" OR "MVP development") founder', 'us'),
+    ('ia_aplicada', '("AI consultancy" OR "AI engineering" OR "applied AI") founder', 'us'),
+    ('software_a_la_medida', 'nearshore (CEO OR "co-founder" OR CTO) "software development"', 'global'),
+    ('producto', '("low-code" OR "AI-built") agency founder MVP', 'us'),
+    ('software_a_la_medida', '(CEO OR "co-founder" OR CTO) "custom software" "US clients"', 'global'),
+    ('software_a_la_medida', '(fundador OR CEO) "desarrollo de software" nearshore "Estados Unidos"', 'global'),
+)
+DEFAULT_SEARCHES = 5
+COMPANY_QUERY = '"{}" founder'  # a company Gustavo names: its founders, anywhere (the criteria still ask for EE. UU.)
+MAX_SEEDS = 5                   # companies and profiles Gustavo may name per search, each
+PROFILE_READS_PER_CANDIDATE = 2  # a profile read may show a seller of something else or a small account: room for that
+COMPANY_NAME = re.compile(r"[^\W_][\w .&'+\-]{0,59}")
+# The prefilter (free, rules only): who clearly sells something else is dropped before any read; who names a service is
+# read first. A service word anywhere (headline or about) outweighs these: «Sales | Founder at a software agency» stays.
+NOT_SELLING = {
+    'coach': r'\bcoach(?:es|ing)?\b',
+    'go-to-market': r'\bgo[- ]to[- ]market\b|\bgtm\b',
+    'marca personal': r'\bpersonal[- ]brand(?:ing)?\b|\bmarca personal\b',
+    'ghostwriting': r'\bghost[- ]?writ(?:er|ers|ing)\b',
+    'ventas': r'\b(?:sales|ventas|outbound|prospecting|appointment setting|lead[- ]gen(?:eration)?|cold (?:email|outreach))\b',
+    'reclutamiento': r'\b(?:recruit(?:er|ers|ing|ment)|talent acquisition|headhunt(?:er|ing)|staffing|reclutamiento|'
+                     r'reclutador(?:a)?)\b',
+    'marketing': r'\b(?:marketing|demand gen(?:eration)?|copywrit(?:er|ing)|seo)\b',
+    'LinkedIn como servicio': r'\blinkedin (?:growth|expert|strategist|strategy|trainer|ghostwriter|consultant|marketing)\b',
+    'inversión': r'\b(?:venture capital|angel investor|investor|inversionista)\b',
+    # The current headline says they left the company they founded.
+    'ya no la dirige': r'\b(?:ex-?|former(?:ly)?|previously|exited)\s*(?:co-?founder|founder|ceo|cto)\b',
+    # Their income is teaching or media about the trade, not selling it.
+    'formación o medios': r'\b(?:courses?|cohort|academy|bootcamp|educator|instructor|community builder|newsletter '
+                          r'(?:writer|author)|podcast host)\b',
+    'liderazgo genérico': r'\b(?:productivity|mindset|motivational|keynote speaker|leadership (?:expert|speaker|author))\b',
+    # Brand content of a giant's executive: a big audience that is the company's, not a seller's.
+    'ejecutivo de gran empresa': r'\b(?:vp|svp|evp|vice president|director|head of|chief \w+ officer)\b.{0,40}\b(?:google|'
+                                 r'microsoft|amazon|aws|meta|apple|salesforce|ibm|oracle|nvidia|openai|accenture|deloitte)\b',
+}
+# Words a headline uses for the services that the 'servicios' criterion does not take by themselves: they only order.
+SERVICE_HINTS = ('software development', 'software consultancy', 'software consulting', 'development studio',
+                 'staff augmentation', 'dedicated teams', 'ai agency', 'ai consultant', 'ai consultancy', 'ai studio',
+                 'desarrollo de software', 'software a la medida', 'software a medida', 'fábrica de software',
+                 'cto fraccional', 'estudio de producto', 'inteligencia artificial aplicada')
+SELLER_ROLE = re.compile(r'\b(?:co-?founder|founder|ceo|cto|owner|partner|principal|managing director|president|'
+                         r'fundador(?:a)?|cofundador(?:a)?|socio|socia|dueñ[oa])\b', re.I)
+US_WORDS = re.compile(r'\b(?:U\.S\.A?\.?|USA|US)\b')  # case-sensitive: «us» is a pronoun
+STEPS = {'prefiltro': 'Prefiltro de titular', 'tamano': 'Es grande', 'actividad': 'Publica seguido',
+         'servicios': 'Vende lo mismo que Gustavo', 'autoridad': 'Autoridad verificable',
+         'mercado_eeuu': 'Vende en EE. UU.', 'audiencia': 'Su audiencia es el barrio'}
+STEP_ORDER = ('tamano', 'actividad', 'servicios', 'autoridad', 'mercado_eeuu', 'audiencia')
+
 
 def _number(name, default, cast=int):
     try:
@@ -101,7 +163,8 @@ def thresholds():
             'min_fit_share': _number('REFERENTES_INDUSTRIA_MIN_ENCAJE', 0.3, float),
             'audience_required': os.environ.get('REFERENTES_INDUSTRIA_AUDIENCIA_OBLIGATORIA', 'false').lower() == 'true',
             'max_proposals': _number('REFERENTES_INDUSTRIA_MAX_ALTAS', 3),
-            'remember_days': _number('REFERENTES_INDUSTRIA_RECORDAR_DIAS', 90)}
+            'remember_days': _number('REFERENTES_INDUSTRIA_RECORDAR_DIAS', 90),
+            'max_attempts': _number('REFERENTES_INDUSTRIA_MAX_INTENTOS', 3)}
 
 
 def default_tope():
@@ -145,13 +208,71 @@ def selection_reservation(chars=SELECTION_MAX_CHARS):
         Decimal('0.01'), rounding=ROUND_UP)
 
 
-def estimate(candidatos=6, busquedas=4):
+def profile_budget(candidatos, perfiles=0):
+    """Profile reads one search may spend: two per candidate measured (a read may show a seller of something else or
+    fewer than min_followers, and then no posts are read) plus one per profile Gustavo named."""
+    return PROFILE_READS_PER_CANDIDATE * candidatos + perfiles
+
+
+def estimate(candidatos=6, busquedas=DEFAULT_SEARCHES, empresas=0, perfiles=0):
     """Worst case of one search, printed before it is enqueued. LinkedIn reads are free but count against the daily
-    caps of red.READ_CAPS; USD is the reservation, the real cost is usually lower."""
+    caps of red.READ_CAPS; USD is the reservation, the real cost is usually lower. The prefilter is rules only: no
+    paid call, so seeds and searches do not change the USD."""
     calls = min(len(EDGES), math.ceil(candidatos / 3))
     web, selection = web_reservation(), selection_reservation()
-    return {'reads': {'search': busquedas + 1, 'profile': candidatos, 'content': 2 * candidatos},
+    location = 1 if any(scope == 'us' for _, _, scope in QUERIES[:busquedas]) else 0  # once, then remembered
+    return {'reads': {'search': busquedas + empresas + location, 'profile': profile_budget(candidatos, perfiles),
+                      'content': 2 * candidatos},
             'web_calls': calls, 'web_call_usd': web, 'selection_usd': selection, 'usd_max': web * calls + selection}
+
+
+def seeds(empresas=(), perfiles=()):
+    """(companies, profile slugs, issues): what Gustavo named, cleaned. A company is a plain name (it goes in quotes in
+    a LinkedIn search); a profile is a linkedin.com/in/ URL or its public id."""
+    from .operador import public_identifier
+    companies, slugs, issues = [], [], []
+    for name in empresas or ():
+        name = ' '.join(str(name).split())
+        if not COMPANY_NAME.fullmatch(name):
+            issues.append(f'Empresa inválida: «{name[:60]}» (solo el nombre, sin enlaces ni comillas).')
+        elif name.casefold() not in {c.casefold() for c in companies}:
+            companies.append(name)
+    for value in perfiles or ():
+        try:
+            slug = public_identifier(str(value))
+        except ValueError:
+            issues.append(f'Perfil inválido: «{str(value)[:80]}» (URL linkedin.com/in/… o identificador público).')
+            continue
+        if slug not in slugs:
+            slugs.append(slug)
+    if len(companies) > MAX_SEEDS or len(slugs) > MAX_SEEDS:
+        issues.append(f'Como máximo {MAX_SEEDS} empresas y {MAX_SEEDS} perfiles por búsqueda.')
+    return companies, slugs, issues
+
+
+def retry_issue(reviews, t=None):
+    """Why this month's industry search may not run again, or ''. Another attempt is allowed only when every earlier
+    one of the month finished without a single proposal: one still preparing may yet propose, and proposals (pending
+    or already decided) mean the month had its search."""
+    from .referentes import TERMINAL
+    t = t or thresholds()
+    if not reviews:
+        return ''
+    if any(r.state == 'preparing' for r in reviews):
+        return 'Hay una búsqueda de referentes de industria en curso este mes; espera a que termine.'
+    changes = ReferentChange.objects.filter(review__in=reviews)
+    if changes.exclude(state__in=TERMINAL).exists():
+        return 'Ya hubo una búsqueda de referentes de industria este mes con propuestas por decidir; decide esas en la Bandeja.'
+    if changes.exists():
+        return 'Ya hubo una búsqueda de referentes de industria este mes con propuestas (ya decididas); la próxima, el mes que viene.'
+    if len(reviews) >= t['max_attempts']:
+        return f'Ya hubo {len(reviews)} búsquedas de referentes de industria este mes (máximo {t["max_attempts"]}).'
+    return ''
+
+
+def request_id(account, month, attempt):
+    """The job's deterministic id. The first attempt keeps the name it always had."""
+    return uuid.uuid5(uuid.NAMESPACE_URL, f'referents:{account.pk}:{month}:{KIND}' + (f':{attempt}' if attempt > 1 else ''))
 
 
 def cycle_left(now=None):
@@ -164,23 +285,31 @@ def cycle_left(now=None):
     return Decimal(str(limits['cost_cap_usd'])) - spent
 
 
-def guard(account, *, tope_usd=None, candidatos=6, busquedas=4, now=None):
+def guard(account, *, tope_usd=None, candidatos=6, busquedas=DEFAULT_SEARCHES, empresas=(), perfiles=(), now=None):
     """Everything that must hold before a paid search is enqueued. `issues` block it; `warnings` do not."""
     from knowledge import presupuesto
     from .operador import period_starts
     from .referentes import month_start, occupancy
     now = now or timezone.now()
+    t = thresholds()
     tope = Decimal(str(tope_usd)) if tope_usd is not None else default_tope()
-    est = estimate(candidatos, busquedas)
-    issues, warnings = [], []
-    if not 1 <= candidatos <= 9 or not 0 <= busquedas <= 8:
-        issues.append('Candidatos entre 1 y 9; búsquedas entre 0 y 8.')
+    companies, slugs, issues = seeds(empresas, perfiles)
+    est = estimate(candidatos, busquedas, len(companies), len(slugs))
+    warnings = []
+    if not 1 <= candidatos <= 9 or not 0 <= busquedas <= len(QUERIES):
+        issues.append(f'Candidatos entre 1 y 9; búsquedas entre 0 y {len(QUERIES)}.')
     if account.provider in ('linkedin', 'linkedin_fake'):
         issues.append('La cuenta de publicación oficial no lee perfiles ajenos.')
     if not ReferentControl.objects.filter(account=account, initialized=True).exists():
         issues.append('Primero identifica los cinco main de la cuenta.')
-    if ReferentReview.objects.filter(account=account, month=month_start(now), kind=KIND).exists():
-        issues.append('Ya hubo una búsqueda de referentes de industria este mes; decide esa en la Bandeja.')
+    reviews = list(ReferentReview.objects.filter(account=account, month=month_start(now), kind=KIND))
+    attempt = max((r.attempt for r in reviews), default=0) + 1
+    retry = retry_issue(reviews, t)
+    if retry:
+        issues.append(retry)
+    elif reviews:
+        warnings.append(f'Intento {attempt} de este mes: lo anterior terminó sin propuestas; se cierra al empezar este '
+                        'intento y queda en el historial. Mismo tope mensual del ciclo.')
     slots = 10 - occupancy(account)['variables']
     if slots <= 0:
         issues.append('No hay plaza variable libre: libera una antes de buscar referentes de industria.')
@@ -201,33 +330,47 @@ def guard(account, *, tope_usd=None, candidatos=6, busquedas=4, now=None):
     if tope < est['usd_max']:
         warnings.append(f'El tope ({tope} USD) es menor que el peor caso ({est["usd_max"]} USD): se harán menos investigaciones.')
     return {'ok': not issues, 'issues': issues, 'warnings': warnings, 'estimate': est, 'tope_usd': tope,
-            'cycle_left_usd': left, 'team_left_usd': team, 'free_slots': max(0, slots)}
+            'cycle_left_usd': left, 'team_left_usd': team, 'free_slots': max(0, slots), 'attempt': attempt,
+            'queries': [{'service': s, 'keywords': k, 'scope': scope} for s, k, scope in QUERIES[:max(0, busquedas)]],
+            'empresas': companies, 'perfiles': slugs}
 
 
-def enqueue(user, account, *, tope_usd=None, candidatos=6, busquedas=4, confirm=False, now=None):
-    """(job or None, guard report). Nothing is enqueued without `confirm` or with a blocking issue."""
+def enqueue(user, account, *, tope_usd=None, candidatos=6, busquedas=DEFAULT_SEARCHES, empresas=(), perfiles=(),
+            confirm=False, now=None):
+    """(job or None, guard report). Nothing is enqueued without `confirm` or with a blocking issue. A later attempt of
+    the month gets its own deterministic request id; the keys a first attempt without seeds never had stay out."""
     from .jobs import enqueue_operation
     from .referentes import month_start
     now = now or timezone.now()
-    report = guard(account, tope_usd=tope_usd, candidatos=candidatos, busquedas=busquedas, now=now)
+    report = guard(account, tope_usd=tope_usd, candidatos=candidatos, busquedas=busquedas, empresas=empresas,
+                   perfiles=perfiles, now=now)
     if not confirm or not report['ok']:
         return None, report
     month = month_start(now)
-    job, _ = enqueue_operation(user, 'review_referents',
-        {'account': str(account.pk), 'month': month.isoformat(), KIND: True, 'tope_usd': str(report['tope_usd']),
-         'candidatos': candidatos, 'busquedas': busquedas},
-        request_id=uuid.uuid5(uuid.NAMESPACE_URL, f'referents:{account.pk}:{month}:{KIND}'))
+    params = {'account': str(account.pk), 'month': month.isoformat(), KIND: True, 'tope_usd': str(report['tope_usd']),
+              'candidatos': candidatos, 'busquedas': busquedas}
+    if report['attempt'] > 1:
+        params['intento'] = report['attempt']
+    if report['empresas']:
+        params['empresas'] = report['empresas']
+    if report['perfiles']:
+        params['perfiles'] = report['perfiles']
+    job, _ = enqueue_operation(user, 'review_referents', params, request_id=request_id(account, month, report['attempt']))
     return job, report
 
 
 # --------------------------------------------------------------------------- LinkedIn reads (free, capped)
 
 def excluded(account, now, t=None):
-    """{slug: why} never proposed again: any referent (active or not), anyone Gustavo rejected (with his note), and
-    whoever failed a measurable criterion in the last `remember_days`."""
+    """{slug or LinkedIn id: why} never proposed again: any referent (active or not), anyone Gustavo rejected (with his
+    note), and whoever failed a measurable criterion in the last `remember_days`. The id is there too because a search
+    row of the direct connector often has no public id until its profile is read."""
     from .operador import public_identifier
     t = t or thresholds()
-    out = {slug: 'Ya es o fue referente' for slug in Referent.objects.filter(account=account).values_list('public_identifier', flat=True)}
+    out = {}
+    for slug, pid in Referent.objects.filter(account=account).values_list('public_identifier', 'provider_user_id'):
+        for key in filter(None, (slug, pid)):
+            out[key] = 'Ya es o fue referente'
     for item in ReferentChange.objects.filter(review__account=account, state='rejected'):
         try:
             slug = public_identifier((item.proposal.get('incoming') or {}).get('identifier', ''))
@@ -239,9 +382,45 @@ def excluded(account, now, t=None):
     for review in ReferentReview.objects.filter(account=account, kind=KIND, created_at__gte=since):
         for row in (review.dossier.get(KIND) or {}).get('descartados', []):
             if not row.get('remember'):
-                continue  # only unknowns: measured again next time
-            out.setdefault(row['slug'], f"Descartado el {row['at'][:10]}: {'; '.join(row['reasons'])[:200]}")
+                continue  # only unknowns and free headline checks: looked at again next time
+            for key in filter(None, (row.get('slug'), row.get('provider_user_id'))):
+                out.setdefault(key, f"Descartado el {row['at'][:10]}: {'; '.join(row['reasons'])[:200]}")
     return out
+
+
+def _us_hint(text, region):
+    """The headline or the about says they sell in the United States (a nearshore team in Latin America does)."""
+    return bool(US_MARKET.search(text) or US_WORDS.search(text) or ubicacion.region(text) == 'us'
+                or (region == 'latam' and _has(text, 'nearshore')))
+
+
+def prefilter(headline, *, bio='', location='', company=''):
+    """The free first look, on the text a search row, a known contact or a profile already carries. Rules only, no
+    paid call. {'decision': 'descartar' | 'priorizar' | 'medir' | 'sin_titular', 'services', 'not_selling', 'reason'}:
+    - descartar: the headline says they sell something else (coach, go-to-market, personal brand, sales, recruiting…)
+      and nothing names a service; or the profile is outside the United States and nothing says they sell there
+      (not for a company Gustavo named: he chose it, and 'mercado_eeuu' still decides).
+    - priorizar: a service and a seller's role (founder, CEO, partner…); medir: a service, or nothing either way.
+    It only orders and saves reads: who passes still meets every criterion, and 'servicios' still needs a cited source."""
+    headline, bio = ' '.join(str(headline or '').split()), ' '.join(str(bio or '').split())
+    text = f'{headline} · {bio} · {company}'
+    services = sorted(key for key, terms in SERVICE_TERMS.items() if any(_has(text, term) for term in terms))
+    hints = [h for h in SERVICE_HINTS if _has(text, h)]
+    sells = bool(services or hints)
+    other = [name for name, pattern in NOT_SELLING.items() if re.search(pattern, headline, re.I)]
+    region = ubicacion.region(location)
+    out = {'services': services, 'hints': hints, 'not_selling': other, 'region': region}
+    if not headline and not bio:
+        return dict(out, decision='sin_titular', reason='Sin titular todavía: se sabe al leer el perfil.')
+    if other and not sells:
+        return dict(out, decision='descartar', reason='Titular de otra industria (' + ', '.join(other) + '): no menciona '
+                    'software a la medida, producto/MVP, IA aplicada ni liderazgo técnico.')
+    if region not in (None, 'us') and not company and not _us_hint(text, region):
+        return dict(out, decision='descartar', reason=f'Fuera de EE. UU. ({location[:80]}) y su titular no dice que venda allí.')
+    if sells and SELLER_ROLE.search(headline):
+        return dict(out, decision='priorizar', reason='Vende uno de los servicios y lo dirige: ' + ', '.join(services or hints) + '.')
+    return dict(out, decision='medir', reason=('Menciona ' + ', '.join(services or hints) + '.') if sells
+                else 'El titular no dice qué vende: se mide si queda cupo.')
 
 
 def posts_stats(posts, now):
@@ -270,50 +449,165 @@ def _stop(account, exc, summary):
         summary['stopped'] = str(exc)
 
 
-def gather(account, connector, now, *, busquedas, t, summary, skip):
-    """Pool of candidates: contacts already known with enough followers, then people searches in the United States
-    for the words of each service, round robin. Biggest first; `skip` (excluded()) never enters."""
+def _discard(item, step, reasons, now, *, remember, reads, name='', slug='', headline=None):
+    """One row of dossier.industria.descartados: where the candidate fell and what that cost in LinkedIn reads."""
+    return {'slug': slug or item.get('slug', ''), 'provider_user_id': item.get('provider_user_id', ''),
+            'name': name or item.get('name') or item.get('display_name') or slug or item.get('slug', ''),
+            'headline': str(item.get('headline', '') if headline is None else headline)[:160],
+            'found_by': list(item.get('found_by') or []), 'at': now.isoformat(), 'step': step, 'step_label': STEPS[step],
+            'reasons': reasons, 'remember': remember, 'reads': reads}
+
+
+def _known(contact):
+    return {'slug': contact.public_identifier, 'provider_user_id': contact.provider_user_id, 'name': contact.display_name,
+            'headline': contact.headline, 'location': contact.location,
+            'followers': (contact.signals or {}).get('followers')}
+
+
+def _search(account, connector, keywords, location, summary, report):
+    """One people search, counted before it is made. [] when it failed; the report row says why."""
     from . import red
-    pool = {}
+    try:
+        red._read(account, 'search')
+        people = connector.search_people(keywords, location=location)
+    except red.ReadCapReached as exc:
+        summary['stopped'] = str(exc)
+        report['error'] = str(exc)
+        return []
+    except ConnectorError as exc:
+        _stop(account, exc, summary)
+        report['error'] = str(exc)[:200]
+        return []
+    summary['searches'] += 1
+    report['results'] = len(people)
+    report['with_public_id'] = sum(bool(p.get('public_identifier')) for p in people)
+    return people
+
+
+def gather(account, connector, now, *, busquedas, t, summary, skip, empresas=(), perfiles=()):
+    """(pool, dropped). The pool, best first: profiles Gustavo named (0), founders of the companies he named (1), then
+    whoever the free prefilter ranks — a service and a seller's role (2), a service or a search row not read yet (3),
+    the rest (4) — biggest known followers first, then search rows round robin across queries. `dropped`: who the
+    prefilter discarded without a single read. `skip` (excluded()) never enters, except a profile Gustavo names now
+    (only an existing referent is left out: his explicit request outweighs an older rejection or discard)."""
+    from . import red
+    pool, dropped, gone, ids = {}, [], set(), {}  # gone: keys dropped for free; ids: LinkedIn id -> pool key
+    referents = set(Referent.objects.filter(account=account).values_list('public_identifier', flat=True))
+
+    def key_of(info):
+        return ids.get(info['provider_user_id']) or info['slug'] or info['provider_user_id']
+
+    def add(info, found_by, tier, order, **extra):
+        key = key_of(info)
+        if not key:
+            return
+        row = pool.get(key)
+        if row is None:
+            row = pool[key] = {'key': key, 'slug': info['slug'], 'provider_user_id': info['provider_user_id'],
+                               'name': info.get('name', ''), 'headline': info.get('headline', ''),
+                               'location': info.get('location', ''), 'followers': info.get('followers'),
+                               'found_by': [found_by], 'tier': tier, 'order': order, 'manual': False, 'company': '', **extra}
+        else:
+            row['found_by'] = sorted(set(row['found_by']) | {found_by})
+            row['tier'], row['order'] = min(row['tier'], tier), min(row['order'], order)
+            for k in ('slug', 'provider_user_id', 'name', 'headline', 'location', 'followers', *extra):
+                if row.get(k) in ('', None):
+                    row[k] = info.get(k, extra.get(k))
+        if row['provider_user_id']:
+            ids[row['provider_user_id']] = key
+
+    def judge(info, found_by, tier_unknown, order, company=''):
+        """The prefilter on what is already known: dropped for free, or pooled with its rank. Someone already in the
+        pool (a profile Gustavo named, a second search) only gains where they were found."""
+        key = key_of(info)
+        if key in gone:
+            return
+        if key in pool:
+            add(info, found_by, 1 if company else pool[key]['tier'], order, company=company)
+            return
+        verdict = prefilter(info.get('headline'), location=info.get('location', ''), company=company)
+        if verdict['decision'] == 'descartar':
+            gone.add(key)
+            dropped.append(_discard(dict(info, found_by=[found_by]), 'prefiltro',
+                                    [f"{STEPS['prefiltro']}: {verdict['reason']}"], now, remember=False, reads='ninguna'))
+            return
+        tier = {'priorizar': 2, 'medir': 3 if verdict['services'] or verdict['hints'] else 4}.get(verdict['decision'], tier_unknown)
+        add(info, found_by, 1 if company else tier, order, company=company)
+
+    for n, slug in enumerate(perfiles or ()):
+        if slug in referents:
+            summary['limitations'].append(f'{slug}: ya es o fue referente; no se mide.')
+            continue
+        add({'slug': slug, 'provider_user_id': '', 'name': slug}, 'perfil_manual', 0, n, manual=True,
+            before=skip.get(slug, ''))
     for contact in Contact.objects.filter(account=account).exclude(public_identifier=''):
         followers = (contact.signals or {}).get('followers')
-        if followers and followers >= t['min_followers'] and contact.public_identifier not in skip:
-            pool[contact.public_identifier] = {'slug': contact.public_identifier, 'provider_user_id': contact.provider_user_id,
-                                               'followers': followers, 'location': contact.location, 'found_by': ['contacto']}
-    terms = [(key, item['terms'][n]) for n in range(max(len(i['terms']) for i in posicionamiento.SERVICES.values()))
-             for key, item in posicionamiento.SERVICES.items() if n < len(item['terms'])][:busquedas]
-    location = red.search_location(account, connector, summary) if terms else None
-    for service, term in terms:
+        if followers and followers >= t['min_followers'] and contact.public_identifier not in skip \
+                and contact.public_identifier not in pool:
+            judge(_known(contact), 'contacto', 4, 0)
+
+    def rows(people, found_by, n_query, company=''):
+        ids = [p.get('id') for p in people if p.get('id')]
+        known = {c.provider_user_id: c for c in Contact.objects.filter(account=account, provider_user_id__in=ids)}
+        new = 0
+        for position, person in enumerate(people):
+            slug, pid = person.get('public_identifier') or '', person.get('id') or ''
+            if (slug and slug in skip) or (pid and pid in skip):
+                continue
+            info = {'slug': slug, 'provider_user_id': pid, 'name': person.get('display_name', ''),
+                    'headline': person.get('headline', ''), 'location': person.get('location', ''),
+                    'followers': (person.get('signals') or {}).get('followers')}
+            if pid in known:  # what the team already read about them, for free
+                info = {k: v if v not in ('', None) else info[k] for k, v in _known(known[pid]).items()}
+                if info['slug'] in skip:
+                    continue
+            if info['followers'] is not None and info['followers'] < t['min_followers']:
+                continue
+            before = len(pool) + len(dropped)
+            judge(info, found_by, 3, position * 10 + n_query, company=company)
+            new += len(pool) + len(dropped) > before
+        return new  # people this search added (to the pool or dropped by the prefilter), not seen before
+
+    for n, company in enumerate(empresas or ()):
         if summary['stopped']:
             break
-        try:
-            red._read(account, 'search')
-            people = connector.search_people(term, location=location)
-        except red.ReadCapReached as exc:
-            summary['stopped'] = str(exc)
+        keywords = COMPANY_QUERY.format(company)
+        report = {'service': '', 'keywords': keywords, 'scope': 'empresa', 'results': 0, 'with_public_id': 0, 'new': 0, 'error': ''}
+        summary['queries'].append(report)
+        report['new'] = rows(_search(account, connector, keywords, None, summary, report), f'empresa:{company}', n, company)
+    queries = QUERIES[:busquedas]
+    location = red.search_location(account, connector, summary) \
+        if any(scope == 'us' for _, _, scope in queries) and not summary['stopped'] else None
+    for n, (service, keywords, scope) in enumerate(queries):
+        if summary['stopped']:
             break
-        except ConnectorError as exc:
-            _stop(account, exc, summary)
-            continue
-        summary['searches'] += 1
-        for person in people:
-            slug, followers = person.get('public_identifier'), (person.get('signals') or {}).get('followers')
-            if not slug or slug in skip or (followers is not None and followers < t['min_followers']):
-                continue
-            row = pool.setdefault(slug, {'slug': slug, 'provider_user_id': person['id'], 'followers': followers,
-                                         'location': person.get('location', ''), 'found_by': []})
-            row['found_by'] = sorted(set(row['found_by']) | {service})
-    return sorted(pool.values(), key=lambda c: c['followers'] or 0, reverse=True)
+        report = {'service': service, 'keywords': keywords, 'scope': scope, 'results': 0, 'with_public_id': 0, 'new': 0, 'error': ''}
+        summary['queries'].append(report)
+        people = _search(account, connector, keywords, location if scope == 'us' else None, summary, report)
+        report['new'] = rows(people, service, n)
+    ordered = sorted(pool.values(), key=lambda c: (c['tier'], c['followers'] is None, -(c['followers'] or 0), c['order']))
+    return ordered, dropped
 
 
-def measure(account, connector, item, now, t, summary):
-    """One profile read, one read of their latest 20 posts and one of the comments of their best post. What is kept:
-    counts, the neighborhood overlap of those commenters and the public profile line as a dated source."""
+def read_profile(account, connector, item, summary):
+    """One capped profile read (the direct connector registers a visit): headline, about, place and followers."""
     from . import red
     try:
         red._read(account, 'profile', purpose='industry_referent')
         summary['profiles'] += 1
-        profile = connector.get_profile(item.get('provider_user_id') or item['slug'])
+        return connector.get_profile(item.get('provider_user_id') or item['slug'])
+    except red.ReadCapReached as exc:
+        summary['stopped'] = str(exc)
+    except ConnectorError as exc:
+        _stop(account, exc, summary)
+    return None
+
+
+def read_activity(account, connector, item, profile, now, t, summary):
+    """One read of their latest 20 posts and one of the comments of their best post. What is kept: counts, the
+    neighborhood overlap of those commenters and the public profile line as a dated source."""
+    from . import red
+    try:
         red._read(account, 'comments')
         summary['content'] += 1
         stats = posts_stats(connector.list_user_posts(profile['id'], limit=20), now)
@@ -347,24 +641,71 @@ def measure(account, connector, item, now, t, summary):
 
 
 def read_linkedin(account, now, params):
+    """The LinkedIn half of a search, in pool order. Per person: one profile read; then the prefilter again with what
+    the profile says (headline, about, place) and the follower count; only who passes both spends the two content
+    reads. Stops at `candidatos` measured, at the profile budget (profile_budget) or at a daily cap."""
     t = thresholds()
-    summary = {'searches': 0, 'profiles': 0, 'content': 0, 'stopped': '', 'limitations': []}
+    summary = {'searches': 0, 'profiles': 0, 'content': 0, 'stopped': '', 'limitations': [], 'queries': []}
     skip = excluded(account, now, t)
     connector = get_connector(account)
-    pool = gather(account, connector, now, busquedas=int(params.get('busquedas', 4)), t=t, summary=summary, skip=skip)
-    candidates = []
-    for item in pool[:int(params.get('candidatos', 6))]:
-        if summary['stopped']:
-            break
-        measured = measure(account, connector, item, now, t, summary)
+    wanted, manual = int(params.get('candidatos', 6)), list(params.get('perfiles') or [])
+    budget = profile_budget(wanted, len(manual))
+    pool, dropped = gather(account, connector, now, busquedas=int(params.get('busquedas', DEFAULT_SEARCHES)), t=t,
+                           summary=summary, skip=skip, empresas=params.get('empresas') or (), perfiles=manual)
+    found = len(pool) + len(dropped)
+    candidates, waiting, after_read, handled = [], [], 0, set()
+    for item in pool:
+        if item['slug'] and item['slug'] in handled:
+            continue  # the same person, read already through a search row without public id
+        why = ('Lecturas detenidas' if summary['stopped'] else
+               'Cupo de candidatos medidos' if len(candidates) >= wanted else
+               'Cupo de lecturas de perfil' if summary['profiles'] >= budget else '')
+        if why:
+            waiting.append({'slug': item['slug'], 'name': item['name'] or item['slug'], 'found_by': item['found_by'], 'reason': why})
+            continue
+        profile = read_profile(account, connector, item, summary)
+        if profile is None:
+            waiting.append({'slug': item['slug'], 'name': item['name'] or item['slug'], 'found_by': item['found_by'],
+                            'reason': 'Lectura de perfil fallida o detenida'})
+            continue
+        slug = profile.get('public_identifier') or item['slug']
+        if slug in handled:
+            continue
+        if not item['manual'] and slug != item['slug'] and slug in skip:
+            after_read += 1  # a search row without public id: known only now
+            continue
+        handled.add(slug)
+        signals = profile.get('signals') or {}
+        location = profile.get('location') or item.get('location') or ''
+        name = profile.get('display_name') or slug
+        verdict = prefilter(profile.get('headline'), bio=signals.get('bio', ''), location=location, company=item['company'])
+        row = dict(item, slug=slug, provider_user_id=profile.get('id') or item['provider_user_id'])
+        if verdict['decision'] == 'descartar' and not item['manual']:
+            dropped.append(_discard(row, 'prefiltro', [f"{STEPS['prefiltro']}: {verdict['reason']}"], now, remember=True,
+                                    reads='perfil', name=name, headline=profile.get('headline', '')))
+            continue
+        followers = signals['followers'] if signals.get('followers') is not None else item.get('followers')
+        if followers is not None and followers < t['min_followers']:
+            dropped.append(_discard(row, 'tamano', [f"{STEPS['tamano']}: no cumple ({_fmt(followers)} seguidores; hacen "
+                                                    f"falta {_fmt(t['min_followers'])})"], now, remember=True,
+                                    reads='perfil', name=name, headline=profile.get('headline', '')))
+            continue
+        measured = read_activity(account, connector, item, profile, now, t, summary)
         if measured:
             measured['prelim'] = prequalify(measured, t)
+            measured['prefilter'] = {k: verdict[k] for k in ('decision', 'services', 'hints', 'not_selling', 'reason')}
+            if item['manual']:
+                measured['manual'] = {'before': item.get('before', '')}
             candidates.append(measured)
+        else:
+            waiting.append({'slug': slug, 'name': name, 'found_by': item['found_by'], 'reason': 'Lectura de posts fallida o detenida'})
+    if after_read:
+        summary['limitations'].append(f'{after_read} resultado(s) de búsqueda ya excluidos se reconocieron al leer su perfil.')
     if summary['stopped']:
         summary['limitations'].append(f"Lecturas detenidas: {summary['stopped']}")
-    return {'candidates': candidates, 'pool': len(pool), 'excluded': len(skip),
+    return {'candidates': candidates, 'discarded': dropped, 'waiting': waiting, 'pool': found, 'excluded': len(skip),
             'excluded_reasons': sorted(set(skip.values()))[:10], 'reads': {k: summary[k] for k in ('searches', 'profiles', 'content')},
-            'limitations': summary['limitations']}
+            'queries': summary['queries'], 'profile_budget': budget, 'limitations': summary['limitations']}
 
 
 # --------------------------------------------------------------------------- criteria (checkable, unknown is not met)
@@ -564,10 +905,45 @@ def verify(account, selected, web, candidates, now, t):
     return final, evaluations, sources, issues + more
 
 
+def supersede(review, attempt, user, now):
+    """An earlier attempt of the month that ended without proposals, closed when the next one starts. Its dossier stays
+    as it was, plus who replaced it; nothing in it was pending, so nothing is lost and no closing notice is sent."""
+    from .jobs import audit
+    previous = review.state
+    review.closed_at = now
+    review.dossier = dict(review.dossier or {}, reemplazada={
+        'at': now.isoformat(), 'por_intento': attempt,
+        'motivo': 'Terminó sin propuestas; Gustavo lanzó otra búsqueda de industria este mes.'})
+    review.save(update_fields=['closed_at', 'dossier'])
+    audit(user, 'referents.industry_retry', review.pk, month=review.month.isoformat(), attempt=review.attempt,
+          next_attempt=attempt, state=previous)
+
+
+def _step(rows):
+    """The first criterion, in the order a search measures them, that put a candidate out."""
+    keys = {row['key'] for row in rows}
+    return next(key for key in STEP_ORDER if key in keys)
+
+
+def funnel(linkedin, discarded, evaluated):
+    """Counts per step, and the same as one line: enough to see where the next run should change."""
+    out = {'encontrados': linkedin.get('pool', 0), 'medidos': len(linkedin.get('candidates', [])),
+           'sin_medir': len(linkedin.get('waiting', [])), **{step: 0 for step in STEPS},
+           'no_elegidos': sum(e['status'] == 'no_elegido' for e in evaluated),
+           'propuestos': sum(e['status'] == 'propuesto' for e in evaluated)}
+    for row in discarded:
+        out[row['step']] += 1
+    line = ' · '.join([f"encontrados {out['encontrados']}"] + [f"{STEPS[s].lower()} {out[s]}" for s in STEPS if out[s]]
+                      + [f"sin medir {out['sin_medir']}", f"no elegidos {out['no_elegidos']}", f"propuestos {out['propuestos']}"])
+    return out, line
+
+
 def run(job):
     """The industry search, as review_referents with params[industria]. Mirrors referentes_research.run: the review
     row is created first, the cycle checkpoints every paid call, and a failure leaves an incomplete review, never a
-    repeated payment."""
+    repeated payment. A later attempt of the month (params.intento) is its own review row, ledger and research keys,
+    under the same monthly budget bucket; it starts only if every earlier attempt ended without proposals, and closes
+    them (supersede)."""
     from . import research
     from .referentes import lock, publish
     from .referentes_research import context
@@ -576,13 +952,24 @@ def run(job):
     account = ConnectorAccount.objects.get(pk=params['account'])
     month = date.fromisoformat(params['month']).replace(day=1)
     tope = Decimal(str(params.get('tope_usd') or default_tope()))
+    attempt = int(params.get('intento') or 1)
     t = thresholds()
     with transaction.atomic():
         control = lock(account)
         if not control.initialized:
             raise ValueError(control.issue)
-        review, _ = ReferentReview.objects.get_or_create(account=account, month=month, kind=KIND,
-            defaults={'deadline': now + timedelta(days=DAYS_TO_DECIDE), 'expected_revision': control.revision})
+        review = ReferentReview.objects.filter(account=account, month=month, kind=KIND, attempt=attempt).first()
+        if review is None:
+            earlier = list(ReferentReview.objects.select_for_update().filter(account=account, month=month, kind=KIND,
+                                                                           attempt__lt=attempt))
+            issue = retry_issue(earlier, dict(t, max_attempts=max(t['max_attempts'], attempt)))
+            if issue:
+                raise ValueError(issue)
+            for old in earlier:
+                if old.closed_at is None:
+                    supersede(old, attempt, job.owner, now)
+            review = ReferentReview.objects.create(account=account, month=month, kind=KIND, attempt=attempt,
+                deadline=now + timedelta(days=DAYS_TO_DECIDE), expected_revision=control.revision)
         if review.state != 'preparing':
             publish(review, now)
             return review
@@ -628,7 +1015,9 @@ def run(job):
             elif candidates:
                 limitations.append('Biblioteca no disponible: no se seleccionó.')
             changes, evaluations, sources, issues = verify(account, selected, web, candidates, now, t)
-            discarded = []
+            # Before any read (free prefilter) or after the profile read (prefilter again, fewer followers than needed).
+            discarded = list(linkedin.get('discarded', []))
+            steps = {}
             for c in linkedin['candidates']:
                 evaluation = evaluations.get(c['slug'])
                 if not c['prelim']['ok']:
@@ -640,24 +1029,35 @@ def run(job):
                 else:
                     continue
                 # A measured «no cumple» is remembered for remember_days; a «sin medir» is measured again next time.
-                discarded.append({'slug': c['slug'], 'name': c['display_name'], 'at': now.isoformat(),
-                                  'reasons': [f"{row['label']}: {row['status_label'].lower()}" for row in rows],
-                                  'remember': any(row['status'] == 'no_cumple' for row in rows)})
+                steps[c['slug']] = _step(rows)
+                discarded.append(_discard(c, steps[c['slug']], [f"{row['label']}: {row['status_label'].lower()}" for row in rows],
+                                          now, remember=any(row['status'] == 'no_cumple' for row in rows),
+                                          reads='perfil y posts'))
             proposed = {public_identifier_of(d) for d in changes}
             evaluated = [{'slug': c['slug'], 'name': c['display_name'], 'profile_url': c['profile_url'],
-                          'status': 'propuesto' if c['slug'] in proposed else 'descartado' if any(d['slug'] == c['slug'] for d in discarded)
+                          'headline': c.get('headline', '')[:160], 'found_by': c.get('found_by', []),
+                          'status': 'propuesto' if c['slug'] in proposed else 'descartado' if c['slug'] in steps
                           else 'no_elegido',
+                          'step': 'propuesto' if c['slug'] in proposed else steps.get(c['slug'], 'no_elegido'),
                           'criteria': evaluations[c['slug']]['criteria'] if c['slug'] in evaluations else list(c['prelim']['criteria'].values())}
                          for c in linkedin['candidates']]
+            counts, line = funnel(linkedin, discarded, evaluated)
+            # Remembered rows first: excluded() reads them; a free headline drop is looked at again next time anyway.
+            discarded.sort(key=lambda d: not d['remember'])
             spent = _spent(runtime)
             dossier = {'kind': KIND, 'summary': selected['summary'], 'sources': sources,
                        'versions': {k: ctx[k]['version'] for k in ('memory', 'orientation', 'positioning')},
                        'course': ctx['grounding'], 'continuity': [], 'main': [],
-                       KIND: {'rule': RULE, 'criteria': criteria_table(t), 'evaluated': evaluated, 'descartados': discarded,
+                       KIND: {'rule': RULE, 'criteria': criteria_table(t), 'evaluated': evaluated,
+                              'descartados': discarded[:80], 'sin_medir': linkedin.get('waiting', [])[:40],
+                              'embudo': counts, 'diagnostico': line, 'busquedas': linkedin.get('queries', []),
+                              'intento': attempt, 'semillas': {'empresas': params.get('empresas') or [],
+                                                               'perfiles': params.get('perfiles') or []},
                               'pool': linkedin['pool'], 'excluded': linkedin['excluded'],
                               'excluded_reasons': linkedin['excluded_reasons'], 'reads': linkedin['reads'],
+                              'profile_budget': linkedin.get('profile_budget'),
                               'tope_usd': str(tope), 'spent_usd': str(spent)},
-                       'limitations': issues + limitations + [x for r in web for x in r.limitations],
+                       'limitations': issues + limitations + [f'Investigación web: {x}' for r in web for x in r.limitations],
                        'status': 'Investigación incompleta' if any(r.status != 'complete' for r in web) or linkedin['limitations']
                                  else 'Propuestas listas' if changes else 'Sin nuevas propuestas'}
             with transaction.atomic():
@@ -688,3 +1088,43 @@ def run(job):
 def public_identifier_of(change):
     from .operador import public_identifier
     return public_identifier(change['incoming']['identifier'])
+
+
+def report_lines(account, now=None):
+    """`operador referentes-industria --informe`: this month's attempts (or the last month with one) as plain lines,
+    from their dossiers only: the funnel, each search and where each candidate fell. No read, no write."""
+    from .referentes import month_start
+    rows = ReferentReview.objects.filter(account=account, kind=KIND)
+    month = month_start(now or timezone.now())
+    latest = rows.filter(month__lte=month).order_by('-month').values_list('month', flat=True).first()
+    if latest is None:
+        return ['Todavía no hay búsquedas de referentes de industria en esta cuenta.']
+    scope = {'us': 'EE. UU.', 'global': 'sin filtro de lugar', 'empresa': 'empresa semilla'}
+    out = []
+    for review in rows.filter(month=latest).order_by('attempt'):
+        d, data = review.dossier or {}, (review.dossier or {}).get(KIND) or {}
+        closed = ' · cerrada: ' + d['reemplazada']['motivo'] if d.get('reemplazada') else ''
+        out.append(f"Búsqueda de industria {review.month:%Y-%m}, intento {review.attempt} ({review.state}{closed}): "
+                   f"{d.get('status', '—')}. {d.get('summary', '')}".strip())
+        if data.get('diagnostico'):
+            out.append('  Embudo: ' + data['diagnostico'])
+        reads = data.get('reads') or {}
+        if reads:
+            out.append(f"  Lecturas: {reads.get('searches', 0)} búsquedas, {reads.get('profiles', 0)} perfiles, "
+                       f"{reads.get('content', 0)} de contenido. Gasto {data.get('spent_usd', '0')} de {data.get('tope_usd', '—')} USD.")
+        for q in data.get('busquedas', []):
+            out.append(f"  Búsqueda {q['keywords']} ({scope.get(q['scope'], q['scope'])}): {q.get('results', 0)} resultados, "
+                       f"{q.get('with_public_id', 0)} con identificador, {q.get('new', 0)} nuevos" + (f"; error: {q['error']}" if q.get('error') else ''))
+        for e in data.get('evaluated', []):
+            if e['status'] != 'descartado':
+                out.append(f"  - {e['name']}: {e.get('step', e['status'])}")
+        for row in data.get('descartados', []):
+            where = STEPS.get(row.get('step'), 'descartado')
+            out.append(f"  - {row.get('name') or row.get('slug')} [{', '.join(row.get('found_by') or []) or '—'}]: {where} — "
+                       f"{'; '.join(row.get('reasons') or [])} (lecturas: {row.get('reads', '—')})")
+        waiting = data.get('sin_medir') or []
+        if waiting:
+            out.append(f"  Sin medir: {len(waiting)} ({'; '.join(sorted({w['reason'] for w in waiting}))}).")
+        for line in d.get('limitations') or []:
+            out.append('  Limitación: ' + line)
+    return out

@@ -505,6 +505,47 @@ describe('Personas · Referentes', () => {
     expect(server.find('PATCH', '/api/v1/operador/referents/r-1')[1]!.body).toEqual({ active: true });
   });
 
+  it('shows Gustavo «Gestionar protección de …» with its text on main and variable cards, and it saves his decision', async () => {
+    // It was blank: `Gestionar protección de {name}` reached the button as an array, drawn outside any <Text>.
+    const server = await renderPersonas(
+      {
+        'GET /api/v1/operador/accounts': { body: [accountFixture()] },
+        'GET /api/v1/operador/referents': page([
+          referentFixture('r-1', { protected: true, position: 1, revision: 3, can_manage_protected: true }),
+          referentFixture('r-2', { display_name: 'Inés Ejemplo', kind: 'industria', revision: 2, can_manage_protected: true }),
+        ]),
+        'PATCH /api/v1/operador/referents/r-2': (request) => ({ body: referentFixture('r-2', { display_name: 'Inés Ejemplo', ...(request.body as object) }) }),
+      },
+      { pestana: 'referentes' },
+    );
+    const main = within(await screen.findByTestId('referent-r-1'));
+    expect(main.getByText('Gestionar protección de Elena Prueba')).toBeOnTheScreen();
+    expect(main.getByRole('button', { name: 'Gestionar protección de Elena Prueba' })).toBeOnTheScreen();
+    expect(main.queryByRole('button', { name: 'Quitar a Elena Prueba' })).toBeNull();
+    const variable = within(screen.getByTestId('referent-r-2'));
+    expect(variable.getByText('Industria')).toBeOnTheScreen();
+    await fireEvent.press(variable.getByText('Gestionar protección de Inés Ejemplo'));
+    const sheet = within(await screen.findByTestId('referent-protection'));
+    expect(sheet.getByText('Variable → Variable; activo; posición 0 → 0.')).toBeOnTheScreen();
+    await fireEvent.press(sheet.getByText('Guardar decisión'));
+    await waitFor(() => expect(server.find('PATCH', '/api/v1/operador/referents/r-2')).toHaveLength(1));
+    expect(server.find('PATCH', '/api/v1/operador/referents/r-2')[0]!.body).toEqual({ version: 2, source: 'personas', protected: false, active: true, position: 0 });
+  });
+
+  it('shows no protection button to anyone who is not Gustavo', async () => {
+    await renderPersonas(
+      {
+        'GET /api/v1/operador/accounts': { body: [accountFixture()] },
+        'GET /api/v1/operador/referents': page([referentFixture('r-1', { protected: true, can_manage_protected: false }), referentFixture('r-2', { display_name: 'Inés Ejemplo' })]),
+      },
+      { pestana: 'referentes' },
+    );
+    expect(await screen.findByTestId('referent-r-2')).toBeOnTheScreen();
+    expect(screen.queryByText(/Gestionar protección/)).toBeNull();
+    expect(screen.queryByTestId('protect-r-1')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Quitar a Inés Ejemplo' })).toBeOnTheScreen();
+  });
+
   it('removes a referent after confirming', async () => {
     const server = await renderPersonas(
       {

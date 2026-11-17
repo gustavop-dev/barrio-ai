@@ -167,6 +167,7 @@ class PostAndCommentTests(SimpleTestCase):
                          (POST,F.POSTED,f'https://www.linkedin.com/feed/update/urn:li:activity:{POST}/'))
         self.assertEqual((first['text'],first['reactions_counter'],first['comments_counter'],first['reposts_counter'],
                           first['user_reacted'],first['impressions'],first['is_repost']),('Primer post',5,2,1,True,300,False))
+        self.assertEqual(first['media'],'')  # no `content` in the update: unknown, never «text only» (lectura.media)
         self.assertEqual(first['author'],{'id':ANA[0],'public_identifier':'ana-ficticia','display_name':'Ana Ficticia',
                                           'profile_url':ana_url(),'headline':'Titular ficticio','type':'individual'})
         self.assertTrue(found[1]['is_repost'])  # someone else's update in Ana's activity

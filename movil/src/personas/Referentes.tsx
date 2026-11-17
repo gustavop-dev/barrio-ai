@@ -102,7 +102,7 @@ function ReferentCard({ referent, candidates, onRemove }: { referent: Referent; 
   };
 
   return (
-    <View style={styles.card} testID={`referent-${referent.id}`}>
+    <View style={styles.card} testID={`referent-${referent.id}`} collapsable={false}>
       <View style={styles.head}>
         <View style={styles.grow}>
           {referent.profile_url && /^https:\/\//i.test(referent.profile_url) ? (

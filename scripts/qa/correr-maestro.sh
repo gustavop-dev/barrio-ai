@@ -127,6 +127,7 @@ run_flow() {
   log "flujo $name: sembrando el mundo de QA"
   local scenario_seed=()
   [ "$name" = "19-referentes-mensual" ] && scenario_seed=(--referentes-mensual)
+  [ "$name" = "13-referentes-proteccion" ] && scenario_seed=(--referentes-mensual)
   [ "$name" = "18-perfil" ] && scenario_seed=(--perfil-capturas)
   [ "$name" = "08-resultados-linkedin" ] && scenario_seed=(--analitica)
   (cd "$INFRA" && uv run python manage.py seed_qa "${scenario_seed[@]}" >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"

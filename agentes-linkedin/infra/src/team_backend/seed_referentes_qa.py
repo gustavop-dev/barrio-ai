@@ -17,6 +17,9 @@ def seed(user, account, now, uid):
             display_name=f'Main QA {n}', profile_url=f'https://www.linkedin.com/in/main-qa-{n}/',
             reason='Referente principal protegido; escenario sintético.', protected=True, position=n, created_by=user))
     ReferentControl.objects.create(account=account, initialized=True, initial_main=[str(r.pk) for r in main])
+    # One variable referent is of industry (docs/plan-referentes-industria.md): its card carries «Industria»
+    # (13-referentes-proteccion).
+    Referent.objects.filter(account=account, public_identifier='analu-torres').update(kind=Referent.Kind.INDUSTRIA)
     month = referentes.month_start(now)
     start, deadline = referentes.bounds(month)
     review = ReferentReview.objects.create(id=uid('review:monthly'), account=account, month=month, state='published',

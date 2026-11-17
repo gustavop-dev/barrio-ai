@@ -197,8 +197,10 @@ class ReferentReview(models.Model):
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
     month=models.DateField()
     # mensual: the monthly batch (and the extraordinary one, which takes its place); industria: the search Gustavo starts
-    # by hand (operador referentes-industria), at most one a month, never applied by silence.
+    # by hand (operador referentes-industria), never applied by silence: one a month, plus another attempt when every
+    # earlier one ended without proposals (attempt 2, 3…; the earlier one is closed, referentes_industria.supersede).
     kind=models.CharField(max_length=16,default='mensual')
+    attempt=models.PositiveSmallIntegerField(default=1)
     state=models.CharField(max_length=24,default='preparing')
     dossier=models.JSONField(default=dict)
     expected_revision=models.PositiveIntegerField(default=1)
@@ -207,7 +209,7 @@ class ReferentReview(models.Model):
     closed_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     class Meta:
-        constraints=[models.UniqueConstraint(fields=['account','month','kind'],name='unique_referent_month_kind')]
+        constraints=[models.UniqueConstraint(fields=['account','month','kind','attempt'],name='unique_referent_month_kind_attempt')]
 
 
 class ReferentChange(models.Model):
@@ -280,6 +282,12 @@ class ObservedPost(models.Model):
     outlier=models.JSONField(default=dict,blank=True)
     structure=models.JSONField(default=dict,blank=True)
     audience=models.JSONField(default=dict,blank=True)
+    # «Qué les funciona y qué no» (analisis_referentes.py): shares as LinkedIn counts them (null: hidden or read before
+    # this field), the media the connector recognized ('' = not known, never «text only») and the post's decomposition
+    # (topic, hook, body, closing, length, topical signals) as labels, cached by a hash of its text and media.
+    reposts_count=models.IntegerField(null=True,blank=True)
+    media=models.CharField(max_length=20,blank=True,default='')
+    analysis=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-posted_at','-observed_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]

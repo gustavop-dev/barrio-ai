@@ -125,6 +125,7 @@ function ReferentCard({ referent, candidates, onRemove }: { referent: Referent; 
           <span className="ref-name">{name}</span>
         )}
         {referent.protected ? <Badge tone="info">Main · Protegido</Badge> : null}
+        {referent.kind === 'industria' ? <Badge tone="info">Industria</Badge> : null}
         {active ? <Badge tone="ok">Activo</Badge> : <Badge tone="muted">Inactivo</Badge>}
       </div>
       {referent.reason ? <p className="ref-reason">{referent.reason}</p> : null}
