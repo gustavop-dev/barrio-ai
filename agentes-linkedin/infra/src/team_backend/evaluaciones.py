@@ -227,9 +227,10 @@ def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
     people=red.classification_people(contacts)
     message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
-    units,missing,_=run.context(red.NETWORK_UNITS)
+    unit_ids,methodology=red.classify_units()  # BAR-25: the same prompt, schema and units as red.classify today
+    units,missing,_=run.context(unit_ids,metodologia=methodology)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
-    return {'system':red.CLASSIFY_SYSTEM,'message':message,'max_tokens':16000,'output_schema':red.CLASSIFY_SCHEMA,'effort':'medium',
+    return {'system':red.classify_system(),'message':message,'max_tokens':16000,'output_schema':red.classify_schema(),'effort':'medium',
             'context':operador.course_block(units)}
 
 def lead_request(post,text,orientation):
@@ -375,11 +376,13 @@ class Run:
             return ids,f'catalogo:{self.catalog}'
         return catalogo.units_for(shelf,fallback)
 
-    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False):
-        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does."""
-        key=(tuple(unit_ids),budget,warm)
+    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET,warm=False,metodologia=None):
+        """`warm`: a warming buyer's post (phase 2) loads the warm-up methodology too, as operador.propose_comment does.
+        `metodologia`: the activated methodology the units belong to (the classifier's con_quien, BAR-25)."""
+        key=(tuple(unit_ids),budget,warm,metodologia)
         if key not in self._units:
-            self._units[key]=operador.warmup_units(list(unit_ids),budget) if warm else operador.course_context(list(unit_ids),budget)
+            self._units[key]=(operador.warmup_units(list(unit_ids),budget) if warm else
+                              operador.course_context(list(unit_ids),budget,metodologia))
         return self._units[key]
 
     def guard(self,worst):
@@ -618,7 +621,7 @@ def run_classifier(run,cases,model,results):
         try:data=run.claude('clasificador',classify_request(run,[c['contact'] for c in batch]),model)
         except ValueError as exc:
             results+=[{'id':c['id'],'etiqueta':c['label'],'error':str(exc)[:300]} for c in batch];continue
-        errors=schema_errors(data,red.CLASSIFY_SCHEMA)[:3]
+        errors=schema_errors(data,red.classify_schema())[:3]
         found={str(r.get('id')):r for r in data.get('contacts',[]) if isinstance(r,dict)}
         for case in batch:
             result=found.get(case['id']);confidence=_confidence(result.get('confidence')) if result else 0.0
@@ -927,6 +930,136 @@ def grade_buyers_case(outcomes,order):
     return {'case':BUYERS_CASE['id'],'passed':not errors,'errors':errors,'kept_right':f'{len(kept)}/{len(expected)-1}'}
 
 
+# BAR-25: the ProjectApp buyer and the partner (Gustavo, 17/11/2026: «se verticaliza a quién se le escribe y con qué
+# prueba, no el feed»). Eight synthetic people, none real. `antes` is what the classifier prompt of 17/11/2026 (BAR-24)
+# asks for each profile, read rule by rule (a founder or executive who decides is a buyer of the startup kind; whoever
+# sells services to another public than founders is fit=false; a director of a big company is an «ejecutivo»): it was
+# not measured with the real model. `despues` is what the ProjectApp prompt asks for. `web` is what the web check finds
+# (None: nothing citable). tests/test_comprador_projectapp.py runs the case through the production functions
+# (red.classify, red.check_stages, red.plan) with fake models and grades it with grade_projectapp_case.
+PROJECTAPP_CASE={
+    'id':'BAR-25-comprador-projectapp',
+    'variants':{
+        'P1':{'label':'CTO de una cadena de retail de 80 personas en Texas que contrata ingenieros','name':'Tomas Retail',
+              'location':'Dallas, Texas, United States',
+              'headline':'CTO at Lone Star Outfitters · family retail chain, 80 people · hiring software engineers',
+              'bio':'We run fourteen stores and an online shop, and we are rebuilding the systems behind them.',
+              'antes':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'ejecutivo','buyer_level':'probable',
+                       'us_market':True,'reason':'CTO de una cadena de retail en Texas que contrata ingenieros: decide sobre desarrollo.'},
+              'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
+                         'buyer_level':'probable','us_market':True,'buyer_segment':'retail_ecommerce','company_size':'20_a_200',
+                         'reason':'Líder de tecnología de una cadena de retail de 80 personas en Texas que contrata ingenieros.'},
+              'web':{'text':'Lone Star Outfitters has about 80 employees and lists two open Software Engineer positions.',
+                     'url':'https://lonestar.example/careers','fecha':'2026-11-10'}},
+        'P2':{'label':'dueña de una academia en línea de 30 personas en Florida, titular en español','name':'Lucia Academia',
+              'location':'Miami, Florida, United States',
+              'headline':'Fundadora y directora de Academia Clara · cursos de inglés en línea para adultos · equipo de 30 personas',
+              'bio':'',
+              'antes':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'bootstrapped','buyer_level':'por_confirmar',
+                       'us_market':True,'affinity':'hispanohablante_declarada',
+                       'reason':'Fundadora de una academia en línea en Miami, sin datos públicos de clientes o ingresos.'},
+              'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional',
+                         'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'educacion_en_linea','company_size':'20_a_200',
+                         'affinity':'hispanohablante_declarada',
+                         'reason':'Dueña de una academia en línea de 30 personas en Miami; titular en español.'},
+              'web':None},
+        'P3':{'label':'dueño de un negocio de 5 personas','name':'Pablo Plomero','location':'Phoenix, Arizona, United States',
+              'headline':'Owner at Desert Plumbing Co. · a five-person plumbing team','bio':'',
+              'antes':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'bootstrapped','buyer_level':'por_confirmar',
+                       'us_market':True,'reason':'Dueño de un negocio de plomería en Phoenix, sin datos de ingresos.'},
+              'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional',
+                         'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'otro','company_size':'menos_de_20',
+                         'reason':'Dueño de un negocio de plomería de cinco personas en Phoenix: por debajo del tamaño buscado.'},
+              'web':None},
+        'P4':{'label':'directora en una multinacional de 20.000 empleados','name':'Diana Global','location':'Atlanta, Georgia, United States',
+              'headline':'Director of IT, North America · global consumer goods company, 20,000 employees','bio':'',
+              'antes':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'ejecutivo','buyer_level':'probable',
+                       'us_market':True,'reason':'Directora de TI de una empresa grande: influye en contratar desarrollo.'},
+              # A consistent model would say no_encaja; the fake keeps «probable» to prove the size rule in code.
+              'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
+                         'buyer_level':'probable','us_market':True,'buyer_segment':'otro','company_size':'mas_de_1000',
+                         'reason':'Directora de TI de una multinacional de 20.000 empleados.'},
+              'web':None},
+        'P5':{'label':'fundador de una agencia de marketing que subcontrata desarrollo','name':'Marco Agencia',
+              'location':'Austin, Texas, United States',
+              'headline':'Founder at Brightside Marketing · campaigns and websites for local businesses, built with our development partners',
+              'bio':'We do brand, campaigns and web for clinics, gyms and restaurants. Development is done by partner studios.',
+              'antes':{'fit':False,'role':'aliado','modality':'alianzas',
+                       'reason':'Vende marketing a negocios locales, no a founders: Gustavo solo le serviría como proveedor.'},
+              'despues':{'fit':True,'role':'partner','modality':'projectapp',
+                         'reason':'Agencia de marketing que subcontrata el desarrollo de sus proyectos web: canal de contratos.'},
+              'web':None},
+        'P6':{'label':'agencia de desarrollo de software (competidor)','name':'Sofia Devshop','location':'Denver, Colorado, United States',
+              'headline':'Founder & CEO at CodeForge · custom software development agency · 40 engineers','bio':'',
+              'antes':{'fit':True,'role':'par','modality':'comunidad_autoridad','reason':'Dirige una agencia de software: par.'},
+              'despues':{'fit':True,'role':'par','modality':'comunidad_autoridad',
+                         'reason':'Vende desarrollo de software a la medida como ProjectApp: par, nunca partner ni comprador.'},
+              'web':None},
+        'P7':{'label':'founder de startup con ronda semilla','name':'Nina Seed','location':'San Francisco, California, United States',
+              'headline':'Co-founder & CEO at Paylane · payments API for marketplaces · seed round led by a fintech fund','bio':'',
+              'antes':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'startup_financiada',
+                       'buyer_level':'confirmado','us_market':True,'reason':'Cofundadora de una startup con ronda semilla.'},
+              'despues':{'fit':True,'role':'comprador','modality':'personal_startups','buyer_profile':'startup_financiada',
+                         'buyer_level':'confirmado','us_market':True,'buyer_segment':'','company_size':'',
+                         'reason':'Cofundadora de una startup con ronda semilla: línea startup.'},
+              'web':None},
+        'P8':{'label':'aliado clásico (servicio complementario para startups)','name':'Alicia Aliada','location':'Boston, Massachusetts, United States',
+              'headline':'Fractional CFO for seed-stage startups · fundraising models and board reporting','bio':'',
+              'antes':{'fit':True,'role':'aliado','modality':'alianzas','reason':'Ofrece finanzas a founders de startups: aliado.'},
+              'despues':{'fit':True,'role':'aliado','modality':'alianzas','reason':'Ofrece finanzas a founders de startups: aliado.'},
+              'web':None},
+    },
+    # kept: still in the neighborhood after the web check; role, line, segment, also (segments it also matches), papel
+    # (what the buyer is inside the company), levels; score: «alto» ≥ 80, «bajo» < 50 and the lowest ProjectApp buyer
+    # kept; journey: whether she walks the buyer's journey; invited: whether the plan invites her once followed.
+    # order: the ProjectApp buyers' invitations, first to last.
+    'expected':{
+        'P1':{'kept':True,'role':'comprador','line':'projectapp','segment':'retail_ecommerce','papel':'lider_tecnologia',
+              'levels':['probable','confirmado'],'score':'alto','journey':True,'invited':True},
+        'P2':{'kept':True,'role':'comprador','line':'projectapp','segment':'educacion_en_linea','also':['duenos_latinos_eeuu'],
+              'papel':'dueno','levels':['por_confirmar'],'journey':True,'invited':True},
+        'P3':{'kept':True,'role':'comprador','line':'projectapp','segment':'otro','papel':'dueno','levels':['por_confirmar'],
+              'score':'bajo','journey':True,'invited':True},
+        'P4':{'kept':False},
+        'P5':{'kept':True,'role':'partner','journey':False,'invited':True},
+        'P6':{'kept':True,'role':'par','journey':False},
+        'P7':{'kept':True,'role':'comprador','line':'startup','levels':['confirmado'],'journey':True,'invited':True},
+        'P8':{'kept':True,'role':'aliado','journey':False,'invited':True},
+        'order':['P1','P2','P3'],
+    },
+}
+
+
+def grade_projectapp_case(outcomes,order):
+    """outcomes: {variant: {kept, role, line, segment, also, papel, level, score, breakdown, journey, invited}}; order: the
+    invited ProjectApp buyers, first to last. Errors name the variant and what failed."""
+    errors=[];expected=PROJECTAPP_CASE['expected']
+    kept_projectapp=[v for v,w in expected.items() if v!='order' and w.get('line')=='projectapp' and (outcomes.get(v) or {}).get('kept')]
+    for variant,want in expected.items():
+        if variant=='order':continue
+        got=outcomes.get(variant) or {}
+        if bool(got.get('kept'))!=want['kept']:errors.append(f'{variant}:kept');continue
+        if not want['kept']:continue
+        for key in ('role','line','segment','papel'):
+            if key in want and got.get(key)!=want[key]:errors.append(f'{variant}:{key}')
+        if 'also' in want and not set(want['also'])<=set(got.get('also') or []):errors.append(f'{variant}:also')
+        if 'levels' in want and got.get('level') not in want['levels']:errors.append(f'{variant}:level')
+        if want.get('role')=='comprador':
+            breakdown=got.get('breakdown') or {}
+            if got.get('score') is None or sum(part.get('points',0) for part in breakdown.values())!=got['score']:
+                errors.append(f'{variant}:score')
+            elif want.get('score')=='alto' and got['score']<80:errors.append(f'{variant}:score_alto')
+            elif want.get('score')=='bajo' and (got['score']>=50 or any((outcomes.get(o) or {}).get('score',0)<=got['score']
+                                                                         for o in kept_projectapp if o!=variant)):
+                errors.append(f'{variant}:score_bajo')
+        if 'journey' in want and bool(got.get('journey'))!=want['journey']:errors.append(f'{variant}:journey')
+        if 'invited' in want and bool(got.get('invited'))!=want['invited']:errors.append(f'{variant}:invited')
+    if list(order)!=expected['order']:errors.append('order')
+    variants=[v for v in expected if v!='order']
+    right=[v for v in variants if not any(e.startswith(v+':') for e in errors)]
+    return {'case':PROJECTAPP_CASE['id'],'passed':not errors,'errors':errors,'right':f'{len(right)}/{len(variants)}'}
+
+
 def grade_evidence_case(result):
     """Grade the deterministic adapter output, never execute or pay a provider."""
     actual={key:result.coverage.get(key) for key in ('fit_pct','classification_coverage','unknown')}
@@ -1180,6 +1313,25 @@ COURSE_CASES={
         'variants':{'flujo':['LI-11-M006-K01','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],'P':['LI-11-M006-K01','LI-12-M001-K04'],
                     'N1':['LI-11-M006-K03','LI-08-M003-K05'],'N2':['LI-11-M006-K03'],'X':['LI-08-M003-K05'],'O':['LI-11-M006-K02'],
                     'B':['LI-11-M006-K01'],'E':['LI-11-M006-K01'],'I':['LI-11-M006-K01']}},
+    # BAR-25 (class 08, activated methodology con_quien): to whom in each company and with what signal, for the ProjectApp
+    # buyer and the partner. The input is PROJECTAPP_CASE (eight synthetic people); tests/test_comprador_projectapp.py
+    # runs it through red.classify, red.check_stages and red.plan with fake models and grades the result here.
+    # Baseline with NETWORK_PROJECTAPP_BUYER_ENABLED=false (docs/linea-base-comprador-projectapp.md): 2/8 right, P4 kept,
+    # P5 out, no line, no segment, no papel and the ProjectApp order P1, P4, P2, P3.
+    'con_quien':{'id':'BIB-08-con-quien',
+        'units':operador.WHO_UNITS,
+        'input':{'caso':PROJECTAPP_CASE['id'],'personas':{v:c['label'] for v,c in PROJECTAPP_CASE['variants'].items()},
+                 'interruptor':'NETWORK_PROJECTAPP_BUYER_ENABLED'},
+        'expected':{'aciertos':'8/8','P1_linea':'projectapp','P1_papel':'lider_tecnologia','P1_segmento':'retail_ecommerce',
+                    'P1_senal':'contrata_desarrolladores','P2_segmento':'educacion_en_linea','P2_tambien':['duenos_latinos_eeuu'],
+                    'P2_papel':'dueno','P3_puntaje':'bajo','P4_fuera_por':'tamano','P5_rol':'partner','P5_recorrido':False,
+                    'P6_rol':'par','P7_linea':'startup','orden':['P1','P2','P3'],'linea_base_apagado':'2/8'},
+        'required':['LI-08-M001-K05','LI-08-M004-K04','LI-08-M004-K05','LI-08-M004-K06','LI-08-M004-K01',
+                    'LI-08-M004-K02','LI-08-V010-K02','LI-08-M001-K02','LI-08-M003-K05'],
+        'variants':{'P1':['LI-08-M001-K05','LI-08-M004-K05','LI-08-M004-K01','LI-08-V010-K02'],
+                    'P2':['LI-08-M004-K06','LI-08-M001-K02'],'P3':['LI-08-M004-K04','LI-08-M004-K02'],
+                    'P4':['LI-08-M001-K02'],'P5':['LI-08-M001-K05'],'P6':['LI-08-M001-K05'],'P7':['LI-08-M004-K06'],
+                    'reevaluacion':['LI-08-M003-K05']}},
 }
 
 def case_methodology(role):

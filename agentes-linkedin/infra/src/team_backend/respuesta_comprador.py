@@ -455,7 +455,9 @@ def units():
 def _write(data,units_):
     from knowledge import providers
     from . import voz
-    answer=providers.claude(voz.with_voice(SYSTEM+'\n\n'+JOBS[data['tipo']]),json.dumps(data,ensure_ascii=False,default=str),
+    from . import projectapp
+    system=SYSTEM+'\n\n'+JOBS[data['tipo']]+(projectapp.CASE_RULES if data.get('caso_projectapp') else '')
+    answer=providers.claude(voz.with_voice(system),json.dumps(data,ensure_ascii=False,default=str),
                             output_schema=SCHEMA,effort='medium',purpose=PURPOSE,context=operador.course_block(units_))
     try:out=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None
@@ -485,20 +487,26 @@ def draft(journey,row,at):
     data.update(tipo=kind,su_mensaje=said,conversacion=conversation(journey),
                 momento={'que_es':'Respondió a los mensajes de Gustavo. Esta es la respuesta; Gustavo la envía a mano.'})
     link=link_for(journey) if kind in LINK_TYPES else ''
+    # BAR-25: who wants to talk or asks for information may hear the case of her segment, with its confirmed facts only.
+    from . import projectapp
+    case=projectapp.case_for(contact) if kind in LINK_TYPES else None
+    if case:data['caso_projectapp']=case
+    def issues_of(body):
+        return text_issues(kind,body,said)+projectapp.case_issues(body,contact)
     answer,out,citations,risks=_write(data,units_)
-    body=_body(out);issues=text_issues(kind,body,said)
+    body=_body(out);issues=issues_of(body)
     redrafted=False
     if issues and presupuesto.left(timezone.now())>0:
         try:
             answer,out,citations,risks=_write(dict(data,revision={'previous':body,'rule_violations':issues}),units_)
-            redrafted=True;body=_body(out);issues=text_issues(kind,body,said)
+            redrafted=True;body=_body(out);issues=issues_of(body)
         except ValueError as exc:risks.append(f'No se pudo reescribir ({exc}); queda el primer borrador.')
     text=f'{body}\n{link}' if body and link else body
     if body:issues=issues+link_issues(kind,text,link)
     anchor=next((f for f in facts if f['id']==out.get('anchor')),{})
     missing_facts=[str(x)[:300] for x in (out.get('faltan') or [])][:5]
     inputs={**(row.inputs or {}),'hechos':facts,'persona':data['persona'],'conversacion':data['conversacion'],'reescrito':redrafted,
-            'riesgos':risks,'faltan':missing_facts,'enlace':bool(link)}
+            'riesgos':risks,'faltan':missing_facts,'enlace':bool(link),**({'caso_projectapp':case} if case else {})}
     if kind=='otra_persona':
         referral=dict((row.inputs or {}).get('referido') or {});referral['nombre']=(out.get('referido_nombre') or referral.get('nombre') or '')[:200]
         inputs['referido']=referral

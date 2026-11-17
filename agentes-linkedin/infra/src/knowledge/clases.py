@@ -57,6 +57,13 @@ METODOLOGIAS_ACTIVAS={
                            'registro':'relaciones/registro-lectura-respuesta-comprador.json',
                            'unidades':('LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06',
                                        'LI-08-M003-K05','LI-12-M001-K04')},
+    # BAR-25 (comprador de ProjectApp): a quién escribirle en cada empresa (dolor y poder; decide, influye, usa; una
+    # ficha por papel) y con qué señal fechada (clase 08). Solo con NETWORK_PROJECTAPP_BUYER_ENABLED.
+    'con_quien':{'evaluacion':'BIB-08-con-quien','lista':'operador.WHO_UNITS',
+                 'roles':('descubrimiento_red','clasificador_red'),
+                 'registro':'observatorio/registro-lectura-con-quien.json',
+                 'unidades':('LI-08-M001-K05','LI-08-M004-K04','LI-08-M004-K05','LI-08-M004-K06','LI-08-M004-K01',
+                             'LI-08-M004-K02','LI-08-V010-K02','LI-08-M001-K02','LI-08-M003-K05')},
 }
 _DE_AGENTES=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
 

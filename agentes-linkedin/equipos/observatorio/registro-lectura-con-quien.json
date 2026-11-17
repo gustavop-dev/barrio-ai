@@ -1,0 +1,278 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "observatorio",
+  "metodologia": "con_quien",
+  "evaluacion": "BIB-08-con-quien",
+  "fecha": "2026-11-17",
+  "metodo": "Lectura con SELECT de units.original en la biblioteca local (barrio-biblioteca-db), sin escribir en ella. hash = units.sha256 (sha256 del JSON canónico de la unidad, knowledge.ingest.canonical); source_path, pointer y fuentes de units y unit_evidence.",
+  "alcance": {
+    "unidades_leidas_completas": 9,
+    "por_clase": {
+      "08": 9
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 9 unidades de la clase 08, no de toda la clase ni de las clases 07–12. Solo estas 9 unidades (y las de las otras metodologías activadas) están abiertas a los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS), y solo con NETWORK_PROJECTAPP_BUYER_ENABLED."
+  },
+  "roles": [
+    "descubrimiento_red",
+    "clasificador_red"
+  ],
+  "lista": "operador.WHO_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-08-M001-K05",
+      "clase": 8,
+      "titulo": "Paso 3 · Las personas: a quién escribirle en cada empresa según dolor y poder",
+      "hash": "9b1bae6332c52c50c223ed7bdbd1a6f932bac468ff15cbf7908acecba20aafc6",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "No al más alto: al que más le duele y puede mover la decisión. En la empresa tradicional de 20 a 200 personas, el líder de tecnología (CTO, VP, Head o Director de ingeniería o de TI, gerente de sistemas) vive el problema de software y decide o influye; el dueño o CEO decide. Una agencia de software vende lo mismo que ProjectApp: es par, nunca partner ni comprador.",
+      "limites_y_excepciones": [
+        "«2 o 3 personas por empresa» no se adopta: LinkedIn sin Sales Navigator no busca por empresa; el barrio invita personas, sin duplicar cargos en una misma empresa a propósito.",
+        "Filtrar perfiles sin foto o sin «acerca de» no se convierte en regla: el clasificador ya pide evidencia concreta."
+      ],
+      "uso": {
+        "regla_fija": "projectapp.papel_from (líder de tecnología o dueño, por el perfil y el titular) y red.CLASSIFY_SYSTEM_PROJECTAPP (dos líneas y el partner con contraejemplos)",
+        "pregunta_del_lider": "papel (BUYER_MEANING_PROJECTAPP) y competidor (partner)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/78",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c37812ffba508d58f31d:p001"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M004-K04",
+      "clase": 8,
+      "titulo": "Creación de listas: ¿a quién invitas de cada empresa? Matriz de dolor y poder",
+      "hash": "5f3ff2031cbf99919a29714d286159bbdda3615ec7daf931da43460024fbaf51",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Matriz de dolor y poder: escribe primero a quien tiene dolor alto y poder; usa como puerta de entrada a quien sufre el problema sin poder; no escribas a quien no le duele.",
+      "limites_y_excepciones": [
+        "El material dice del CEO «Todavía no» (decide, pero le duele poco). Gana la decisión de Gustavo (17/11/2026): en la empresa tradicional de 20 a 200 personas el dueño o CEO sí entra, con un 40 % suave de los turnos de ProjectApp (60 % líderes de tecnología).",
+        "El reparto 60/40 es suave: si falta un papel, el otro toma el turno; nadie espera por un porcentaje."
+      ],
+      "uso": {
+        "regla_fija": "reparto._mix (60/40 suave entre lider_tecnologia y dueno, projectapp.PAPEL_SHARE)",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/97",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p024",
+        "08:c153dbf87e58b33bff78:p025"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M004-K05",
+      "clase": 8,
+      "titulo": "¿A quién saludas en la campaña? Los tres papeles: decide, influye, usa",
+      "hash": "e240d7879e7e36db3a569e461a53a86d6176af7caa6f4f969a314bb5b881cb65",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Cada persona es decide, influye o usa; el comprador de ProjectApp es quien decide o influye en contratar desarrollo. El papel suma al puntaje (decide 12 de 100; sin dato, el valor medio).",
+      "limites_y_excepciones": [
+        "El material no fija un orden obligatorio entre los tres papeles: el orden lo da el puntaje y el reparto, no una regla de «solo quien decide».",
+        "Quien solo usa (un desarrollador, un analista) no es comprador; puede ser par."
+      ],
+      "uso": {
+        "regla_fija": "nivel_comprador._papel_v2 (V2_PAPEL) y buyer.papel",
+        "pregunta_del_lider": "papel (BUYER_MEANING_PROJECTAPP)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/98",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p026"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M004-K06",
+      "clase": 8,
+      "titulo": "Buyer persona: una ficha por rol (la persona, no el cargo)",
+      "hash": "4942736231951a0c9e2301cb2d434c1f0422f04d440316eb38fba9393bc56496",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Una ficha por papel y segmento: el dueño de una empresa tradicional y el líder de tecnología tienen preguntas distintas (qué le duele, qué gana, qué le da miedo, dónde está), y la revisión web pregunta por su perfil, no por el cargo.",
+      "limites_y_excepciones": [
+        "La ficha no se escribe a mano por persona: son las preguntas por perfil (nivel_comprador.QUESTIONS) y los hechos públicos citados.",
+        "Una ficha genérica por cargo sin segmento pierde precisión: por eso el segmento (educacion_en_linea, retail_ecommerce, duenos_latinos_eeuu, otro) va con cada comprador."
+      ],
+      "uso": {
+        "regla_fija": "nivel_comprador.QUESTIONS (dueno_empresa_tradicional, lider_tecnologia: web y juez) y red.STAGE_SYSTEM_PROJECTAPP",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/99",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p027"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M004-K01",
+      "clase": 8,
+      "titulo": "Triggers de compra: las señales que indican que una empresa o una persona te necesita ahora",
+      "hash": "74fd1e7ad17e16963de2963c486c1324b64429f69b69603802d179314fecc0de",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Más reciente y más cerca de tu problema = señal más fuerte. Para ProjectApp: contrata desarrolladores (la más fuerte), lanzamiento digital, sistema legado y crecimiento; cada señal lleva su fuente y su fecha, o no cuenta.",
+      "limites_y_excepciones": [
+        "HEADCOUNT GROWTH y JOB CHANGE se ven en Sales Navigator: no se usan (la cuenta no lo tiene); la contratación se ve en LinkedIn Empleos y en la web de la empresa.",
+        "Una señal sin fecha cuenta como sin dato (valor medio), nunca como reciente."
+      ],
+      "uso": {
+        "regla_fija": "red.STAGE_SCHEMA_PROJECTAPP (senales con kind, fuente y fecha) y nivel_comprador._signal (V2_SIGNAL: contrata_desarrolladores 10, reciente ≤ 90 días 8, antigua 6, sin dato 5)",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/94",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p021",
+        "08:c153dbf87e58b33bff78:p023"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M004-K02",
+      "clase": 8,
+      "titulo": "La señal no crea campañas: decide a quién invitas primero",
+      "hash": "5444918bf5011f8f77f44d21d5e232caa569b4c68f202a50b03186b4f76e6cf0",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "La señal ordena a quién se invita primero; no es un filtro ni crea campañas. Un comprador sin señal visible sigue en el barrio con el valor medio de la señal.",
+      "limites_y_excepciones": [
+        "No se multiplican campañas por tipo de señal (G×S×T×E por señal).",
+        "Descartar a alguien bien segmentado solo porque no muestra señal es el error que la unidad corrige."
+      ],
+      "uso": {
+        "regla_fija": "nivel_comprador.score_v2 (la señal suma puntos; la falta de dato es el valor medio) y red.prioritized",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/95",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p022"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-V010-K02",
+      "clase": 8,
+      "titulo": "Caso startups: ICP de cofundadores y dueños, y señales de inversión y contratación sin Sales Navigator",
+      "hash": "32a9b1456bb5ef256aeb56571882577715be26fc1b2fa7d420d5d83fc023201d",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Inversión y contratación son señales públicas (posts de la empresa, vacantes abiertas, prensa): se verifican en la web con la fuente, sin Sales Navigator.",
+      "limites_y_excepciones": [
+        "Lemlist y Sales Navigator no se adoptan; el docente no detalló cómo se configuran en otra plataforma.",
+        "La verificación con IA pide siempre la fuente: sin fuente citada no hay señal."
+      ],
+      "uso": {
+        "regla_fija": "red.STAGE_SYSTEM_PROJECTAPP (búsqueda web con fuentes citadas) y red._judge_stage (señales sin fecha no cuentan)",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/35",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p021",
+        "08:c153dbf87e58b33bff78:p023",
+        "08:qt00260",
+        "08:qt00261",
+        "08:qt00262",
+        "08:qt00263",
+        "08:qt00264",
+        "08:qt00320",
+        "08:qt00323"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M001-K02",
+      "clase": 8,
+      "titulo": "Qué es una campaña y por qué no venderle a todos: campañas chicas, empresa primero y persona después",
+      "hash": "cecb58e81cbed148a596b0861298c643047ba2f869fce4c97944a9d089860619",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Varias campañas chicas en vez de una lista gigante: los tres segmentos de prueba (educacion_en_linea, retail_ecommerce, duenos_latinos_eeuu, y otro) se miden por separado, y sin 30 invitaciones de un segmento no se juzga. Empresa primero: el tamaño de la empresa (20 a 200) se juzga antes que la persona y una de más de 1000 sale.",
+      "limites_y_excepciones": [
+        "El contenido no se verticaliza (Gustavo, 17/11/2026): el segmento cambia a quién se le escribe y con qué prueba, no el feed.",
+        "Las búsquedas de LinkedIn no filtran por empresa: «empresa primero» se aplica al clasificar y en la revisión web."
+      ],
+      "uso": {
+        "regla_fija": "projectapp.segments, comprador.funnel (por_segmento, por_linea, muestra de 30) y projectapp.SIZE_RULE",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/75",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p001",
+        "08:c153dbf87e58b33bff78:p006",
+        "08:c37812ffba508d58f31d:p001"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M003-K05",
+      "clase": 8,
+      "titulo": "Reciclaje según la respuesta: no respondió, «ahora no», «no, gracias» y «sí, hablemos»; lista negra",
+      "hash": "c36dbf3bfea1066da050452a38f6b9f0927e4c2abb3bceb079a8b51e0e1f1b55",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Quien dijo que no (Gustavo o LinkedIn) va a la lista negra: la reevaluación de 17/11/2026 nunca lo devuelve al barrio ni lo cambia de línea, y a quien ya volvió al clasificador una vez no se le devuelve otra.",
+      "limites_y_excepciones": [
+        "La misma unidad sigue en respuesta_comprador para contestar al comprador que respondió.",
+        "Cambiar de interlocutor en la misma empresa no se automatiza."
+      ],
+      "uso": {
+        "regla_fija": "nivel_comprador.reevaluation_group (SAID_NO) y _projectapp_group (REQUEUED_PROJECTAPP)",
+        "pregunta_del_lider": null
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/91",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p017",
+        "08:c153dbf87e58b33bff78:p018",
+        "08:qt00105",
+        "08:qt00138",
+        "08:qt00145",
+        "08:qt00146",
+        "08:qt00150",
+        "08:qt00200",
+        "08:qt00205",
+        "08:qt00207",
+        "08:qt00210",
+        "08:qt00213",
+        "08:qt00214",
+        "08:qt00215",
+        "08:qt00216",
+        "08:qt00217"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "Gustavo, 17/11/2026: no se verticaliza el contenido; se verticaliza a QUIÉN se le escribe y con qué PRUEBA.",
+    "Tres audiencias: el comprador de ProjectApp (empresa tradicional de 20 a 200 personas en EE. UU.; dueño o CEO, o líder de tecnología), el comprador startup (el de antes) y el partner (agencia de marketing, diseño, consultoría o producto que subcontrata desarrollo; papel distinto del aliado).",
+    "Reparto suave 60/40 dentro del comprador de ProjectApp: 60 % líderes de tecnología y 40 % dueños o CEO. Gana sobre el «CEO: todavía no» de LI-08-M004-K04.",
+    "Las 80 invitaciones de la semana: ProjectApp 28, startup 12, partner 12, recomendador y aliado 8, par 10, divulgador 10; a los líderes solo se les comenta.",
+    "Segmentos de prueba del 17/11/2026 al 17/02/2027: educacion_en_linea, retail_ecommerce, duenos_latinos_eeuu y otro; sin 30 invitaciones de un segmento no se juzga.",
+    "Señales de la clase 08 con fuente y fecha: contratar desarrolladores es la mejor; también lanzamiento, sistema legado y crecimiento.",
+    "Los casos reales (dos plataformas grandes a la medida: educación en línea y retail) solo se citan a un comprador del mismo segmento y solo con hechos que Gustavo confirmó (preguntas en Tu turno).",
+    "Sin Sales Navigator: las búsquedas de LinkedIn solo filtran por palabras clave, ubicación e idioma.",
+    "NETWORK_PROJECTAPP_BUYER_ENABLED=false por defecto: apagado se comporta exactamente como antes."
+  ],
+  "no_convertido_en_regla": [
+    "las campañas G×S×T×E (geografía, sector, tamaño, tipo de empresa) con nomenclatura y una campaña por corte",
+    "lemlist u otra herramienta de secuencias de pago",
+    "Sales Navigator (crecimiento de empleados, cambio de cargo, filtros por empresa) y bases de datos de pago",
+    "la búsqueda por empresa primero en LinkedIn (el conector solo busca personas)",
+    "2 o 3 personas por empresa con su ficha escrita a mano",
+    "el post semanal de negocio: en su lugar, preguntas a Gustavo sobre los casos (TeamQuestion)"
+  ],
+  "siguiente_paso": "Revisión de la prueba el 17/02/2027 con la lectura por segmento (lectura_embudo, prueba_projectapp)."
+}

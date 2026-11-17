@@ -24,6 +24,12 @@ DEFAULT_CAPABILITIES='INT-03,CONT-09,RED-01,RED-02,RED-04'
 
 from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one positioning source)
 CRITERIA_DEL_BARRIO=_lead_criteria()
+# BAR-25: with NETWORK_PROJECTAPP_BUYER_ENABLED the lead reads the refined ProjectApp neighborhood and the offer.
+CRITERIA_DEL_BARRIO_PROJECTAPP=_lead_criteria(projectapp_buyer=True)
+
+def criteria_del_barrio():
+    from . import projectapp
+    return CRITERIA_DEL_BARRIO_PROJECTAPP if projectapp.enabled() else CRITERIA_DEL_BARRIO
 LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
 WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
@@ -34,7 +40,7 @@ CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
     'falsa':['LI-03-M005-K06'],'empresa':['LI-03-M005-K06'],'reclutador':['LI-03-M005-K06'],'prospector':['LI-03-M005-K06'],
-    'proveedor':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
+    'proveedor':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],'competidor':['LI-03-M005-K06'],
     # BIB-09-primer-mensaje: the class 09 criterion behind each question about the first message.
     'dm_toque':['LI-09-M003-K02','LI-09-V011-K01'],'dm_puente':['LI-09-M003-K02','LI-09-M003-K04'],
     'dm_pregunta':['LI-09-M003-K03'],'dm_un_tema':['LI-09-M003-K04'],'dm_en_persona':['LI-09-M004-K02'],
@@ -48,6 +54,7 @@ CRITERION_SOURCES={
     'resp_responde':['LI-11-M006-K01'],'resp_pitch':['LI-11-M006-K01','LI-08-M003-K05'],'resp_presiona':['LI-08-M003-K05'],
     'resp_inventa':['LI-11-M006-K01'],'resp_paso_facil':['LI-12-M001-K04'],'resp_insiste':['LI-11-M006-K03','LI-08-M003-K05'],
     'resp_agradece':['LI-11-M006-K02'],
+    'caso_inventa':['LI-06-M001-K07'],
 }
 
 def ground_questions(state,questions):
@@ -168,7 +175,9 @@ NETWORK_THRESHOLD={CAP.FOLLOW:0.6,CAP.INVITE:0.5,CAP.ACCEPT:0.6}
 PERSON_CHECKS=[('falsa','el perfil parece falso o de relleno'),('empresa','es la cuenta de una organización, no una persona'),
                ('reclutador','se dedica a reclutar'),('prospector','se dedica a prospectar en frío para otros')]
 BUYER_CHECK=('proveedor','vende sus propios servicios; no parece comprador')
-NETWORK_RISKS=tuple(qid for qid,_ in PERSON_CHECKS+[BUYER_CHECK])
+# BAR-25: a partner subcontracts development; one who sells development itself is a peer (a competitor), never a partner.
+PARTNER_CHECK=('competidor','vende desarrollo de software propio: es par, no partner')
+NETWORK_RISKS=tuple(qid for qid,_ in PERSON_CHECKS+[BUYER_CHECK,PARTNER_CHECK])
 # What each role of the classifier (red.ROLES) means, as the lead reads it in `clasificacion.papel`.
 ROLE_MEANING={
     'par':'par: construye producto o software, o funda una startup de tecnología, como Gustavo',
@@ -181,14 +190,25 @@ ROLE_MEANING={
     'lider':'líder: dirige una empresa, una comunidad o un equipo en tecnología o negocio',
     # Phase 5 (sin_posts.py): not a role of the classifier's table; a rule of Gustavo's route sets it.
     'puente':'puente: colega, en la misma empresa, de un posible comprador que no publica; el equipo lo calienta para llegar a él',
+    # BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): a new role of the classifier, distinct from `aliado`.
+    'partner':'partner: agencia de marketing, diseño, consultoría o producto que subcontrata el desarrollo de software de sus '
+              'clientes; canal de contratos para ProjectApp, no comprador. Se sigue, se comenta y se invita como comunidad',
 }
+# BAR-25: the ProjectApp buyer, as the lead reads it with the switch on (a traditional company, not a startup).
+BUYER_MEANING_PROJECTAPP=('comprador de ProjectApp (hipótesis): dueño o CEO, o líder de tecnología, de una empresa tradicional '
+                          'de 20 a 200 personas en EE. UU. que necesita digitalizarse o ampliar su software. Su nivel dice cuánta '
+                          'evidencia pública hay; «por_confirmar» es que no hay datos públicos, nunca evidencia en contra')
 
 def network_checks(capability,role=None):
-    """The lead's checks on a person: the concrete risks for every role, plus selling services for a buyer."""
+    """The lead's checks on a person: the concrete risks for every role, plus selling services for a buyer and selling
+    development itself for a partner."""
     threshold=NETWORK_THRESHOLD[capability]
-    return [(qid,'max',threshold,label) for qid,label in PERSON_CHECKS+([BUYER_CHECK] if role=='comprador' else [])]
+    extra=[BUYER_CHECK] if role=='comprador' else [PARTNER_CHECK] if role=='partner' else []
+    return [(qid,'max',threshold,label) for qid,label in PERSON_CHECKS+extra]
 
 ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
+# BAR-25: a case of ProjectApp with names, figures, durations or results Gustavo did not confirm (projectapp.case_for).
+CASE_CHECK=('caso_inventa','max',0.2,'caso de ProjectApp con datos que Gustavo no confirmó')
 # His own request: «min» checks fail only below these (yes clearly unlikely), «max» checks only above (yes clearly likely).
 GUSTAVO_THRESHOLDS={'clara':0.3,'pitch':0.6,'inventa':0.6,'idioma':0.5,'orientacion':0.2}
 GUSTAVO_TEXTS,GUSTAVO_TEXT_CHARS=8,1500
@@ -314,9 +334,12 @@ def _questions(proposal,orientation):
                           'ubicacion':contact.location,'seguidores':signals.get('followers'),'grado':contact.network_distance,'origen':contact.source,
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
                'clasificacion':{'papel':ROLE_MEANING.get(role,role or ''),'razon':classification.get('reason') or ''},
-               'criterios_del_barrio':CRITERIA_DEL_BARRIO}
+               'criterios_del_barrio':criteria_del_barrio()}
         buyer=classification.get('buyer') or {}
         if role=='comprador' and buyer.get('level'):state['clasificacion']['nivel']=buyer['level']  # BAR-24, context only
+        from . import projectapp
+        if role=='comprador' and projectapp.enabled() and projectapp.line_in(classification)=='projectapp':
+            state['clasificacion']['papel']=BUYER_MEANING_PROJECTAPP  # BAR-25: an owner of a traditional company runs an operation
         questions={
             'falsa':_noul('¿El perfil de `persona` parece falso, automatizado o de relleno: sin cargo ni actividad reconocible, o con '
                           'promesas de dinero fácil?','Titular vacío o incoherente, o promesas de ingresos, cripto u «oportunidades» por mensaje',
@@ -337,6 +360,20 @@ def _questions(proposal,orientation):
                                          'Es consultor, freelancer, coach o dueño de una agencia de servicios',
                                          'Dirige o fundó una empresa con producto, clientes u operación propia, aunque también asesore, '
                                          'esté en stealth o su perfil sea escueto («Founder @X»)')
+        if role=='comprador' and state['clasificacion']['papel']==BUYER_MEANING_PROJECTAPP:
+            # BAR-25: an owner of a traditional services business runs an operation; she is not a «proveedor».
+            questions['proveedor']=_noul('¿`persona` vive de vender su propio trabajo profesional como independiente (consultoría, '
+                                         'freelance, coaching) o con una agencia que vende ese trabajo a otras empresas, en vez de '
+                                         'dirigir una empresa con operación propia?',
+                                         'Consultor, freelancer o coach independiente, o dueño de una agencia de servicios profesionales',
+                                         'Dirige o es líder de tecnología de una empresa que opera (comercio, educación, salud, servicios a '
+                                         'clientes finales, manufactura, logística…), aunque esa operación sea de servicios')
+        if role=='partner':
+            questions['competidor']=_noul('¿`persona` vende desarrollo de software hecho por su propio equipo de ingeniería (una agencia o '
+                                          'estudio de desarrollo, una software factory), en vez de subcontratarlo para sus clientes?',
+                                          'Agencia, estudio o fábrica de software con ingenieros propios que vende desarrollo a la medida',
+                                          'Agencia de marketing, diseño, consultoría o producto que hace proyectos digitales con socios de '
+                                          'desarrollo, o que no dice tener ingenieros propios')
         kind=capability
     if kind in ('text','post','reply'):
         public,_=memory.confirmed_blocks()
@@ -536,6 +573,19 @@ def review_buyer_draft(draft):
                        'momento':'Nota de la invitación a conectar; su único trabajo es que acepte.'}
         questions=note_questions()
         checks=list(NOTE_CHECKS);units,metodologia,purpose=INVITE_NOTE_UNITS,'nota_invitacion','lead-review-note'
+    from . import projectapp
+    if projectapp.enabled():
+        # BAR-25: a case of ProjectApp only with what Gustavo confirmed, and only to a buyer of its segment (case_for).
+        case=(draft.inputs or {}).get('caso_projectapp') or {}
+        state['caso_confirmado']={'caso':case.get('caso',''),'hechos':case.get('hechos',{})} if case else {}
+        text_key=next((k+'.texto' for k in ('respuesta','seguimiento','primer_mensaje','nota') if k in state),'el texto')
+        questions['caso_inventa']=_noul(f'¿`{text_key}` menciona un proyecto, un cliente o un caso de ProjectApp con nombres, '
+                                        'cifras, plazos o resultados que no están en `caso_confirmado.hechos`, o menciona un caso '
+                                        'cuando `caso_confirmado` está vacío?',
+                                        'Nombra un cliente, una cifra, un plazo o un resultado del caso que no está en los hechos, o '
+                                        'cita un caso sin caso confirmado',
+                                        'No menciona casos de ProjectApp, o lo que dice del caso está en `caso_confirmado.hechos`')
+        checks.append(CASE_CHECK)
     if orientation:
         state['orientacion_de_gustavo']=orientation
         questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
@@ -576,7 +626,7 @@ def prefilter_threshold():
 def comment_worthy(post):
     """{'decision': 'comment' | 'skip' | 'unavailable', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
     now=timezone.now();orientation=_orientation()
-    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':CRITERIA_DEL_BARRIO}
+    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':criteria_del_barrio()}
     topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
            'IA aplicada, startups o negocio')
     from . import calentamiento

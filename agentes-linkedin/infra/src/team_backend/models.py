@@ -1626,6 +1626,12 @@ class BuyerJourney(models.Model):
     entry_level=models.CharField(max_length=14,blank=True)
     entry_score=models.PositiveSmallIntegerField(null=True,blank=True)
     entry_score_version=models.CharField(max_length=20,blank=True)
+    # BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the buyer's line (projectapp, startup) and, for a ProjectApp buyer, her
+    # segment of the three-month test, measured apart in the funnel. They follow the classification until the first
+    # follow or invitation, are fixed then, and are set once more only if still empty (a reevaluation that gives a line
+    # to a buyer the team already followed before the switch). '' with the switch off.
+    line=models.CharField(max_length=12,blank=True,db_index=True)
+    segment=models.CharField(max_length=24,blank=True,db_index=True)
     route=models.CharField(max_length=12,choices=Route.choices,default=Route.UNKNOWN)
     step=models.CharField(max_length=12,choices=Step.choices,default=Step.CHOSEN,db_index=True)
     # When something is due for this person (comprador.next_at); null when nothing is scheduled.

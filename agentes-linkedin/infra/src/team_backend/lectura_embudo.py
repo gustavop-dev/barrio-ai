@@ -11,7 +11,11 @@ for the others, so they are the team's and named as such: inventory (half or mor
 meetings (under 20 % of those who replied, with at least 5 replies).
 
 Slack: on Mondays, inside READ_WINDOW, on the summaries channel (alertas_slack.lectura_semanal_embudo), five lines at
-most."""
+most.
+
+BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the same reading by line (projectapp, startup) and by segment of the ProjectApp
+buyers (by the line and segment they entered with), each with its own sample rule, and one line on the three-month test:
+week N of 13, invitations per segment and whether any has a sample yet; review on 17/02/2027. Off, none of it."""
 from datetime import timedelta
 from django.utils import timezone
 from . import comprador
@@ -63,6 +67,24 @@ def _checks(journeys,now):
                     'rota':bool(broken)})
     return out
 
+def _split(journeys,now):
+    """One audience's reading: its invitations, whether the sample is small and where it breaks first (None while small)."""
+    invited=sum(1 for j in journeys if j.invited_at);small=invited<comprador.SMALL_SAMPLE
+    broken=None if small else next((row for row in _checks(journeys,now) if row['rota']),None)
+    return {'personas':len(journeys),'invitaciones':invited,'muestra_chica':small,'se_rompe':broken['etapa'] if broken else None,
+            'cambio':broken['cambio'] if broken else None}
+
+def test_line(progress):
+    """The three-month test in one line for Slack."""
+    from . import projectapp
+    segments=' · '.join(f'{projectapp.SEGMENT_LABELS[s].lower()} {row["invitaciones"]}' for s,row in progress['por_segmento'].items())
+    ready=[projectapp.SEGMENT_LABELS[s].lower() for s,row in progress['por_segmento'].items() if row['muestra']]
+    sample=('con muestra: '+', '.join(ready)) if ready else f'ningún segmento tiene muestra todavía ({comprador.SMALL_SAMPLE} invitaciones)'
+    week=('antes de empezar' if progress['semana']==0 else 'terminó, toca revisarla' if progress['semana']>progress['de']
+          else f'semana {progress["semana"]} de {progress["de"]}')
+    return (f'Prueba ProjectApp, {week}: invitaciones a compradores por segmento: {segments}; partners '
+            f'{progress["partner"]["invitaciones"]}. {sample.capitalize()}. Revisión el {projectapp.REVIEW}.')
+
 def read(now=None,account=None):
     """The week's reading: the table, where it breaks first (or the small sample), its cause and ONE change, this week
     against the last one, drafts pending against sent, and `lineas` (five at most) for Slack."""
@@ -93,8 +115,15 @@ def read(now=None,account=None):
         lines.append(f'Lo más probable: {broken["causa"].lower()}. Un solo cambio esta semana: {broken["cambio"].lower()}.')
     else:
         lines.append('Ninguna etapa bajo su umbral: no se cambia nada esta semana.')
+    from . import projectapp
+    split={}
+    if projectapp.enabled():
+        split={'por_linea':{line:_split([j for j in journeys if (j.line or 'startup')==line],now) for line in projectapp.LINES},
+               'por_segmento':{s:_split([j for j in journeys if j.line=='projectapp' and j.segment==s],now) for s in projectapp.SEGMENTS},
+               'prueba_projectapp':funnel['prueba_projectapp']}
+        lines.append(test_line(funnel['prueba_projectapp']))
     lines.append(f'Borradores: {pending} esperan en Tu turno; {sent} enviados en total.')
-    return {'generado':now.isoformat(),'semana':week,'muestra_chica':small,'invitaciones':invitations,'tabla':table,
+    return {**split,'generado':now.isoformat(),'semana':week,'muestra_chica':small,'invitaciones':invitations,'tabla':table,
             'se_rompe':broken['etapa'] if broken else None,'causa':broken['causa'] if broken else None,
             'cambio':broken['cambio'] if broken else None,
             'semana_actual':this,'semana_anterior':last,'borradores':{'pendientes':pending,'enviados':sent},

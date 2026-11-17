@@ -45,6 +45,10 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 17/11/2026 | **Compradores de Latinoamérica**: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una». Entran después de los de EE. UU. (primero los que venden en EE. UU.) y pasan por el mismo recorrido y el mismo calentamiento. |
 | 17/11/2026 | **Reparto de papeles**: «debería ser construido», pero «estamos cortando con una misma tijera a todos; podríamos cambiar las preguntas dependiendo del perfil, pero no ser tan rígidos». Las invitaciones de la semana tienen cupos blandos por papel (`NETWORK_ROLE_SHARE`, tabla del barrio). Un papel sin candidatos cede su turno, y el aliado comparte el turno de los recomendadores. |
 | 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas, que se arma después del outbound, con su propia base de conocimiento y abierta a otras fuentes además de LinkedIn. Agenda con Cal.com. |
+| 17/11/2026 | **No se verticaliza el contenido; se verticaliza a QUIÉN se le escribe y con qué PRUEBA** ([BAR-25](funcionalidades/red.md#bar-25)). Tres audiencias: el comprador de ProjectApp (empresa tradicional de 20 a 200 personas en EE. UU.; dueño o CEO, o líder de tecnología; suave 60 % líderes de tecnología, 40 % dueños), el comprador startup (el de antes) y el **partner** (agencia de marketing, diseño, consultoría o producto que subcontrata desarrollo; papel distinto del aliado). |
+| 17/11/2026 | **Oferta de ProjectApp:** equipo dedicado desde unos 20 millones de pesos al mes (unos 5.000 USD) o proyecto por requerimientos desde unos 20 millones; argumento nearshore: buena calidad a menor costo. **Casos reales:** dos plataformas grandes a la medida (educación en línea y retail); ningún otro dato confirmado. Un caso solo se cita a un comprador de su mismo segmento y solo con hechos que Gustavo confirmó. |
+| 17/11/2026 | **Prueba de tres meses, del 17/11/2026 al 17/02/2027**, con los segmentos `educacion_en_linea`, `retail_ecommerce`, `duenos_latinos_eeuu` y `otro`. Señales de la clase 08 con fuente y fecha: contratar desarrolladores es la mejor; también lanzamiento, sistema heredado y crecimiento. Sin 30 invitaciones de un segmento no se juzga. |
+| 17/11/2026 | **Las 80 invitaciones de la semana:** ProjectApp 28, startup 12, partner 12, recomendador y aliado 8, par 10, divulgador 10; a los líderes solo se les comenta. No hay post semanal de negocio: en su lugar, preguntas a Gustavo sobre los casos (Tu turno). |
 
 ## Lo que ya funciona
 
@@ -269,6 +273,64 @@ admite preguntas propias, que es donde la máquina de ventas pondrá después la
 mensajes), la conversación resumida en tres líneas, la fecha de la reunión y lo que el equipo sabe del negocio con
 sus fuentes. Sin nota de calificación: esa la pone la máquina de ventas.
 
+## El comprador de ProjectApp y la prueba de 3 meses (BAR-25, 17/11/2026)
+
+Detrás de `NETWORK_PROJECTAPP_BUYER_ENABLED` (apagado por defecto; apagado, todo es exactamente lo de BAR-24). Ficha:
+[BAR-25](funcionalidades/red.md#bar-25). Línea base y resultado: `agentes-linkedin/infra/docs/linea-base-comprador-projectapp.md`
+(2/8 antes, 8/8 después).
+
+**A quién.** El clasificador (`red.CLASSIFY_SYSTEM_PROJECTAPP`, con la metodología `con_quien` de la clase 08) juzga dos
+líneas de comprador y el partner en una sola llamada:
+
+- *Comprador de ProjectApp:* dueño o CEO (`dueno_empresa_tradicional`), o líder de tecnología (`lider_tecnologia`: CTO,
+  VP, Head o Director de ingeniería o TI, gerente de sistemas) de una empresa tradicional (no de software) que necesita
+  digitalizarse o ampliar su software; objetivo de 20 a 200 personas en EE. UU. Más de 1000 personas sale
+  (`projectapp.SIZE_RULE`), en código.
+- *Comprador startup:* el de antes (`startup_financiada`, `bootstrapped`, `stealth`, `ejecutivo`).
+- *Partner:* agencia o estudio de marketing, diseño, consultoría o producto que subcontrata el desarrollo de sus
+  clientes. Contraejemplos: una agencia de desarrollo es par (competidor); un servicio complementario que no es un
+  proyecto digital es aliado. Se sigue, se comenta (cupo «comunidad» de los comentarios del día) y se invita como
+  comunidad; no tiene recorrido de comprador ni mensajes.
+
+**Segmento y tamaño.** Cada comprador de ProjectApp lleva `segment` (educacion_en_linea, retail_ecommerce,
+duenos_latinos_eeuu u otro; la industria gana y «dueños latinos en EE. UU.» queda como coincidencia adicional),
+`company_size` (solo si el perfil o la web lo dicen) y `papel` (lider_tecnologia o dueno). La revisión web de ProjectApp
+pregunta el tamaño y las señales con fuente y fecha en la misma llamada.
+
+**Puntaje v2** (`buyer_score_v2`, 0 a 100, el desglose suma el puntaje): evidencia 32/21/10/0, tamaño 26 (20 a 200) / 13
+sin dato / 8 / 2 / 0, señal 10 (contrata desarrolladores) / 8 reciente / 6 antigua / 5 sin dato, mercado 14/10/8 sin
+dato/4/2, papel 12 decide / 8 sin dato / 4, confianza hasta 6. Un dato que falta vale el punto medio: nunca resta. La
+línea startup conserva los componentes de v1.
+
+**Búsquedas.** Rotan por audiencia en proporción 28/12/12 (`NETWORK_SEARCH_AUDIENCE_SHARE`) dentro del mismo cupo
+(`NETWORK_SEARCHES_PER_RUN`, 20 búsquedas al día). LinkedIn solo filtra por palabras clave, ubicación (EE. UU.) e idioma
+(«[es]»); tamaño, industria, cargo y contratación los juzgan el clasificador y la web. Valores para producción:
+
+- `NETWORK_SEARCH_QUERIES_PROJECTAPP=CTO retail;Director of IT ecommerce;Head of Technology online education;Owner online academy;VP Engineering retail;CEO family business;dueño de empresa [es];gerente de sistemas [es]`
+- `NETWORK_SEARCH_QUERIES_PARTNER=marketing agency founder development partners;design agency owner web development;digital agency white label development;product consultancy founder;agencia de marketing [es]`
+- `NETWORK_SEARCH_QUERIES` (startup) no cambia.
+
+**Reparto.** Con el interruptor, `NETWORK_ROLE_SHARE` por defecto (sin la variable en el `.env`) es
+`comprador_projectapp=28,comprador_startup=12,partner=12,recomendador+aliado=8,par=10,divulgador=10` y, dentro de
+ProjectApp, el turno alterna 60/40 suave entre líderes de tecnología y dueños. Un grupo sin candidatos cede su turno; el
+plan (`network.planned`) trae el déficit de cada grupo.
+
+**Prueba con casos.** `manage.py operador --usuario <u> preguntas-casos-projectapp` encola en Tu turno cinco preguntas
+por caso (problema, qué se construyó, duración, qué cambió, si se puede nombrar al cliente); repetirlo no crea nada.
+Solo las respuestas confirmadas con uso público son hechos citables. La regla fija (`projectapp.case_issues`) rechaza un
+caso de otro segmento y cualquier cifra que no esté en los hechos (o en la oferta), y el líder pregunta `caso_inventa`.
+
+**Reevaluación.** `manage.py operador --usuario <u> reevaluar-compradores --cuenta <id>` (en seco sin `--confirmar`)
+asigna la línea a los compradores de antes, devuelve al clasificador a los que el equipo aún no tocó y a las agencias
+descartadas que pueden ser partners. Nadie a quien Gustavo o LinkedIn dijeron que no; idempotente.
+
+**Medición.** El embudo (`por_linea`, `por_segmento`, `prueba_projectapp`) y la lectura del lunes en Slack: semana N de
+13, invitaciones por segmento y por partner, si algún segmento tiene muestra. Revisión: 17/02/2027.
+
+**No adoptado de la clase 08:** las campañas G×S×T×E con nomenclatura, lemlist, Sales Navigator y bases de pago, la
+búsqueda por empresa primero (el conector solo busca personas) y «2 o 3 personas por empresa». Gana el 60/40 de Gustavo
+sobre el «CEO: todavía no» de LI-08-M004-K04.
+
 ## La base actual y lo que hay que añadir (anotado el 14/11/2026)
 
 Revisión hecha a pedido de Gustavo: ¿el sistema de hoy sirve de base para el outbound? Sí, para calentar e invitar;
@@ -449,6 +511,7 @@ Apagar cualquiera devuelve el comportamiento de la fase anterior; nada se borra.
 | 4. Secuencia M2–M4 ([BAR-21](funcionalidades/red.md#bar-21)) | `BUYER_SEQUENCE_ENABLED` (`false`) | migración 0050; la fase 3; `INBOX_ENABLED=true` y el inbox leyendo | `BUYER_SEQUENCE_DAYS`, `BUYER_SEQUENCE_REST_AFTER_DAYS`, `BUYER_SEQUENCE_REST_DAYS`, `BUYER_SEQUENCE_INBOX_FRESH_HOURS`, `BUYER_SEQUENCE_MAX_LATE_DAYS` |
 | 5. El que no publica ([BAR-22](funcionalidades/red.md#bar-22)) | `BUYER_NO_POSTS_ROUTE_ENABLED` (`false`) | migración 0051; la fase 2 (y la 3 para la nota y el mensaje) | `BUYER_BRIDGE_SEARCHES_PER_DAY`, `BUYER_BRIDGE_PROFILES_PER_SEARCH`, `BUYER_BRIDGE_WAIT_DAYS`, `BUYER_SIGNAL_RECENT_DAYS` |
 | 6. Respuesta, reunión y entrega ([BAR-23](funcionalidades/red.md#bar-23)) | `BUYER_REPLY_ENABLED` (`false`) | migración 0052; clases 08, 11 y 12; la fase 4; el webhook en Cal.com | `BUYER_REPLY_MIN`, `BUYER_REPLY_MARGIN`, `CALCOM_BOOKING_URL`, `CALCOM_WEBHOOK_SECRET` |
+| Comprador de ProjectApp y partner ([BAR-25](funcionalidades/red.md#bar-25)) | `NETWORK_PROJECTAPP_BUYER_ENABLED` (`false`) | migración 0054; clase 08 en la base; para comentar a partners, la fase 2 | `NETWORK_SEARCH_QUERIES_PROJECTAPP`, `NETWORK_SEARCH_QUERIES_PARTNER`, `NETWORK_SEARCH_AUDIENCE_SHARE`; `NETWORK_ROLE_SHARE` sin definir toma el reparto 28/12/12/8/10/10 (si el `.env` lo fija, ponerlo a mano; se revierte junto con el interruptor) |
 
 Orden en producción:
 
@@ -477,12 +540,21 @@ Orden en producción:
    4. Mirar `buyer.reply_classified`, `buyer.reply_no_link`, `calcom.event`, `calcom.rejected`, `buyer.meeting_booked`,
       `lead.handoff_ready` y `respuestas` del embudo. Los lunes llega la lectura semanal al canal de resúmenes.
 
+8. **Comprador de ProjectApp (BAR-25).** `manage.py migrate` (0054). En el `.env`:
+   `NETWORK_PROJECTAPP_BUYER_ENABLED=true`, las dos búsquedas de arriba (o dejar sus valores por defecto) y
+   `NETWORK_ROLE_SHARE=comprador_projectapp=28,comprador_startup=12,partner=12,recomendador+aliado=8,par=10,divulgador=10` si el `.env` fija esa variable (si no la
+   trae, ya es el valor por defecto; vacía apaga los cupos); reiniciar el
+   worker, el autopiloto y la API. Después, `manage.py operador --usuario <u> reevaluar-compradores --cuenta <id>` en
+   seco, revisar la lista y repetir con `--confirmar`; y `manage.py operador --usuario <u> preguntas-casos-projectapp`
+   (lo corre Gustavo). Mirar `network.searched` por audiencia, `network.classified`, `network.planned` (`distribution` y
+   el reparto) y el embudo por segmento. Apagarlo vuelve a BAR-24 (con `NETWORK_ROLE_SHARE` de vuelta a `comprador=20,recomendador+aliado=15,divulgador=20,par=25` si se fijó: `partner` y `comprador_*` no valen apagado); las líneas y segmentos guardados se quedan.
+
 Sin verificar contra Cal.com real: que el enlace de reserva conserve `metadata[barrio]` y que una reprogramación lo
 mantenga; si no llega, la reserva se empareja por el correo o el nombre, o la empareja Gustavo.
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-24) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-25) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

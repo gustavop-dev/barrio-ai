@@ -27,6 +27,8 @@ class Command(BaseCommand):
         cola.add_argument('--confirmar',action='store_true')
         reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
         reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
+        sub.add_parser('preguntas-casos-projectapp',help='Encola en Tu turno las preguntas a Gustavo sobre los dos casos reales de '
+                       'ProjectApp (educación en línea y retail); idempotente: repetirlo no crea preguntas nuevas')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -43,6 +45,15 @@ class Command(BaseCommand):
             if o['accion']=='cuenta':
                 account=operador.register_account(user,o['proveedor'],o['account_id'],o['etiqueta'])
                 self.stdout.write(f'Cuenta {account.id} ({account.provider}). Ejecuta "comprobar" antes de operar.')
+                return
+            if o['accion']=='preguntas-casos-projectapp':
+                from team_backend import projectapp
+                created=projectapp.ask_case_questions()
+                total=len(projectapp.CASE_SEGMENTS)*len(projectapp.CASE_QUESTIONS)
+                self.stdout.write(f'Preguntas de los casos de ProjectApp creadas ahora: {len(created)} de {total}.')
+                for item in created:self.stdout.write(f'  · {item.memory_key}: {item.question}')
+                if len(created)<total:
+                    self.stdout.write('Las demás ya estaban abiertas, respondidas, rechazadas o retiradas: no se repiten.')
                 return
             account=ConnectorAccount.objects.filter(id=o['cuenta']).first()
             if not account:raise CommandError('Cuenta no registrada')
@@ -76,11 +87,13 @@ class Command(BaseCommand):
             elif o['accion']=='reevaluar-compradores':
                 from team_backend import nivel_comprador
                 result=nivel_comprador.reevaluate(user,account,confirm=o['confirmar'])
-                counts=', '.join(f'{group} ({nivel_comprador.ACTIONS[group]}): {n}' for group,n in result['found'].items())
+                groups=nivel_comprador.actions()
+                counts=', '.join(f'{group} ({groups[group]}): {n}' for group,n in result['found'].items())
                 self.stdout.write(f"Compradores a reevaluar: {result['total']}. {counts}.")
                 for row in result['people']:
                     score='—' if row['score'] is None else f"{row['score']}{'*' if row['provisional'] else ''}"
-                    self.stdout.write(f"{score:>4}  {row['level']:<13} {row['action']:<12} {row['name']} · {row['group']} · {row['reason']}")
+                    line=f" · línea {row['line']}" if row.get('line') else ''
+                    self.stdout.write(f"{score:>4}  {row['level'] or '—':<13} {row['action']:<12} {row['name']} · {row['group']}{line} · {row['reason']}")
                 if any(row['provisional'] for row in result['people']):
                     self.stdout.write('* Puntaje provisional: lo fija el clasificador al volver a juzgarlo.')
                 self.stdout.write(f"Aplicados: {result['applied']}." if o['confirmar'] else 'Sin --confirmar no se cambia nada.')

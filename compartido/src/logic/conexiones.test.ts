@@ -29,8 +29,9 @@ describe('Conexiones · role chips', () => {
   });
 
   it('names the roles in plural for the chips and in singular for a row', () => {
-    expect(['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado', 'puente', NO_ROLE].map(rolePlural)).toEqual([
+    expect(['comprador', 'partner', 'par', 'recomendador', 'divulgador', 'lider', 'aliado', 'puente', NO_ROLE].map(rolePlural)).toEqual([
       'Compradores',
+      'Partners',
       'Pares',
       'Recomendadores',
       'Divulgadores',
@@ -41,6 +42,7 @@ describe('Conexiones · role chips', () => {
     ]);
     expect(roleLabel(contactFixture('c-1', { classification: { role: 'lider' } }))).toBe('Líder');
     expect(roleLabel(contactFixture('c-1', { classification: { role: 'puente' } }))).toBe('Puente');
+    expect(roleLabel(contactFixture('c-1', { classification: { role: 'partner' } }))).toBe('Partner');
     expect(roleLabel(contactFixture('c-1', { classification: {} }))).toBe('Sin etiqueta');
     expect(roleLabel(contactFixture('c-1', { classification: { role: '' } }))).toBe('Sin etiqueta');
   });
