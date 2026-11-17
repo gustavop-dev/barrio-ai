@@ -12,8 +12,11 @@ Only what no table records is sent where it happens: a paid provider refusing it
 (knowledge.providers.CREDENTIAL_LISTENERS, registered in apps.ready). The push alerts of alerts.py and notificaciones.py
 are another channel and stay as they are.
 
-Limit: the watchers run inside the autopilot. If the autopilot itself stops, nothing here notices; that needs a watcher
-outside it (the container healthcheck already sees the heartbeat file; an external uptime check would have to alert)."""
+Limit: the watchers run inside the autopilot. If the autopilot itself stops, nothing here notices: its container
+healthcheck sees the heartbeat file (/tmp/barrio-autopilot-heartbeat) and Docker marks it unhealthy, but nobody is told.
+That needs a watcher outside it, on the host (a cron that reads `docker inspect` health and posts to the same webhook,
+or an external uptime check); it is not built here. The daily backup runs outside Django too: deploy/backup.sh posts its
+own failure to SLACK_WEBHOOK_URL."""
 import logging
 import math
 import os
@@ -348,7 +351,7 @@ def _stuck(row):
             'discarded':'descartado por el líder' if review.get('decision')=='discard' else 'descartado por las reglas fijas',
             'approved':'aprobado, sin publicar todavía (espera turno de escritura)',
             'executing':'publicándose ahora','sent':'enviado, sin confirmar en LinkedIn',
-            'uncertain':'resultado incierto: resuélvelo en la Bandeja','expired':'caducó sin publicar',
+            'uncertain':'no se sabe si salió: respóndelo en Tu turno («¿Salió o no?»)','expired':'caducó sin publicar',
             'failed':'no salió al publicar','superseded':'reemplazado por otra versión'}.get(state,state)
 
 def _words(text,count=8):
@@ -419,6 +422,80 @@ def lecturas_detenidas(now):
         f'Barrio · No se están leyendo los comentarios de tus posts {when}: {_why_not_reading(reader,now)}. '
         f'{len(overdue)} {"post espera" if len(overdue)==1 else "posts esperan"} su lectura; mientras tanto nadie responde '
         'los comentarios nuevos.')]
+
+# --------------------------------------------------------------------------- urgent: the machine itself
+
+def queue_stuck_minutes():
+    """ALERT_QUEUE_STUCK_MINUTES (20): how long a queued job may wait while no worker takes any."""
+    return timedelta(minutes=_number('ALERT_QUEUE_STUCK_MINUTES',20,5,24*60))
+
+LANE_TEXT={'acciones':'las escrituras en LinkedIn y su conciliación','general':'lecturas, borradores, piezas y lo demás'}
+
+@vigilante
+def cola_detenida(now):
+    """Per worker lane (jobs.LANES): jobs queued for more than ALERT_QUEUE_STUCK_MINUTES while no job of that lane started
+    in that time: its worker is down, or stuck in one long job. Once a day per lane. (A stopped autopilot cannot watch
+    itself: see the module docstring.)"""
+    from .jobs import ACTION_KINDS, lane_jobs
+    from .models import Job, Worker
+    limit=queue_stuck_minutes();alerts=[]
+    for lane in ('acciones','general'):
+        mine=(lambda q:q.filter(kind__in=ACTION_KINDS)) if lane=='acciones' else (lambda q:q.exclude(kind__in=ACTION_KINDS))
+        late=lane_jobs(lane).filter(created_at__lt=now-limit);oldest=late.order_by('created_at').first()
+        if oldest is None or mine(Job.objects.filter(started_at__gte=now-limit)).exists():continue
+        running=mine(Job.objects.filter(state=Job.State.RUNNING)).order_by('started_at').first()
+        alive=Worker.objects.filter(lane__in=[lane,'todas'],stopped_at__isnull=True,last_seen__gte=now-limit).exists()
+        if running:state=f'sigue con «{running.kind}» desde {since_text(running.started_at,now)}'
+        elif alive:state='da señales de vida pero no toma trabajos'
+        else:state='no da señales de vida'
+        alerts.append(Aviso(f'cola:detenida:{lane}',
+            f'Barrio · El worker de «{lane}» ({LANE_TEXT[lane]}) no está procesando: {state}. {late.count()} trabajo(s) en cola '
+            f'sin empezar, el más viejo («{oldest.kind}») desde {since_text(oldest.created_at,now)}. Revisa ese contenedor en el '
+            'servidor (docker compose ps y logs).'))
+    return alerts
+
+@vigilante
+def escritura_incierta(now):
+    """A write LinkedIn did not confirm and nobody can observe (proposal `uncertain`): only Gustavo closes it. Once each."""
+    from .models import ActionProposal
+    alerts=[]
+    for proposal in ActionProposal.objects.select_related('execution').filter(state='uncertain').order_by('created_at'):
+        execution=getattr(proposal,'execution',None)
+        when=since_text(execution.started_at if execution else proposal.created_at,now)
+        alerts.append(Aviso(f'incierta:{proposal.id}',
+            f'Barrio · ¿Salió o no? {capability_label(proposal.capability)} ({proposal.capability}) de {when}: LinkedIn no '
+            'confirmó si se aplicó y no se repite sola. Compruébalo en LinkedIn y respóndelo en Tu turno («¿Salió o no?»).',
+            once='ever'))
+    return alerts
+
+def navegador_deferrals():
+    """ALERT_NAVEGADOR_DEFERRALS (3): writes the navegador left unsent (503) within an hour before the alert."""
+    return int(_number('ALERT_NAVEGADOR_DEFERRALS',3,1,100))
+
+@vigilante
+def navegador_no_disponible(now):
+    """The navegador service: writes it could not send (busy, not started or unreachable: kind not_sent) piling up within
+    the hour, once a day; another internet exit refused (navegador.egress_refused), once per episode. Its reads failing
+    show in lecturas_detenidas and in the jobs; a closed LinkedIn session pauses the account (cuenta_en_pausa)."""
+    from .operador import WRITE_DEFERRED
+    from .connectors_directo import EGRESS_NOTICE
+    from .models import ConnectorAccount
+    alerts=[]
+    unsent=AuditEvent.objects.filter(action=WRITE_DEFERRED,metadata__kind='not_sent',created_at__gte=now-timedelta(hours=1))
+    if unsent.count()>=navegador_deferrals():
+        first=unsent.order_by('created_at').first()
+        alerts.append(Aviso('navegador:no_disponible',
+            f'Barrio · El navegador de LinkedIn no responde: {unsent.count()} escrituras aplazadas sin salir desde '
+            f'{since_text(first.created_at,now)} (el servicio está ocupado, sin arrancar o no se alcanza). Nada llegó a '
+            'LinkedIn y se reintentan solas; si sigue, revisa el servicio navegador en el servidor.'))
+    for event in AuditEvent.objects.filter(action=EGRESS_NOTICE,created_at__gte=now-timedelta(days=2)).order_by('created_at'):
+        account=ConnectorAccount.objects.filter(pk=event.target).first()
+        alerts.append(Aviso(f'navegador:salida:{event.pk}',
+            f'Barrio · El navegador no abre «{account.label if account else event.target}» por otra salida a internet '
+            f'(desde {since_text(event.created_at,now)}). No sale nada a LinkedIn con esa cuenta y lo pendiente espera. En '
+            'el servidor: python -m navegador salida <cuenta> (con --aceptar solo si el cambio de salida es a propósito).',
+            once='ever'))
+    return alerts
 
 # --------------------------------------------------------------------------- the daily summary
 

@@ -8,7 +8,7 @@ from unittest.mock import patch
 import httpx
 from knowledge import providers
 from team_backend import alertas_slack, autopiloto, operador
-from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job, PostComment
+from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job, PostComment, Worker
 from team_backend.tests.test_ventana_lectura import WindowBase, at
 
 ALERTS='https://hooks.slack.test/services/ALERTAS'
@@ -287,3 +287,61 @@ class SummaryTests(SlackBase):
     def test_the_summary_can_be_turned_off(self):
         with patch.dict('os.environ',{'SLACK_DAILY_SUMMARY':'false'}):self.watch(at(21,30))
         self.assertEqual(self.texts(),[])
+
+
+class UrgentAlertTests(SlackBase):
+    def with_word(self,word):
+        return [t for t in self.texts() if word in t]
+
+    def job(self,kind,created,**fields):
+        return Job.objects.create(owner=self.bot,request_hash=uuid.uuid4().hex,agent='operador',task=kind,kind=kind,
+                                  created_at=created,**fields)
+
+    def test_a_lane_whose_worker_takes_nothing(self):
+        Worker.objects.update(last_seen=at(8))
+        self.job('read_inbox',at(9,50))
+        self.job('observe',at(9),state='complete',started_at=at(9,40),finished_at=at(9,41))
+        self.watch(at(10))
+        self.assertEqual(self.with_word('worker'),[])  # 10 min: not yet
+        self.watch(at(10,30));self.watch(at(11))
+        texts=self.with_word('El worker')
+        self.assertEqual(len(texts),1)
+        self.assertIn('El worker de «general» (lecturas, borradores, piezas y lo demás) no está procesando: no da señales de vida. '
+                      '1 trabajo(s) en cola sin empezar, el más viejo («read_inbox») desde las 09:50',texts[0])
+
+    def test_a_lane_that_moves_or_a_long_job_is_told_apart(self):
+        self.job('read_inbox',at(9))
+        self.job('observe',at(9),state='complete',started_at=at(9,55),finished_at=at(9,58))
+        self.job('execute_action',at(9,10))
+        self.job('reconcile_action',at(8),state='running',started_at=at(8,5))
+        self.watch(at(10))
+        texts=self.with_word('El worker')
+        self.assertEqual(len(texts),1)  # «general» started a job 5 min ago: it moves
+        self.assertIn('El worker de «acciones» (las escrituras en LinkedIn y su conciliación) no está procesando: sigue con '
+                      '«reconcile_action» desde las 08:05',texts[0])
+
+    def test_an_uncertain_write_alerts_once(self):
+        contact=Contact.objects.create(account=self.account,provider_user_id='u-7',display_name='P',source='manual')
+        proposal=ActionProposal.objects.create(account=self.account,contact=contact,capability='RED-01',payload={},payload_hash='5'*64,
+                                               state='uncertain')
+        ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin_fake',state='uncertain',
+                                       executed_by=self.gustavo,started_at=at(9))
+        self.watch(at(10));self.watch(at(10,0,1))
+        texts=self.with_word('¿Salió o no?')
+        self.assertEqual(texts,['Barrio · ¿Salió o no? Seguir a una persona (RED-01) de las 09:00: LinkedIn no confirmó si se aplicó y '
+                                'no se repite sola. Compruébalo en LinkedIn y respóndelo en Tu turno («¿Salió o no?»).'])
+
+    def test_the_navegador_not_sending_and_another_exit(self):
+        for minute in (0,10):
+            AuditEvent.objects.create(action=operador.WRITE_DEFERRED,target=str(self.account.id),
+                                      metadata={'kind':'not_sent','capability':'RED-01'},created_at=at(9,minute))
+        AuditEvent.objects.create(action=operador.WRITE_DEFERRED,target=str(self.account.id),metadata={'kind':'budget'},created_at=at(9,5))
+        self.watch(at(9,30))
+        self.assertEqual(self.with_word('navegador'),[])  # two in an hour: a busy browser, not an outage
+        AuditEvent.objects.create(action=operador.WRITE_DEFERRED,target=str(self.account.id),metadata={'kind':'not_sent'},created_at=at(9,20))
+        AuditEvent.objects.create(action='navegador.egress_refused',target=str(self.account.id),metadata={'since':'x'},created_at=at(9,25))
+        self.watch(at(9,40));self.watch(at(9,50))
+        texts=self.with_word('navegador')
+        self.assertEqual(len(texts),2)
+        self.assertIn('3 escrituras aplazadas sin salir desde las 09:00',texts[0])
+        self.assertIn('no abre «Cuenta simulada» por otra salida a internet (desde las 09:25)',texts[1])
