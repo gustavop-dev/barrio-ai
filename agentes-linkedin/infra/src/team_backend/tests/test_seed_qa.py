@@ -201,6 +201,8 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(set(control.initial_main),{str(uid(f'main:{n}')) for n in range(1,6)})
         self.assertEqual(Referent.objects.filter(account_id=account_id,protected=True).count(),5)
         self.assertEqual(Referent.objects.filter(account_id=account_id,protected=False,active=True).count(),3)
+        # 13-referentes-proteccion reads «Industria» on Ana's card.
+        self.assertEqual(list(Referent.objects.filter(account_id=account_id,kind='industria').values_list('public_identifier',flat=True)),['analu-torres'])
         self.assertEqual((ReferentReview.objects.count(),ReferentChange.objects.count(),
                           ReferentExperiment.objects.count(),ReferentNotice.objects.count()),(1,3,1,1))
         reviews=app.get('/api/v1/referentes/revisiones').json()

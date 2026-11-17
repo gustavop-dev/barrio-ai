@@ -1,0 +1,125 @@
+# cubre: PRS-12, OBS-01
+# Personas › Referentes with five protected main referents and three variable ones (seed_qa --referentes-mensual,
+# chosen for this flow by scripts/qa/correr-maestro.sh; Ana Lucía Torres is a variable referent of industry). The QA
+# user is Gustavo, so every card has «Gestionar protección de …». Until 17/11/2026 that button was drawn BLANK in the
+# release build (its label reached the button as an array of strings, outside any <Text>), and 19-referentes-mensual
+# only tapped it by its testID. Here its text is checked on a main card and on a variable one (the button's id and
+# its text in one selector), Gustavo opens it on Ana, deactivates her from the sheet and saves: the sheet closes and
+# her card reads «Inactivo» with «Reactivar a Ana Lucía Torres». A main card never offers «Quitar».
+# Card ids: seed_qa.uid('main:1') and uid('referent:analu-torres').
+appId: co.projectapp.office
+name: Referentes · protección
+tags: [personas, referentes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- tapOn:
+    id: personas-referentes
+- extendedWaitUntil:
+    visible:
+      id: referentes-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: referent-add
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: referent-account
+    commands:
+      - tapOn:
+          id: referent-account
+      - tapOn: "LinkedIn de Gustavo.*"
+
+# ---------------------------------------------------------------- a main card: the button says what it does
+# cubre: PRS-12, OBS-01
+- scrollUntilVisible:
+    element:
+      id: protect-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible:
+    id: protect-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
+    text: "Gestionar protección de Main QA 1"
+- assertVisible: "Main · Protegido"
+- assertNotVisible: "Quitar a Main QA 1"
+- takeScreenshot: 13-referentes-proteccion-01-main
+
+# ---------------------------------------------------------------- a variable referent of industry
+# cubre: PRS-12, OBS-01
+- scrollUntilVisible:
+    element:
+      id: protect-e7653e07-4b37-5215-aadf-005ec293209e
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible:
+    id: protect-e7653e07-4b37-5215-aadf-005ec293209e
+    text: "Gestionar protección de Ana Lucía Torres"
+- assertVisible: "Industria"
+- assertVisible: "Desactivar a Ana Lucía Torres"
+- assertVisible: "Quitar a Ana Lucía Torres"
+- takeScreenshot: 13-referentes-proteccion-02-variable
+- tapOn:
+    id: protect-e7653e07-4b37-5215-aadf-005ec293209e
+- extendedWaitUntil:
+    visible:
+      id: referent-protection
+    timeout: 20000
+- tapOn:
+    id: protection-active
+- tapOn:
+    text: "Inactivo"
+    childOf:
+      id: referent-protection
+- scrollUntilVisible:
+    element:
+      text: 'Variable → Variable; inactivo; posición 0 → 0\.'
+      childOf:
+        id: referent-protection
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- takeScreenshot: 13-referentes-proteccion-03-hoja
+- scrollUntilVisible:
+    element:
+      text: "Guardar decisión"
+      childOf:
+        id: referent-protection
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: "Guardar decisión"
+    childOf:
+      id: referent-protection
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    notVisible:
+      id: referent-protection
+    timeout: 20000
+# Saved: after the refresh her card reads «Inactivo» and offers «Reactivar».
+- scrollUntilVisible:
+    element:
+      text: "Reactivar a Ana Lucía Torres"
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- assertVisible: "Inactivo"
+- assertVisible:
+    id: protect-e7653e07-4b37-5215-aadf-005ec293209e
+    text: "Gestionar protección de Ana Lucía Torres"
+- takeScreenshot: 13-referentes-proteccion-04-guardado
