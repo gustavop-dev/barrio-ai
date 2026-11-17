@@ -311,6 +311,7 @@ class Contact(models.Model):
         SEARCH='search','Búsqueda'
         INCOMING='incoming','Invitación recibida'
         MANUAL='manual','Añadido a mano'
+        REFERRAL='referido','Referido por un comprador que respondió (fase 6)'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='contacts')
     provider_user_id=models.CharField(max_length=200)
@@ -339,6 +340,9 @@ class Contact(models.Model):
     connected_at=models.DateTimeField(null=True,blank=True)
     discovered_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
+    # Phase 5 (sin_posts.py): this person is the bridge («puente») to the buyer of that journey, a colleague at the
+    # same company who does post. Its own contact with its own role, never a second buyer. Null for everyone else.
+    bridge_for=models.ForeignKey('BuyerJourney',on_delete=models.SET_NULL,null=True,blank=True,related_name='bridges')
     class Meta:
         ordering=['-updated_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_contact_per_account')]
@@ -1566,3 +1570,303 @@ class StrategyChange(models.Model):
         ordering=['review','position']
         constraints=[models.UniqueConstraint(fields=['review','position'],name='one_strategy_change_per_position')]
     def __str__(self):return f'{self.title} · {self.get_state_display()}'
+
+
+# ---------------------------------------------------------------------------
+# The buyer's journey (comprador.py; docs/plan-outbound.md «El sistema del comprador»). One record per buyer beside
+# Contact, whose Stage stays as it is, and the append-only log of what happened to that person: touches the team made,
+# signals the person gave and changes of state. BuyerJourney is a projection: comprador.update() rebuilds it from the
+# person's BuyerTouch rows in time order, so the same facts always give the same journey (live or rebuilt).
+
+class BuyerJourney(models.Model):
+    class Step(models.TextChoices):
+        CHOSEN='elegido','Elegido'
+        WARMING='calentando','Calentando'
+        INVITED='invitado','Invitado'
+        ACCEPTED='acepto','Aceptó'
+        MESSAGE_1='mensaje_1','Mensaje 1'
+        MESSAGE_2='mensaje_2','Mensaje 2'
+        MESSAGE_3='mensaje_3','Mensaje 3'
+        MESSAGE_4='mensaje_4','Mensaje 4'
+        REPLIED='respondio','Respondió'
+        INTERESTED='interesado','Interesado'
+        MEETING='reunion','Reunión agendada'
+        RESTING='descanso','En descanso; puede volver'
+        LEFT='salio','Salió del recorrido'
+    class Route(models.TextChoices):
+        UNKNOWN='sin_definir','Sin definir'
+        COMMENTS='comentarios','Publica: se calienta con comentarios'
+        NO_POSTS='sin_posts','No publica'
+    class Entry(models.TextChoices):
+        OUTBOUND='saliente','El equipo lo eligió'
+        INBOUND='entrante','Llegó con su invitación'
+    class RestReason(models.TextChoices):
+        NO_WARM_REPLY='sin_respuesta_calentamiento','Sin respuesta al calentamiento'
+        INVITE_NOT_ACCEPTED='invitacion_no_aceptada','Invitación no aceptada'
+        SEQUENCE_NO_REPLY='secuencia_sin_respuesta','Secuencia terminada sin respuesta'
+        NOT_NOW='no_es_el_momento','No es el momento'
+    class ExitReason(models.TextChoices):
+        # Definitive (Gustavo, 17/11/2026): the buyer machine never contacts the person again.
+        DO_NOT_CONTACT='pidio_no_contacto','Pidió no ser contactado'
+        NOT_INTERESTED='no_le_interesa','No le interesa'
+        DISCARDED_BY_GUSTAVO='descartado_por_gustavo','Descartado por Gustavo'
+        # Closed by a rule in force today (red.py); something the person does (accepting, writing) reopens it.
+        OUT_OF_CRITERIA='fuera_de_criterio','Dejó de cumplir el criterio de comprador'
+        INVITATION_CLOSED='invitacion_cerrada','Invitación ignorada o retirada'
+        RESTRICTED='perfil_restringido','Perfil restringido'
+    class Origin(models.TextChoices):
+        LIVE='en_vivo','Registrado al ocurrir'
+        REBUILT='reconstruido','Reconstruido desde el historial'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    contact=models.OneToOneField(Contact,on_delete=models.CASCADE,related_name='buyer_journey')
+    entry=models.CharField(max_length=10,choices=Entry.choices,default=Entry.OUTBOUND)
+    route=models.CharField(max_length=12,choices=Route.choices,default=Route.UNKNOWN)
+    step=models.CharField(max_length=12,choices=Step.choices,default=Step.CHOSEN,db_index=True)
+    # When something is due for this person (comprador.next_at); null when nothing is scheduled.
+    next_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    # Retries: the current attempt and every attempt so far, [{numero, desde, angulo, hasta, motivo}].
+    attempt=models.PositiveSmallIntegerField(default=1)
+    attempts=models.JSONField(default=list,blank=True)
+    rest_reason=models.CharField(max_length=30,choices=RestReason.choices,blank=True)
+    rest_until=models.DateTimeField(null=True,blank=True)
+    exit_reason=models.CharField(max_length=30,choices=ExitReason.choices,blank=True)
+    exited_at=models.DateTimeField(null=True,blank=True)
+    exit_step=models.CharField(max_length=12,blank=True)  # the step it was in when it left
+    # Milestones: the first time each one happened, across attempts (the funnel counts them).
+    chosen_at=models.DateTimeField(db_index=True)
+    warming_at=models.DateTimeField(null=True,blank=True)
+    invited_at=models.DateTimeField(null=True,blank=True)
+    invite_note=models.BooleanField(null=True,blank=True)  # the first invitation went with a note; null: no invitation or unknown
+    accepted_at=models.DateTimeField(null=True,blank=True)
+    first_message_at=models.DateTimeField(null=True,blank=True)
+    last_message_at=models.DateTimeField(null=True,blank=True)
+    replied_at=models.DateTimeField(null=True,blank=True)
+    interested_at=models.DateTimeField(null=True,blank=True)
+    meeting_at=models.DateTimeField(null=True,blank=True)
+    # Counters. messages_sent and warm_comments belong to the current attempt; comments_before_invite to the first invitation.
+    messages_sent=models.PositiveSmallIntegerField(default=0)
+    warm_comments=models.PositiveSmallIntegerField(default=0)
+    comments_before_invite=models.PositiveSmallIntegerField(default=0)
+    visits=models.PositiveSmallIntegerField(default=0)
+    # Signals the person gave (direction «entrante»): how many, the latest, and whether one came before the first invitation.
+    inbound_signals=models.PositiveIntegerField(default=0)
+    last_inbound_at=models.DateTimeField(null=True,blank=True)
+    signal_before_invite=models.BooleanField(default=False)
+    # Phase 6: the person who pointed to this one after her message 3 («¿no eres la persona indicada?»;
+    # secuencia_comprador.link_referral). Null when nobody referred her.
+    referred_by=models.ForeignKey('self',on_delete=models.SET_NULL,null=True,blank=True,related_name='referrals')
+    # Phase 6 (respuesta_comprador.py): the type of her latest classified reply (interesado, pide_informacion,
+    # no_es_el_momento, no_le_interesa, otra_persona, otro); the identifier that travels in her booking link
+    # (?metadata[barrio]=…, agenda_calcom matches the Cal.com booking with it); and the date of the booked meeting.
+    reply_type=models.CharField(max_length=20,blank=True)
+    booking_ref=models.CharField(max_length=24,null=True,blank=True,unique=True)
+    meeting_date=models.DateTimeField(null=True,blank=True)
+    origin=models.CharField(max_length=12,choices=Origin.choices,default=Origin.LIVE)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-chosen_at']
+    def __str__(self):return f'{self.contact} · {self.get_step_display()}'
+
+class BuyerTouch(models.Model):
+    """One entry of a buyer's log; never edited nor deleted. `key` names its source (an execution, a comment, a message…)
+    so the same fact is recorded once, whether a live hook or the rebuild sees it first."""
+    class Direction(models.TextChoices):
+        OUT='saliente','Lo hizo el equipo o Gustavo'
+        IN='entrante','Lo hizo la persona'
+        STATE='estado','Cambio de estado del recorrido'
+    class Kind(models.TextChoices):
+        # estado
+        CHOSEN='elegido','Elegido como comprador'
+        ROUTE='ruta','Ruta decidida'
+        ANGLE='angulo','Ángulo del intento'
+        REST='descanso','Pasa a descanso'
+        RETRY='reintento','Nuevo intento'
+        EXIT='salida','Sale del recorrido'
+        REOPENED='reabierto','Vuelve al recorrido'
+        ALREADY_CONNECTED='ya_conectados','Ya eran conexión'
+        NO_MESSAGE='no_escribirle','Gustavo decidió no escribirle'
+        DRAFT='borrador','Borrador preparado o descartado (fase 3)'
+        OPPORTUNITY='oportunidad','Oportunidad registrada'
+        INTERESTED='interesado','Respuesta con interés'
+        REFERRED='referido','Llegó referido por otra persona (su mensaje 3)'
+        BRIDGE='puente','Puente por otra persona de su empresa (fase 5)'
+        RECHECK='reverificacion','Reverificación de sus señales de compra al terminar un descanso (fase 5)'
+        REPLY_CLASSIFIED='respuesta_clasificada','Su respuesta clasificada (fase 6)'
+        MEETING_CANCELLED='reunion_cancelada','Reunión cancelada (fase 6)'
+        # saliente
+        FOLLOW='seguir','Seguir (RED-01)'
+        COMMENT='comentario','Comentario en un post suyo (INT-03)'
+        REACTION='reaccion','Reacción a un post o comentario suyo (INT-02)'
+        THREAD_REPLY='respuesta_hilo','Respuesta a su comentario en un post de Gustavo (INT-04)'
+        VISIT='visita','Visita a su perfil'
+        INVITATION='invitacion','Invitación (RED-02)'
+        ACCEPTED_THEIRS='aceptaste_invitacion','Gustavo aceptó su invitación (RED-04)'
+        MESSAGE='mensaje','Mensaje enviado por Gustavo («Hecho, le escribí»)'
+        MESSAGE_SEEN='mensaje_visto','Mensaje de Gustavo leído en el inbox'
+        REPLY_SENT='respuesta_enviada','Respuesta enviada por Gustavo a lo que ella escribió (fase 6)'
+        # entrante
+        REPLIED_COMMENT='respondio_comentario','Respondió a un comentario del equipo'
+        COMMENTED_POST='comento_post','Comentó en un post de Gustavo'
+        REACTED_POST='reacciono_post','Reaccionó a un post de Gustavo'
+        FOLLOWED_US='nos_siguio','Siguió a Gustavo'
+        INVITED_US='nos_invito','Invitó a Gustavo'
+        ACCEPTED_OURS='acepto_invitacion','Aceptó la invitación'
+        OPENED_CONVERSATION='abrio_conversacion','Le escribió primero'
+        REPLIED_MESSAGE='respondio_mensaje','Respondió un mensaje'
+        MEETING='reunion','Agendó una reunión'
+        BRIDGE_SIGNAL='senal_puente','Su colega (el puente) aceptó o interactuó'
+    class Source(models.TextChoices):
+        LIVE='en_vivo','Registrado al ocurrir'
+        REBUILT='reconstruido','Reconstruido desde el historial'
+        PHASE='fase','Registrado por una fase del recorrido'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    journey=models.ForeignKey(BuyerJourney,on_delete=models.CASCADE,related_name='touches')
+    kind=models.CharField(max_length=24,choices=Kind.choices)
+    direction=models.CharField(max_length=10,choices=Direction.choices)
+    at=models.DateTimeField(db_index=True)
+    key=models.CharField(max_length=200)
+    detail=models.JSONField(default=dict,blank=True)
+    source=models.CharField(max_length=12,choices=Source.choices,default=Source.LIVE)
+    proposal=models.ForeignKey(ActionProposal,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    execution=models.ForeignKey(ActionExecution,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    post=models.ForeignKey(ObservedPost,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    comment=models.ForeignKey(PostComment,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    conversation=models.ForeignKey(Conversation,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    opportunity=models.ForeignKey(Opportunity,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    outcome=models.ForeignKey(ActionOutcome,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['at','created_at']
+        constraints=[models.UniqueConstraint(fields=['journey','key'],name='one_buyer_touch_per_key')]
+    def save(self,*args,**kwargs):
+        if not self._state.adding:raise ValueError('El registro del comprador solo se añade; no se edita.')
+        super().save(*args,**kwargs)
+    def delete(self,*args,**kwargs):raise ValueError('El registro del comprador solo se añade; no se borra.')
+    def __str__(self):return f'{self.kind} · {self.at:%Y-%m-%d}'
+
+class BuyerDraft(models.Model):
+    """A text the team prepared for a buyer (phase 3, mensajes_comprador.py): the first message after the acceptance, which
+    Gustavo sends himself from LinkedIn (INB-08: the app never sends one), or the note of an invitation. One decision per
+    person, kind, number and attempt, including the decision not to write (sin_borrador) and the reason. Phase 4
+    (secuencia_comprador.py) adds messages 2–4 with `number`, cancelled when she replies. It hangs from the Contact, so it
+    outlives a rebuilt journey."""
+    class Kind(models.TextChoices):
+        MESSAGE='mensaje','Mensaje privado (el primero después de aceptar; fase 4: los seguimientos 2 a 4)'
+        NOTE='nota','Nota de la invitación'
+        REPLY='respuesta','Respuesta a lo que ella escribió (fase 6; `number`: su n-ésima respuesta del intento)'
+    class State(models.TextChoices):
+        REVIEWING='en_revision','Esperando la revisión del líder'
+        READY='listo','Listo: en Tu turno (mensaje) o esperando la invitación (nota)'
+        USED='usada','Nota puesta en una invitación'
+        SENT='enviado','Enviado (Gustavo le escribió o la nota salió con la invitación)'
+        NOT_SENT='no_enviado','No enviado (Gustavo decidió no escribirle o la invitación salió sin la nota)'
+        DISCARDED='descartado','Descartado por las reglas fijas o el líder'
+        NONE='sin_borrador','Sin borrador: nada real que citar, sin cupo de notas o ya hay conversación'
+        EXPIRED='caducado','Caducado sin usar'
+        REPLACED='reemplazado','Reemplazado: ya hubo otro primer mensaje o la persona ya no está en ese paso'
+        CANCELLED='cancelado','Cancelado: la persona respondió y la secuencia se detuvo'
+    class StoppedBy(models.TextChoices):
+        RULES='reglas','Reglas fijas'
+        JUDGE='juez','Líder (Jev)'
+        FACT='hecho','Nada real que citar'
+        QUOTA='cupo','Sin cupo de notas este mes'
+        CONVERSATION='conversacion','Ya hay una conversación'
+        LINK='agenda','Sin enlace de agenda (CALCOM_BOOKING_URL vacío)'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    contact=models.ForeignKey(Contact,on_delete=models.CASCADE,related_name='buyer_drafts')
+    kind=models.CharField(max_length=12,choices=Kind.choices)
+    number=models.PositiveSmallIntegerField(default=1)  # 1: the first message; phase 4: the follow-ups 2–4
+    attempt=models.PositiveSmallIntegerField(default=1)  # the journey's attempt it belongs to
+    state=models.CharField(max_length=12,choices=State.choices,db_index=True)
+    stopped_by=models.CharField(max_length=12,choices=StoppedBy.choices,blank=True)
+    reason=models.TextField(blank=True)  # why it was written (its fact) or why it stopped
+    text=models.TextField(blank=True)
+    language=models.CharField(max_length=10,blank=True)
+    # The fact the first line (or the note) cites: {id, tipo, texto, fecha, fuente…}; every fact it was given in `inputs`.
+    anchor=models.JSONField(default=dict,blank=True)
+    inputs=models.JSONField(default=dict,blank=True)
+    citations=models.JSONField(default=list,blank=True)
+    issues=models.JSONField(default=list,blank=True)  # the fixed rules it broke (after the single redraft)
+    review=models.JSONField(default=dict,blank=True)  # the lead's verdict, with the course grounding it read
+    model=models.CharField(max_length=100,blank=True)
+    show_at=models.DateTimeField(null=True,blank=True)  # a message's card never shows the minute she accepted
+    proposal=models.ForeignKey(ActionProposal,on_delete=models.SET_NULL,null=True,blank=True,related_name='buyer_drafts')
+    created_at=models.DateTimeField(default=timezone.now)
+    decided_at=models.DateTimeField(null=True,blank=True)  # ready, discarded or not written
+    closed_at=models.DateTimeField(null=True,blank=True)  # sent, not sent, expired or replaced
+    closed_note=models.TextField(blank=True)
+    class Meta:
+        ordering=['-created_at']
+        constraints=[models.UniqueConstraint(fields=['contact','kind','number','attempt'],name='one_buyer_draft_per_step')]
+    def __str__(self):return f'{self.contact} · {self.kind} {self.number} · {self.state}'
+
+class MeetingBooking(models.Model):
+    """Phase 6 (agenda_calcom.py): a meeting a buyer booked through Gustavo's Cal.com link, as its signed webhook told it
+    (BOOKING_CREATED, BOOKING_RESCHEDULED, BOOKING_CANCELLED), or that Gustavo marked by hand («Agendó»). The body is only
+    trusted to match it with a journey: the identifier the link carries (metadata[barrio] → `ref`), else the attendee's
+    email or name against what Barrio knows; nothing matched stays «sin_emparejar» for Gustavo to associate."""
+    class State(models.TextChoices):
+        BOOKED='agendada','Agendada'
+        RESCHEDULED='reprogramada','Reprogramada: la reemplaza otra reserva'
+        CANCELLED='cancelada','Cancelada'
+        DISCARDED='descartada','Descartada por Gustavo (no era de un comprador)'
+    class MatchedBy(models.TextChoices):
+        LINK='enlace','Identificador del enlace'
+        EMAIL='correo','Correo que ella escribió en la conversación'
+        NAME='nombre','Nombre exacto, una sola candidata'
+        PREVIOUS='reserva_anterior','La reserva que reprograma'
+        GUSTAVO='gustavo','Gustavo la asoció'
+        MANUAL='manual','«Agendó» a mano'
+        NONE='sin_emparejar','Sin emparejar'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    provider=models.CharField(max_length=20,default='calcom')
+    uid=models.CharField(max_length=200,unique=True)  # Cal.com's booking uid; «manual:<draft>» for «Agendó»
+    previous_uid=models.CharField(max_length=200,blank=True)  # the booking it reschedules (payload.rescheduleUid)
+    state=models.CharField(max_length=14,choices=State.choices,default=State.BOOKED,db_index=True)
+    start_at=models.DateTimeField(null=True,blank=True)
+    end_at=models.DateTimeField(null=True,blank=True)
+    attendee_name=models.CharField(max_length=200,blank=True)
+    attendee_email=models.CharField(max_length=254,blank=True)
+    ref=models.CharField(max_length=40,blank=True)  # what travelled in the link (metadata[barrio])
+    journey=models.ForeignKey(BuyerJourney,on_delete=models.SET_NULL,null=True,blank=True,related_name='bookings')
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='bookings')
+    matched_by=models.CharField(max_length=16,choices=MatchedBy.choices,default=MatchedBy.NONE)
+    matched_at=models.DateTimeField(null=True,blank=True)
+    events=models.JSONField(default=list,blank=True)  # [{evento, at, cuerpo_sha256}] each webhook that touched it
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-created_at']
+    def __str__(self):return f'{self.uid} · {self.state}'
+
+class LeadHandoff(models.Model):
+    """Phase 6 (entrega_lead.py): the lead handed to the sales machine once the meeting is booked, source-neutral (today
+    only «linkedin»): who and the company, the journey (entry signal, touches, messages sent, the one she replied to, the
+    bridge or the referral), the conversation in three lines, the meeting and what the team knows of the business with
+    its sources. No qualification: that is the sales machine's. A model and not a JSON on the journey: the sales machine
+    reads every source the same way and by state, and the opportunity, the conversation and the journey hang from it.
+    Only Gustavo creates the opportunity (PRS-09): «Crear la oportunidad» confirms it with one tap."""
+    class Source(models.TextChoices):
+        LINKEDIN='linkedin','LinkedIn (máquina del comprador)'
+    class State(models.TextChoices):
+        READY='lista','Lista: espera que Gustavo cree o vincule la oportunidad'
+        CONFIRMED='confirmada','Oportunidad creada o vinculada'
+        CANCELLED='cancelada','La reunión se canceló'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    key=models.CharField(max_length=120,unique=True)  # «linkedin:<journey>:<attempt>»: one handoff per journey attempt
+    source=models.CharField(max_length=20,choices=Source.choices,default=Source.LINKEDIN)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.READY,db_index=True)
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    journey=models.ForeignKey(BuyerJourney,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    booking=models.ForeignKey(MeetingBooking,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    conversation=models.ForeignKey(Conversation,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    opportunity=models.ForeignKey(Opportunity,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    meeting_at=models.DateTimeField(null=True,blank=True)
+    data=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    confirmed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-created_at']
+    def __str__(self):return f'{self.source} · {self.contact} · {self.state}'

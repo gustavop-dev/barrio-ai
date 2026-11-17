@@ -26,6 +26,10 @@ from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one 
 CRITERIA_DEL_BARRIO=_lead_criteria()
 LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
+WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
+INVITE_NOTE_UNITS=operador.INVITE_NOTE_UNITS  # loaded only when the lead reviews a buyer's invitation note (phase 3)
+SEQUENCE_UNITS=operador.SEQUENCE_UNITS  # loaded only when the lead reviews a follow-up 2–4 of the sequence (phase 4)
+BUYER_REPLY_UNITS=operador.BUYER_REPLY_UNITS  # loaded only when the lead reviews the reply to what a buyer wrote (phase 6)
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
@@ -35,16 +39,28 @@ CRITERION_SOURCES={
     'dm_toque':['LI-09-M003-K02','LI-09-V011-K01'],'dm_puente':['LI-09-M003-K02','LI-09-M003-K04'],
     'dm_pregunta':['LI-09-M003-K03'],'dm_un_tema':['LI-09-M003-K04'],'dm_en_persona':['LI-09-M004-K02'],
     'dm_pitch':['LI-09-M002-K04','LI-03-M006-K01'],
+    # BIB-09-comentario-calentamiento: the class 07 criterion behind each question about a warm-up comment.
+    'cal_aporte':['LI-07-M005-K05','LI-07-M001-K04'],'cal_pregunta':['LI-07-M005-K05'],'cal_aplauso':['LI-07-M001-K04','LI-07-M005-K05'],
+    # BIB-09-nota-invitacion: the class 09 criterion behind each question about a buyer's invitation note.
+    'nota_hecho':['LI-09-M002-K06','LI-09-V008-K04'],'nota_aceptar':['LI-09-V008-K04'],'nota_generica':['LI-09-M002-K06','LI-09-V008-K04'],
+    'nota_pitch':['LI-09-M002-K06','LI-03-M006-K01'],'nota_inventa':['LI-06-M001-K07'],
+    # BIB-11-respuesta-comprador: the class 11, 08 and 12 criterion behind each question about the reply to a buyer.
+    'resp_responde':['LI-11-M006-K01'],'resp_pitch':['LI-11-M006-K01','LI-08-M003-K05'],'resp_presiona':['LI-08-M003-K05'],
+    'resp_inventa':['LI-11-M006-K01'],'resp_paso_facil':['LI-12-M001-K04'],'resp_insiste':['LI-11-M006-K03','LI-08-M003-K05'],
+    'resp_agradece':['LI-11-M006-K02'],
 }
 
 def ground_questions(state,questions):
-    """Load the lead's units (and, with a first message to judge, the activated class 09 units) and point each question
-    at its criterion. If the class 09 units are missing, the first message is not judged (no card) and the rest of the
-    review goes on as before."""
+    """Load the lead's units (and, with a first message to judge, the activated class 09 units; with a warm-up comment,
+    the activated class 07/10 units) and point each question at its criterion. If the class 09 units are missing, the
+    first message is not judged (no card) and the rest of the review goes on as before. If the warm-up units are missing,
+    course_missing says so and the review waits (lider._review: retry): a buyer is never commented without them."""
     def ground(units,metodologia=None):
         return operador.role_context('lider',units,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},
                                      metodologia=metodologia)
-    if 'primer_mensaje' in state:
+    if 'calentamiento' in state:
+        context,grounding=ground(LEAD_UNITS+[u for u in WARMUP_COMMENT_UNITS if u not in LEAD_UNITS],metodologia='comentario_calentamiento')
+    elif 'primer_mensaje' in state:
         context,grounding=ground(LEAD_UNITS+[u for u in FIRST_MESSAGE_UNITS if u not in LEAD_UNITS],metodologia='primer_mensaje')
         if grounding['course_missing'] and set(grounding['course_missing'])<=set(FIRST_MESSAGE_UNITS):
             state.pop('primer_mensaje')
@@ -84,6 +100,28 @@ DM_CHECKS=[('dm_toque','min',0.7,'el primer mensaje no retoma algo concreto que 
            ('dm_en_persona','min',0.6,'el primer mensaje no suena a lo que le diría en persona'),
            ('dm_pitch','max',0.2,'el primer mensaje vende o pide una reunión')]
 DM_IDS=frozenset(qid for qid,*_ in DM_CHECKS)
+# BIB-09-comentario-calentamiento: a comment on a warming buyer's post is also judged as a warm-up comment (LI-07-M005-K05,
+# LI-07-M001-K04): an own concrete contribution, one open question about their experience, no applause. Length, the
+# question mark and applause or selling words are fixed rules first (autopiloto.warmup_text_issues). A failing check
+# discards the comment, like the other checks of a comment.
+CAL_CHECKS=[('cal_aporte','min',0.7,'el comentario de calentamiento no aporta algo propio y concreto'),
+            ('cal_pregunta','min',0.6,'el comentario de calentamiento no termina en una pregunta abierta sobre su experiencia'),
+            ('cal_aplauso','max',0.2,'el comentario de calentamiento aplaude o felicita en vez de aportar')]
+CAL_IDS=frozenset(qid for qid,*_ in CAL_CHECKS)
+
+def warmup_questions():
+    return {
+        'cal_aporte':_noul('¿El `comentario` aporta algo propio y concreto que la `publicacion` no dice (un mecanismo, una práctica, '
+                           'un matiz o un hecho de `hechos_publicos_de_gustavo`), en vez de repetirla, resumirla o elogiarla?',
+                           'Suma una idea concreta propia sobre lo que cuenta el autor',
+                           'Repite o resume la publicación, felicita, o es una opinión genérica que serviría para cualquier post'),
+        'cal_pregunta':_noul('¿El `comentario` termina con una sola pregunta abierta y concreta sobre la experiencia, la decisión o el '
+                             'aprendizaje del autor, que puede contestar en el hilo?',
+                             'Una pregunta acotada sobre qué hizo, qué eligió o qué cambiaría',
+                             'Ninguna pregunta, varias, una retórica o una genérica («¿qué opinas?», «¿cómo lo ves?»)'),
+        'cal_aplauso':_noul('¿El `comentario` es sobre todo un aplauso o una felicitación («gran post», «felicidades», emojis de '
+                            'aplauso) en vez de un aporte?'),
+    }
 DM_UNAVAILABLE='Líder: el primer mensaje no se juzgó (Biblioteca no disponible para la clase 09)'
 
 def drafted_message(proposal):
@@ -92,7 +130,18 @@ def drafted_message(proposal):
     decision=proposal.comment.decision or {}
     return (decision.get('dm_opener') or '').strip() if decision.get('closing') else ''
 
-def dm_questions():
+def dm_questions(source='conversacion'):
+    """The six questions about a first message. `conversacion`: RSP-07, the message after a conversation on his post
+    (unchanged). `recorrido` (phase 3): the buyer's journey, whose facts are `hechos` (an interaction, a post of hers the
+    team commented, a buying signal); same ids and thresholds (DM_CHECKS)."""
+    if source=='recorrido':
+        toque=_noul('¿La primera frase de `primer_mensaje.texto` retoma con precisión uno de `hechos` (lo que la persona publicó, '
+                    'respondió o comentó, o la señal citada), de modo que no serviría para otra persona?',
+                    'Nombra de qué trataba su post, qué respondió o qué señal, en concreto',
+                    'Saluda, agradece la conexión o alude a «tu post» o «tu trabajo» sin decir de qué')
+        puente=_noul('¿`primer_mensaje.texto` dice con honestidad por qué Gustavo le escribe: ese tema de `hechos` que les interesa a '
+                     'los dos, y no sus servicios ni a quién ayuda?')
+        return dict(dm_questions(),dm_toque=toque,dm_puente=puente)
     return {
         'dm_toque':_noul('¿La primera frase de `primer_mensaje.texto` retoma algo concreto que la persona dijo en `comentario` o en '
                          'el `hilo`, de modo que no serviría para otra persona?',
@@ -128,6 +177,8 @@ ROLE_MEANING={
     'aliado':'aliado: ofrece a startups un servicio complementario al de Gustavo, no competidor',
     'divulgador':'divulgador: crea contenido con audiencia sobre los temas del barrio',
     'lider':'líder: dirige una empresa, una comunidad o un equipo en tecnología o negocio',
+    # Phase 5 (sin_posts.py): not a role of the classifier's table; a rule of Gustavo's route sets it.
+    'puente':'puente: colega, en la misma empresa, de un posible comprador que no publica; el equipo lo calienta para llegar a él',
 }
 
 def network_checks(capability,role=None):
@@ -182,6 +233,8 @@ def _questions(proposal,orientation):
     if capability==CAP.COMMENT:
         post=proposal.post
         state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'comentario':proposal.payload['text']}
+        from . import calentamiento
+        warm=calentamiento.warmup_post(post)
         questions={
             'aporta':_noul('¿El `comentario` aporta algo concreto a la conversación de la `publicacion`: una opinión con fundamento, '
                            'un matiz o una pregunta específica?','Aporta una idea concreta relacionada con el tema de la publicación',
@@ -191,6 +244,11 @@ def _questions(proposal,orientation):
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
         }
+        if warm:
+            state['calentamiento']={'autor':post.author_name,
+                                    'que_es':'Comentario en el post de un posible cliente al que Gustavo calienta antes de invitarlo: '
+                                             'un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir.'}
+            questions.update(warmup_questions())
         kind='text'
     elif capability==CAP.REPLY:
         row=proposal.comment;piece=row.piece;decision=row.decision or {}
@@ -281,7 +339,10 @@ def _questions(proposal,orientation):
     checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
-    if capability==CAP.INVITE and proposal.payload.get('note'):
+    # A buyer's note (phase 3) was already judged with its own methodology (review_buyer_draft): only the person is
+    # reviewed here, and note_approved follows from that review.
+    from .mensajes_comprador import approved_note
+    if capability==CAP.INVITE and proposal.payload.get('note') and not approved_note(proposal):
         state['nota']=proposal.payload['note'];state['razon_nota']=proposal.payload.get('note_reason')
         public,_=memory.confirmed_blocks();state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
         questions.update(
@@ -300,6 +361,7 @@ def _questions(proposal,orientation):
         checks=[(qid,bound,GUSTAVO_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
     ground_questions(state,questions)
     if 'primer_mensaje' in state:checks.extend(DM_CHECKS)  # still there: its class 09 units were loaded
+    if 'calentamiento' in state:checks.extend(CAL_CHECKS)
     return state,questions,checks
 
 def review(proposal):
@@ -332,6 +394,168 @@ def _review(proposal):
     elif drafted_message(proposal):verdict.update(dm_approved=False,dm_reasons=[DM_UNAVAILABLE])
     return verdict
 
+# --------------------------------------------------------------------------- phase 3: the buyer's drafts
+# BIB-09-primer-mensaje-comprador: the first message of the journey is judged with the six DM checks (dm_questions with
+# the journey's facts) plus «inventa». BIB-09-nota-invitacion: the note with five checks of its own. Each review loads
+# the lead's units and the activated methodology's, whole; a missing unit makes the draft wait (retry), never pass.
+BUYER_MESSAGE_CHECKS=DM_CHECKS+[('inventa','max',0.2,'el primer mensaje atribuye a Gustavo algo que no está en sus hechos')]
+NOTE_CHECKS=[('nota_hecho','min',0.7,'la nota no nombra con precisión un hecho concreto de la persona'),
+             ('nota_aceptar','min',0.6,'la nota no busca solo que acepte'),
+             ('nota_generica','max',0.2,'la nota serviría para cualquiera'),
+             ('nota_pitch','max',0.2,'la nota vende o lo insinúa'),
+             ('nota_inventa','max',0.2,'la nota inventa hechos de la persona o atribuye a Gustavo algo que no está en sus hechos')]
+
+def note_questions():
+    return {
+        'nota_hecho':_noul('¿`nota.texto` nombra con precisión uno de `hechos` (de qué trataba su post, qué respondió o qué señal), '
+                           'y no solo «tu post» o «tu trabajo»?','Dice de qué trataba lo que publicó o respondió',
+                           'Alude a su post, su perfil o su trabajo sin decir de qué'),
+        'nota_aceptar':_noul('¿El único trabajo de `nota.texto` es que la persona acepte la invitación: propone conectar por ese hecho, '
+                             'sin pedir nada más?'),
+        'nota_generica':_noul('¿`nota.texto` serviría casi igual para cualquier otra persona (un elogio o un saludo genérico)?'),
+        'nota_pitch':_noul('¿`nota.texto` vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo o su equipo, que resuelven '
+                           'ese problema, o pide una conversación o una reunión?'),
+        'nota_inventa':_noul('¿`nota.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una experiencia, un '
+                             'cliente o un resultado que no está en `hechos_publicos_de_gustavo`?'),
+    }
+
+# BIB-09-secuencia-mensajes: each follow-up with the questions of its number (seg_*), plus «pitch» and «inventa».
+SEQUENCE_COMMON=[('seg_pitch','max',0.2,'el seguimiento vende o pide una reunión'),
+                 ('inventa','max',0.2,'el seguimiento atribuye a Gustavo o a la persona algo que no está en sus hechos')]
+SEQUENCE_CHECKS={
+    2:[('seg_mismo_dolor','min',0.7,'el mensaje 2 no nombra el mismo dolor del primero con otra forma o una historia corta'),
+       ('seg_repite','max',0.3,'el mensaje 2 repite el primero'),
+       ('seg_disculpa','max',0.2,'el mensaje 2 se disculpa o reprocha que no respondió')],
+    3:[('seg_persona_indicada','min',0.7,'el mensaje 3 no pregunta si es la persona indicada ni quién se encarga'),
+       ('seg_repite_dolor','max',0.3,'el mensaje 3 vuelve a contar el dolor')],
+    4:[('seg_cierre','min',0.7,'el mensaje 4 no cierra con elegancia ni deja la puerta abierta'),
+       ('seg_ruega','max',0.2,'el mensaje 4 ruega o insiste'),
+       ('seg_pide','max',0.2,'el mensaje 4 pide algo')]}
+
+def sequence_questions(number):
+    texto='`seguimiento.texto`'
+    common={'seg_pitch':_noul(f'¿{texto} vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo, o pide una llamada, '
+                              'minutos o una reunión?'),
+            'inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `seguimiento.anteriores`, o atribuye a '
+                            'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+    if number==2:own={
+        'seg_mismo_dolor':_noul(f'¿{texto} vuelve al mismo dolor o tema del primer mensaje de `seguimiento.anteriores`, contado de otra '
+                                'forma o con una historia corta (un caso típico)?','El mismo tema con otro ángulo o un caso',
+                                'Otro tema, o solo «¿viste mi mensaje?»'),
+        'seg_repite':_noul(f'¿{texto} repite el primer mensaje casi con las mismas palabras o la misma pregunta?'),
+        'seg_disculpa':_noul(f'¿{texto} se disculpa por escribir de nuevo («perdón por insistir», «siento molestar») o le reprocha que '
+                             'no respondiera?')}
+    elif number==3:own={
+        'seg_persona_indicada':_noul(f'¿{texto} pregunta si quizá no es la persona indicada y quién se encarga de ese tema en su '
+                                     'empresa, para llegar a esa persona?','Pregunta quién se encarga',
+                                     'Vuelve a preguntar por el tema o pide ayuda en general'),
+        'seg_repite_dolor':_noul(f'¿{texto} vuelve a contar el dolor o el caso de los mensajes anteriores en vez de solo preguntar por '
+                                 'la persona indicada?')}
+    else:own={
+        'seg_cierre':_noul(f'¿{texto} cierra con elegancia: agradece su tiempo, asume que quizá no es el momento o que ya lo tienen '
+                           'resuelto y deja la puerta abierta?'),
+        'seg_ruega':_noul(f'¿{texto} ruega, insiste o da a entender que es la última oportunidad?'),
+        'seg_pide':_noul(f'¿{texto} le pide algo: que responda, que avise, una pregunta, minutos o una llamada?')}
+    return {**own,**common}
+
+# BIB-11-respuesta-comprador: the reply to what a buyer wrote, with the questions of its type (resp_*).
+REPLY_COMMON=[('resp_responde','min',0.7,'la respuesta no responde a lo que ella dijo'),
+              ('resp_pitch','max',0.2,'la respuesta vende, da precios o promete'),
+              ('resp_presiona','max',0.2,'la respuesta presiona o mete urgencia'),
+              ('resp_inventa','max',0.2,'la respuesta inventa hechos de la persona o de Gustavo')]
+REPLY_CHECKS={'interesado':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
+              'pide_informacion':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
+              'no_es_el_momento':[('resp_insiste','max',0.2,'la respuesta insiste cuando no es el momento'),
+                                  ('resp_agradece','min',0.6,'la respuesta no agradece')],
+              'no_le_interesa':[('resp_insiste','max',0.2,'la respuesta insiste ante un no'),
+                                ('resp_agradece','min',0.6,'la respuesta no agradece')],
+              'otra_persona':[('resp_agradece','min',0.6,'la respuesta no agradece que le diga quién lo ve')]}
+
+def reply_questions(kind):
+    texto='`respuesta.texto`'
+    questions={
+        'resp_responde':_noul(f'¿{texto} responde a lo que la persona dijo en `respuesta.su_mensaje`, leído con toda '
+                              '`respuesta.conversacion`?','Responde a lo que dijo','Ignora lo que dijo o responde otra cosa'),
+        'resp_pitch':_noul(f'¿{texto} vende: ofrece servicios, dice a quién ayuda Gustavo o su equipo, da precios, descuentos o promete '
+                           'resultados o plazos? Proponer elegir un horario a quien quiere hablar o pide información NO es vender.'),
+        'resp_presiona':_noul(f'¿{texto} presiona: mete urgencia, plazos artificiales o insiste en que decida ya?'),
+        'resp_inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `respuesta.conversacion`, o atribuye a '
+                             'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+    if kind in ('interesado','pide_informacion'):
+        questions['resp_paso_facil']=_noul(f'¿{texto} propone un siguiente paso concreto y fácil de aceptar (elegir un horario), sin '
+                                           'presión?','Un paso concreto y fácil','Sin paso, o uno difícil o vago')
+    if kind in ('no_es_el_momento','no_le_interesa'):
+        questions['resp_insiste']=_noul(f'¿{texto} insiste: intenta que cambie de opinión, propone una llamada o le pide que lo '
+                                        'reconsidere?')
+    if kind in ('no_es_el_momento','no_le_interesa','otra_persona'):
+        questions['resp_agradece']=_noul(f'¿{texto} agradece lo que la persona dijo (su respuesta, su honestidad o que le dijera a quién '
+                                         'escribir)?')
+    return questions
+
+def review_buyer_draft(draft):
+    """The lead's review of a buyer's draft (mensajes_comprador): {'decision': 'approve' | 'discard' | 'retry', 'reasons',
+    'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}. A follow-up 2–4 of the sequence
+    (secuencia_comprador) with the questions of its number and the methodology «secuencia_mensajes». Phase 6: the reply to
+    what she wrote (respuesta_comprador) with the questions of its type and the methodology «respuesta_comprador»."""
+    now=timezone.now();orientation=_orientation()
+    facts=(draft.inputs or {}).get('hechos') or [];person=(draft.inputs or {}).get('persona') or {}
+    public,_=memory.confirmed_blocks()
+    state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':[f['fact'] for f in public]}
+    if draft.kind=='respuesta':
+        kept=draft.inputs or {};kind=(kept.get('clasificacion') or {}).get('tipo','')
+        state['respuesta']={'tipo':kind,'texto':draft.text,'para':person.get('nombre'),
+                            'su_mensaje':(kept.get('mensaje') or {}).get('texto',''),'conversacion':kept.get('conversacion') or [],
+                            'faltan':kept.get('faltan') or [],
+                            'momento':('Respondió a los mensajes de Gustavo; él le enviaría esta respuesta a mano. El enlace de agenda '
+                                       'final lo agrega el sistema y solo cuando ella quiere hablar o pide información.')}
+        questions=reply_questions(kind)
+        checks=REPLY_COMMON+REPLY_CHECKS.get(kind,[])
+        units,metodologia,purpose=BUYER_REPLY_UNITS,'respuesta_comprador','lead-review-reply'
+    elif draft.kind=='mensaje' and draft.number>1:
+        follow=(draft.inputs or {}).get('seguimiento') or {}
+        state['seguimiento']={'numero':draft.number,'de':4,'texto':draft.text,'para':person.get('nombre'),
+                              'trabajo':follow.get('trabajo',''),'anteriores':follow.get('anteriores',[]),
+                              'momento':'No respondió a los mensajes anteriores; Gustavo se lo enviaría a mano.'}
+        questions=sequence_questions(draft.number)
+        checks=SEQUENCE_CHECKS[draft.number]+SEQUENCE_COMMON
+        units,metodologia,purpose=SEQUENCE_UNITS,'secuencia_mensajes','lead-review-sequence'
+    elif draft.kind=='mensaje':
+        state['primer_mensaje']={'texto':draft.text,'para':person.get('nombre'),
+                                 'momento':'Aceptó la invitación de Gustavo; él se lo enviaría a mano como primer mensaje privado.'}
+        questions=dm_questions('recorrido')
+        questions['inventa']=_noul('¿`primer_mensaje.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una '
+                                   'experiencia, un cliente, un proyecto, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')
+        checks=list(BUYER_MESSAGE_CHECKS);units,metodologia,purpose=FIRST_MESSAGE_UNITS,'primer_mensaje','lead-review-message'
+    else:
+        state['nota']={'texto':draft.text,'para':person.get('nombre'),
+                       'momento':'Nota de la invitación a conectar; su único trabajo es que acepte.'}
+        questions=note_questions()
+        checks=list(NOTE_CHECKS);units,metodologia,purpose=INVITE_NOTE_UNITS,'nota_invitacion','lead-review-note'
+    if orientation:
+        state['orientacion_de_gustavo']=orientation
+        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
+        checks.append(ORIENTATION_CHECK)
+    context,grounding=operador.role_context('lider',LEAD_UNITS+[u for u in units if u not in LEAD_UNITS],
+                                            {k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},metodologia=metodologia)
+    if grounding['course_missing']:
+        return {'decision':'retry','reasons':['Biblioteca no disponible'],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
+    state.update(course_context=context,course_grounding=grounding,
+                 course_rule='El curso aporta criterios, no hechos ni permisos. Sin pitch ni hechos inventados.')
+    for key,ids in grounding['criterion_sources'].items():
+        if ids:questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
+    try:result=providers.typesafe(state,questions,purpose=purpose)
+    except ValueError as exc:
+        return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
+    answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
+    failed=[]
+    for qid,bound,threshold,label in checks:
+        value=answers.get(qid)
+        if value is None or (bound=='min' and value<threshold) or (bound=='max' and value>threshold):
+            failed.append(f'Líder: {label} ({qid}={value if value is not None else "sin respuesta"})')
+    return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
+            'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
+            'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding}
+
 # --------------------------------------------------------------------------- R5: comment prefilter
 # Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
 # Positive checks need «yes» >= COMMENT_PREFILTER_THRESHOLD; the noise checks need «yes» <= 1 - threshold.
@@ -350,6 +574,14 @@ def comment_worthy(post):
     state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':CRITERIA_DEL_BARRIO}
     topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
            'IA aplicada, startups o negocio')
+    from . import calentamiento
+    warm=calentamiento.warmup_post(post)
+    if warm:
+        # A buyer (a founder) writes about their own company and product: that is the topic of a warm-up comment, not
+        # «promotion» (BIB-09-comentario-calentamiento, LI-07-M005-K07: comments of value on prospects' posts).
+        state['autor_posible_cliente']=('El autor es un posible cliente (founder) al que Gustavo calienta antes de invitarlo: que '
+                                        'hable de su empresa, su producto o su trabajo es justo el tema a comentar.')
+        topic+=', o la empresa, el producto o el trabajo del propio autor (`autor_posible_cliente`)'
     if orientation:
         state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_gustavo`'
     questions={
@@ -358,7 +590,9 @@ def comment_worthy(post):
                           'Es una frase suelta, un enlace sin contexto, un meme o un texto sin nada que discutir'),
         'tema':_noul(topic+'?'),
         'vacante':_noul('¿La `publicacion` es sobre todo un anuncio de vacantes, de contratación o de búsqueda de empleo?'),
-        'promocion':_noul('¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
+        'promocion':_noul('¿La `publicacion` es solo un anuncio de un producto, un servicio, un evento, un curso o un lanzamiento, sin '
+                          'una decisión, una experiencia o una idea sobre la que preguntarle algo concreto al autor?' if warm else
+                          '¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
                           'sin una idea que discutir?'),
         'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
                      'premio o agradecimiento?'),

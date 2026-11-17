@@ -169,6 +169,81 @@ describe('Tu turno · Pendiente', () => {
     await waitFor(() => expect(api.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
   });
 
+  it('labels the first message of a buyer who accepted by the fact it cites, not as a comment on his post', async () => {
+    const close = '/api/v1/respuestas/bd-1/mensaje';
+    const journey = {
+      ...MESSAGE_CARD,
+      id: 'dm:bd-1',
+      title: 'Ana Acme aceptó tu invitación',
+      actions: [
+        { label: 'Abrir su perfil', href: 'https://www.linkedin.com/in/ana-acme', primary: true },
+        { label: 'Hecho, le escribí', endpoint: close, body: { how: 'enviado' } },
+        { label: 'No escribirle', endpoint: close, body: { how: 'no' }, note_optional: true },
+      ],
+      message: {
+        ...MESSAGE_CARD.message!,
+        text: 'Hi Ana, your answer about the spreadsheet stayed with me. Which report made the client pay first?',
+        comment: 'We shipped our first paid pilot with two engineers and a spreadsheet.',
+        reply: 'Two engineers and a spreadsheet is how most pilots start.',
+        comment_label: 'Su post',
+        reply_label: 'Lo que comentó el equipo (y ella respondió)',
+        origin: 'recorrido' as const,
+        piece_id: '',
+        topic: '',
+        person: { id: 'c-1', display_name: 'Ana Acme', headline: 'Founder & CEO at Acme', profile_url: 'https://www.linkedin.com/in/ana-acme', role: 'comprador' },
+      },
+    };
+    const api = server(busyTurno({ items: [journey], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [], mensajes: [journey] } }), {
+      [`POST ${close}`]: { body: {} },
+    });
+    renderApp('/tu-turno');
+    const view = within(await cardTitled('Ana Acme aceptó tu invitación'));
+    expect(view.getByText('Su post')).toBeInTheDocument();
+    expect(view.getByText('Lo que comentó el equipo (y ella respondió)')).toBeInTheDocument();
+    expect(view.queryByText('Lo que comentó en tu post')).not.toBeInTheDocument();
+    expect(view.getByTestId('suggested-message')).toHaveTextContent(journey.message.text);
+    await userEvent.click(view.getByRole('button', { name: 'No escribirle' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'No escribirle' }));
+    expect(dialog.getByText('La tarjeta sale de la Bandeja. Nadie le escribe por ti.')).toBeInTheDocument();
+    await userEvent.click(dialog.getByRole('button', { name: 'No escribirle' }));
+    await waitFor(() => expect(api.find('POST', close)[0]?.body).toEqual({ how: 'no' }));
+  });
+
+  it('labels a follow-up of the buyer sequence «Seguimiento 2 de 4» and shows the message he sent her last', async () => {
+    const close = '/api/v1/respuestas/bd-2/mensaje';
+    const followUp = {
+      ...MESSAGE_CARD,
+      id: 'dm:bd-2',
+      title: 'Seguimiento 2 de 4 para Ana Acme',
+      actions: [
+        { label: 'Abrir su perfil', href: 'https://www.linkedin.com/in/ana-acme', primary: true },
+        { label: 'Hecho, le escribí', endpoint: close, body: { how: 'enviado' } },
+        { label: 'No escribirle', endpoint: close, body: { how: 'no' }, note_optional: true },
+      ],
+      message: {
+        ...MESSAGE_CARD.message!,
+        text: 'Ana, the fifth client asking for the same weekly report is usually when the pain stops being small.',
+        text_label: 'Seguimiento 2 de 4',
+        comment: 'Hi Ana, your answer about the spreadsheet stayed with me. Which report do your clients open first?',
+        comment_label: 'Tu mensaje 1 (hace 4 días)',
+        reply: '',
+        reply_label: '',
+        origin: 'recorrido' as const,
+        person: { id: 'c-1', display_name: 'Ana Acme', headline: 'Founder & CEO at Acme', profile_url: 'https://www.linkedin.com/in/ana-acme', role: 'comprador' },
+      },
+    };
+    const api = server(busyTurno({ items: [followUp], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [], mensajes: [followUp] } }), {
+      [`POST ${close}`]: { body: {} },
+    });
+    renderApp('/tu-turno');
+    const view = within(await cardTitled('Seguimiento 2 de 4 para Ana Acme'));
+    expect(view.getByText('Seguimiento 2 de 4')).toBeInTheDocument();
+    expect(view.getByText('Tu mensaje 1 (hace 4 días)')).toBeInTheDocument();
+    expect(view.getByTestId('suggested-message')).toHaveTextContent(followUp.message.text);
+    await userEvent.click(view.getByRole('button', { name: 'Hecho, le escribí' }));
+    await waitFor(() => expect(api.find('POST', close)[0]?.body).toEqual({ how: 'enviado' }));
+  });
+
   it('shows a conversation that is his turn, opens the opportunity form prefilled and closes it with an optional reason', async () => {
     const api = server(busyTurno({ items: [CONVERSATION_CARD], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [CONVERSATION_CARD] } }), {
       'GET /api/v1/red/contacts': { body: { count: 0, next: null, previous: null, results: [] } },

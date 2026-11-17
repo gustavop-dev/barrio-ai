@@ -2708,7 +2708,7 @@
       "modo_autonomia_por_defecto": "auto",
       "degradacion": "capacidad_y_cuenta",
       "tope": "mensajes_iniciados",
-      "politica": "Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia.",
+      "politica": "Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto. Sin secuencia, salvo la del comprador del recorrido (decisión de Gustavo del 17/11/2026, BAR-21): mensajes 2 a 4 como borradores que Gustavo envía a mano, a los 4, 5 y 7 días del anterior y detenidos si responde.",
       "condiciones_estrictas": null,
       "datos_ids": [
         "D01",

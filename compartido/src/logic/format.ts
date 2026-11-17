@@ -172,6 +172,8 @@ export const CONTACT_ROLE_LABEL: Record<string, string> = {
   comprador: 'Comprador',
   divulgador: 'Divulgador',
   aliado: 'Aliado',
+  // Outbound phase 5 (BAR-22): a colleague of a buyer who does not post, the team's way in to him.
+  puente: 'Puente',
 };
 
 /** Network classification; the editorial calendar has its own modality labels (lib/editorial.ts). */

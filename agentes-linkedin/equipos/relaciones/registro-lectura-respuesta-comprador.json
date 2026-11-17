@@ -1,0 +1,209 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "relaciones",
+  "metodologia": "respuesta_comprador",
+  "evaluacion": "BIB-11-respuesta-comprador",
+  "fecha": "2026-11-17",
+  "metodo": "Lectura con SELECT de units.original en la biblioteca local (barrio-biblioteca-db), sin escribir en ella. hash = units.sha256 (sha256 del JSON canónico de la unidad, knowledge.ingest.canonical); source_path, pointer y fuentes de units y unit_evidence.",
+  "alcance": {
+    "unidades_leidas_completas": 6,
+    "por_clase": {
+      "08": 1,
+      "11": 4,
+      "12": 1
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 6 unidades (4 de la clase 11, 1 de la 08 y 1 de la 12), no de toda la clase ni de las clases 07–12. Solo estas 6 unidades (y las de las otras metodologías activadas) están abiertas a los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS). LI-09-V004-K02 no se adopta."
+  },
+  "roles": [
+    "relaciones_comunidad",
+    "lider_jev"
+  ],
+  "lista": "operador.BUYER_REPLY_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-11-M006-K01",
+      "clase": 11,
+      "titulo": "Receta 16 · La bandeja de cada mañana: clasificar respuestas y dejar contestaciones listas para aprobar",
+      "hash": "26228ebbccddc4a33d1a6196240735f28f292bd63c4b6cfd0b662f01840c7cce",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Cada respuesta nueva se clasifica leyendo TODA la conversación en cinco tipos (interesado, pide información, no es el momento, no le interesa, otra persona) y deja una contestación en la voz de Gustavo que él aprueba; nada se envía sin su OK.",
+      "limites_y_excepciones": [
+        "El curso revisa a una hora fija (8 a. m.); aquí la clasificación corre en cuanto el inbox lee su respuesta y la tarjeta espera en Tu turno: la hora la decide Gustavo al abrir la app.",
+        "Sin confianza suficiente (BUYER_REPLY_MIN y BUYER_REPLY_MARGIN) o con un caso que no encaja en los cinco tipos, la respuesta es «otro»: tarjeta «necesita tu respuesta» sin borrador (decisión del equipo; el curso no trae un sexto tipo).",
+        "«De 10 respuestas, unas 2 hay que corregirlas»: se mantiene la aprobación humana; la app nunca envía (INB-08).",
+        "«Marcar como descartados los contactos con conversación sin agenda»: «No escribirle» en la tarjeta cierra esa conversación sin salida; la salida definitiva es «no le interesa» o la de Gustavo."
+      ],
+      "uso": {
+        "regla_fija": "respuesta_comprador.classify (cinco tipos más «otro», umbral y margen), conversation (toda la conversación) y text_issues",
+        "pregunta_del_lider": "resp_responde (mín. 0,7) y resp_pitch, resp_presiona, resp_inventa (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-11-revisada.json",
+      "pointer": "/learning_units/112",
+      "fuentes_con_prefijo_de_clase": [
+        "11:01dbbcd5000c57bf1f43:p011",
+        "11:90f0ba7663204760b71f:p017",
+        "11:90f0ba7663204760b71f:p024"
+      ]
+    },
+    {
+      "unidad_id": "LI-11-M006-K02",
+      "clase": 11,
+      "titulo": "Receta 17 · «Eso lo ve otra persona» se vuelve un lead: aprovechar las redirecciones",
+      "hash": "108ebe3a6d64189cacf28997f980893cc8f8e869765fe58a3db1c5062ded8577",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "«Eso lo ve otra persona» no es un no: la persona nombrada se vuelve un contacto nuevo con su propio recorrido, su primer mensaje puede nombrar a quien la sugirió, y a quien redirigió se le agradece.",
+      "limites_y_excepciones": [
+        "La persona se crea solo con su perfil de LinkedIn: el que trae su mensaje o el que Gustavo pega en la tarjeta («Pegar su perfil»); sin perfil no se inventa a nadie.",
+        "El tope de dos personas por empresa admite a la referida como tercera (una redirección explícita no es una campaña de cuenta); nunca una cuarta.",
+        "El primer mensaje de la referida sigue el camino de la fase 3 (aceptar la invitación, borrador, líder, Gustavo lo envía)."
+      ],
+      "uso": {
+        "regla_fija": "respuesta_comprador.resolve_referral con secuencia_comprador.link_referral; mensajes_comprador.anchors («referido»)",
+        "pregunta_del_lider": "resp_agradece (mín. 0,6) en la respuesta de quien redirigió"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-11-revisada.json",
+      "pointer": "/learning_units/113",
+      "fuentes_con_prefijo_de_clase": [
+        "11:01dbbcd5000c57bf1f43:p011",
+        "11:90f0ba7663204760b71f:p017"
+      ]
+    },
+    {
+      "unidad_id": "LI-11-M006-K03",
+      "clase": 11,
+      "titulo": "Receta 18 · «No es el momento» vuelve solo en 90 días",
+      "hash": "8566999b37a75070c10f8e51a771f96c18aff5ddf6f99828ebf8b03b465108d0",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "«No es el momento» es una oportunidad aplazada: descansa 90 días, o hasta la fecha que dio, y vuelve retomando exactamente lo que dijo.",
+      "limites_y_excepciones": [
+        "La fecha se lee con un analizador determinista («after January», «en marzo», «next quarter», «in 6 weeks», Q1–Q4, fechas): si no es futura o pasa de 365 días, 90 días.",
+        "La vuelta es un intento nuevo del recorrido (comprador.retry) con el ángulo «lo que dijo»; no se reenvía la secuencia anterior.",
+        "El curso revisa la lista antes de activar la campaña: aquí cada mensaje de vuelta es un borrador que Gustavo aprueba."
+      ],
+      "uso": {
+        "regla_fija": "respuesta_comprador.rest_until (fecha), comprador.rest(..., no_es_el_momento, until) y respuesta_comprador.wake",
+        "pregunta_del_lider": "resp_insiste (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-11-revisada.json",
+      "pointer": "/learning_units/114",
+      "fuentes_con_prefijo_de_clase": [
+        "11:01dbbcd5000c57bf1f43:p011"
+      ]
+    },
+    {
+      "unidad_id": "LI-11-M006-K06",
+      "clase": 11,
+      "titulo": "Receta 21 · Del «sí» al CRM, con todo el contexto",
+      "hash": "b812d2f0b270aef7fa82d80fb3291b8d1affdb6edebf01a974a9756e82ced00b",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "El paso del outbound al proceso comercial no pierde información: empresa, resumen de la conversación en 3 líneas y la señal por la que entró, sin duplicar contactos y mostrando qué se va a crear antes de crearlo.",
+      "limites_y_excepciones": [
+        "Contradicción del curso: el material dispara el paso al CRM con el «sí» y el docente prefiere la conversación con un sí real; LI-08-M003-K05 («lo sacaría cuando agenda») y la decisión de Gustavo (17/11/2026) ganan: el disparador es la REUNIÓN AGENDADA en Cal.com.",
+        "Sin CRM de terceros (HubSpot): la entrega es un registro propio (LeadHandoff) neutral respecto de la fuente; la oportunidad la crea Gustavo con un toque (PRS-09).",
+        "Sin calificación ni tarea de «agendar la llamada en 24 h»: la reunión ya está agendada y calificar es de la futura máquina de ventas.",
+        "Sin enriquecer email ni teléfono (créditos): solo el correo que trae la reserva de Cal.com."
+      ],
+      "uso": {
+        "regla_fija": "entrega_lead.build (persona, empresa, fuente, recorrido, conversación en 3 líneas, reunión, hechos con fuente) y entrega_lead.confirm",
+        "pregunta_del_lider": "ninguna: la entrega es determinista"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-11-revisada.json",
+      "pointer": "/learning_units/117",
+      "fuentes_con_prefijo_de_clase": [
+        "11:01dbbcd5000c57bf1f43:p013",
+        "11:90f0ba7663204760b71f:p018"
+      ]
+    },
+    {
+      "unidad_id": "LI-08-M003-K05",
+      "clase": 8,
+      "titulo": "Reciclaje según la respuesta: no respondió, «ahora no», «no, gracias» y «sí, hablemos»; lista negra",
+      "hash": "c36dbf3bfea1066da050452a38f6b9f0927e4c2abb3bceb079a8b51e0e1f1b55",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Reciclaje según la respuesta: «ahora no» vuelve cuando dijo; «no, gracias» va a la lista negra y no se insiste; «sí, hablemos» ya es cita y sale de la campaña. Lo que saca a alguien del flujo es la cita, no una respuesta cualquiera.",
+      "limites_y_excepciones": [
+        "«No, gracias» es la salida definitiva no_le_interesa: nunca se le vuelve a escribir.",
+        "La reunión agendada es el fin de la máquina de LinkedIn; «interesado» no basta para la entrega.",
+        "Reutilizar a la misma persona solo si nunca interactuó; si se enfrió, cambiar de interlocutor: fuera de alcance (lo cubre la regla del calentamiento)."
+      ],
+      "uso": {
+        "regla_fija": "respuesta_comprador.apply (descanso, salida, interesado) y agenda_calcom (reunion)",
+        "pregunta_del_lider": "resp_insiste (máx. 0,2) en no_es_el_momento y no_le_interesa"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-08-revisada.json",
+      "pointer": "/learning_units/91",
+      "fuentes_con_prefijo_de_clase": [
+        "08:c153dbf87e58b33bff78:p017",
+        "08:c153dbf87e58b33bff78:p018",
+        "08:qt00105",
+        "08:qt00138",
+        "08:qt00145",
+        "08:qt00146",
+        "08:qt00150",
+        "08:qt00200",
+        "08:qt00205",
+        "08:qt00207",
+        "08:qt00210",
+        "08:qt00213",
+        "08:qt00214",
+        "08:qt00215",
+        "08:qt00216",
+        "08:qt00217"
+      ]
+    },
+    {
+      "unidad_id": "LI-12-M001-K04",
+      "clase": 12,
+      "titulo": "Dónde se rompe el embudo y qué tocar: tabla de diagnóstico y regla de arreglar una etapa a la vez",
+      "hash": "465a14cccb01c8684c3a0b6159c8863d83ba1692e3c9729e37377a81d4f15723",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Tabla de diagnóstico: recorrer las etapas en orden, detenerse en la primera que se rompe, nombrar su causa más probable y aplicar UN solo cambio. «Responden, pero no hay reuniones»: proponer algo concreto y fácil de aceptar.",
+      "limites_y_excepciones": [
+        "Umbrales: aceptación bajo 20 % (el docente: 20 % o 10 % «sería trágico»); respuesta bajo 10 %, reunión bajo 20 % de las respuestas y fuga de 21 días son propuestas del equipo, no del curso.",
+        "Con menos de 30 invitaciones en la semana la lectura dice «muestra chica» y no propone cambios.",
+        "Los diagnósticos son «lo más probable», no certezas: la lectura lo dice así."
+      ],
+      "uso": {
+        "regla_fija": "lectura_embudo.read (tabla, primera etapa rota, causa, un cambio, semana contra semana); el paso fácil del interesado es el enlace de agenda",
+        "pregunta_del_lider": "resp_paso_facil (mín. 0,6) en interesado"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-12-revisada.json",
+      "pointer": "/learning_units/75",
+      "fuentes_con_prefijo_de_clase": [
+        "12:ddcd3c4655abdd89d951:p005",
+        "12:ddcd3c4655abdd89d951:p006"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "Gustavo, 17/11/2026: la máquina de LinkedIn termina en la REUNIÓN AGENDADA; la calificación es de una futura máquina de ventas.",
+    "Herramienta de agenda: Cal.com. El único enlace permitido en un mensaje es el de la agenda (CALCOM_BOOKING_URL), y solo en las respuestas interesado y pide_informacion; nunca en el M1–M4 ni en la nota.",
+    "Las respuestas siempre son borradores que Gustavo copia y envía (INB-08); una reescritura, revisión del líder, y un borrador rechazado no llega a Tu turno y queda auditado.",
+    "Contradicción del disparador del CRM: el «sí» (material y docente de LI-11-M006-K06) frente al clic en el enlace de agenda; aquí manda la reserva confirmada por Cal.com (y el «Agendó» manual de Gustavo), coherente con LI-08-M003-K05.",
+    "La oportunidad la crea un humano (PRS-09): la entrega queda lista y Gustavo la confirma con un toque.",
+    "BUYER_REPLY_ENABLED=false por defecto: apagado se comporta como las fases 1–5."
+  ],
+  "no_convertido_en_regla": [
+    "el envío automático de la herramienta del curso (las contestaciones las envía Gustavo)",
+    "el CRM de terceros (HubSpot) y la tarea «agendar la llamada en 24 h»",
+    "la calificación del lead (presupuesto, autoridad, necesidad, tiempo) en la entrega",
+    "enriquecer email o teléfono con créditos",
+    "la revisión a una hora fija (8 a. m.): la tarjeta espera en Tu turno",
+    "LI-09-V004-K02 (no adoptada)"
+  ],
+  "siguiente_paso": "Futura máquina de ventas: la calificación y lo que sigue a la reunión, a partir de la entrega (LeadHandoff) y la oportunidad."
+}

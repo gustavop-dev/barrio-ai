@@ -353,6 +353,89 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 - **Una sexta hoja sola con datos.** Aún no se vio: se lee como la de audiencia. Los nombres de las hojas quedan en `AnalyticsImport.sheets` para comprobarlo.
 - **Unir con la pieza** cuando LinkedIn enlaza un urn distinto del que guardamos.
 
+## Embudo del comprador
+
+`GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; un número fuera de rango da 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Sale de `comprador.funnel`, la fase 1 del sistema del comprador ([plan](../../../docs/plan-outbound.md), ficha [BAR-18](../../../docs/funcionalidades/red.md#bar-18)). Lee `BuyerJourney`: un recorrido por comprador elegido, calculado de su registro de toques.
+
+- **Código:** `src/team_backend/comprador.py`; `resultados_views.EmbudoComprador`; `management/commands/comprador.py`.
+- **Pruebas:** `tests/test_comprador.py` y `tests/test_comprador_e2e.py`.
+
+**Etapas** (LI-12-M001-K03), en este orden:
+
+| Etapa | Cuenta a quien… |
+| --- | --- |
+| `elegidos` | el equipo eligió como comprador |
+| `calentados` | tuvo al menos un comentario del equipo en un post suyo antes de su primera invitación |
+| `calentados_2` | tuvo dos o más: el calentamiento completo de la fase 2 ([BAR-19](../../../docs/funcionalidades/red.md#bar-19)) |
+| `invitados` | recibió la invitación |
+| `aceptaron` | quedó conectado: aceptó la invitación o Gustavo aceptó la suya |
+| `recibieron_mensaje` | recibió un mensaje: «Hecho, le escribí» o un mensaje de Gustavo visto en el inbox |
+| `respondieron` | escribió después del primer mensaje de Gustavo |
+| `interesados` | su respuesta se clasificó como interés, o agendó (quien agenda también cuenta como interesado). Fase 6 ([BAR-23](../../../docs/funcionalidades/red.md#bar-23)); antes, 0 |
+| `reunion` | agendó la reunión: una reserva de Cal.com emparejada o «Agendó» de Gustavo; una cancelación la saca. Fase 6; antes, 0 |
+
+Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
+
+**Bloque.** Cada embudo tiene esta forma:
+
+```json
+{ "personas": 0, "invitaciones": 0, "muestra_chica": true, "aviso": "Muestra chica: menos de 30 invitaciones; no se juzga.",
+  "etapas": [{ "etapa": "elegidos", "nombre": "Elegidos", "personas": 0, "desde_elegidos_pct": null, "paso_pct": null }] }
+```
+
+- `paso_pct`: de quienes llegaron a la etapa anterior, el porcentaje que llegó a esta. Es `null` en la primera etapa o si la anterior está vacía.
+- `desde_elegidos_pct`: el porcentaje de los elegidos que llegó a la etapa.
+- Con menos de 30 invitaciones (LI-12-M001-K04), `muestra_chica` es `true` y `aviso` lo dice.
+
+**Respuesta:**
+
+```json
+{ "generado", "zona_horaria", "definiciones": { "<clave>": "texto" },
+  "acumulado": Bloque,
+  "semanas": [{ "semana": "AAAA-MM-DD", "hasta": "AAAA-MM-DD", "cohorte": Bloque, "actividad": { … } }],
+  "comparaciones": { "ruta": { "sin_definir|comentarios|sin_posts": Bloque },
+                     "calentamiento": { "calentados": Bloque, "no_calentados": Bloque },
+                     "nota": { "con_nota": Bloque, "sin_nota": Bloque },
+                     "senal": { "con_senal": Bloque, "sin_senal": Bloque },
+                     "senal_de_compra": { "con_senal_de_compra": Bloque, "sin_senal_de_compra": Bloque },
+                     "entrada": { "saliente": Bloque, "entrante": Bloque } },
+  "borradores": { "pendientes", "enviados", "no_enviados", "enviados_pct", "fuentes": ["mensaje_sugerido", "recorrido"],
+                  "recorrido": { "preparados", "pendientes", "enviados", "no_enviados", "parados": { "<motivo>": n } },
+                  "notas": { "preparadas", "con_invitacion", "enviadas", "parados": { "<motivo>": n } },
+                  "por_numero": { "1".."4": { "preparados", "pendientes", "enviados", "no_enviados", "cancelados", "parados" } },
+                  "respuestas": { "preparados", "pendientes", "sin_borrador", "enviados", "no_enviados", "parados": { "<motivo>": n } } },
+  "secuencia": { "recibieron": { "1".."4": n }, "respondieron_tras": { "1".."4": n },
+                 "comprobacion": { "curso", "respuestas", "tras_2_o_3", "tras_2_o_3_pct", "muestra_chica" },
+                 "descansan", "activa" },
+  "ruta_sin_posts": { "activa", "definiciones", "comparacion": { "con_puente": Bloque, "sin_puente": Bloque },
+                      "puentes": { "pedidos", "busquedas", "encontrados", "sin_puente": { "<motivo>": n }, "seguidos", "invitados",
+                                   "aceptaron", "compradores_con_senal_del_puente", "compradores_con_interaccion_del_puente" },
+                      "donde_comenta": { "disponible": false, "motivo" }, "visitas": { "disponible": false, "motivo" },
+                      "reintentos": { "por_angulo": { "senal_en_descanso|senal_nueva|puente|otro_tema|sin_tipo": n } },
+                      "reverificaciones": { "pedidas", "hechas", "con_senal_nueva", "vencidas" } },
+  "respuestas": { "activa", "clasificadas",
+                  "por_tipo": { "interesado", "pide_informacion", "no_es_el_momento", "no_le_interesa", "otra_persona", "otro" },
+                  "borradores": { "preparados", "pendientes", "sin_borrador", "enviados", "no_enviados", "parados" },
+                  "reuniones", "horas_respuesta_a_reunion": { "mediana", "personas" } },
+  "estado_actual": { "elegido|calentando|…|reunion|descanso|salio": n },
+  "descanso": { "<motivo>": n }, "salidas": { "<motivo>": n } }
+```
+
+- **Semanas:** de la actual hacia atrás, de lunes a domingo en `OPERATOR_TIMEZONE`. `cohorte` agrupa a quienes se eligieron esa semana y cuenta hasta dónde llegaron. `actividad` cuenta lo que pasó en la semana: `elegidos`, `seguidos`, `invitados`, `aceptaron`, `recibieron_mensaje`, `respondieron`, `interesados`, `reunion`, `comentarios`, `mensajes_enviados`, `no_escribirle` y `senales_entrantes`.
+- **A quién cuenta:** solo a los compradores que eligió el equipo (`entry: saliente`). Quien llegó con su propia invitación va solo en `comparaciones.entrada.entrante`.
+- **Comparaciones:**
+  - `nota`: una invitación sin dato de nota (anterior al registro de notas) no cuenta en ninguno de los dos.
+  - `senal`: `con_senal` es una señal de la persona antes de su primera invitación: comentó un post de Gustavo, respondió un comentario del equipo, lo invitó o le escribió.
+  - `senal_de_compra`: la verificación web de su empresa citó una señal de compra con fuente (ronda, contratación o expansión; clase 08). Solo se guardan con `BUYER_WARMUP_ENABLED`, así que antes de encenderlo todos van en `sin_senal_de_compra`.
+- **Borradores:** el «Mensaje sugerido» de una conversación en un post de Gustavo ([RSP-07](../../../docs/funcionalidades/respuestas.md#rsp-07)) y, con `BUYER_FIRST_MESSAGE_ENABLED`, el primer mensaje del recorrido a quien aceptó ([BAR-20](../../../docs/funcionalidades/red.md#bar-20)). Está pendiente mientras su tarjeta espera en Tu turno, enviado con «Hecho, le escribí» y no enviado con «No escribirle»; `pendientes`, `enviados` y `no_enviados` cuentan las dos fuentes. `recorrido` desglosa los del recorrido: `preparados` (el líder los aprobó), los tres estados y `parados` por motivo (`reglas`, `juez`, `hecho`: nada real que citar, `cupo`, `conversacion`: ya había una conversación). `notas` hace lo mismo con las notas de invitación de los calentados: `preparadas`, `con_invitacion` (puestas en una invitación), `enviadas` y `parados`. La comparación `nota` (con nota frente a sin nota) sigue en `comparaciones`. `por_numero` desglosa los mensajes del recorrido por número (1 el primero; 2 a 4 los seguimientos de la fase 4, [BAR-21](../../../docs/funcionalidades/red.md#bar-21)), con `cancelados` (respondió y la secuencia se detuvo) y `parados` (reglas o líder). `recorrido` sigue contando solo el primero.
+- **Secuencia (fase 4):** `recibieron` cuenta cuántos recibieron el mensaje 1, 2, 3 y 4 (por «Hecho, le escribí», en algún intento); `respondieron_tras`, tras cuántos mensajes de ese intento respondieron los que respondieron. `comprobacion` pone a prueba lo que dice el curso («la mayoría responde al 2.º o 3.º», LI-09-M003-K05) con `tras_2_o_3_pct` y avisa `muestra_chica` con menos de 30 respuestas: se mide, no se asume. `descansan` son los que terminaron la secuencia sin responder (`secuencia_sin_respuesta`) y siguen descansando; `activa` dice si `BUYER_SEQUENCE_ENABLED` está encendido.
+- **Ruta sin posts (fase 5):** solo con `BUYER_NO_POSTS_ROUTE_ENABLED` encendido ([BAR-22](../../../docs/funcionalidades/red.md#bar-22)); apagado, la clave no aparece. `comparacion` separa a los compradores de la ruta `sin_posts` con puente encontrado de los que no lo tienen (el bloque de etapas de siempre). `puentes`: `pedidos` (uno por intento), `busquedas` (búsquedas de personas hechas), `encontrados`, `sin_puente` por motivo (`sin_empresa`, `empresa_completa`, `mismo_cargo`, `otra_empresa`, `sin_cargo`, `no_publica`, `sin_lectura`, `conocido`, `sin_resultados`), y de los encontrados cuántos se siguieron, se invitaron y aceptaron, más los compradores con alguna señal de su puente y con una interacción real. `donde_comenta` y `visitas` dicen que no se miden y por qué (el conector no puede). `reintentos.por_angulo` cuenta los nuevos intentos por ángulo, en todas las rutas (`sin_tipo`: los de antes de la fase 5 o con el interruptor apagado). `reverificaciones` cuenta la verificación web de señales al terminar cada descanso.
+- **Respuestas (fase 6):** [BAR-23](../../../docs/funcionalidades/red.md#bar-23), con `BUYER_REPLY_ENABLED`. `por_tipo` cuenta cada mensaje suyo por su última clasificación (Jev lee toda la conversación; `otro` cuando no hay confianza o margen); `clasificadas`, los mensajes clasificados. `borradores`: `preparados` (pasaron las reglas y el líder), `pendientes` (con borrador en Tu turno), `sin_borrador` (tarjeta sin borrador: `otro`, sin `CALCOM_BOOKING_URL` o parado), `enviados` («Hecho, le escribí»), `no_enviados` y `parados`. `reuniones` cuenta los recorridos con reunión; `horas_respuesta_a_reunion`, la mediana de horas entre su primera respuesta y la reserva. En `borradores`, `respuestas` desglosa lo mismo para sumar a `pendientes` y `enviados` en la lectura semanal; `pendientes` y `sin_borrador` son 0 con el interruptor apagado.
+- **Lectura semanal (fase 6):** `GET /api/v1/comprador/lectura-semanal` y `lectura_embudo.read` aplican la tabla de diagnóstico de LI-12-M001-K04 a este embudo, sin modelo: la primera etapa que se rompe, su causa y un solo cambio, «muestra chica» con menos de 30 invitaciones, la semana frente a la anterior y los borradores pendientes frente a enviados. Los lunes, dentro de la ventana de lectura, va a Slack (canal de resúmenes, cinco líneas como mucho) y entra en el resumen semanal como `comprador`.
+- **Comando:**
+  - `manage.py comprador embudo --semanas N` imprime lo mismo en JSON.
+  - `manage.py comprador reconstruir [--cuenta ID] [--seco]` rellena los recorridos desde el historial. Es idempotente y cada persona se guarda por separado.
+
 ## Configuración
 
 | Variable | Por defecto | Qué hace |
@@ -362,6 +445,7 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 | `METRICS_POSTS_LIMIT` | 20 | Cuántos posts propios recientes se leen por vuelta (1 a 100). |
 | `METRICS_PROFILE_VIEWS_DAYS` | 28 | Ventana de las visitas al perfil: 14, 28, 90 o 365. |
 | `METRICS_READ_CAPS` | — | Topes diarios de lectura, por ejemplo `posts=12,post=20,comments=20,profile=3,views=3`. |
+| `BUYER_RECORD_ENABLED` | true | Ganchos pasivos del recorrido del comprador. Con `false` nada se registra al ocurrir; `comprador reconstruir` lo recupera después. |
 
 ## Pendiente
 

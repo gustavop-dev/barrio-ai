@@ -65,10 +65,17 @@ class ParticipationTests(NetworkBase):
         return people
 
     def test_defaults_weekends_and_invitation_hard_ceilings(self):
-        self.assertEqual(operador.limits(self.now),{'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),
+        self.assertEqual(operador.limits(self.now),{'INT-03':(15,75),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),
             'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)})
         saturday=self.now+timedelta(days=5)
-        self.assertEqual(operador.limits(saturday)['INT-03'],(2,25))
+        self.assertEqual(operador.limits(saturday)['INT-03'],(7,75))
+        # 17/11/2026 (docs/plan-outbound.md): 15 comments a day and 75 a week, 20 paid drafts a day, shared 8/2/5.
+        from team_backend import autopiloto, calentamiento
+        with patch.dict(os.environ):
+            for name in ('OPERATOR_DAILY_PROPOSALS','BUYER_COMMENT_SHARE','OPERATOR_DAILY_LIMITS','OPERATOR_WEEKLY_LIMITS'):
+                os.environ.pop(name,None)
+            self.assertEqual((operador.limits(self.now)['INT-03'],autopiloto.daily_proposals(),calentamiento.shares()),
+                             ((15,75),20,{'compradores':8,'comunidad':2,'referentes':5}))
         self.assertEqual(operador.limits(saturday)['CONT-09'],(1,7))
         self.assertEqual(operador.capacity_left(self.account,'RED-02',saturday),0)
         # Reading a future weekend's cap must not create an invitation pause today.

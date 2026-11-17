@@ -972,6 +972,19 @@ export interface TurnoMessage {
   piece_id: string;
   /** The thesis of the post they talked about. */
   topic: string;
+  /**
+   * The first message of the buyer's journey (BUYER_FIRST_MESSAGE_ENABLED, phase 3) cites a fact that is not always a
+   * comment on his post: `comment` may be her post (and `reply` the team's comment on it) or a buying signal. These
+   * labels name them; absent (the conversation on his post), the card keeps its usual labels.
+   */
+  comment_label?: string;
+  reply_label?: string;
+  /**
+   * The label of `text`: «Seguimiento 2 de 4»… for a follow-up of the buyer's sequence (BUYER_SEQUENCE_ENABLED, phase 4),
+   * where `comment` is the message Gustavo sent her last. Absent: «Mensaje sugerido».
+   */
+  text_label?: string;
+  origin?: 'recorrido';
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
 }
 

@@ -43,11 +43,25 @@ _POST_SELL=(r'hire me|book a call|schedule a call|link in (?:bio|comments)|limit
 POST_CTA=re.compile(_POST_CTA,re.I)
 POST_SELL=re.compile(_POST_SELL,re.I)
 POST_PITCH=re.compile(_POST_SELL+'|'+_POST_CTA,re.I)
+# BIB-09-comentario-calentamiento (LI-07-M001-K04, LI-07-M005-K05): a warm-up comment on a buyer's post is an own
+# contribution and one question, 25–40 words, without applause or selling. Fixed rules; the lead judges the rest.
+WARMUP_WORDS=(25,40)
+WORD=re.compile(r"[^\W_]+(?:['’\-][^\W_]+)*")
+APPLAUSE=re.compile(r'great (?:post|read|share|insight|work)|love (?:this|it|how|that)|congrat|amazing (?:post|work|news)|well said|'
+                    r'so true|spot on|kudos|excelente (?:post|publicaci[oó]n|aporte)|gran post|felicidades|felicitaciones|'
+                    r'enhorabuena|me encant[oó]|👏|🙌|💯|🔥',re.I)
+WARMUP_SELL=re.compile(r'our team builds|we help (?:startups|companies|founders|teams)|happy to (?:help|show)|i can help|'
+                       r'let me know if you need|podemos ayudar|te ayudamos|te puedo ayudar|con gusto te (?:ayudo|muestro)',re.I)
 POST_LENGTH=(200,2200)
 POST_MAX_HASHTAGS=3
 
 def setting(name,default):
     return os.environ.get(name,default)
+
+def daily_proposals():
+    """Paid comment drafts a day (OPERATOR_DAILY_PROPOSALS). 20 since 17/11/2026: 15 comments a day with the lead
+    discarding some need room for their redrafts (docs/plan-outbound.md)."""
+    return int(setting('OPERATOR_DAILY_PROPOSALS','20'))
 
 # Capabilities that existed when Gustavo chose the autonomous machine default to auto; any newer capability
 # (the network block RED-*) waits for human approval until OPERATOR_AUTONOMY lists it. INT-04 (replies on his own posts)
@@ -106,14 +120,36 @@ def comment_text_issues(proposal):
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
     if proposal.source=='agent' and proposal.post_id and idioma.english_on_spanish(text,proposal.post.text):
         issues.append('Está en inglés y la publicación está en español')  # Gustavo, 2026-11-12
+    from . import calentamiento
+    if proposal.post_id and calentamiento.warmup_post(proposal.post):
+        from . import sin_posts
+        issues+=warmup_text_issues(text)+sin_posts.repeat_issues(proposal)  # phase 5: never the same to two of a company
     public,private=guardas.blocks()
     return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
 
+def warmup_text_issues(text):
+    """The fixed rules of a warm-up comment (calentamiento.warmup_post): 25–40 words, ends with one question, no
+    applause, no offer of help. Selling, links and the rest are the rules of every comment."""
+    text=text or '';issues=[];words=len(WORD.findall(text));low,high=WARMUP_WORDS
+    if not low<=words<=high:issues.append(f'Comentario de calentamiento fuera de {low}–{high} palabras ({words})')
+    if not text.rstrip().rstrip('"\'”’»)').endswith('?'):issues.append('Comentario de calentamiento que no termina en una pregunta')
+    elif text.count('?')>1:issues.append('Comentario de calentamiento con más de una pregunta')
+    if APPLAUSE.search(text):issues.append('Comentario de calentamiento que aplaude o felicita')
+    if WARMUP_SELL.search(text):issues.append('Comentario de calentamiento que ofrece ayuda o servicios')
+    return issues
+
 def comment_author_issues(proposal):
-    """INT-03 rule about the target, which no redraft can fix: one comment per referent within the cooldown."""
+    """INT-03 rule about the target, which no redraft can fix: one comment per referent within the cooldown and, with
+    BUYER_WARMUP_ENABLED, one per author of the post (a buyer has no referent)."""
+    from . import calentamiento
+    states=['approved','executing','sent','confirmed','uncertain'];now=timezone.now()
+    hours=int(author_cooldown().total_seconds()//3600)
     if proposal.post and proposal.post.referent_id and proposal.post.referent_id in recent_comment_authors(
-            proposal.account,timezone.now(),states=['approved','executing','sent','confirmed','uncertain'],exclude=proposal.pk):
-        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {int(author_cooldown().total_seconds()//3600)} h']
+            proposal.account,now,states=states,exclude=proposal.pk):
+        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {hours} h']
+    if (calentamiento.enabled() and proposal.post and proposal.post.author_provider_id and
+            proposal.post.author_provider_id in recent_comment_author_ids(proposal.account,now,states=states,exclude=proposal.pk)):
+        return [f'Ya hay un comentario para {proposal.post.author_name} en las últimas {hours} h']
     return []
 
 def policy_review(proposal,lead_budget=None):
@@ -295,6 +331,10 @@ def tick(user,now=None):
         redrafted=_lead_redraft(user,account,now)  # before a new draft: it holds the one draft at a time
         if redrafted:report['lead_redraft']=report.get('lead_redraft',0)+redrafted
         report['propose']+=_propose(user,account,now)
+        try:  # phase 3: before the plan, so a warmed buyer's note is decided when the invitation is proposed
+            drafted=_buyer_drafts(user,account,now)
+            if drafted:report['buyer_drafts']=report.get('buyer_drafts',0)+drafted
+        except Exception as exc:report['buyer_drafts_error']=type(exc).__name__  # never stops the rest of the tick
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
@@ -365,12 +405,29 @@ def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
     if exclude:qs=qs.exclude(pk=exclude)
     return set(qs.values_list('post__referent_id',flat=True))
 
+def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=None):
+    """Authors (author_provider_id) who already got (or are about to get) a comment within the cooldown: the wait of
+    phase 2 is per author of the post, referent or buyer."""
+    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+                                     created_at__gte=now-author_cooldown())
+    if exclude:qs=qs.exclude(pk=exclude)
+    return set(filter(None,qs.values_list('post__author_provider_id',flat=True)))
+
 def _observe(user,account,now):
     if not operador.within_read_window(now):return 0
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
     last=account.referents.filter(active=True).order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
-    if not account.referents.filter(active=True).exists() or (last and last>now-every) or _pending('observe',account=str(account.id)):return 0
+    referents_due=account.referents.filter(active=True).exists() and not (last and last>now-every)
+    if _pending('observe',account=str(account.id)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
+    if not referents_due:
+        # Phase 2: the buyers warming up have their own reads; when only they are due, observe reads only them.
+        from . import calentamiento, sin_posts
+        # Phase 5: a bridge search or a bridge's posts due count as the buyers' reads.
+        if not (calentamiento.enabled() and (calentamiento.reading_due(account,now) or sin_posts.reading_due(account,now))):return 0
+        _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[],'solo_compradores':True},
+                                    request_id=_job_id('observe-buyers',account.id,bucket))
+        return int(created)
     _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[]},request_id=_job_id('observe',account.id,bucket))
     return int(created)
 
@@ -407,10 +464,12 @@ def _propose(user,account,now):
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     pending=Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).count()
-    room=int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted-pending
+    room=daily_proposals()-drafted-pending
     if room<=0 or pending:return 0  # one paid draft at a time keeps spend within the daily cap
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
     prefilter=prefilter_enabled()
+    from . import calentamiento
+    if calentamiento.enabled():return _propose_groups(user,account,now,max_age,prefilter)
     # A verdict is never older than its post, so verdicts from before the oldest candidate are irrelevant.
     verdicts=prefilter_verdicts(now-max_age-timedelta(days=1)) if prefilter else {}
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
@@ -431,6 +490,35 @@ def _propose(user,account,now):
         return int(created)
     return 0
 
+def _propose_groups(user,account,now,max_age,prefilter):
+    """Phase 2 (BUYER_WARMUP_ENABLED): the same one-draft-at-a-time within the same caps, budget and daily drafts, but
+    the day's INT-03 slots are shared by group (calentamiento.rooms: compradores 8, comunidad 2, referentes 5 of 15) and a
+    group with nothing to comment passes its slots on. Buyers' posts first, warmest author first; then the referents' as
+    today. The wait is per author of the post. The prefilter judges both, with the buyer's own wording for a buyer."""
+    from . import calentamiento, experimentos
+    verdicts=prefilter_verdicts(now-max(max_age,calentamiento.post_max_age())-timedelta(days=1)) if prefilter else {}
+    skips=[pid for pid,decision in verdicts.items() if decision=='skip']
+    authors=recent_comment_author_ids(account,now)
+    referents=list(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
+                   .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                   .exclude(author_provider_id__in=list(authors)).exclude(id__in=skips).order_by('-posted_at')[:30])
+    focus=experimentos.active_focus(account,now)
+    if focus:referents.sort(key=lambda post:post.referent_id!=focus.referent_id)
+    groups={'compradores':calentamiento.buyer_posts(account,now,authors,skips)[:30],'comunidad':[],'referentes':referents}
+    room=calentamiento.rooms(account,now,{group for group,posts in groups.items() if posts})
+    asked=0
+    for group in calentamiento.GROUPS:
+        if room[group]<=0:continue
+        for post in groups[group]:
+            if not experimentos.eligible(post,now):continue
+            if prefilter and str(post.id) not in verdicts:
+                if asked>=PREFILTER_PER_TICK:return 0  # the next candidates are judged on the next tick
+                asked+=1
+                if _prefilter(post)=='skip':continue
+            _,created=enqueue_operation(user,'propose_comment',{'post':str(post.id)},request_id=_job_id('propose',post.id))
+            return int(created)
+    return 0
+
 def _lead_redraft(user,account,now):
     """A comment the lead discarded in the last 24 h gets ONE redraft with the lead's reasons (docs/compuertas.md): same
     write slot, budget, daily room and one-draft-at-a-time as _propose. The redraft goes through the rules and the lead
@@ -443,22 +531,70 @@ def _lead_redraft(user,account,now):
         return 0
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
-    if int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted<=0:return 0
+    if daily_proposals()-drafted<=0:return 0
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
+    from . import calentamiento
+    warm=calentamiento.enabled()
+    target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
+    if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
+        from . import sin_posts
+        target|=Q(post__posted_at__gte=now-calentamiento.post_max_age(),post__referent__isnull=True,
+                  post__author_provider_id__in=[j.contact.provider_user_id for j in
+                                                [*calentamiento.warming(account),*calentamiento.second_touch(account)]]
+                  +[b.provider_user_id for b in sin_posts.warming(account)])
     discarded=(ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
-                                             decided_at__gte=now-timedelta(hours=24),post__posted_at__gte=now-max_age,
-                                             post__referent__active=True)
+                                             decided_at__gte=now-timedelta(hours=24)).filter(target)
                .exclude(post__referent_id__in=recent_comment_authors(account,now))
                .annotate(drafts=Count('post__proposals',filter=Q(post__proposals__capability='INT-03'))).filter(drafts=1)
                .select_related('post').order_by('-decided_at'))
+    if warm:discarded=discarded.exclude(post__author_provider_id__in=list(recent_comment_author_ids(account,now)))
     from . import experimentos
-    for proposal in discarded[:10]:
+    rows=list(discarded[:10]);room=None
+    if warm:
+        buyers=calentamiento.buyer_ids(account)
+        room=calentamiento.rooms(account,now,{calentamiento.group_of(p.post,buyers) for p in rows})
+    for proposal in rows:
+        if room is not None and room.get(calentamiento.group_of(proposal.post,buyers),0)<=0:continue
         if not experimentos.eligible(proposal.post,now):continue
         _,created=enqueue_operation(user,'propose_comment',{'post':str(proposal.post_id),'redraft_of':str(proposal.id)},
                                     request_id=_job_id('redraft',proposal.id))
         if created:return 1
     return 0
+
+def _buyer_drafts(user,account,now):
+    """Phase 3 (BUYER_FIRST_MESSAGE_ENABLED, with the lead on): the decisions that need no paid call (nothing real to cite,
+    no note left, a conversation already, drafts that no longer apply) and then one paid draft at a time
+    (prepare_buyer_draft): the note of a warmed buyer about to be invited, or the first message of an accepted one when
+    it is due. Never sends anything (INB-08). Returns the decisions plus the job queued. Only inside READ_WINDOW, like the
+    periodic reads: a draft builds on what the reads brought (her posts, the inbox), and its card is for the day.
+    Phase 4 (BUYER_SEQUENCE_ENABLED, secuencia_comprador.step): messages 2–4 to whoever did not reply, the same job with
+    its `number`; her reply, her rest after message 4 and the inbox-off notice are decided there too, without a paid call.
+    Phase 6 (BUYER_REPLY_ENABLED, respuesta_comprador.step): her reply classified and answered (a draft he sends), the
+    same job with kind «respuesta» and her reply's `number`; the rests that end and the referrals, without a paid call."""
+    from . import mensajes_comprador, respuesta_comprador, secuencia_comprador
+    from knowledge import presupuesto
+    if not mensajes_comprador.active() or account.provider not in ('fake','directo'):return 0
+    if not operador.within_read_window(now):return 0
+    if _pending('prepare_buyer_draft'):return 0
+    decided,item=mensajes_comprador.step(account,now)
+    if secuencia_comprador.active():
+        more,follow_up=secuencia_comprador.step(account,now)
+        decided+=more;item=item or follow_up
+    if respuesta_comprador.active():
+        # Phase 6 (BUYER_REPLY_ENABLED): her reply goes first; the sequence's step already stopped it and moved her to «respondio».
+        more,reply=respuesta_comprador.step(account,now)
+        decided+=more;item=reply or item
+    if item is None or presupuesto.left(now)<=0:return decided
+    contact,kind,attempt,number=item
+    tries=mensajes_comprador.tries(contact,kind,attempt,number)
+    params={'contact':str(contact.pk),'kind':kind,'attempt':attempt,'at':now.isoformat()}
+    if number>1 or kind==mensajes_comprador.REPLY:
+        params['number']=number
+        request_id=_job_id('buyer_draft',contact.pk,kind,attempt,number,tries)
+    else:request_id=_job_id('buyer_draft',contact.pk,kind,attempt,tries)
+    _,created=enqueue_operation(user,'prepare_buyer_draft',params,request_id=request_id)
+    return decided+int(created)
 
 def _every(name,default):
     return timedelta(minutes=int(setting(name,default)))

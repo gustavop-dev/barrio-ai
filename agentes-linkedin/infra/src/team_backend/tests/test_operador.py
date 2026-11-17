@@ -55,7 +55,8 @@ class OperatorBase(TransactionTestCase):
                 VALUES('LI-03-M006-K02',3,'Comentarios que aportan','{"title":"Opinión, fundamento y apertura"}','abc','fixture','/units/0','{}')''')
         # Synthetic corpus only; never import private course text into fixtures.
         role_units=set(operador.COMMENT_UNITS+operador.REFERENTS_UNITS+operador.ANALYSIS_UNITS+operador.NETWORK_UNITS+operador.INBOX_UNITS+operador.LEAD_UNITS
-                       +operador.FIRST_MESSAGE_UNITS)
+                       +operador.FIRST_MESSAGE_UNITS+operador.WARMUP_COMMENT_UNITS+operador.INVITE_NOTE_UNITS+operador.SEQUENCE_UNITS
+                       +operador.BUYER_REPLY_UNITS)
         with db.connect() as c:
             for uid in role_units:
                 c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)

@@ -1,10 +1,11 @@
 """HTTP API of Resultados for the office (docs/metricas-resultados.md).
 GET /api/v1/resultados?dias=7|28|90&modalidad=todo|personal_startups|projectapp (defaults: 28, todo).
 GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d or ?desde&hasta: LinkedIn's own analytics, stored data only.
-/api/v1/resultados/resumen-semanal…: the weekly summary of analista_barrio_resultados (docs/resumen-semanal.md)."""
+/api/v1/resultados/resumen-semanal…: the weekly summary of analista_barrio_resultados (docs/resumen-semanal.md).
+GET /api/v1/resultados/embudo-comprador?semanas=1..26 (default 8): the buyer's funnel (comprador.funnel), read-only."""
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import analitica, resultados, resumen_semanal
+from . import analitica, comprador, resultados, resumen_semanal
 from .models import WeeklySummary
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
@@ -24,6 +25,12 @@ class Analitica(APIView):
         require(request.user,'operate_linkedin')
         p=request.query_params
         return Response(analitica.overview(p.get('cuenta'),p.get('periodo'),p.get('desde'),p.get('hasta')))
+
+class EmbudoComprador(APIView):
+    """The buyer's funnel by week and cumulative (docs/plan-outbound.md, phase 1). Read-only; never calls LinkedIn."""
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        return Response(comprador.funnel(request.query_params.get('semanas','8')))
 
 # --------------------------------------------------------------------------- weekly summary (docs/resumen-semanal.md)
 

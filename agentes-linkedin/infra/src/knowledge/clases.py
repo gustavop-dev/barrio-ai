@@ -28,11 +28,35 @@ def patron(clases):
 #   lista: la constante de las unidades, con la misma clave en course_lists de equipos/grafo.yaml.
 #   roles: los nodos del grafo que la cargan; ningún otro nodo puede enlazar la lista.
 #   unidades: la lista curada completa, en orden; se cargan enteras, sin búsqueda dinámica.
+#   registro: el registro de lectura de esas unidades (hash, puntero, fuentes), relativo a agentes-linkedin/equipos.
 METODOLOGIAS_ACTIVAS={
     'primer_mensaje':{'evaluacion':'BIB-09-primer-mensaje','lista':'operador.FIRST_MESSAGE_UNITS',
-                      'roles':('relaciones_comunidad','lider_jev'),
+                      'roles':('relaciones_comunidad','lider_jev'),'registro':'relaciones/registro-lectura-primer-mensaje.json',
                       'unidades':('LI-09-M002-K04','LI-09-M002-K05','LI-09-M003-K02','LI-09-V011-K01',
                                   'LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02')},
+    # Fase 2 del comprador (docs/plan-outbound.md): el comentario de calentamiento en el post de un comprador.
+    'comentario_calentamiento':{'evaluacion':'BIB-09-comentario-calentamiento','lista':'operador.WARMUP_COMMENT_UNITS',
+                                'roles':('relaciones_comunidad','lider_jev'),
+                                'registro':'relaciones/registro-lectura-comentario-calentamiento.json',
+                                'unidades':('LI-07-M005-K05','LI-07-M001-K04','LI-07-M005-K04','LI-07-M005-K07',
+                                            'LI-07-M004-K03','LI-10-V009-K01')},
+    # Fase 3 del comprador: la nota de invitación, reservada a compradores calentados con un hecho concreto.
+    'nota_invitacion':{'evaluacion':'BIB-09-nota-invitacion','lista':'operador.INVITE_NOTE_UNITS',
+                       'roles':('relaciones_comunidad','lider_jev'),
+                       'registro':'relaciones/registro-lectura-nota-invitacion.json',
+                       'unidades':('LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01')},
+    # Fase 4 del comprador: los mensajes 2 a 4 después del primero (clase 09) y cuándo se detienen (clase 10).
+    'secuencia_mensajes':{'evaluacion':'BIB-09-secuencia-mensajes','lista':'operador.SEQUENCE_UNITS',
+                          'roles':('relaciones_comunidad','lider_jev'),
+                          'registro':'relaciones/registro-lectura-secuencia-mensajes.json',
+                          'unidades':('LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03',
+                                      'LI-10-V013-K02','LI-10-M001-K08')},
+    # Fase 6 del comprador: clasificar su respuesta y contestarla hasta la reunión agendada (clase 11, con la 08 y la 12).
+    'respuesta_comprador':{'evaluacion':'BIB-11-respuesta-comprador','lista':'operador.BUYER_REPLY_UNITS',
+                           'roles':('relaciones_comunidad','lider_jev'),
+                           'registro':'relaciones/registro-lectura-respuesta-comprador.json',
+                           'unidades':('LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06',
+                                       'LI-08-M003-K05','LI-12-M001-K04')},
 }
 _DE_AGENTES=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
 

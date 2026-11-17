@@ -1,0 +1,238 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "relaciones",
+  "metodologia": "secuencia_mensajes",
+  "evaluacion": "BIB-09-secuencia-mensajes",
+  "fecha": "2026-11-17",
+  "metodo": "Lectura con SELECT de units.original en la biblioteca local (barrio-biblioteca-db), sin escribir en ella. hash = units.sha256 (sha256 del JSON canónico de la unidad, knowledge.ingest.canonical); source_path, pointer y fuentes de units y unit_evidence.",
+  "alcance": {
+    "unidades_leidas_completas": 6,
+    "por_clase": {
+      "09": 4,
+      "10": 2
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 6 unidades (4 de la clase 09 y 2 de la clase 10), no de toda la clase ni de las clases 07–12. Solo estas 6 unidades (y las de las otras metodologías activadas) están abiertas a los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS)."
+  },
+  "roles": [
+    "relaciones_comunidad",
+    "lider_jev"
+  ],
+  "lista": "operador.SEQUENCE_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-09-M003-K05",
+      "clase": 9,
+      "titulo": "La secuencia de la campaña 1: nota opcional y cuatro mensajes, cada uno con un trabajo distinto",
+      "hash": "546ea0a1cab066419fc2ccdadd04641cca465a05a337664c9fec41aa42391f2a",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "La secuencia tiene cuatro mensajes y cada uno un trabajo distinto: M1 abre (tres líneas, fase 3); M2 (+4 días) nombra el dolor con una historia corta; M3 (+5 días) pregunta «¿no eres la persona indicada?»; M4 (+7 días) cierra con elegancia. Si responde, se detiene todo.",
+      "limites_y_excepciones": [
+        "Discrepancia de tiempos: la diapositiva fija +4/+5/+7; el docente dijo «máximo 4 días» para el M2, una frase confusa para el M3 («sería como un día después del mensaje 2») y nada para el M4. Gana la diapositiva, configurable (BUYER_SEQUENCE_DAYS=4,5,7), contada desde el «Hecho, le escribí» del anterior.",
+        "Tras el M4, «sacar de la base o pasar a email o teléfono»: el equipo no tiene canal de email ni teléfono; descansa 90 días (secuencia_sin_respuesta) y una señal suya la despierta.",
+        "«Si no acepta, retira la invitación y escríbele por email»: no se aplica (fase 2: nunca se retira una invitación).",
+        "«La mayoría responde al 2.º o 3.º mensaje» (infografía): se mide en el embudo (comprador.funnel → secuencia.comprobacion), no se asume.",
+        "La automatización del curso envía los mensajes; aquí son borradores que Gustavo copia y envía (INB-08)."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.days, due y text_issues (trabajo por número); mensajes_comprador._draft con estas unidades y metodología",
+        "pregunta_del_lider": "seg_mismo_dolor (M2), seg_persona_indicada (M3) y seg_cierre (M4), mín. 0,7"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/101",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p020",
+        "09:d68888515e0f53845f66:p028",
+        "09:d68888515e0f53845f66:p029",
+        "09:qt00027",
+        "09:qt00028",
+        "09:qt00214",
+        "09:qt00217",
+        "09:qt00332",
+        "09:qt00333",
+        "09:qt00334",
+        "09:qt00336",
+        "09:qt00339",
+        "09:qt00340",
+        "09:qt00341",
+        "09:qt00343",
+        "09:qt00344",
+        "09:qt00346",
+        "09:qt00347",
+        "09:qt00349",
+        "09:qt00350",
+        "09:qt00351",
+        "09:qt00354",
+        "09:qt00355",
+        "09:qt00363",
+        "09:qt00364",
+        "09:qt00369",
+        "09:qt00370",
+        "09:qt00371",
+        "09:qt00577",
+        "09:qt00578"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-V014-K01",
+      "clase": 9,
+      "titulo": "Por qué una campaña necesita una secuencia y no un único mensaje",
+      "hash": "bc5d77a39d8a0f4c78493792bf21abeb863fa6c1897c31d05bb25b77efa08f81",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "El silencio tras el primer mensaje es olvido o mal momento, no rechazo ni prueba de que el M1 estaba mal: se sigue con la secuencia sin reescribir el M1. Si responde, se detiene todo.",
+      "limites_y_excepciones": [
+        "El M1 no se reescribe ni se repite: el M2 cuenta el mismo dolor de otra forma (repeats: ratio ≥ 0,6 u ocho palabras seguidas en común).",
+        "El arranque del M1 (1–3 semanas) es de la fase 3 (BUYER_MESSAGE_AFTER_HOURS desde la aceptación), no de esta."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.step (continúa sin respuesta, se detiene con respuesta) y repeats",
+        "pregunta_del_lider": "seg_repite (M2, máx. 0,3)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/50",
+      "fuentes_con_prefijo_de_clase": [
+        "09:05cc5247c75f4a91d610:p001",
+        "09:d68888515e0f53845f66:p020",
+        "09:qt00334",
+        "09:qt00336",
+        "09:qt00337",
+        "09:qt00338",
+        "09:qt00339"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-V014-K02",
+      "clase": 9,
+      "titulo": "Cadencia y contenido de los mensajes 2 y 3: replantear el dolor y preguntar '¿no eres la persona indicada?' para conseguir un referido",
+      "hash": "4f9352f5466eac12e0dcd642e9a457a8bbc8fe479c1b0b820bf165500a6de644",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "M2: el mismo dolor con otro enfoque o una historia corta, sin repetir el M1; puede reconocer sin reproche que no pudo responder, pero no se disculpa. M3: ya no repite el dolor; pregunta si es la persona indicada y quién se encarga, para conseguir un referido que luego se usa («tal persona me dijo que viniera contigo»).",
+      "limites_y_excepciones": [
+        "«Sé que no me pudiste responder antes» se permite (reconocer); «perdón por insistir» no (APOLOGY).",
+        "El referido lo usa la fase 6 (secuencia_comprador.referral_asked y link_referral); esta fase solo registra que el M3 se envió.",
+        "Intervalo del M2: el oral dice 2–4 días, máximo 4; la diapositiva +4: se usa 4, desde el «Hecho» del M1."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.text_issues: M2 sin repetir (repeats) ni disculparse (APOLOGY); M3 con RIGHT_PERSON y una pregunta",
+        "pregunta_del_lider": "seg_mismo_dolor (mín. 0,7), seg_repite (máx. 0,3) y seg_disculpa (máx. 0,2) en el M2; seg_persona_indicada (mín. 0,7) y seg_repite_dolor (máx. 0,3) en el M3"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/51",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p020",
+        "09:qt00340",
+        "09:qt00341",
+        "09:qt00342",
+        "09:qt00343",
+        "09:qt00344",
+        "09:qt00345",
+        "09:qt00346",
+        "09:qt00347",
+        "09:qt00348"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-V014-K03",
+      "clase": 9,
+      "titulo": "Mensaje 4: cerrar con elegancia y salir de la campaña sin rogar",
+      "hash": "d07b8f248cb85bcadaecac6a2607e446ce2fec147229abd7f6b7c539dd380b5a",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "M4: cerrar con elegancia (gracias por tu tiempo, quizá no es el momento o ya lo tienen resuelto), sin rogar ni pedir nada, y salir. No mantener indefinidamente a quien no responde tras el cierre.",
+      "limites_y_excepciones": [
+        "El docente deja el M4 «a gusto de cada uno»; Gustavo eligió los cuatro mensajes.",
+        "Tras el M4 sin respuesta: descanso de 90 días (BUYER_SEQUENCE_REST_DAYS) 7 días después (BUYER_SEQUENCE_REST_AFTER_DAYS), no borrarla: sigue siendo conexión."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.text_issues: M4 sin preguntas, sin pedir (ASKS) ni rogar (BEGS); _rest con secuencia_sin_respuesta",
+        "pregunta_del_lider": "seg_cierre (mín. 0,7), seg_ruega (máx. 0,2) y seg_pide (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/52",
+      "fuentes_con_prefijo_de_clase": [
+        "09:qt00349",
+        "09:qt00350",
+        "09:qt00351",
+        "09:qt00352",
+        "09:qt00353",
+        "09:qt00354"
+      ]
+    },
+    {
+      "unidad_id": "LI-10-V013-K02",
+      "clase": 10,
+      "titulo": "Reglas de detención de la campaña: cuándo debe frenarse la secuencia para un prospecto",
+      "hash": "3e5d8c7468cd507500d23c34e3db74f5596403e99a3a962ed2f409bf3c88ad75",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Antes de lanzar una secuencia se definen los eventos que la detienen para cada persona; como mínimo, su respuesta. Seguir mandándole pasos a quien ya respondió rompe la conversación.",
+      "limites_y_excepciones": [
+        "Implementado: su respuesta (leída del inbox) cancela los seguimientos pendientes y pasa el recorrido a «respondio».",
+        "No implementado: clic en un enlace (los mensajes no llevan enlaces) y reunión agendada (fase 6, sin CRM).",
+        "Sin inbox encendido no se sabe si respondió: la secuencia espera y avisa; nunca asume «no respondió»."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.replied_at, _stop e inbox_ready (antes de preparar y antes de mostrar la tarjeta)",
+        "pregunta_del_lider": "ninguna: es una regla de código, no un juicio"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-10-revisada.json",
+      "pointer": "/learning_units/34",
+      "fuentes_con_prefijo_de_clase": [
+        "10:0b14f1f411a3bf76e583:p001",
+        "10:qt00206",
+        "10:qt00253",
+        "10:qt00355",
+        "10:qt00356",
+        "10:qt00357"
+      ]
+    },
+    {
+      "unidad_id": "LI-10-M001-K08",
+      "clase": 10,
+      "titulo": "Horario, ritmo, pausa al responder, lanzamiento piloto y lectura de la tasa de aceptación",
+      "hash": "6b25786ab456bae31f1ca12bf80d7667a091e606e74b100d965a8cb04ae7c7ba",
+      "lectura_completa": true,
+      "lectura": "original completo leído de la biblioteca local (barrio-biblioteca-db, solo SELECT)",
+      "fecha": "2026-11-17",
+      "criterio_derivado": "Los envíos van de lunes a viernes en horario laboral; cuando la persona responde se pausa todo para ella.",
+      "limites_y_excepciones": [
+        "Se aplica a la preparación: los seguimientos se redactan de lunes a viernes dentro de READ_WINDOW; Gustavo decide cuándo los envía.",
+        "El ritmo entre prospectos, el piloto de 5–10 y la tasa de aceptación son de las fases 1–2 (RED-02), no de esta."
+      ],
+      "uso": {
+        "regla_fija": "secuencia_comprador.step (operador.is_weekend) y autopiloto._buyer_drafts (READ_WINDOW)",
+        "pregunta_del_lider": "ninguna"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-10-revisada.json",
+      "pointer": "/learning_units/60",
+      "fuentes_con_prefijo_de_clase": [
+        "10:0b14f1f411a3bf76e583:p001"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "Gustavo, 17/11/2026: el seguimiento es la secuencia de cuatro mensajes del curso, siempre en borradores que él copia y envía (INB-08); la app nunca envía un mensaje privado.",
+    "Plazos de la diapositiva (+4, +5, +7 días), configurables (BUYER_SEQUENCE_DAYS) y contados desde el «Hecho, le escribí» del anterior; si no envió el anterior, el siguiente no se prepara.",
+    "Si responde, se detiene todo: sin el inbox encendido (INBOX_ENABLED) y leído en las últimas 3 h no se prepara nada; se avisa una vez al día.",
+    "Tras el M4 sin respuesta descansa 90 días (secuencia_sin_respuesta), sigue siendo conexión y una señal suya la despierta (regla del calentamiento). «No escribirle» es la salida definitiva.",
+    "El mensaje va en el idioma de la persona; reglas fijas del primer mensaje más las de cada número, una reescritura y revisión del líder; un seguimiento rechazado no llega a Tu turno y queda auditado."
+  ],
+  "no_convertido_en_regla": [
+    "el oral «máximo 4 días» (2–4) para el M2 y la frase confusa del M3: rige la diapositiva",
+    "pasar a email o teléfono tras el M4: no hay ese canal",
+    "retirar la invitación de quien no acepta",
+    "detener por clic o por reunión agendada (sin enlaces; reunión en la fase 6)",
+    "«la mayoría responde al 2.º o 3.º mensaje»: se mide en el embudo, no se asume",
+    "el envío automático de la herramienta del curso"
+  ],
+  "siguiente_paso": "Fase 5 del plan outbound: la conversación después de su respuesta; la fase 6 usa el referido del M3 (secuencia_comprador.link_referral) y REPLY_HANDLERS."
+}

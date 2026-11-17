@@ -94,6 +94,9 @@ def _comment(account,connector,execution,now,summary):
     if not _save(execution,'72h',now,source=ActionOutcome.Source.READ,provider_comment_id=str(found['id'])[:255],
                  reactions=found.get('reaction_counter'),replies=replies,author_replied=author_replied,repliers=repliers):
         return None  # another run wrote it: nothing new
+    if repliers:
+        from . import comprador
+        comprador.on_comment_outcome(execution,repliers)  # who answered: a buyer's signal, passive record only
     return ''
 
 def collect_comments(account,executions,now,summary):
