@@ -45,6 +45,12 @@ METODOLOGIAS_ACTIVAS={
                        'roles':('relaciones_comunidad','lider_jev'),
                        'registro':'relaciones/registro-lectura-nota-invitacion.json',
                        'unidades':('LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01')},
+    # Fase 4 del comprador: los mensajes 2 a 4 después del primero (clase 09) y cuándo se detienen (clase 10).
+    'secuencia_mensajes':{'evaluacion':'BIB-09-secuencia-mensajes','lista':'operador.SEQUENCE_UNITS',
+                          'roles':('relaciones_comunidad','lider_jev'),
+                          'registro':'relaciones/registro-lectura-secuencia-mensajes.json',
+                          'unidades':('LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03',
+                                      'LI-10-V013-K02','LI-10-M001-K08')},
 }
 _DE_AGENTES=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
 

@@ -6,13 +6,14 @@ avanza: la lectura del inbox (el conector simulado es LinkedIn: lo que Gustavo e
 paso de borradores del autopiloto con sus jobs, Tu turno y los cierres de Gustavo. Claude y Jev simulados
 (test_comprador_e2e.judge_sequence); unidades del curso sintéticas, sin red ni proveedores pagados. El equipo nunca
 envía un mensaje: los seguimientos son borradores que Gustavo copia y envía (INB-08)."""
+import json
 import os
 from datetime import timedelta
 from unittest import expectedFailure
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
-from team_backend import evaluaciones
+from team_backend import evaluaciones, operador
 from team_backend.models import AuditEvent
 from team_backend.tests.test_comprador_e2e import SequencePathBase, case_text, sequence_text
 
@@ -129,7 +130,6 @@ class SequenceCaseTests(SequenceCaseBase):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
 
-    @expectedFailure  # Línea base: `secuencia_mensajes` no está activada; sus seis unidades no se cargan
     def test_the_case_loads_whole_versioned_sources_and_rejects_wrong_behaviour(self):
         context, grounding = evaluaciones.course_case_context('secuencia_mensajes')
         self.assertEqual(grounding['course_missing'], [])
@@ -157,3 +157,61 @@ class SequenceRulesTests(SimpleTestCase):
         self.assertEqual(self.issues(3, sequence_text('S9', 3)), [])  # passes the rules: the lead stops it
         for variant, number in (('S5', 2), ('S6', 2), ('S7', 3), ('S8', 4)):
             self.assertTrue(self.issues(number, sequence_text(variant, number)), variant)
+
+
+class SequenceActivationTests(SimpleTestCase):
+    """La activación es por metodología: solo sus seis unidades de las clases 09 y 10, solo cuando se nombra, solo en sus
+    roles."""
+
+    def test_the_activated_list_is_the_case_and_the_graph_list(self):
+        from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, legible_por_agentes
+        activa = METODOLOGIAS_ACTIVAS['secuencia_mensajes']
+        self.assertEqual(CLASES_AGENTES, tuple(range(1, 7)))
+        self.assertEqual(list(activa['unidades']), operador.SEQUENCE_UNITS)
+        self.assertEqual((activa['evaluacion'], activa['lista']), (CASE['id'], 'operador.SEQUENCE_UNITS'))
+        self.assertEqual(CASE['units'], operador.SEQUENCE_UNITS)
+        self.assertLessEqual(set(CASE['required']), set(CASE['units']))
+        self.assertEqual(activa['roles'], ('relaciones_comunidad', 'lider_jev'))
+        for uid in operador.SEQUENCE_UNITS:
+            self.assertTrue(legible_por_agentes(uid, 'secuencia_mensajes'))
+            self.assertFalse(legible_por_agentes(uid))
+            self.assertFalse(legible_por_agentes(uid, 'primer_mensaje'))
+        # The first message's and the note's units stay closed to the sequence, and the rest of classes 09–10 too.
+        for uid in ('LI-09-M003-K02', 'LI-09-M002-K06', 'LI-09-M003-K06', 'LI-10-V013-K01'):
+            self.assertFalse(legible_por_agentes(uid, 'secuencia_mensajes'), uid)
+        from team_backend.orquestacion import load_graph
+        graph = load_graph()
+        self.assertEqual(graph['course_lists']['operador.SEQUENCE_UNITS'], operador.SEQUENCE_UNITS)
+        self.assertEqual([n['id'] for n in graph['nodes'] if 'operador.SEQUENCE_UNITS' in n['course_lists']],
+                         ['relaciones_comunidad', 'lider_jev'])
+
+
+class SequenceReadingRegistryTests(SimpleTestCase):
+    """El registro de lectura nombra exactamente las unidades activadas, con su hash, puntero y fuentes; las decisiones de
+    Gustavo que ganan al curso y lo que no se convirtió en regla."""
+
+    def test_the_reading_registry_matches_the_activation(self):
+        from pathlib import Path
+        from knowledge.clases import METODOLOGIAS_ACTIVAS
+        activa = METODOLOGIAS_ACTIVAS['secuencia_mensajes']
+        self.assertEqual(activa['registro'], 'relaciones/registro-lectura-secuencia-mensajes.json')
+        path = Path(operador.__file__).resolve().parents[3] / 'equipos' / activa['registro']
+        if not path.exists():
+            self.skipTest('La imagen solo empaqueta grafo.yaml; el registro vive en equipos/relaciones.')
+        registry = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual((registry['metodologia'], registry['evaluacion'], registry['lista']),
+                         ('secuencia_mensajes', activa['evaluacion'], activa['lista']))
+        self.assertEqual(tuple(registry['roles']), activa['roles'])
+        self.assertEqual([u['unidad_id'] for u in registry['unidades']], operador.SEQUENCE_UNITS)
+        self.assertEqual(registry['alcance']['por_clase'], {'09': 4, '10': 2})
+        for unit in registry['unidades']:
+            prefix = unit['unidad_id'][3:5]
+            self.assertEqual(unit['clase'], int(prefix))
+            self.assertTrue(unit['lectura_completa'])
+            self.assertRegex(unit['hash'], r'^[0-9a-f]{64}$')
+            self.assertRegex(unit['pointer'], r'^/learning_units/\d+$')
+            self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
+            self.assertTrue(unit['fuentes_con_prefijo_de_clase'])
+            self.assertTrue(all(key.startswith(prefix + ':') for key in unit['fuentes_con_prefijo_de_clase']))
+        self.assertTrue(any('Gustavo' in d and 'borradores' in d for d in registry['decisiones_vigentes_que_ganan']))
+        self.assertTrue(any('email' in item for item in registry['no_convertido_en_regla']))

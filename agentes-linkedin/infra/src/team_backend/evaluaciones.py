@@ -1011,7 +1011,7 @@ COURSE_CASES={
     # (M2 que repite el M1, M2 que se disculpa, M3 sin la pregunta de la persona indicada, M4 que pide algo). S9: el líder
     # rechaza un M3 que repite el dolor. S10: «No escribirle» en el M3 es una salida definitiva. S11: interruptor apagado.
     'secuencia_mensajes':{'id':'BIB-09-secuencia-mensajes',
-        'units':['LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03','LI-10-V013-K02','LI-10-M001-K08'],
+        'units':operador.SEQUENCE_UNITS,
         'input':{
             'flujo':{'mensaje_2':('Ana, a pattern that shows up after a spreadsheet pilot: the fifth client asks for the same weekly '
                                   'report and somebody ends up copying numbers between tabs every Friday night. That is usually '

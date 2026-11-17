@@ -57,6 +57,10 @@ WARMUP_COMMENT_UNITS=list(METODOLOGIAS_ACTIVAS['comentario_calentamiento']['unid
 # drafted at invite time (phase 3, mensajes_comprador.py). Loaded whole, only with the methodology named, by Relaciones
 # when it drafts the note and by the lead when it reviews it. Baseline: docs/linea-base-nota-invitacion.md.
 INVITE_NOTE_UNITS=list(METODOLOGIAS_ACTIVAS['nota_invitacion']['unidades'])
+# BIB-09-secuencia-mensajes (classes 09 and 10, activated in METODOLOGIAS_ACTIVAS): messages 2–4 after the first one and
+# when the sequence stops (phase 4, secuencia_comprador.py). Loaded whole, only with the methodology named, by Relaciones
+# when it drafts a follow-up and by the lead when it reviews one. Baseline: docs/linea-base-secuencia-mensajes.md.
+SEQUENCE_UNITS=list(METODOLOGIAS_ACTIVAS['secuencia_mensajes']['unidades'])
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'

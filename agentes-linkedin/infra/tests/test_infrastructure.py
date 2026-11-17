@@ -39,14 +39,14 @@ def test_agents_keep_reading_01_06_while_the_library_holds_01_12():
     unit=retrieval.unit('LI-08-V001-K01')
     assert unit['session']==8 and unit['sources'] and all(s['key'].startswith('08:') for s in unit['sources'])
 
-@pytest.mark.parametrize('metodologia',['primer_mensaje','comentario_calentamiento','nota_invitacion'])
+@pytest.mark.parametrize('metodologia',['primer_mensaje','comentario_calentamiento','nota_invitacion','secuencia_mensajes'])
 def test_activated_methodology_registry_matches_the_real_corpus(metodologia):
-    """BIB-10, BIB-09-comentario-calentamiento y BIB-09-nota-invitacion: las unidades activadas de cada metodología existen en el corpus real con
+    """BIB-10, BIB-09-comentario-calentamiento, BIB-09-nota-invitacion y BIB-09-secuencia-mensajes: las unidades activadas de cada metodología existen en el corpus real con
     el hash, el puntero y las fuentes de su registro de lectura; se cargan solo con la metodología nombrada y el resto de
     sus clases sigue fuera."""
     from pathlib import Path
     from knowledge.clases import METODOLOGIAS_ACTIVAS,legible_por_agentes
-    assert set(METODOLOGIAS_ACTIVAS)=={'primer_mensaje','comentario_calentamiento','nota_invitacion'}  # una metodología nueva entra aquí
+    assert set(METODOLOGIAS_ACTIVAS)=={'primer_mensaje','comentario_calentamiento','nota_invitacion','secuencia_mensajes'}  # una metodología nueva entra aquí
     activa=METODOLOGIAS_ACTIVAS[metodologia]
     path=Path(__file__).resolve().parents[2]/'equipos'/activa['registro']
     if not path.exists():pytest.skip('Registro de equipos no disponible en esta copia')
