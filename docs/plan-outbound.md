@@ -177,6 +177,9 @@ El curso no lo trata. Ruta aprobada, medida aparte de los calentados con comenta
 4. Invitar a los 14 días. Con una señal fuerte y reciente, usar una de las 3 notas citando esa señal.
 5. Al aceptar, primer mensaje con la señal o algo en común como primera línea.
 
+Construida como fase 5 ([BAR-22](funcionalidades/red.md#bar-22)), salvo la visita del paso 1, el paso 2 y «algo en
+común», que el conector o los datos no permiten hoy.
+
 ### Reciprocidad: lo que la persona hace de vuelta (17/11/2026)
 
 Decisión de Gustavo: el calentamiento es de ambos lados. Lo que la persona hace sube su prioridad y cambia el paso
@@ -386,7 +389,21 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
    - Para la fase 6: `REPLY_HANDLERS` (qué hacer cuando responde) y `link_referral` (el referido del M3).
    - Embudo: cuántos recibieron M1 a M4, tras qué mensaje respondieron y los borradores por número. Para desplegar:
      migración 0048 y el inbox encendido.
-5. **Ruta del que no publica.**
+5. ~~**Ruta del que no publica.**~~ Hecho en la misma rama ([BAR-22](funcionalidades/red.md#bar-22)), sin desplegar y
+   detrás de `BUYER_NO_POSTS_ROUTE_ENABLED` (apagado por defecto; apagado, todo es como en las fases 2 a 4):
+   - Seguir sí; la visita al perfil y «comentar donde él comenta» no: el conector no registra una visita visible ni lee
+     la actividad de comentarios de una persona. No se simulan.
+   - El puente: sin señal ni interacción que citar, se busca por su empresa (del titular) a un colega que publique, con
+     su propio tope de búsquedas (2 al día) y dentro de los de lectura; máximo dos personas por empresa y nunca el mismo
+     cargo. Es su propio contacto (papel «Puente»): se sigue, se comenta dos veces y se invita sin nota. Lo que hace
+     cuenta como señal del comprador; «hablé con X de tu equipo», solo tras una interacción real.
+   - Invitación a los 14 días; con una señal de compra fuerte, reciente y con fuente, candidato a una de las 3 notas,
+     después de los calentados con comentarios. Primer mensaje con la señal o el puente; sin nada real, sin mensaje.
+   - Reintentos: invitado con menos de dos comentarios y sin aceptar en 21 días también descansa; en esta ruta, antes
+     el puente; cada reintento guarda su ángulo (señal nueva, puente, otro tema); tres intentos y un año; una
+     reverificación web de sus señales al terminar cada descanso, dentro del cupo diario de verificaciones.
+   - Embudo `ruta_sin_posts`: con y sin puente, puentes encontrados y aceptados, reintentos por ángulo. Para
+     desplegar: migración 0049 y el calentamiento encendido.
 6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
 7. **Lectura semanal del embudo.**
 
@@ -394,7 +411,7 @@ Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, u
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-21) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-22) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

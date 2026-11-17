@@ -291,6 +291,14 @@ Con `BUYER_SEQUENCE_ENABLED=true` (por defecto `false`), la fase 3, el líder y 
 - **`POST /api/v1/respuestas/<id>/mensaje`** acepta el id de un seguimiento. «Hecho, le escribí» registra el mensaje n y empieza a contar el plazo del siguiente; «No escribirle», salida definitiva. 409 si se canceló porque ella respondió.
 - **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma `secuencia: { recibieron: {"1".."4"}, respondieron_tras: {"1".."4"}, comprobacion: { curso, respuestas, tras_2_o_3, tras_2_o_3_pct, muestra_chica }, descansan, activa }` y, en `borradores`, `por_numero: {"1".."4": { preparados, pendientes, enviados, no_enviados, cancelados, parados }}`. `borradores.recorrido` sigue contando solo el primer mensaje; `pendientes` suma los seguimientos listos con el interruptor encendido. `descanso` puede traer `secuencia_sin_respuesta`.
 
+### La ruta del comprador que no publica (fase 5)
+
+Con `BUYER_NO_POSTS_ROUTE_ENABLED=true` (por defecto `false`) y el calentamiento encendido (ficha BAR-22). Apagado, nada de esto aparece. Sin endpoints nuevos.
+
+- **Personas y red.** Un colega de un comprador que no publica entra como contacto con `classification.role: "puente"` (y `classification.puente: { comprador, recorrido, empresa, cargo, cargo_comprador }`), etapa `fit` → `followed` → `invited` → `connected` como cualquier otro. La PWA y la app lo etiquetan «Puente» («Puentes» en los chips); un cliente que no conoce el papel muestra su nombre tal cual.
+- **Tu turno.** La tarjeta del primer mensaje (fase 3) puede traer `comment_label: "Su colega (el puente)"` cuando el mensaje cita lo que hizo el puente; mismos campos y acciones.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma `ruta_sin_posts: { activa, definiciones, comparacion: { con_puente, sin_puente }, puentes: { pedidos, busquedas, encontrados, sin_puente: { "<motivo>": n }, seguidos, invitados, aceptaron, compradores_con_senal_del_puente, compradores_con_interaccion_del_puente }, donde_comenta: { disponible: false, motivo }, visitas: { disponible: false, motivo }, reintentos: { por_angulo }, reverificaciones: { pedidas, hechas, con_senal_nueva, vencidas } }`. `descanso` puede traer `invitacion_no_aceptada` también para quien fue invitado con menos de dos comentarios.
+
 ### Trabajos y roles (escena de la oficina)
 
 Hay cuatro trabajos nuevos (`Job.kind`). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:

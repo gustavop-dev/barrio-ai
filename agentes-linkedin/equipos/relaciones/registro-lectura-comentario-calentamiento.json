@@ -205,7 +205,8 @@
     "Sin mensajes privados automáticos (INB-08): el calentamiento solo comenta en público y prepara la invitación (RED-02, sin nota por defecto).",
     "Sin cambios de la rampa de RED-02. El tope de INT-03 sube a 15 al día y 75 a la semana por decisión de Gustavo (17/11/2026: seguir comentando a referentes y comentar a posibles clientes), no por el curso: el reparto 8/2/5 es dentro de ese tope.",
     "El comentario va en el idioma de la publicación (Gustavo, 12/11/2026).",
-    "Nunca se retira una invitación ni se vuelve a invitar mientras siga pendiente: retirarla es manual (GET /api/v1/red/invitaciones-pendientes)."
+    "Nunca se retira una invitación ni se vuelve a invitar mientras siga pendiente: retirarla es manual (GET /api/v1/red/invitaciones-pendientes).",
+    "Fase 5 del outbound (BAR-22, 17/11/2026): con BUYER_NO_POSTS_ROUTE_ENABLED esta metodología también comenta los posts del puente de un comprador que no publica (un colega suyo de la misma empresa que sí publica), con un para_que propio y sin repetir lo que se le escribió al comprador. La ruta es diseño de Gustavo («apruebo entrar por el cofounder»), no del curso; la sustentan LI-07-M005-K01, LI-07-M005-K02, LI-08-M004-K04, LI-08-M004-K05 y LI-10-V008-K01, leídas completas con SELECT, que no se cargan: sus reglas son código (sin_posts.py)."
   ],
   "no_convertido_en_regla": [
     "el prompt 7.2 (LI-07-M007-K05): cinco alternativas, 25–35 palabras y «sin emojis»; rige 25–40 de LI-07-M001-K04 y solo se prohíbe el aplauso",
