@@ -8,7 +8,7 @@ from unittest.mock import patch
 import httpx
 from knowledge import db, providers
 from team_backend import alertas_slack, autopiloto, operador
-from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job, PostComment, Worker
+from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Conversation, Job, PostComment, Worker
 from team_backend.tests.test_ventana_lectura import WindowBase, at
 
 ALERTS='https://hooks.slack.test/services/ALERTAS'
@@ -377,3 +377,36 @@ class MoneyAlertTests(SlackBase):
         operador._audit(None,'network.ramp','member',stage=1,pause_until=None,health=dict(health,rate=0.45,sample_key='c'*64))
         self.watch(at(10,0,2))  # too few mature invitations, then a healthy rate: nothing to say
         self.assertEqual(len([t for t in self.texts() if 'Aceptación' in t]),1)
+
+
+class GustavoAlertTests(SlackBase):
+    def test_a_suggested_message_and_a_conversation_once_each_without_the_message_text(self):
+        piece,_=self.post_at(at(8,0,-1),'Post de ayer sobre evaluaciones en producción.')
+        row=PostComment.objects.create(account=self.account,piece=piece,provider_post_id='p',provider_comment_id='c1',author_name='Ana',
+                                       text='x',commented_at=at(9),observed_at=at(9),state='reply',decision={'turn':2,'dm_opener':'Hola Ana'})
+        with patch('team_backend.respuestas._dm_rows',return_value=[row]):
+            self.watch(at(10));self.watch(at(11))
+        conversation=Conversation.objects.create(account=self.account,provider_chat_id='chat-1',attendee_name='Luis',last_message_at=at(9),
+            messages=[{'id':'m1','at':at(9).isoformat(),'from_me':False,'text':'Texto privado del mensaje'}],
+            assessment={'message_id':'m1','awaiting_reply':True,'answers':{'espera':0.74}})
+        self.watch(at(12));self.watch(at(13))
+        Conversation.objects.filter(pk=conversation.pk).update(closed_message_id='m1')  # he closed it
+        self.watch(at(14))
+        texts=self.texts()
+        self.assertEqual([t for t in texts if 'Mensaje sugerido' in t],
+                         ['Barrio · Mensaje sugerido listo: Ana conversó contigo en tu post «Post de ayer sobre evaluaciones en producción.» '
+                          'y ya es contacto. El primer mensaje está redactado en Tu turno para que lo envíes tú desde LinkedIn.'])
+        self.assertEqual([t for t in texts if 'Luis' in t],
+                         ['Barrio · Luis te escribió por LinkedIn: Espera tu respuesta (74 %). Está en Tu turno; el equipo no responde mensajes.'])
+        self.assertNotIn('Texto privado',' '.join(texts))
+
+    def test_proposals_about_to_expire_go_together_once_a_day(self):
+        with patch.dict('os.environ',{'OPERATOR_AUTONOMY':'RED-01=approval,RED-04=auto','OPERATOR_PROPOSAL_TTL_HOURS':'48'}):
+            for n,(capability,hours) in enumerate((('RED-01',40),('RED-01',45),('RED-01',10),('RED-04',45))):
+                contact=Contact.objects.create(account=self.account,provider_user_id=f'u-{n}',display_name='P',source='manual')
+                ActionProposal.objects.create(account=self.account,contact=contact,capability=capability,payload={},payload_hash=f'{n}'*64,
+                                              state='proposed',created_at=at(12)-timedelta(hours=hours))
+            self.watch(at(12));self.watch(at(14))
+        texts=[t for t in self.texts() if 'caducan' in t]
+        self.assertEqual(texts,['Barrio · 2 propuesta(s) esperan tu aprobación y caducan en menos de 12 h (2 × Seguir a una persona); '
+                                'la primera caduca a las 15:00. Apruébalas o recházalas en Tu turno; si no, caducan sin salir.'])

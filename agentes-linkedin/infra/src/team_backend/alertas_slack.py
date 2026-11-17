@@ -96,6 +96,11 @@ def since_text(moment,now):
     local,today=_local(moment),_local(now).date()
     return f'las {local:%H:%M}' if local.date()==today else f'el {local:%d/%m} a las {local:%H:%M}'
 
+def at_text(moment,now):
+    """«a las 14:05», or «el 17/11 a las 08:30» when it is another day."""
+    local,today=_local(moment),_local(now).date()
+    return f'a las {local:%H:%M}' if local.date()==today else f'el {local:%d/%m} a las {local:%H:%M}'
+
 def duration(delta):
     minutes=max(0,int(delta.total_seconds()//60));hours,minutes=divmod(minutes,60)
     return f'{hours} h {minutes:02d} min' if hours else f'{minutes} min'
@@ -536,6 +541,54 @@ def aceptacion_baja(now):
         f'Barrio · Aceptación de invitaciones baja: {health.get("accepted",0)} de {health["mature"]} ({rate:.0%}), bajo el '
         f'{minimum:.0%} (OPERATOR_INVITE_ACCEPTANCE_MIN). La rampa baja una etapa y no sube en una semana; bajo el 25 % las '
         'invitaciones se pausan. Revisa en Personas a quién se está invitando.',once='ever')]
+
+# --------------------------------------------------------------------------- what waits for Gustavo
+
+@vigilante
+def mensaje_sugerido(now):
+    """A «Mensaje sugerido» card in Tu turno (respuestas._dm_rows): once each."""
+    from . import respuestas
+    return [Aviso(f'tuturno:{respuestas.card_id(row)}',
+                  f'Barrio · Mensaje sugerido listo: {row.author_name or "alguien"} conversó contigo en tu post «{_words(row.piece.final_text)}» '
+                  'y ya es contacto. El primer mensaje está redactado en Tu turno para que lo envíes tú desde LinkedIn.',once='ever')
+            for row in respuestas._dm_rows()]
+
+@vigilante
+def conversacion_espera(now):
+    """A LinkedIn conversation Jev judged as business or waiting for his reply (conversaciones.needs_gustavo): once per
+    inbound message. Never the message text: who, and the team's read."""
+    from . import conversaciones
+    from .models import Conversation
+    alerts=[]
+    for conversation in Conversation.objects.filter(last_from_me=False,last_message_at__gte=now-conversaciones.max_age()):
+        if not conversaciones.needs_gustavo(conversation,now):continue
+        alerts.append(Aviso(f'tuturno:{conversaciones.card_id(conversation)}',
+            f'Barrio · {conversation.attendee_name or "Alguien"} te escribió por LinkedIn: {conversaciones.why(conversation) or "espera tu respuesta"}. '
+            'Está en Tu turno; el equipo no responde mensajes.',once='ever'))
+    return alerts
+
+def expiry_hours():
+    """ALERT_PROPOSAL_EXPIRY_HOURS (12): proposals waiting for his approval that expire within this are grouped."""
+    return timedelta(hours=_number('ALERT_PROPOSAL_EXPIRY_HOURS',12,1,48))
+
+@vigilante
+def propuestas_por_caducar(now):
+    """Proposals that only Gustavo approves (OPERATOR_AUTONOMY=approval) expiring within ALERT_PROPOSAL_EXPIRY_HOURS
+    (OPERATOR_PROPOSAL_TTL_HOURS, as autopiloto.tick expires them): one grouped message a day."""
+    from .autopiloto import autonomy
+    from .models import ActionProposal
+    ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')));soon=[]
+    for proposal in ActionProposal.objects.select_related('piece').filter(state='proposed',execution__isnull=True):
+        if autonomy(proposal.capability)!='approval':continue
+        expires=(proposal.piece.scheduled_for if proposal.piece_id else proposal.created_at)+ttl
+        if now<expires<=now+expiry_hours():soon.append((expires,proposal))
+    if not soon:return []
+    soon.sort(key=lambda item:item[0]);counts={}
+    for _,proposal in soon:counts[capability_label(proposal.capability)]=counts.get(capability_label(proposal.capability),0)+1
+    what=', '.join(f'{n} × {label}' for label,n in counts.items())
+    return [Aviso('tuturno:caducan',
+        f'Barrio · {len(soon)} propuesta(s) esperan tu aprobación y caducan en menos de {int(expiry_hours().total_seconds()//3600)} h '
+        f'({what}); la primera caduca {at_text(soon[0][0],now)}. Apruébalas o recházalas en Tu turno; si no, caducan sin salir.')]
 
 # --------------------------------------------------------------------------- the daily summary
 
