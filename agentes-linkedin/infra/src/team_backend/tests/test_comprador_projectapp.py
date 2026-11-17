@@ -156,6 +156,16 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
             _,grounding=evaluaciones.course_case_context('con_quien')
             self.assertEqual(evaluaciones.grade_course_case('con_quien',result,grounding)['errors'],[])
 
+    def test_more_than_1000_people_is_out_at_the_classification_before_any_follow_or_web_check(self):
+        # The fake classifier keeps P4 «probable» with fit=true: the size rule in code takes her out right there.
+        with patch.dict(os.environ,{SWITCH:'true'}):
+            self.seed()
+            with self.models():red.classify(self.bot,self.account,MONDAY)
+        p4=Contact.objects.get(display_name='Diana Global');c=p4.classification
+        self.assertEqual((c['fit'],c['rule'],c['buyer']['level'],c['buyer']['company_size'],'stage_check' in c),
+                         (False,red.projectapp.SIZE_RULE,'no_encaja','mas_de_1000',False))
+        self.assertNotIn(p4.stage,('fit','followed'))
+
 
 # --------------------------------------------------------------------------- targeted tests (BAR-25)
 
