@@ -105,7 +105,7 @@ class AnalysisEndToEndTests(tri.IndustryMixin, TestCase):
         self.publish(ana, 17, 300, 40, tar.LIST.format(n=30))
         self.publish(beto, 10, 200, 20, tar.LIST.format(n=7))
         self.publish(beto, 2, 400, 60, tar.NEWS, media='imagen')
-        self.publish(ana, 2.1, 40, 5, tar.DEVDAY)
+        self.publish(ana, 2, 40, 5, tar.DEVDAY)
 
         summary = operador.observe(self.user, self.account, limit=20)
         self.assertEqual((summary['referents'], summary['new_posts']), (2, 21))

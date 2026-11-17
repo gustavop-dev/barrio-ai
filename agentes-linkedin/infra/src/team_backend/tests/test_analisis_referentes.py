@@ -43,7 +43,8 @@ class AnalysisData:
     """Ana (industria): a norm of 45 interactions, two list posts far above it in different weeks, two one-line
     questions far below, a post about DevDay and a young one. Beto (industria): a norm of 30, a list post far above it,
     a news post far above it and a contrarian one far above it. Ciro (industria) has three posts only; Nico is a niche
-    voice. Ana and Beto both named Acme Summit 40 days ago and DevDay two days ago."""
+    voice. Ana and Beto both named Acme Summit 40 days ago and DevDay two days ago, each pair at the same instant so
+    that it shares an ISO week whatever the clock says."""
 
     def build(self):
         self.now = timezone.now()
@@ -57,11 +58,11 @@ class AnalysisData:
         for d in range(20, 60, 5):
             self.post(self.ana, d, 40, 5, BASE, reposts=1)
             self.post(self.beto, d + 1, 25, 5, BASE)
-        self.ana_summit, self.beto_summit = self.post(self.ana, 40.5, 40, 5, SUMMIT, reposts=1), self.post(self.beto, 40.2, 25, 5, SUMMIT)
+        self.ana_summit, self.beto_summit = self.post(self.ana, 40.5, 40, 5, SUMMIT, reposts=1), self.post(self.beto, 40.5, 25, 5, SUMMIT)
         self.ana_list = self.post(self.ana, 3, 300, 40, LIST.format(n=12), reposts=12)
         self.ana_list2 = self.post(self.ana, 17, 300, 40, LIST.format(n=30), reposts=1)
         self.flops = [self.post(self.ana, d, 10, 0, FLOP, reposts=0) for d in (5, 8)]
-        self.ana_devday = self.post(self.ana, 2.1, 40, 5, DEVDAY, reposts=1)
+        self.ana_devday = self.post(self.ana, 2, 40, 5, DEVDAY, reposts=1)
         self.young = self.post(self.ana, 0.5, 900, 90, LIST.format(n=7))
         self.beto_list = self.post(self.beto, 10, 200, 20, LIST.format(n=7))
         self.beto_news = self.post(self.beto, 2, 400, 60, NEWS)
@@ -78,17 +79,20 @@ class AnalysisData:
 
 
 class DecompositionTests(SimpleTestCase):
-    def test_a_post_is_taken_apart_in_labels_tied_to_gustavos_pillars(self):
+    def test_a_post_is_taken_apart_in_labels_without_any_of_its_sentences(self):
         post = ObservedPost(text=LIST.format(n=12), media='documento')
         parts = an.decompose(post)
         self.assertEqual((parts['tema'], parts['pilar'], parts['firma']), ('mvp_alcance', 'business_to_product', DURABLE))
-        self.assertEqual(parts['partes']['recurso_visual'], {'tipo': 'documento', 'detalle': 'no_disponible'})
-        self.assertEqual(parts['partes']['gancho'], {'tipo': 'lista_anunciada', 'palabras': 8, 'linea_propia': True})
+        self.assertEqual({k: parts['partes'][k] for k in ('recurso_visual', 'gancho', 'cierre')},
+                         {'recurso_visual': {'tipo': 'documento', 'detalle': 'no_disponible'},
+                          'gancho': {'tipo': 'lista_anunciada', 'palabras': 8, 'linea_propia': True},
+                          'cierre': {'tipo': 'pregunta', 'cta': True}})
         self.assertEqual((parts['partes']['cuerpo']['formato'], parts['partes']['cuerpo']['items_lista']), ('lista', 5))
-        self.assertEqual(parts['partes']['cierre'], {'tipo': 'pregunta', 'cta': True})
         self.assertEqual(parts['partes']['longitud']['banda'], 'corto')
         self.assertEqual((parts['senales_coyuntura'], parts['apto']), ([], True))
         self.assertEqual(leaks({k: v for k, v in parts.items() if k != 'nombres'}), [])
+
+    def test_every_topic_of_the_growth_models_maps_to_one_of_gustavos_pillars(self):
         self.assertLessEqual(set(an.PILLAR_OF.values()), set(posicionamiento.PILLARS))
         self.assertEqual(set(an.PILLAR_OF), set(mc.THEMES))
 
@@ -104,35 +108,41 @@ class DecompositionTests(SimpleTestCase):
         self.assertFalse(an.decompose(ObservedPost(text="We're hiring senior engineers. Apply now."))['apto'])
 
     def test_the_connector_names_the_media_it_recognizes_and_never_guesses_text_only(self):
-        image = {'com.linkedin.voyager.feed.render.ImageComponent': {'images': [{}, {}]}}
-        self.assertEqual(lectura.media({'content': image}), 'imagenes')
-        self.assertEqual(lectura.media({'content': {'com.linkedin.voyager.feed.render.ImageComponent': {'images': [{}]}}}), 'imagen')
-        self.assertEqual(lectura.media({'content': {'com.linkedin.voyager.feed.render.LinkedInVideoComponent': {}}}), 'video')
-        self.assertEqual(lectura.media({'content': {'com.linkedin.voyager.feed.render.DocumentComponent': {}}}), 'documento')
-        self.assertEqual(lectura.media({'content': {'$type': 'com.linkedin.voyager.feed.render.PollComponent'}}), 'encuesta')
-        self.assertEqual(lectura.media({'content': {'com.linkedin.voyager.feed.render.SomethingNew': {}}}), 'otro')
-        self.assertEqual(lectura.media({}), '')
-        self.assertEqual(lectura.media({'content': None}), '')
+        render = 'com.linkedin.voyager.feed.render.'
+        cases = (({'content': {render + 'ImageComponent': {'images': [{}, {}]}}}, 'imagenes'),
+                 ({'content': {render + 'ImageComponent': {'images': [{}]}}}, 'imagen'),
+                 ({'content': {render + 'LinkedInVideoComponent': {}}}, 'video'),
+                 ({'content': {render + 'DocumentComponent': {}}}, 'documento'),
+                 ({'content': {'$type': render + 'PollComponent'}}, 'encuesta'),
+                 ({'content': {render + 'SomethingNew': {}}}, 'otro'),
+                 ({}, ''),
+                 ({'content': None}, ''))
+        for update, expected in cases:
+            with self.subTest(expected=expected, update=update):
+                self.assertEqual(lectura.media(update), expected)
 
 
 class ReportTests(AnalysisData, TestCase):
     def setUp(self):
         self.build()
 
-    def test_each_counter_is_compared_with_its_own_authors_median_and_judged_only_with_a_sample(self):
-        data = an.report(self.account, now=self.now)
-        standout = {s['post_id']: s for s in data['destacados']}
+    def test_each_counter_is_compared_with_its_own_authors_median_and_judged_only_once_mature(self):
+        standout = {s['post_id']: s for s in an.report(self.account, now=self.now)['destacados']}
         top = standout[str(self.ana_list.pk)]
         self.assertEqual(top['veredicto'], 'funciono')
-        self.assertEqual(top['metricas']['reacciones'], {'valor': 300, 'mediana_autor': 40, 'veces': 7.5, 'muestra': 13})
-        self.assertEqual(top['metricas']['comentarios'], {'valor': 40, 'mediana_autor': 5, 'veces': 8.0, 'muestra': 13})
-        self.assertEqual(top['metricas']['compartidos'], {'valor': 12, 'mediana_autor': 1, 'veces': 12.0, 'muestra': 13})
+        self.assertEqual({k: top['metricas'][k] for k in ('reacciones', 'comentarios', 'compartidos')},
+                         {'reacciones': {'valor': 300, 'mediana_autor': 40, 'veces': 7.5, 'muestra': 13},
+                          'comentarios': {'valor': 40, 'mediana_autor': 5, 'veces': 8.0, 'muestra': 13},
+                          'compartidos': {'valor': 12, 'mediana_autor': 1, 'veces': 12.0, 'muestra': 13}})
         self.assertEqual(top['metricas']['interacciones']['mediana_autor'], 45)
-        self.assertEqual(standout[str(self.flops[0].pk)]['veredicto'], 'no_funciono')
-        self.assertEqual(standout[str(self.flops[0].pk)]['metricas']['interacciones']['veces'], 0.22)
+        flop = standout[str(self.flops[0].pk)]
+        self.assertEqual((flop['veredicto'], flop['metricas']['interacciones']['veces']), ('no_funciono', 0.22))
         self.assertEqual(standout[str(self.beto_list.pk)]['metricas']['compartidos'], {'valor': None, 'mediana_autor': None,
                                                                                          'veces': None, 'muestra': 0})
         self.assertNotIn(str(self.young.pk), standout)  # 12 h old: not judged yet, however big
+
+    def test_each_referent_is_summed_up_and_one_without_a_base_is_left_unjudged(self):
+        data = an.report(self.account, now=self.now)
         rows = {r['nombre']: r for r in data['referentes']}
         self.assertEqual({k: rows['Ana'][k] for k in ('posts', 'funciono', 'no_funciono', 'sin_juicio')},
                          {'posts': 15, 'funciono': 2, 'no_funciono': 2, 'sin_juicio': 1})
@@ -151,10 +161,13 @@ class ReportTests(AnalysisData, TestCase):
         self.assertEqual(once['estado'], 'hipotesis')
         self.assertEqual(len(once['faltan']), 3)
         # The news post worked, but news did: its structure is not a model.
-        self.assertNotIn(an.decompose(self.beto_news)['firma'], durable)
+        self.assertNotIn('cifra·caso·pregunta', durable)
         news = next(s for s in data['destacados'] if s['post_id'] == str(self.beto_news.pk))
         self.assertEqual(news['coyuntura'], {'flag': True, 'referentes_misma_semana': 2,
                                              'senales': ['menciona_noticia', 'menciona_lanzamiento', 'varios_referentes_misma_semana']})
+
+    def test_what_falls_below_the_norm_and_each_part_are_counted_with_their_sample(self):
+        data = an.report(self.account, now=self.now)
         below = {s['firma']: s for s in data['estructuras_por_debajo']}
         self.assertEqual((below['pregunta·pregunta_abierta·pregunta']['no_funciono'],
                           below['pregunta·pregunta_abierta·pregunta']['muestra_pequena']), (2, True))
@@ -236,7 +249,7 @@ class EndpointTests(AnalysisData, TestCase):
         self.build()
         self.client = APIClient()
 
-    def test_gustavo_reads_the_analysis_and_bad_parameters_or_no_permission_are_refused(self):
+    def test_gustavo_reads_the_analysis_of_one_account_or_of_another_window(self):
         self.client.force_authenticate(get_user_model().objects.create_user('gustavo', is_superuser=True))
         answer = self.client.get('/api/v1/referentes/analisis', {'account': str(self.account.pk)})
         self.assertEqual(answer.status_code, 200)
@@ -245,9 +258,13 @@ class EndpointTests(AnalysisData, TestCase):
                                      'estructuras_sostenidas', 'estructuras_por_debajo', 'temas_en_tendencia', 'limites'})
         self.assertEqual((data['activo'], data['muestra']['referentes']), (False, 3))
         self.assertEqual(leaks(data), [])
+        self.assertEqual(self.client.get('/api/v1/referentes/analisis', {'dias': '30'}).json()['muestra']['dias'], 30)
+
+    def test_bad_parameters_an_unknown_account_and_who_may_not_operate_are_refused(self):
+        self.assertEqual(self.client.get('/api/v1/referentes/analisis').status_code, 401)
+        self.client.force_authenticate(get_user_model().objects.create_user('gustavo', is_superuser=True))
         self.assertEqual(self.client.get('/api/v1/referentes/analisis', {'dias': '3'}).status_code, 400)
         self.assertEqual(self.client.get('/api/v1/referentes/analisis', {'account': 'no-es-uuid'}).status_code, 400)
         self.assertEqual(self.client.get('/api/v1/referentes/analisis', {'account': '00000000-0000-0000-0000-000000000000'}).status_code, 404)
-        self.assertEqual(self.client.get('/api/v1/referentes/analisis', {'dias': '30'}).json()['muestra']['dias'], 30)
         self.client.force_authenticate(get_user_model().objects.create_user('sin-permiso'))
         self.assertEqual(self.client.get('/api/v1/referentes/analisis').status_code, 403)
