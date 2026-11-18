@@ -73,6 +73,23 @@ def por_miembro(function):
         return alerts
     return watcher
 
+def privado(label):
+    """A watcher whose alerts carry a member's private content: who writes to her and what, her conversations, her
+    comments' and buyers' names, her post's words (organizaciones, phase 5). The Slack channel is one for the whole
+    organization, so with several active members each alert keeps its key (one per row, as before) but only says
+    «label» and where to look, never whose person nor what. With one member, or none, the channel is only hers and the
+    alert is the one of before, untouched."""
+    def wrap(function):
+        @functools.wraps(function)
+        def watcher(now):
+            from . import miembros
+            alerts=list(function(now) or ())
+            if len(miembros.active_members())<=1:return alerts
+            return [alert._replace(text=f'Barrio · {label}. El detalle está en Tu turno de quien corresponde; Slack no lo nombra.')
+                    for alert in alerts]
+        return watcher
+    return wrap
+
 def named(text,member):
     """«Barrio · Ana · …»: the alert says whose it is."""
     return text.replace('Barrio · ',f'Barrio · {member.display_name} · ',1)
@@ -421,6 +438,7 @@ def _words(text,count=8):
     return ' '.join(words[:count])+('…' if len(words)>count else '')
 
 @vigilante
+@privado('Hay un comentario sin responder')
 def comentario_sin_responder(now):
     """A comment on his post that deserves an answer (not a short congratulation, spam or a thread already answered),
     waiting more than ALERT_REPLY_PENDING_HOURS of window hours without a published reply or a decision not to answer:
@@ -606,15 +624,17 @@ def aceptacion_baja(now,member):
 # --------------------------------------------------------------------------- what waits for Gustavo
 
 @vigilante
+@privado('Hay un mensaje sugerido listo')
 def mensaje_sugerido(now):
     """A «Mensaje sugerido» card in Tu turno (respuestas._dm_rows): once each."""
-    from . import respuestas
+    from . import alcance, respuestas
     return [Aviso(f'tuturno:{respuestas.card_id(row)}',
                   f'Barrio · Mensaje sugerido listo: {row.author_name or "alguien"} conversó contigo en tu post «{_words(row.piece.final_text)}» '
                   'y ya es contacto. El primer mensaje está redactado en Tu turno para que lo envíes tú desde LinkedIn.',once='ever')
-            for row in respuestas._dm_rows()]
+            for row in respuestas._dm_rows(alcance.TODOS)]  # the machine's channel: every member's
 
 @vigilante
+@privado('Una conversación de LinkedIn espera respuesta')
 def conversacion_espera(now):
     """A LinkedIn conversation Jev judged as business or waiting for his reply (conversaciones.needs_gustavo): once per
     inbound message. Never the message text: who, and the team's read."""
@@ -629,6 +649,7 @@ def conversacion_espera(now):
     return alerts
 
 @vigilante
+@privado('Hay seguimientos de compradores para hoy')
 def seguimiento_vence_hoy(now):
     """Phase 4 (BUYER_SEQUENCE_ENABLED): the buyer follow-ups that wait for Gustavo today (ready in Tu turno, or due
     before the local day ends): one grouped message a day, the first time the watcher runs inside READ_WINDOW (the
@@ -644,6 +665,7 @@ def seguimiento_vence_hoy(now):
         'Están en Tu turno (o llegan al vencer, si no respondieron): los envías tú desde LinkedIn y marcas «Hecho, le escribí».')]
 
 @vigilante
+@privado('Un comprador respondió durante la secuencia')
 def comprador_respondio(now):
     """Phase 4: a buyer replied while in the sequence (secuencia_comprador audits buyer.sequence_replied when it stops
     it): once per reply, in the same tick that saw it. Who and after which message; never her text."""
@@ -682,6 +704,7 @@ def _name(contact_id):
     return Contact.objects.filter(pk=contact_id).values_list('display_name',flat=True).first() or 'Un comprador'
 
 @vigilante
+@privado('Un comprador está interesado')
 def comprador_interesado(now):
     """Phase 6 (BUYER_REPLY_ENABLED): a buyer replied with interest (respuesta_comprador classified it «interesado»):
     once per reply, in the tick that classified it. Who; never her text."""
@@ -694,6 +717,7 @@ def comprador_interesado(now):
                                                    created_at__gte=now-timedelta(days=2)).order_by('created_at')]
 
 @vigilante
+@privado('Hay una reunión agendada o reprogramada')
 def reunion_agendada(now):
     """Phase 6: a meeting booked (the Cal.com webhook matched it, Gustavo associated it or marked «Agendó») or
     rescheduled: once per booking event. Who and when; the lead is in Tu turno."""
@@ -714,13 +738,14 @@ def reunion_agendada(now):
 @vigilante
 def reserva_sin_emparejar(now):
     """Phase 6: a Cal.com booking the team could not match with a buyer: once per booking."""
-    from . import agenda_calcom, respuesta_comprador
+    from . import agenda_calcom, alcance, respuesta_comprador
     if not respuesta_comprador.enabled():return []
+    # Slack names nobody (organizaciones, phase 5): only the date of the booking, the rest is in her Tu turno.
     return [Aviso(f'comprador:reserva:{booking.pk}',
                   'Barrio · Reserva de Cal.com sin emparejar'+(f' para el {_local(booking.start_at):%d/%m a las %H:%M}' if booking.start_at else '')+
                   ': no trae el identificador de tu enlace y ni el correo ni el nombre coinciden con un comprador. Dile al equipo de '
                   'quién es en Tu turno.',once='ever')
-            for booking in agenda_calcom.unmatched()]
+            for booking in agenda_calcom.unmatched(alcance.TODOS)]
 
 @vigilante
 def falta_enlace_agenda(now):
