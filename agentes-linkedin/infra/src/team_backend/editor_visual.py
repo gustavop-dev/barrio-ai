@@ -6,12 +6,13 @@ tools neither dispatch to agents nor authorize publication.
 import json
 
 from knowledge import providers
-from . import guardas, imagenes, infografias, orquestacion, research
+from . import guardas, identidad, imagenes, infografias, orquestacion, research
 from .models import GalleryPhoto
 from .orquestacion_schemas import ARRAY, OBJECT, STRING, obj
 
 
-# gustavo_request is optional: requests snapshotted before it existed still validate when a cycle resumes.
+# gustavo_request (the stored name of the member's own request, keyed for her in the message) is optional: requests
+# snapshotted before it existed still validate when a cycle resumes.
 REQUEST_SCHEMA = obj(('piece', 'text_sha256', 'context_sha256', 'post', 'brief', 'gallery', 'public_facts', 'sources'),
     piece=STRING, text_sha256=STRING, context_sha256=STRING, post=STRING, brief=OBJECT,
     gallery=ARRAY, public_facts=ARRAY, sources=ARRAY, gustavo_request=ARRAY)
@@ -24,15 +25,15 @@ PACKAGE_SCHEMA = obj(('text_sha256', 'context_sha256', 'media', 'images', 'desig
 SYSTEM = '''Eres editor_visual de Editorial. Propones al director el medio del post ganador exacto;
 no publicas, no cambias su texto ni llamas a otros agentes. Devuelve solo el contrato de elección IMG.
 Elige foto, infografia o carrusel por su aporte al texto final. brief.image es una sugerencia inicial,
-no una orden: explica el motivo y cualquier cambio. gustavo_request trae lo que Gustavo dijo de este post (sus ideas
+no una orden: explica el motivo y cualquier cambio. {alias}_request trae lo que {nombre} dijo de este post (sus ideas
 y comentarios): si pide un formato (carrusel, infografía, su foto), ese es el formato. Carrusel (3–8 láminas que se
 leen en orden) cuando el post avanza por partes: pasos de un proceso, una lista de errores, lecciones o señales, antes
 y después, un marco con sus piezas o varias opciones comparadas. Infografia cuando lo protagoniza un dato o una frase;
-preguntas para la audiencia (o preguntas y respuestas rápidas que pida Gustavo) llevan infografia, con su plantilla
+preguntas para la audiencia (o preguntas y respuestas rápidas que pida {nombre}) llevan infografia, con su plantilla
 preguntas. Galería vacía o sin foto pertinente: infografia o carrusel, según cómo avance el texto. Usa solo fotos
 ofrecidas, como máximo ocho y sin repetir. Lee notas, uso previo y permiso de edición; prefiere las fotos de la propuesta si son pertinentes.
 Alt describe la foto en inglés sin inventar experiencias. instruction cita literalmente la nota.
-No editar impide cualquier retoque. Una edición que Gustavo pide en la nota de su foto (fondo o lugar, peinado,
+No editar impide cualquier retoque. Una edición que {nombre} pide en la nota de su foto (fondo o lugar, peinado,
 ropa, retoques o luz) es válida: cítala en instruction con instruction_kind=edit y no descartes la foto
 por pedirla; es estilo de su propia imagen, no un hecho inventado. Si solo pide recortarla o encuadrarla,
 instruction_kind=crop. El código recorta cada foto al tamaño de LinkedIn (4:5 vertical o 1:1, centrada) sin IA: su
@@ -176,12 +177,20 @@ def fallback(request, reason):
             'choice': choice, 'mode': 'fallback', 'reason': reason}
 
 
+def system(member=None):
+    """The selector's instructions for the piece's member, with the infographic rule."""
+    ident = identidad.of(member)
+    return infografias.with_rule(ident.render(SYSTEM), ident.name)
+
+
 def propose(request):
     if not imagenes.connector.available('anthropic'):
         return fallback(request, 'Selector visual no disponible; se conserva la elección inicial de IMG')
-    message = [{'type': 'text', 'text': json.dumps(request, ensure_ascii=False, default=str)}]
+    from .models import EditorialPiece
+    ident = identidad.of_account(EditorialPiece.objects.select_related('account').get(pk=request['piece']).account)
+    message = [{'type': 'text', 'text': json.dumps(ident.keyed(request, values=False), ensure_ascii=False, default=str)}]
     message += imagenes.previews(request['gallery'])
-    answer = providers.claude(infografias.with_rule(SYSTEM), message,
+    answer = providers.claude(system(ident), message,
         output_schema=infografias.CHOICE_SCHEMA, max_tokens=2400,
         model=imagenes.connector.VISION_MODEL, effort='low', purpose='editorial-visual')
     choice = json.loads(answer['text'])

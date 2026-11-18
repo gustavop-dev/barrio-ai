@@ -72,6 +72,7 @@ class DrafterContextTests(RepliesBase):
         self.assertEqual(sent['recent_own_comments'],[{'author':posts[1].author_name,'text':'Earlier comment: evals are where the work hides.'}])
         self.assertEqual(operador.recent_own_comments(self.account,exclude_post=posts[1]),[])
         # Opinions, questions and the post's own figures are not claims to verify: they used to discard good drafts.
-        self.assertNotIn('cualquier afirmación que Gustavo deba comprobar',operador.COMMENT_SYSTEM)
-        self.assertIn('atribuidas a su autor',operador.COMMENT_SYSTEM)
-        self.assertIn('recent_own_comments',operador.COMMENT_SYSTEM)
+        system=operador.comment_system()
+        self.assertNotIn('cualquier afirmación que Gustavo deba comprobar',system)
+        self.assertIn('atribuidas a su autor',system)
+        self.assertIn('recent_own_comments',system)

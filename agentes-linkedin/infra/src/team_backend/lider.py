@@ -1,35 +1,44 @@
-"""Agente líder: the autonomous gate that replaces Gustavo's per-action approval (oficina/PLAN-REDISENO.md, «sin aprobaciones»).
+"""Agente líder: the autonomous gate that replaces the member's per-action approval (oficina/PLAN-REDISENO.md, «sin aprobaciones»).
 
 Order of the gate in autopiloto.policy_review (mode `auto`):
 1. Deterministic rules first (autopiloto.content_issues, red.network_issues). Any issue discards the proposal.
 2. Jev (TypeSafe System One) judges the exact proposal with narrow yes/no questions and calibrated probabilities.
 3. Code applies the thresholds of the capability: every check passes clearly -> approve; otherwise -> discard,
-   with the failing checks as the reason. Nothing is escalated to Gustavo: a doubtful action is simply not done
-   and the team drafts something else. Gustavo steers through his orientation and the results, not per action.
+   with the failing checks as the reason. Nothing is escalated to the member: a doubtful action is simply not done
+   and the team drafts something else. She steers through her orientation and the results, not per action.
 
 If Jev is unavailable the proposal stays pending and is retried after LEAD_RETRY_MINUTES; it expires on its TTL.
 Thresholds start conservative and are meant to be tuned with real outcomes.
 
-A post Gustavo asked for (the piece uses his ideas or he commented it) is judged much more softly: his own words are
-facts Jev may read, and a check only fails when Jev is fairly sure of it (GUSTAVO_THRESHOLDS)."""
+A post the member asked for (the piece uses her ideas or she commented it) is judged much more softly: her own words are
+facts Jev may read, and a check only fails when Jev is fairly sure of it (OWN_THRESHOLDS).
+
+Phase 3 (organizations): every question, check label and state text is a template with the member's name ({nombre}) and
+her key token ({alias}); _member() resolves whose proposal it is and identidad renders it. For the first member every
+text is the one of before, byte for byte (test_identidad_prompts)."""
 import os
 from datetime import timedelta
 from django.utils import timezone
-from knowledge import memory, providers
-from . import operador
-from .models import ActionProposal, Orientation
+from knowledge import providers
+from . import identidad, operador
+from .models import ActionProposal
 
 CAP=ActionProposal.Capability
 DEFAULT_CAPABILITIES='INT-03,CONT-09,RED-01,RED-02,RED-04'
 
-from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one positioning source)
-CRITERIA_DEL_BARRIO=_lead_criteria()
-# BAR-25: with NETWORK_PROJECTAPP_BUYER_ENABLED the lead reads the refined ProjectApp neighborhood and the offer.
-CRITERIA_DEL_BARRIO_PROJECTAPP=_lead_criteria(projectapp_buyer=True)
+def criteria_del_barrio(member=None):
+    """The member's neighborhood as the lead reads it (posicionamiento.lead_criteria). BAR-25: with
+    NETWORK_PROJECTAPP_BUYER_ENABLED, the refined ProjectApp neighborhood and the offer."""
+    from . import posicionamiento, projectapp
+    return posicionamiento.lead_criteria(member,projectapp_buyer=projectapp.enabled())
 
-def criteria_del_barrio():
-    from . import projectapp
-    return CRITERIA_DEL_BARRIO_PROJECTAPP if projectapp.enabled() else CRITERIA_DEL_BARRIO
+def _render(ident,value):
+    """Every authored text of a question set (or a check list) with her name and key token."""
+    if isinstance(value,str):return ident.render(value)
+    if isinstance(value,dict):return {k:_render(ident,v) for k,v in value.items()}
+    if isinstance(value,list):return [_render(ident,v) for v in value]
+    if isinstance(value,tuple):return tuple(_render(ident,v) for v in value)
+    return value
 LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
 WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
@@ -88,14 +97,14 @@ def _noul(instructions,true=None,false=None):
 # (question id, minimum or maximum probability of «yes», label shown when it fails)
 CHECKS={
     'text':[('aporta','min',0.7,'no aporta una idea concreta'),('pitch','max',0.2,'suena a venta o pide contacto'),
-            ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
+            ('inventa','max',0.2,'atribuye a {nombre} algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
     # The language of comments and replies is a fixed rule (idioma.py): Jev misjudged «same language» on English texts.
     # INT-04: a reply on his own post answers what that person said and follows the post and the thread.
     'reply':[('responde','min',0.7,'no responde a lo que dijo la persona'),('hilo','min',0.6,'no sigue la línea del post y del hilo'),
              ('pitch','max',0.2,'suena a venta o propone conectar fuera de lugar'),
-             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
+             ('inventa','max',0.2,'atribuye a {nombre} algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
-            ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
+            ('inventa','max',0.2,'atribuye a {nombre} algo que no está en sus hechos')],
 }
 # BIB-09-primer-mensaje: the first message drafted with a closing reply (dm_opener) is judged in the same review, with
 # questions 1–5 of the class 09 guide (LI-09-M004-K02) and selling; question 6 (no links, no asking for a meeting) is a
@@ -119,7 +128,7 @@ CAL_IDS=frozenset(qid for qid,*_ in CAL_CHECKS)
 def warmup_questions():
     return {
         'cal_aporte':_noul('¿El `comentario` aporta algo propio y concreto que la `publicacion` no dice (un mecanismo, una práctica, '
-                           'un matiz o un hecho de `hechos_publicos_de_gustavo`), en vez de repetirla, resumirla o elogiarla?',
+                           'un matiz o un hecho de `hechos_publicos_de_{alias}`), en vez de repetirla, resumirla o elogiarla?',
                            'Suma una idea concreta propia sobre lo que cuenta el autor',
                            'Repite o resume la publicación, felicita, o es una opinión genérica que serviría para cualquier post'),
         'cal_pregunta':_noul('¿El `comentario` termina con una sola pregunta abierta y concreta sobre la experiencia, la decisión o el '
@@ -146,7 +155,7 @@ def dm_questions(source='conversacion'):
                     'respondió o comentó, o la señal citada), de modo que no serviría para otra persona?',
                     'Nombra de qué trataba su post, qué respondió o qué señal, en concreto',
                     'Saluda, agradece la conexión o alude a «tu post» o «tu trabajo» sin decir de qué')
-        puente=_noul('¿`primer_mensaje.texto` dice con honestidad por qué Gustavo le escribe: ese tema de `hechos` que les interesa a '
+        puente=_noul('¿`primer_mensaje.texto` dice con honestidad por qué {nombre} le escribe: ese tema de `hechos` que les interesa a '
                      'los dos, y no sus servicios ni a quién ayuda?')
         return dict(dm_questions(),dm_toque=toque,dm_puente=puente)
     return {
@@ -154,7 +163,7 @@ def dm_questions(source='conversacion'):
                          'el `hilo`, de modo que no serviría para otra persona?',
                          'Nombra una idea, un dato o una pregunta concreta de la persona en esta conversación',
                          'Saluda, agradece o alude a «la conversación» o a «tu post» sin decir de qué'),
-        'dm_puente':_noul('¿`primer_mensaje.texto` dice con honestidad por qué Gustavo le escribe: lo que quedó abierto o les interesa '
+        'dm_puente':_noul('¿`primer_mensaje.texto` dice con honestidad por qué {nombre} le escribe: lo que quedó abierto o les interesa '
                           'a los dos de esa conversación, y no sus servicios ni a quién ayuda?'),
         'dm_pregunta':_noul('¿`primer_mensaje.texto` termina con una sola pregunta concreta sobre ese tema que la persona puede contestar '
                             'en una o dos líneas sin pensarlo mucho?',
@@ -162,9 +171,9 @@ def dm_questions(source='conversacion'):
                             'Pregunta filosófica o abierta («¿cómo ves…?», «¿qué opinas de…?»), varias preguntas o ninguna'),
         'dm_un_tema':_noul('¿`primer_mensaje.texto` trata un solo tema, el de la conversación, sin enumerar varios problemas, servicios o '
                            'propuestas?'),
-        'dm_en_persona':_noul('¿`primer_mensaje.texto` suena a lo que Gustavo le diría en persona a alguien con quien acaba de '
+        'dm_en_persona':_noul('¿`primer_mensaje.texto` suena a lo que {nombre} le diría en persona a alguien con quien acaba de '
                               'conversar, y no a una plantilla de prospección?'),
-        'dm_pitch':_noul('¿`primer_mensaje.texto` vende, ofrece servicios, presenta la empresa de Gustavo, pide una reunión, una llamada '
+        'dm_pitch':_noul('¿`primer_mensaje.texto` vende, ofrece servicios, presenta la empresa de {nombre}, pide una reunión, una llamada '
                          'o minutos, o lleva un enlace?'),
     }
 # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues. The lead only looks for
@@ -180,15 +189,15 @@ PARTNER_CHECK=('competidor','vende desarrollo de software propio: es par, no par
 NETWORK_RISKS=tuple(qid for qid,_ in PERSON_CHECKS+[BUYER_CHECK,PARTNER_CHECK])
 # What each role of the classifier (red.ROLES) means, as the lead reads it in `clasificacion.papel`.
 ROLE_MEANING={
-    'par':'par: construye producto o software, o funda una startup de tecnología, como Gustavo',
+    'par':'par: construye producto o software, o funda una startup de tecnología, como {nombre}',
     'comprador':'comprador (hipótesis): dirige una empresa con producto u operación propia y podría contratar ingeniería de producto. '
                 'Su nivel dice cuánta evidencia pública hay de su etapa; «por_confirmar» es que no hay datos públicos, nunca '
                 'evidencia en contra (17/11/2026)',
     'recomendador':'recomendador: trabaja cerca de founders (inversor, asesor, ejecutivo fraccional, aceleradora) y puede recomendar proveedores',
-    'aliado':'aliado: ofrece a startups un servicio complementario al de Gustavo, no competidor',
+    'aliado':'aliado: ofrece a startups un servicio complementario al de {nombre}, no competidor',
     'divulgador':'divulgador: crea contenido con audiencia sobre los temas del barrio',
     'lider':'líder: dirige una empresa, una comunidad o un equipo en tecnología o negocio',
-    # Phase 5 (sin_posts.py): not a role of the classifier's table; a rule of Gustavo's route sets it.
+    # Phase 5 (sin_posts.py): not a role of the classifier's table; a rule of the member's route sets it.
     'puente':'puente: colega, en la misma empresa, de un posible comprador que no publica; el equipo lo calienta para llegar a él',
     # BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): a new role of the classifier, distinct from `aliado`.
     'partner':'partner: agencia de marketing, diseño, consultoría o producto que subcontrata el desarrollo de software de sus '
@@ -206,34 +215,34 @@ def network_checks(capability,role=None):
     extra=[BUYER_CHECK] if role=='comprador' else [PARTNER_CHECK] if role=='partner' else []
     return [(qid,'max',threshold,label) for qid,label in PERSON_CHECKS+extra]
 
-ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
-# BAR-25: a case of ProjectApp with names, figures, durations or results Gustavo did not confirm (projectapp.case_for).
-CASE_CHECK=('caso_inventa','max',0.2,'caso de ProjectApp con datos que Gustavo no confirmó')
-# His own request: «min» checks fail only below these (yes clearly unlikely), «max» checks only above (yes clearly likely).
-GUSTAVO_THRESHOLDS={'clara':0.3,'pitch':0.6,'inventa':0.6,'idioma':0.5,'orientacion':0.2}
-GUSTAVO_TEXTS,GUSTAVO_TEXT_CHARS=8,1500
+ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de {nombre}')
+# BAR-25: a case of ProjectApp with names, figures, durations or results the organization did not confirm (projectapp.case_for).
+CASE_CHECK=('caso_inventa','max',0.2,'caso de ProjectApp con datos que {nombre} no confirmó')
+# Her own request: «min» checks fail only below these (yes clearly unlikely), «max» checks only above (yes clearly likely).
+OWN_THRESHOLDS={'clara':0.3,'pitch':0.6,'inventa':0.6,'idioma':0.5,'orientacion':0.2}
+OWN_TEXTS,OWN_TEXT_CHARS=8,1500
 
-def gustavo_request(proposal):
-    """What Gustavo said for this post (the ideas the piece uses and his comments on it), oldest first; [] when the
+def own_request(proposal):
+    """What the member said for this post (the ideas the piece uses and her comments on it), oldest first; [] when the
     post is the team's own."""
     if proposal.capability!=CAP.PUBLISH or not proposal.piece_id:return []
     return piece_request(proposal.piece_id)
 
 def piece_request(piece_id):
-    """gustavo_request for a piece that has no proposal yet (editor_visual reads it to honour a format he asks for)."""
+    """own_request for a piece that has no proposal yet (editor_visual reads it to honour a format she asks for)."""
     from django.db.models import Q
     from .models import Capture
     pid=str(piece_id)
     rows=Capture.objects.filter(Q(state=Capture.State.USED,routed_to__used_in=pid)|
                                 Q(state=Capture.State.NOTED,context_type='pieza',context_id=pid)).order_by('created_at')
-    texts=[' '.join((c.text or '').split())[:GUSTAVO_TEXT_CHARS] for c in rows]
-    return [t for t in texts if t][-GUSTAVO_TEXTS:]
+    texts=[' '.join((c.text or '').split())[:OWN_TEXT_CHARS] for c in rows]
+    return [t for t in texts if t][-OWN_TEXTS:]
 
 def enabled():
     return os.environ.get('LEAD_ENABLED','false').lower()=='true'
 
 def capabilities():
-    """INT-04 is always reviewed: Gustavo made its replies autonomous with the lead as their gate (12/11/2026)."""
+    """INT-04 is always reviewed: its replies are autonomous with the lead as their gate (decision of 12/11/2026)."""
     listed=[c.strip() for c in os.environ.get('LEAD_CAPABILITIES',DEFAULT_CAPABILITIES).split(',') if c.strip()]
     return listed+([CAP.REPLY.value] if CAP.REPLY.value not in listed else [])
 
@@ -247,10 +256,27 @@ def waiting_retry(proposal,now=None):
     from datetime import datetime
     return datetime.fromisoformat(at)>(now or timezone.now())-timedelta(minutes=minutes)
 
-def _orientation():
-    return (Orientation.current().text or '').strip()
+def _orientation(ident):
+    return identidad.orientation(ident)
 
-def _questions(proposal,orientation):
+def _member(proposal):
+    """Whose proposal it is: the member of its account (or of its target's, for a proposal not saved yet: the
+    evaluation harness judges drafts that never were rows); none at all: identidad.of()."""
+    from django.core.exceptions import ObjectDoesNotExist
+    for owner in (proposal,getattr(proposal,'post',None),getattr(proposal,'contact',None),getattr(proposal,'comment',None)):
+        try:account=getattr(owner,'account',None) if owner is not None else None
+        except ObjectDoesNotExist:account=None
+        if account is not None:return identidad.of_account(account)
+    return identidad.of()
+
+def _public_facts(ident):
+    public,_=identidad.facts(ident)
+    return [f['fact'] for f in public]
+
+def _questions(proposal,orientation,ident=None):
+    """(state, questions, checks) of the lead's review, with the stored key names in `state` (_review shows the member
+    her own with identidad.keyed) and every authored text rendered for her."""
+    ident=ident or _member(proposal)
     capability=proposal.capability
     if capability==CAP.COMMENT:
         post=proposal.post
@@ -261,15 +287,15 @@ def _questions(proposal,orientation):
             'aporta':_noul('¿El `comentario` aporta algo concreto a la conversación de la `publicacion`: una opinión con fundamento, '
                            'un matiz o una pregunta específica?','Aporta una idea concreta relacionada con el tema de la publicación',
                            'Es un elogio genérico, repite la publicación o no tiene relación con ella'),
-            'pitch':_noul('¿El `comentario` vende, ofrece servicios, promociona la empresa de Gustavo o invita a escribirle por privado?'),
-            'inventa':_noul('¿El `comentario` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
-                            'no aparece en `hechos_publicos_de_gustavo`?'),
+            'pitch':_noul('¿El `comentario` vende, ofrece servicios, promociona la empresa de {nombre} o invita a escribirle por privado?'),
+            'inventa':_noul('¿El `comentario` atribuye a {nombre} una experiencia, un cliente, un proyecto, una cifra o un resultado que '
+                            'no aparece en `hechos_publicos_de_{alias}`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
         }
         if warm:
             state['calentamiento']={'autor':post.author_name,
-                                    'que_es':'Comentario en el post de un posible cliente al que Gustavo calienta antes de invitarlo: '
-                                             'un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir.'}
+                                    'que_es':ident.render('Comentario en el post de un posible cliente al que {nombre} calienta antes de invitarlo: '
+                                                          'un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir.')}
             questions.update(warmup_questions())
         kind='text'
     elif capability==CAP.REPLY:
@@ -277,7 +303,7 @@ def _questions(proposal,orientation):
         from .respuestas import _thread, _who
         closing=bool(decision.get('closing'))
         state={'publicacion':{'tesis':(piece.brief or {}).get('thesis') or '','texto':piece.final_text[:3000]},
-               'hilo':[{'quien':_who(r),'texto':r.text[:600]} for r in _thread(row).order_by('commented_at')[:12]],
+               'hilo':[{'quien':_who(r,ident),'texto':r.text[:600]} for r in _thread(row).order_by('commented_at')[:12]],
                'comentario':{'autor':row.author_name,'titular':(row.contact.headline[:300] if row.contact_id else ''),'texto':row.text[:1500]},
                'respuesta':proposal.payload['text'],'turno':decision.get('turn',1)}
         questions={
@@ -286,23 +312,23 @@ def _questions(proposal,orientation):
                              'Retoma lo que la persona dijo y le contesta o le suma algo','Es genérica, solo agradece o ignora lo que dijo'),
             'hilo':_noul('¿La `respuesta` sigue la línea de la `publicacion` y del `hilo`, sin contradecir la tesis, cambiar de tema ni '
                          'repetir lo que ya se dijo en el hilo?'),
-            'pitch':_noul('¿La `respuesta` vende, ofrece servicios, promociona la empresa de Gustavo, pide una reunión o una llamada'+
+            'pitch':_noul('¿La `respuesta` vende, ofrece servicios, promociona la empresa de {nombre}, pide una reunión o una llamada'+
                           (', o invita a seguir por privado?' if not closing else
                            '? Proponer al final conectar o seguir la conversación por privado porque la conversación está interesante '
                            'no cuenta como venta.')),
-            'inventa':_noul('¿La `respuesta` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
-                            'no aparece en `hechos_publicos_de_gustavo`?'),
+            'inventa':_noul('¿La `respuesta` atribuye a {nombre} una experiencia, un cliente, un proyecto, una cifra o un resultado que '
+                            'no aparece en `hechos_publicos_de_{alias}`?'),
             'respeto':_noul('¿La `respuesta` es respetuosa con la persona y con las demás, sin sarcasmo, burla ni condescendencia?'),
         }
         dm=drafted_message(proposal)
         if dm:
             state['primer_mensaje']={'texto':dm,'para':row.author_name,
-                                     'momento':'Gustavo se lo enviaría él mismo por privado si conectan, después de esta conversación en su post.'}
+                                     'momento':ident.render('{nombre} se lo enviaría él mismo por privado si conectan, después de esta conversación en su post.')}
             questions.update(dm_questions())
         kind='reply'
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
-        asked=gustavo_request(proposal)
+        asked=own_request(proposal)
         # A Sales post of the weekly strategy may carry ONE invitation to talk (compuertas.gate_policy): the rules and the
         # verifier already let it through, so the lead must not discard it for exactly that.
         from . import compuertas
@@ -314,14 +340,14 @@ def _questions(proposal,orientation):
                           '¿La `publicacion` vende de forma agresiva, crea urgencia artificial, pide que lo contraten o trae más de '
                           'una invitación a escribirle o a comentar? Es un post de venta: una sola invitación a conversar es lo que '
                           'debe llevar y no cuenta como venta.'),
-            'inventa':_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
-                            'no aparece en `hechos_publicos_de_gustavo`?'),
+            'inventa':_noul('¿La `publicacion` atribuye a {nombre} una experiencia, un cliente, un proyecto, una cifra o un resultado que '
+                            'no aparece en `hechos_publicos_de_{alias}`?'),
         }
         if asked:
             state['pedido_de_gustavo']=asked
-            questions['inventa']=_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un '
-                                       'resultado que no aparece en `hechos_publicos_de_gustavo` ni en lo que él mismo contó en '
-                                       '`pedido_de_gustavo`?')
+            questions['inventa']=_noul('¿La `publicacion` atribuye a {nombre} una experiencia, un cliente, un proyecto, una cifra o un '
+                                       'resultado que no aparece en `hechos_publicos_de_{alias}` ni en lo que él mismo contó en '
+                                       '`pedido_de_{alias}`?')
         kind='post'
     else:
         # Whether the person fits is judged once, by the classifier, and checked by red.network_issues (audit R2).
@@ -333,8 +359,8 @@ def _questions(proposal,orientation):
         state={'persona':{'nombre':contact.display_name,'titular':contact.headline[:400],'bio':(signals.get('bio') or '')[:600],
                           'ubicacion':contact.location,'seguidores':signals.get('followers'),'grado':contact.network_distance,'origen':contact.source,
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
-               'clasificacion':{'papel':ROLE_MEANING.get(role,role or ''),'razon':classification.get('reason') or ''},
-               'criterios_del_barrio':criteria_del_barrio()}
+               'clasificacion':{'papel':ident.render(ROLE_MEANING.get(role,role or '')),'razon':classification.get('reason') or ''},
+               'criterios_del_barrio':criteria_del_barrio(ident)}
         buyer=classification.get('buyer') or {}
         if role=='comprador' and buyer.get('level'):state['clasificacion']['nivel']=buyer['level']  # BAR-24, context only
         from . import projectapp
@@ -376,8 +402,7 @@ def _questions(proposal,orientation):
                                           'desarrollo, o que no dice tener ingenieros propios')
         kind=capability
     if kind in ('text','post','reply'):
-        public,_=memory.confirmed_blocks()
-        state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
+        state['hechos_publicos_de_gustavo']=_public_facts(ident)
     checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
@@ -386,10 +411,10 @@ def _questions(proposal,orientation):
     from .mensajes_comprador import approved_note
     if capability==CAP.INVITE and proposal.payload.get('note') and not approved_note(proposal):
         state['nota']=proposal.payload['note'];state['razon_nota']=proposal.payload.get('note_reason')
-        public,_=memory.confirmed_blocks();state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
+        state['hechos_publicos_de_gustavo']=_public_facts(ident)
         questions.update(
             pitch=_noul('¿La nota vende, ofrece servicios o pide reunión antes de una necesidad expresada?'),
-            inventa=_noul('¿La nota inventa hechos o atribuye a Gustavo experiencia ausente de sus hechos públicos?'),
+            inventa=_noul('¿La nota inventa hechos o atribuye a {nombre} experiencia ausente de sus hechos públicos?'),
             idioma=_noul('¿La nota está en inglés?'),
             aporta=_noul('¿La nota es específica y pertinente, y razon_nota justifica reservar un cupo escaso para esta persona?',
                          'Razón concreta basada en evidencia de encaje; conexión sin pitch','Saludo genérico o prioridad sin evidencia'))
@@ -397,14 +422,15 @@ def _questions(proposal,orientation):
                        ('idioma','min',0.7,'nota fuera de inglés'),('aporta','min',0.7,'nota sin justificación suficiente')])
     if orientation:
         state['orientacion_de_gustavo']=orientation
-        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
+        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_{alias}`, o al menos no la contradice?')
         checks.append(ORIENTATION_CHECK)
     if state.get('pedido_de_gustavo'):
-        checks=[(qid,bound,GUSTAVO_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
+        checks=[(qid,bound,OWN_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
+    questions=_render(ident,questions)
     ground_questions(state,questions)
     if 'primer_mensaje' in state:checks.extend(DM_CHECKS)  # still there: its class 09 units were loaded
     if 'calentamiento' in state:checks.extend(CAL_CHECKS)
-    return state,questions,checks
+    return state,questions,_render(ident,checks)
 
 def review(proposal):
     from .orquestacion import review_gate
@@ -414,12 +440,13 @@ def review(proposal):
 def _review(proposal):
     """{'decision': 'approve' | 'discard' | 'retry', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
     now=timezone.now()
-    orientation=_orientation()
-    state,questions,checks=_questions(proposal,orientation)
+    ident=_member(proposal)
+    orientation=_orientation(ident)
+    state,questions,checks=_questions(proposal,orientation,ident)
     grounding=state['course_grounding']
     if grounding['course_missing']:
         return {'decision':'retry','reasons':['Biblioteca no disponible'],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
-    try:result=providers.typesafe(state,questions,purpose='lead-review')
+    try:result=providers.typesafe(ident.keyed(state,values=False),questions,purpose='lead-review')
     except ValueError as exc:
         return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
@@ -440,12 +467,12 @@ def _review(proposal):
 # BIB-09-primer-mensaje-comprador: the first message of the journey is judged with the six DM checks (dm_questions with
 # the journey's facts) plus «inventa». BIB-09-nota-invitacion: the note with five checks of its own. Each review loads
 # the lead's units and the activated methodology's, whole; a missing unit makes the draft wait (retry), never pass.
-BUYER_MESSAGE_CHECKS=DM_CHECKS+[('inventa','max',0.2,'el primer mensaje atribuye a Gustavo algo que no está en sus hechos')]
+BUYER_MESSAGE_CHECKS=DM_CHECKS+[('inventa','max',0.2,'el primer mensaje atribuye a {nombre} algo que no está en sus hechos')]
 NOTE_CHECKS=[('nota_hecho','min',0.7,'la nota no nombra con precisión un hecho concreto de la persona'),
              ('nota_aceptar','min',0.6,'la nota no busca solo que acepte'),
              ('nota_generica','max',0.2,'la nota serviría para cualquiera'),
              ('nota_pitch','max',0.2,'la nota vende o lo insinúa'),
-             ('nota_inventa','max',0.2,'la nota inventa hechos de la persona o atribuye a Gustavo algo que no está en sus hechos')]
+             ('nota_inventa','max',0.2,'la nota inventa hechos de la persona o atribuye a {nombre} algo que no está en sus hechos')]
 
 def note_questions():
     return {
@@ -455,15 +482,15 @@ def note_questions():
         'nota_aceptar':_noul('¿El único trabajo de `nota.texto` es que la persona acepte la invitación: propone conectar por ese hecho, '
                              'sin pedir nada más?'),
         'nota_generica':_noul('¿`nota.texto` serviría casi igual para cualquier otra persona (un elogio o un saludo genérico)?'),
-        'nota_pitch':_noul('¿`nota.texto` vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo o su equipo, que resuelven '
+        'nota_pitch':_noul('¿`nota.texto` vende o lo insinúa: ofrece servicios, dice a quién ayuda {nombre} o su equipo, que resuelven '
                            'ese problema, o pide una conversación o una reunión?'),
-        'nota_inventa':_noul('¿`nota.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una experiencia, un '
-                             'cliente o un resultado que no está en `hechos_publicos_de_gustavo`?'),
+        'nota_inventa':_noul('¿`nota.texto` afirma algo de la persona que no está en `hechos`, o atribuye a {nombre} una experiencia, un '
+                             'cliente o un resultado que no está en `hechos_publicos_de_{alias}`?'),
     }
 
 # BIB-09-secuencia-mensajes: each follow-up with the questions of its number (seg_*), plus «pitch» and «inventa».
 SEQUENCE_COMMON=[('seg_pitch','max',0.2,'el seguimiento vende o pide una reunión'),
-                 ('inventa','max',0.2,'el seguimiento atribuye a Gustavo o a la persona algo que no está en sus hechos')]
+                 ('inventa','max',0.2,'el seguimiento atribuye a {nombre} o a la persona algo que no está en sus hechos')]
 SEQUENCE_CHECKS={
     2:[('seg_mismo_dolor','min',0.7,'el mensaje 2 no nombra el mismo dolor del primero con otra forma o una historia corta'),
        ('seg_repite','max',0.3,'el mensaje 2 repite el primero'),
@@ -476,10 +503,10 @@ SEQUENCE_CHECKS={
 
 def sequence_questions(number):
     texto='`seguimiento.texto`'
-    common={'seg_pitch':_noul(f'¿{texto} vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo, o pide una llamada, '
+    common={'seg_pitch':_noul(f'¿{texto} vende o lo insinúa: ofrece servicios, dice a quién ayuda {{nombre}}, o pide una llamada, '
                               'minutos o una reunión?'),
             'inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `seguimiento.anteriores`, o atribuye a '
-                            'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+                            '{nombre} una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_{alias}`?')}
     if number==2:own={
         'seg_mismo_dolor':_noul(f'¿{texto} vuelve al mismo dolor o tema del primer mensaje de `seguimiento.anteriores`, contado de otra '
                                 'forma o con una historia corta (un caso típico)?','El mismo tema con otro ángulo o un caso',
@@ -504,7 +531,7 @@ def sequence_questions(number):
 REPLY_COMMON=[('resp_responde','min',0.7,'la respuesta no responde a lo que ella dijo'),
               ('resp_pitch','max',0.2,'la respuesta vende, da precios o promete'),
               ('resp_presiona','max',0.2,'la respuesta presiona o mete urgencia'),
-              ('resp_inventa','max',0.2,'la respuesta inventa hechos de la persona o de Gustavo')]
+              ('resp_inventa','max',0.2,'la respuesta inventa hechos de la persona o de {nombre}')]
 REPLY_CHECKS={'interesado':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
               'pide_informacion':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
               'no_es_el_momento':[('resp_insiste','max',0.2,'la respuesta insiste cuando no es el momento'),
@@ -518,11 +545,11 @@ def reply_questions(kind):
     questions={
         'resp_responde':_noul(f'¿{texto} responde a lo que la persona dijo en `respuesta.su_mensaje`, leído con toda '
                               '`respuesta.conversacion`?','Responde a lo que dijo','Ignora lo que dijo o responde otra cosa'),
-        'resp_pitch':_noul(f'¿{texto} vende: ofrece servicios, dice a quién ayuda Gustavo o su equipo, da precios, descuentos o promete '
+        'resp_pitch':_noul(f'¿{texto} vende: ofrece servicios, dice a quién ayuda {{nombre}} o su equipo, da precios, descuentos o promete '
                            'resultados o plazos? Proponer elegir un horario a quien quiere hablar o pide información NO es vender.'),
         'resp_presiona':_noul(f'¿{texto} presiona: mete urgencia, plazos artificiales o insiste en que decida ya?'),
         'resp_inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `respuesta.conversacion`, o atribuye a '
-                             'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+                             '{nombre} una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_{alias}`?')}
     if kind in ('interesado','pide_informacion'):
         questions['resp_paso_facil']=_noul(f'¿{texto} propone un siguiente paso concreto y fácil de aceptar (elegir un horario), sin '
                                            'presión?','Un paso concreto y fácil','Sin paso, o uno difícil o vago')
@@ -539,17 +566,16 @@ def review_buyer_draft(draft):
     'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}. A follow-up 2–4 of the sequence
     (secuencia_comprador) with the questions of its number and the methodology «secuencia_mensajes». Phase 6: the reply to
     what she wrote (respuesta_comprador) with the questions of its type and the methodology «respuesta_comprador»."""
-    now=timezone.now();orientation=_orientation()
+    now=timezone.now();ident=identidad.of_account(draft.contact.account);orientation=_orientation(ident)
     facts=(draft.inputs or {}).get('hechos') or [];person=(draft.inputs or {}).get('persona') or {}
-    public,_=memory.confirmed_blocks()
-    state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':[f['fact'] for f in public]}
+    state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':_public_facts(ident)}
     if draft.kind=='respuesta':
         kept=draft.inputs or {};kind=(kept.get('clasificacion') or {}).get('tipo','')
         state['respuesta']={'tipo':kind,'texto':draft.text,'para':person.get('nombre'),
                             'su_mensaje':(kept.get('mensaje') or {}).get('texto',''),'conversacion':kept.get('conversacion') or [],
                             'faltan':kept.get('faltan') or [],
-                            'momento':('Respondió a los mensajes de Gustavo; él le enviaría esta respuesta a mano. El enlace de agenda '
-                                       'final lo agrega el sistema y solo cuando ella quiere hablar o pide información.')}
+                            'momento':ident.render('Respondió a los mensajes de {nombre}; él le enviaría esta respuesta a mano. El enlace de agenda '
+                                                   'final lo agrega el sistema y solo cuando ella quiere hablar o pide información.')}
         questions=reply_questions(kind)
         checks=REPLY_COMMON+REPLY_CHECKS.get(kind,[])
         units,metodologia,purpose=BUYER_REPLY_UNITS,'respuesta_comprador','lead-review-reply'
@@ -557,16 +583,16 @@ def review_buyer_draft(draft):
         follow=(draft.inputs or {}).get('seguimiento') or {}
         state['seguimiento']={'numero':draft.number,'de':4,'texto':draft.text,'para':person.get('nombre'),
                               'trabajo':follow.get('trabajo',''),'anteriores':follow.get('anteriores',[]),
-                              'momento':'No respondió a los mensajes anteriores; Gustavo se lo enviaría a mano.'}
+                              'momento':ident.render('No respondió a los mensajes anteriores; {nombre} se lo enviaría a mano.')}
         questions=sequence_questions(draft.number)
         checks=SEQUENCE_CHECKS[draft.number]+SEQUENCE_COMMON
         units,metodologia,purpose=SEQUENCE_UNITS,'secuencia_mensajes','lead-review-sequence'
     elif draft.kind=='mensaje':
         state['primer_mensaje']={'texto':draft.text,'para':person.get('nombre'),
-                                 'momento':'Aceptó la invitación de Gustavo; él se lo enviaría a mano como primer mensaje privado.'}
+                                 'momento':ident.render('Aceptó la invitación de {nombre}; él se lo enviaría a mano como primer mensaje privado.')}
         questions=dm_questions('recorrido')
-        questions['inventa']=_noul('¿`primer_mensaje.texto` afirma algo de la persona que no está en `hechos`, o atribuye a Gustavo una '
-                                   'experiencia, un cliente, un proyecto, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')
+        questions['inventa']=_noul('¿`primer_mensaje.texto` afirma algo de la persona que no está en `hechos`, o atribuye a {nombre} una '
+                                   'experiencia, un cliente, un proyecto, una cifra o un resultado que no está en `hechos_publicos_de_{alias}`?')
         checks=list(BUYER_MESSAGE_CHECKS);units,metodologia,purpose=FIRST_MESSAGE_UNITS,'primer_mensaje','lead-review-message'
     else:
         state['nota']={'texto':draft.text,'para':person.get('nombre'),
@@ -575,7 +601,7 @@ def review_buyer_draft(draft):
         checks=list(NOTE_CHECKS);units,metodologia,purpose=INVITE_NOTE_UNITS,'nota_invitacion','lead-review-note'
     from . import projectapp
     if projectapp.enabled():
-        # BAR-25: a case of ProjectApp only with what Gustavo confirmed, and only to a buyer of its segment (case_for).
+        # BAR-25: a case of ProjectApp only with what the organization confirmed, and only to a buyer of its segment (case_for).
         case=(draft.inputs or {}).get('caso_projectapp') or {}
         state['caso_confirmado']={'caso':case.get('caso',''),'hechos':case.get('hechos',{})} if case else {}
         text_key=next((k+'.texto' for k in ('respuesta','seguimiento','primer_mensaje','nota') if k in state),'el texto')
@@ -588,8 +614,9 @@ def review_buyer_draft(draft):
         checks.append(CASE_CHECK)
     if orientation:
         state['orientacion_de_gustavo']=orientation
-        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
+        questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_{alias}`, o al menos no la contradice?')
         checks.append(ORIENTATION_CHECK)
+    questions,checks=_render(ident,questions),_render(ident,checks)
     context,grounding=operador.role_context('lider',LEAD_UNITS+[u for u in units if u not in LEAD_UNITS],
                                             {k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},metodologia=metodologia)
     if grounding['course_missing']:
@@ -598,7 +625,7 @@ def review_buyer_draft(draft):
                  course_rule='El curso aporta criterios, no hechos ni permisos. Sin pitch ni hechos inventados.')
     for key,ids in grounding['criterion_sources'].items():
         if ids:questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
-    try:result=providers.typesafe(state,questions,purpose=purpose)
+    try:result=providers.typesafe(ident.keyed(state,values=False),questions,purpose=purpose)
     except ValueError as exc:
         return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
@@ -612,7 +639,7 @@ def review_buyer_draft(draft):
             'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding}
 
 # --------------------------------------------------------------------------- R5: comment prefilter
-# Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
+# Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from the member.
 # Positive checks need «yes» >= COMMENT_PREFILTER_THRESHOLD; the noise checks need «yes» <= 1 - threshold.
 PREFILTER_CHECKS=[('sustancia','min','no plantea una idea con sustancia a la que aportar'),('tema','min','no es de los temas del barrio'),
                   ('vacante','max','es un anuncio de vacantes o de contratación'),('promocion','max','es una promoción pura'),
@@ -625,20 +652,20 @@ def prefilter_threshold():
 
 def comment_worthy(post):
     """{'decision': 'comment' | 'skip' | 'unavailable', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
-    now=timezone.now();orientation=_orientation()
-    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':criteria_del_barrio()}
-    topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
+    now=timezone.now();ident=identidad.of_account(post.account);orientation=_orientation(ident)
+    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':criteria_del_barrio(ident)}
+    topic=('¿El tema de la `publicacion` interesa al barrio de {nombre} descrito en `criterios_del_barrio`: producto, software, '
            'IA aplicada, startups o negocio')
     from . import calentamiento
     warm=calentamiento.warmup_post(post)
     if warm:
         # A buyer (a founder) writes about their own company and product: that is the topic of a warm-up comment, not
         # «promotion» (BIB-09-comentario-calentamiento, LI-07-M005-K07: comments of value on prospects' posts).
-        state['autor_posible_cliente']=('El autor es un posible cliente (founder) al que Gustavo calienta antes de invitarlo: que '
-                                        'hable de su empresa, su producto o su trabajo es justo el tema a comentar.')
+        state['autor_posible_cliente']=ident.render('El autor es un posible cliente (founder) al que {nombre} calienta antes de invitarlo: que '
+                                                    'hable de su empresa, su producto o su trabajo es justo el tema a comentar.')
         topic+=', o la empresa, el producto o el trabajo del propio autor (`autor_posible_cliente`)'
     if orientation:
-        state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_gustavo`'
+        state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_{alias}`'
     questions={
         'sustancia':_noul('¿La `publicacion` desarrolla una idea, una experiencia o una opinión concreta a la que alguien podría aportar '
                           'un matiz, un dato o una pregunta específica?','Plantea algo concreto que admite una aportación',
@@ -652,9 +679,10 @@ def comment_worthy(post):
         'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
                      'premio o agradecimiento?'),
     }
+    questions=_render(ident,questions)
     grounding=ground_questions(state,questions)
     if grounding['course_missing']:return {'decision':'unavailable','reasons':['Biblioteca no disponible'],'at':now.isoformat(),**grounding}
-    try:result=providers.typesafe(state,questions,purpose='comment-prefilter')
+    try:result=providers.typesafe(ident.keyed(state,values=False),questions,purpose='comment-prefilter')
     except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
     threshold=prefilter_threshold();failed=[]

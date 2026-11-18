@@ -12,7 +12,7 @@ from unittest.mock import patch
 import httpx
 from PIL import Image, ImageDraw
 from django.core.files.base import ContentFile
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.utils import timezone
 from knowledge import db, providers
 from team_backend import autopiloto, capturas, connectors_images, connectors_linkedin, imagenes, infografias, operador
@@ -59,7 +59,7 @@ def choice(photo,edit='none'):
             'edit':edit,'edit_reason':'Está oscura' if edit=='light' else '', 'instruction':'','instruction_kind':'none'}
 
 
-class RendererTests(SimpleTestCase):
+class RendererTests(TestCase):  # the name drawn at the foot is the member's (identidad, phase 3)
     def test_four_board_templates_dimensions_palette_and_private_bundled_font(self):
         for name in ('portada','pasos','barras','numero'):
             with self.subTest(template=name):

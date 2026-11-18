@@ -15,9 +15,9 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.core.management import call_command
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
-from team_backend import (calentamiento, comprador, evaluaciones, lectura_embudo, lider, nivel_comprador, operador, posicionamiento,
+from team_backend import (calentamiento, comprador, evaluaciones, identidad, lectura_embudo, lider, nivel_comprador, operador, posicionamiento,
                           preguntas, projectapp, red, reparto, research)
 from team_backend.models import ActionProposal, AuditEvent, BuyerJourney, Contact, TeamQuestion
 from team_backend.tests.test_red import NetworkBase
@@ -137,7 +137,7 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
             self.assertEqual({v:outcomes[v]['score'] for v in ('P1','P2','P3','P7')},{'P1':99,'P2':72,'P3':48,'P7':99})
             p1=Contact.objects.get(display_name='Tomas Retail')
             self.assertEqual(p1.classification['buyer']['score_breakdown']['senal']['value'],'contrata_desarrolladores')
-            self.assertEqual(outcomes['P4']['rule'],red.projectapp.SIZE_RULE)
+            self.assertEqual(outcomes['P4']['rule'],red.projectapp.size_rule())
             # The classifier loaded the class 08 methodology and its verdicts cite it.
             self.assertEqual(p1.classification['course_methodology'],'con_quien')
             self.assertTrue(set(operador.WHO_UNITS)<=set(p1.classification['course_hashes']))
@@ -150,7 +150,7 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
                     'P1_segmento':outcomes['P1']['segment'],
                     'P1_senal':p1.classification['buyer']['score_breakdown']['senal']['value'],
                     'P2_segmento':outcomes['P2']['segment'],'P2_tambien':outcomes['P2']['also'],'P2_papel':outcomes['P2']['papel'],
-                    'P3_puntaje':'bajo' if outcomes['P3']['score']<50 else 'alto','P4_fuera_por':'tamano' if outcomes['P4']['rule']==red.projectapp.SIZE_RULE else '',
+                    'P3_puntaje':'bajo' if outcomes['P3']['score']<50 else 'alto','P4_fuera_por':'tamano' if outcomes['P4']['rule']==red.projectapp.size_rule() else '',
                     'P5_rol':outcomes['P5']['role'],'P5_recorrido':outcomes['P5']['journey'],'P6_rol':outcomes['P6']['role'],
                     'P7_linea':outcomes['P7']['line'],'orden':order,'linea_base_apagado':'2/8','course_citations':sorted(cited&set(operador.WHO_UNITS))}
             _,grounding=evaluaciones.course_case_context('con_quien')
@@ -163,7 +163,7 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
             with self.models():red.classify(self.bot,self.account,MONDAY)
         p4=Contact.objects.get(display_name='Diana Global');c=p4.classification
         self.assertEqual((c['fit'],c['rule'],c['buyer']['level'],c['buyer']['company_size'],'stage_check' in c),
-                         (False,red.projectapp.SIZE_RULE,'no_encaja','mas_de_1000',False))
+                         (False,red.projectapp.size_rule(),'no_encaja','mas_de_1000',False))
         self.assertNotIn(p4.stage,('fit','followed'))
 
 
@@ -187,18 +187,20 @@ def buyer(profile,level='probable',**extra):
     return {'profile':profile,'level':level,'us_market':True,'evidence':'','sources':[],'basis':'perfil',**extra}
 
 
-class SwitchOffTests(SimpleTestCase):
+class SwitchOffTests(TestCase):  # the prompts are read from the member's profile (phase 3)
     """K: NETWORK_PROJECTAPP_BUYER_ENABLED=false is the code of before 17/11/2026 (BAR-24). The hashes are those of
     origin/main at 6508245, computed from its own modules: a change to the prompts or criteria with the switch off fails."""
 
     def test_prompts_schemas_criteria_and_shares_are_the_ones_of_before(self):
         with patch.dict(os.environ,OFF):
-            self.assertIs(red.classify_system(),red.CLASSIFY_SYSTEM)
             self.assertIs(red.classify_schema(),red.CLASSIFY_SCHEMA)
-            pins={'CLASSIFY_SYSTEM':_sha(red.CLASSIFY_SYSTEM),'CLASSIFY_SCHEMA':_sha(red.CLASSIFY_SCHEMA),
-                  'STAGE_SYSTEM':_sha(red.STAGE_SYSTEM),'STAGE_SCHEMA':_sha(red.STAGE_SCHEMA),
+            # Phase 3 of organizations: the prompts are templates rendered for the member; for the installation's first
+            # person they render to the same bytes (test_identidad_prompts pins all of them).
+            ident=identidad.of()
+            pins={'CLASSIFY_SYSTEM':_sha(red.classify_system()),'CLASSIFY_SCHEMA':_sha(red.CLASSIFY_SCHEMA),
+                  'STAGE_SYSTEM':_sha(red.stage_system()),'STAGE_SCHEMA':_sha(red.STAGE_SCHEMA),
                   'network_criteria':_sha(posicionamiento.network_criteria()),'lead':_sha(lider.criteria_del_barrio()),
-                  'ROLE_MEANING':_sha({k:v for k,v in lider.ROLE_MEANING.items() if k!='partner'})}
+                  'ROLE_MEANING':_sha({k:ident.render(v) for k,v in lider.ROLE_MEANING.items() if k!='partner'})}
             self.assertEqual(pins,{'CLASSIFY_SYSTEM':'ede1f6aef1133af0','CLASSIFY_SCHEMA':'94b29b6babde1d63',
                                    'STAGE_SYSTEM':'8f2e44fc186827b7','STAGE_SCHEMA':'092a6c1e12973eb0',
                                    'network_criteria':'cb8975fd47bfc36c','lead':'af5c3d752e71f24c',
@@ -398,11 +400,11 @@ class ShareTests(SimpleTestCase):
                           rows[('comprador_projectapp',)]['planned'],rows[('partner',)]['ready']),(28,28,1,0))
 
 
-class CaseRuleTests(SimpleTestCase):
+class CaseRuleTests(TestCase):  # the cases are the organization's profile (phase 3)
     """G (the fixed rule, without the database): a case only to a buyer of its segment and only with confirmed facts."""
 
     def setUp(self):
-        facts=patch('team_backend.projectapp.case_facts',side_effect=lambda s:{'caso':posicionamiento.CASES[s]})
+        facts=patch('team_backend.projectapp.case_facts',side_effect=lambda s:{'caso':posicionamiento.cases()[s]})
         facts.start();self.addCleanup(facts.stop)
         env=patch.dict(os.environ,ON);env.start();self.addCleanup(env.stop)
 
@@ -457,7 +459,7 @@ class ProjectAppDatabaseTests(ProjectAppCaseBase):
         preguntas.answer(self.gustavo,ask('cambio').pk,'Las ventas en línea crecieron 40 %.',public_use=False)
         self.assertEqual(projectapp.ask_case_questions(),[])  # answered keys are never asked again
         facts=projectapp.case_facts('retail_ecommerce')
-        self.assertEqual(facts,{'caso':posicionamiento.CASES['retail_ecommerce'],'duracion':'La primera versión salió en 6 meses.'})
+        self.assertEqual(facts,{'caso':posicionamiento.cases()['retail_ecommerce'],'duracion':'La primera versión salió en 6 meses.'})
         retail=self.contact('Tomas Retail','CTO at Lone Star Outfitters',{'role':'comprador','fit':True,'buyer':buyer(
             'lider_tecnologia',line='projectapp',segment='retail_ecommerce')},'followed')
         self.assertEqual(projectapp.case_issues('We built a custom retail platform; the first version took 6 months.',retail),[])

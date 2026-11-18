@@ -168,7 +168,7 @@ class ProfileAssetsTests(ProfileBase):
     def test_completed_legacy_assets_job_does_not_swallow_corrected_request(self):
         from team_backend import perfil_galeria as gallery
         proposal=self.blocked_proposal();refs=gallery.references(self.gustavo)
-        old_signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.BRAND_VERSION})
+        old_signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.brand_version()})
         old_id=uuid.uuid5(perfil.NS,f'{proposal.id}:v{proposal.version}:assets:{old_signature}')
         Job.objects.create(id=old_id,owner=self.gustavo,kind='prepare_profile_assets',state='complete',
             params={'proposal':str(proposal.id),'version':proposal.version,'references':refs})

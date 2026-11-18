@@ -14,7 +14,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 from PIL import Image
-from . import guardas, imagenes, miembros, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
+from . import guardas, identidad, imagenes, miembros, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
 from .models import ActionExecution, Capture, CycleLedger, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
 from .jobs import audit, enqueue_operation
 
@@ -69,7 +69,7 @@ def facts(mode):
             'signals':piece.signals})
     return orquestacion.plain({'public_facts':public,'private_guidance':private,'recent_pieces':pieces,
         'section_ids':list(content.MONTHLY if mode=='monthly' else content.SECTIONS),'mode':mode,
-        'brand_version':content.BRAND_VERSION})
+        'brand_version':content.brand_version()})
 
 
 def _job(proposal):
@@ -240,7 +240,7 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                 lambda:cached if cached is not None else client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),
                 key='person:'+orquestacion.digest(request))
             render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},
-                'brand':content.BRAND_VERSION,'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION}
+                'brand':content.brand_version(),'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION}
             package=runtime.call('perfil_render',render_input,lambda:visual.render_tool({kind:edited},banner),
                 key='render:'+orquestacion.digest(render_input))
             if kind not in package['files']:
@@ -266,7 +266,7 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
             render_evidence=[dict(e,reviewed=True) if e['id'] in ('render.preview_mobile','render.preview_desktop') else e
                 for e in render_evidence]
-            provenance={'references':scoped,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
+            provenance={'references':scoped,'brand_version':content.brand_version(),'base_prompt':visual.BASE_PROMPT,
                 'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry'],
                 'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION,
                 'render_version':visual.RENDER_VERSION,'render_evidence':render_evidence,'reused_edit':reused}
@@ -415,9 +415,18 @@ def notify(proposal):
                 'cycle_id':str(proposal.cycle_id or '')})
 
 
+def _applier(proposal):
+    """Who applies the profile by hand: the name of the proposal owner's member, else «el dueño del perfil»."""
+    try:
+        return identidad.of_user(proposal.owner).name
+    except miembros.MiembroRequerido:
+        return 'el dueño del perfil'
+
+
 def markdown(proposal):
-    lines=[f'# Propuesta de perfil · v{proposal.version}',f'\nMarca: {content.BRAND_VERSION}. Ciclo: {proposal.cycle_id or "QA"}.',
-        '\nAplicación manual por Gustavo. Aceptar no significa aplicar ni comprobar.',
+    who=_applier(proposal)
+    lines=[f'# Propuesta de perfil · v{proposal.version}',f'\nMarca: {content.brand_version()}. Ciclo: {proposal.cycle_id or "QA"}.',
+        f'\nAplicación manual por {who}. Aceptar no significa aplicar ni comprobar.',
         '\n'+content.MICROPHONE_NOTE,'\nRetrato elegido: '+(proposal.photo_choice or 'Pendiente: elige A o B.')]
     invalid=gallery.stale(proposal.references,proposal.owner)
     for row in proposal.sections:
@@ -434,7 +443,7 @@ def markdown(proposal):
             lines+=['\nCopy público (English)'+(' · completa los placeholders antes de pegar:' if row['readiness']=='needs_input' else ':'),'```text',row['copy'],'```']
         lines+=['- '+s for s in row.get('steps',[])]
         lines+=['Pendiente: '+s for s in row.get('issues',[])]
-        if row.get('applied_text'):lines+=['Texto aplicado por Gustavo:',row['applied_text']]
+        if row.get('applied_text'):lines+=[f'Texto aplicado por {who}:',row['applied_text']]
     questions=[(row['title'],m) for row in proposal.sections if not row.get('superseded_by')
         and proposal.state not in ('superseded','cancelled') for m in row.get('missing',[])]
     if questions:

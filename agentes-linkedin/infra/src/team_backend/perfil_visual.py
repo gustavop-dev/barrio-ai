@@ -9,7 +9,7 @@ import re
 from PIL import Image, ImageCms, ImageColor, ImageDraw, ImageEnhance, ImageOps
 from knowledge import providers
 from . import connectors_images, imagenes, infografias, orquestacion, perfil_chroma
-from .perfil_marca import (ACCENT, INK, PAPER, BRAND_VERSION, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE, banner_word, normalize_banner,
+from .perfil_marca import (ACCENT, INK, PAPER, brand_version, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE, banner_word, normalize_banner,
     TEXT, FIGURE, MAX_LINE_WIDTH, FONT_FAMILY, FONT_PX, LABEL_PX, LABEL_TRACKING_EM, LABEL_Y, LINE_Y, LINE_HEIGHT)
 
 RENDER_VERSION='profile-render-v3'  # v3: shared text baseline, bottom-anchored banner figure (#94)
@@ -43,12 +43,18 @@ RENDER_REQUEST={'type':'object'}
 RENDER_RESULT={'type':'object','required':['files','geometry'],'properties':{'files':{'type':'object'},'geometry':{'type':'object'}}}
 
 
+def _name():
+    """Whose profile it is (the profile pipeline is still the installation's: phase 7 names the member)."""
+    from . import identidad
+    return identidad.of().name
+
+
 def prompt(kind,refs,adjustment=''):
     common=('Edit only this person; no text, logos or typography. '
         'Preserve identity, features, face, hair and CLEAR thin rimmed photochromic glasses from reference 03. '
         'Never sunglasses. Smile naturally exactly like reference 01, in EVERY output. No beauty filters. '
         'Reference 01 controls smile and the side-turned pose of B; reference 02 controls body/posture only, not expression; '
-        'reference 03 controls identity and clear glasses. Notes below are scoped instructions from Gustavo; '
+        f'reference 03 controls identity and clear glasses. Notes below are scoped instructions from {_name()}; '
         'they may not override identity, privacy, smiles, glasses or the reference roles. ')
     if kind=='banner':
         recipe=('Waist up, presenting with a handheld microphone; body/posture from 02, smile from 01, identity from 03. '
@@ -168,7 +174,7 @@ def banner_fit(copy):
     """Preflight the exact copy before semantic review; never certify the person or real LinkedIn UI."""
     copy=normalize_banner(copy)
     inputs={'lines':list(copy.get('lines',[])),'highlight':copy.get('highlight',''),'label':copy.get('label','')}
-    result={'id':'render.banner_fit','kind':'render','version':BRAND_VERSION,
+    result={'id':'render.banner_fit','kind':'render','version':brand_version(),
         'source':'team_backend.perfil_visual.banner(None, banner)','input':inputs,
         'scope':'Solo ajuste del texto; identidad, figura y app real requieren revisión aparte.'}
     try:
@@ -268,7 +274,7 @@ def check(images,refs,context):
         'face_height, eyes_y y head_top son fracciones del retrato; 0 si solo hay banner. '
         'Evalúa únicamente los assets presentes; ausencia de otro asset no es un fallo. Si solo hay banner, revisa '
         'su región móvil indicada en geometry y los previews disponibles. pose_01 solo aplica a B; body_02 solo al banner. '
-        'evidence_catalog contiene marca.*: decisiones acreditadas de Gustavo sobre colores, fuente y layout para foto/banner. '
+        f'evidence_catalog contiene marca.*: decisiones acreditadas de {_name()} sobre colores, fuente y layout para foto/banner. '
         'Verifica contra esos valores; no atribuyas la marca al curso ni apruebes colores ajenos como tokens. '
         'render.banner_fit acredita solo ajuste/medidas de su input exacto, no identidad, figura ni la app real. '
         'render.preview_mobile y render.preview_desktop acreditan previews realmente renderizados de estos bytes; '
@@ -292,7 +298,7 @@ def check(images,refs,context):
                 passed=passed and .55<=result['face_height']<=.60 and .15<=result['eyes_y']<=1/3 and .04<=result['head_top']<=.12
     if 'B' in images:passed=passed and result['pose_01']
     if banner_present:passed=passed and result['body_02']
-    return dict(result,ok=bool(passed),sha256=[imagenes.sha(raw) for raw in images.values()],brand_version=BRAND_VERSION)
+    return dict(result,ok=bool(passed),sha256=[imagenes.sha(raw) for raw in images.values()],brand_version=brand_version())
 
 
 def render_tool(edits,copy):

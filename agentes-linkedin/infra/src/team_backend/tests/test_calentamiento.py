@@ -160,7 +160,7 @@ class BuyingSignalTests(WarmupBase):
     def test_with_the_switch_off_the_stage_check_is_todays(self):
         with patch.dict(os.environ, {'BUYER_WARMUP_ENABLED': 'false'}):
             contact, calls = self.stage_check([])
-        self.assertEqual((calls[0]['system'], calls[0]['schema']), (red.STAGE_SYSTEM, red.STAGE_SCHEMA))
+        self.assertEqual((calls[0]['system'], calls[0]['schema']), (red.stage_system(), red.STAGE_SCHEMA))
         self.assertNotIn('senales', contact.classification['stage_check'])
 
 

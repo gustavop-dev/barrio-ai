@@ -28,7 +28,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
-from . import analitica, desenlaces, editorial, metricas, operador, orientacion, posicionamiento, red, resultados
+from . import analitica, desenlaces, editorial, identidad, metricas, operador, orientacion, posicionamiento, red, resultados
 from .exceptions import Conflict
 from .jobs import audit, enqueue_operation
 from .models import (ActionExecution, ActionOutcome, ActionProposal, AuditEvent, Capture, ConnectorAccount, Contact,
@@ -423,7 +423,7 @@ ITEM=_obj(texto=_s(),cifra=_s(),course_citations=_arr(_s()))
 # No orientacion_propuesta since 2026-11-16 (the summary observes; validate() keeps the key, null, in what is stored).
 SCHEMA=_obj(titular=_s(),lo_que_funciono=_arr(ITEM),lo_que_no=_arr(ITEM),recomendaciones=_arr(ITEM),advertencias=_arr(_s()))
 
-SYSTEM='''Eres analista_barrio_resultados de 0ff1ce, el equipo de agentes que lleva el LinkedIn de Gustavo. Cada lunes le
+SYSTEM='''Eres analista_barrio_resultados de 0ff1ce, el equipo de agentes que lleva el LinkedIn de {nombre}. Cada lunes le
 escribes el resumen de la semana que terminó (de lunes a domingo): qué funcionó, qué no y qué cambiar.
 
 Reglas de los números:
@@ -455,13 +455,13 @@ Qué escribir (en español, frases cortas y concretas):
 
 Criterio:
 - Cada hallazgo/recomendación lleva course_citations con IDs recuperados que sustentan el criterio,
-  separados de cifra (evidencia observada). El curso no prueba resultados de Gustavo.
+  separados de cifra (evidencia observada). El curso no prueba resultados de {nombre}.
 - No compares likes de siete días con composición de público de noventa. Conserva ventanas comparables.
 - DM no equivale a venta; seguidores agregados no revelan identidades ni motivos. Pares y divulgadores tienen valor.
 - `posicionamiento` y `orientacion_actual` mandan sobre los números: las impresiones no son negocio. No propongas abandonar
   la dirección ni la mezcla de modalidades por perseguir alcance.
 - Con menos de tres posts medidos, cualquier patrón es una pista, no una conclusión: dilo en advertencias.
-- `comentarios_de_gustavo` son sus comentarios sobre piezas de la semana: tenlos en cuenta.
+- `comentarios_de_{alias}` son sus comentarios sobre piezas de la semana: tenlos en cuenta.
 - `semana.por_tipo` trae los resultados por tipo GASP (G crecimiento, A autoridad, S venta, P personal) y, en cada uno,
   a qué respondió la audiencia (lo_que_respondio). `plan_siguiente` dice qué señales de la audiencia movieron el plan de
   la semana que empieza. Cuando haya datos, cuenta por tipo qué respondió la audiencia y di qué señales movieron el plan;
@@ -507,12 +507,18 @@ def for_analyst(data):
     return dict(data,evidencia_compartida=[dict(_compact(e),referents=[_compact(r) for r in e.get('referents') or []])
                                            for e in data['evidencia_compartida']])
 
-def message(week_start,data):
-    return json.dumps({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
+def system(member=None):
+    """The analyst's instructions with the member's name and key token. The weekly summary is still the installation's
+    (phase 6 makes it each member's): with several active members and none named, MiembroRequerido."""
+    return identidad.of(member).render(SYSTEM)
+
+def message(week_start,data,member=None):
+    ident=identidad.of(member)
+    return json.dumps(ident.keyed({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
                        'estadisticas':for_analyst(data),
-                       'posicionamiento':{'version':posicionamiento.VERSION,'estado':posicionamiento.STATUS,
-                                          'direccion':posicionamiento.editorial_direction()},
-                       'orientacion_actual':orientacion.text(),'comentarios_de_gustavo':gustavo_comments(week_start)},
+                       'posicionamiento':{'version':posicionamiento.version(ident),'estado':posicionamiento.status(ident),
+                                          'direccion':posicionamiento.editorial_direction(ident)},
+                       'orientacion_actual':identidad.orientation(ident),'comentarios_de_gustavo':gustavo_comments(week_start)},values=False),
                       ensure_ascii=False,default=str)
 
 # --------------------------------------------------------------------------- number validator
@@ -645,7 +651,7 @@ def run(user,week_start,origin_job=''):
                       validacion={'ok':False,'descartado':[]},course_citations=[])
     else:
         _guard(now)
-        answer=providers.claude(SYSTEM,message(week_start,data),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE,context=context)
+        answer=providers.claude(system(),message(week_start,data),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE,context=context)
         try:raw=json.loads(answer['text'])
         except (json.JSONDecodeError,TypeError):raise ValueError('El analista no devolvió JSON válido.') from None
         if not isinstance(raw,dict):raise ValueError('El analista no devolvió un objeto.')

@@ -46,7 +46,7 @@ def queue(user,pid,*,expected_revision=None):
     if pending(proposal):
         return Job.objects.filter(kind='prepare_profile_assets',params__proposal=str(pid),state__in=['queued','running']).first()
     refs=gallery.references(user)
-    signature=orquestacion.digest({'references':refs,'brand':content.BRAND_VERSION,
+    signature=orquestacion.digest({'references':refs,'brand':content.brand_version(),
         'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION,'review':visual.REVIEW_VERSION,'model':connectors_images.EDIT_MODEL,
         'transparent':connectors_images.supports_transparency(),'assets':ASSETS_VERSION})
     jid=uuid.uuid5(perfil.NS,f'{pid}:v{proposal.version}:assets:{signature}')

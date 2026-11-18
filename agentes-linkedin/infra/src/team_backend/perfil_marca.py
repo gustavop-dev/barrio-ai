@@ -1,8 +1,11 @@
-"""Gustavo's approved profile brand and render constraints, shared with evidence consumers."""
+"""The member's approved profile brand and render constraints, shared with evidence consumers."""
 import unicodedata
 from collections import Counter
 
-BRAND_VERSION='PerfilLinkedIn-gustavo-addenda-6-v1'
+def brand_version(member=None):
+    """Her profile brand version (her profile's `brand_version`; the first member's is the approved addenda 6)."""
+    from . import identidad
+    return identidad.of(member).me('brand_version')
 SOURCE='docs/funcionalidades/estrategia-perfil.md#marca'
 ACCENT='#0FF1CE';INK='#1E1E2B';PAPER='#F7F6F0';DEEP='#00715E'
 TOKENS={'aguamarina':ACCENT,'tinta':INK,'papel':PAPER,'0ff1ce-hondo':DEEP}
@@ -53,5 +56,5 @@ def evidence():
             'label_tracking_em':LABEL_TRACKING_EM,'line_count':2,'shrink_to_fit':False,
             'scope':'Restricciones de nuestro render; el ajuste de una frase exige render.banner_fit.'},
     }
-    return [dict(id=eid,kind='brand',version=BRAND_VERSION,source=SOURCE,scope='photo/banner',values=value)
+    return [dict(id=eid,kind='brand',version=brand_version(),source=SOURCE,scope='photo/banner',values=value)
             for eid,value in values.items()]

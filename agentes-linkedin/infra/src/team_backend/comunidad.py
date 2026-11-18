@@ -17,7 +17,7 @@ from django.db import transaction
 from django.utils import timezone
 from knowledge import providers
 
-from . import evidencia, operador, orquestacion, posicionamiento, red
+from . import evidencia, identidad, operador, orquestacion, posicionamiento, red
 from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit, enqueue_operation
@@ -80,7 +80,7 @@ Devuelve una clasificación por source, usando solo los códigos del schema. No 
 topic/need/argument/evidence/objection describen lo expresado en comentarios, no lo inferido del cargo.
 Un perfil solo declara función profesional; todos los códigos argumentales de un perfil son unknown.
 No conviertas coincidencia, cargo, conexión, interacción ni delta de seguidores en motivo de seguimiento.
-follow_status=declared exige una frase pública explícita en primera persona sobre seguir a Gustavo
+follow_status=declared exige una frase pública explícita en primera persona sobre seguir a {nombre}
 y su razón; copia SOLO esa frase en follow_quote y clasifica la razón. Nunca deduzcas cuándo siguió.
 Una hipótesis limitada al comentario va como hypothesis, con confianza low y sin cita declarada.
 Si no hay base: unknown, follow_quote vacío. Conserva contradicciones, desacuerdos y desconocidos.
@@ -132,7 +132,7 @@ def enqueue(user, account, *, refresh=False, now=None):
             raise Conflict('Ya se usaron las dos versiones de este mes; se conserva el presupuesto y la trazabilidad.')
         study = CommunityStudy.objects.create(account=account, period=period, version=previous.version+1 if previous else 1,
             window_start=end-timedelta(days=90), window_end=end, created_at=now,
-            expires_at=now+timedelta(days=180), positioning_version=posicionamiento.VERSION)
+            expires_at=now+timedelta(days=180), positioning_version=posicionamiento.version())
     jid = uuid.uuid5(uuid.NAMESPACE_URL, f'community:{study.pk}')
     existing = Job.objects.filter(pk=jid).first()
     if existing:
@@ -420,7 +420,7 @@ def analyze(study):
         units, missing, omitted = operador.course_context(operador.ANALYSIS_UNITS)
         if missing: raise ValueError('Biblioteca no disponible para el estudio de comunidad.')
         if not units: raise ValueError('Sin biblioteca para el estudio de comunidad.')
-        answer = providers.claude(ANALYST_SYSTEM, json.dumps({'public_excerpts': [
+        answer = providers.claude(identidad.of_account(study.account).render(ANALYST_SYSTEM), json.dumps({'public_excerpts': [
             {'source': str(r.pk), 'kind': r.kind, 'text': r.text, 'date': evidencia.iso(r.event_at)} for r in rows],
             'course_units': units}, ensure_ascii=False), output_schema=ANALYSIS_SCHEMA,
             max_tokens=16000, effort='medium', purpose='community-study')
@@ -451,11 +451,12 @@ def analyze(study):
                 for key in LABELS: item[key] = 'unknown'
                 item.update(follow_status='unknown', follow_quote='')
             quote = item['follow_quote']
+            name = re.escape(identidad.of_account(study.account).name)
             own_targets = {evidencia.digest(['comments', p]) for p in PersonEvidence.objects.filter(
                 person_id=row.person_id, kind='own_comment').values_list('post_id', flat=True)}
             if item['follow_status'] == 'declared' and not (quote and quote in row.text and
-                    (row.target in own_targets or re.search(r'\bGustavo\b', quote)) and
-                    re.search(r'\b(I (?:started )?follow|te sigo|empec[eé] a seguir|sigo a Gustavo)\b', quote, re.I) and
+                    (row.target in own_targets or re.search(rf'\b{name}\b', quote)) and
+                    re.search(rf'\b(I (?:started )?follow|te sigo|empec[eé] a seguir|sigo a {name})\b', quote, re.I) and
                     re.search(r'\b(because|for|por|porque)\b', quote, re.I)):
                 item.update(follow_status='unknown', follow_reason='unknown', follow_quote='')
             if item['follow_status'] != 'declared': item['follow_quote'] = ''
@@ -534,7 +535,7 @@ def current(account, now=None, request_refresh=True):
     study = CommunityStudy.objects.filter(account=account).exclude(state='building').order_by('-period', '-version').first()
     valid = bool(study and study.state == 'partial' and study.completed_at and
         study.created_at >= now-timedelta(days=45) and study.expires_at > now and
-        study.positioning_version == posicionamiento.VERSION and study.summary.get('findings'))
+        study.positioning_version == posicionamiento.version() and study.summary.get('findings'))
     if not valid and request_refresh and account:
         day = timezone.localtime(now, operador.local_tz()).date().isoformat()
         if not AuditEvent.objects.filter(action='community.refresh', target=str(account.pk), metadata__day=day).exists():
@@ -555,7 +556,7 @@ def reader_packet(context, now=None):
     maintain(now)
     study = CommunityStudy.objects.filter(pk=context.get('study_id')).first() if context.get('study_id') else None
     if not study or study.state != 'partial' or not study.completed_at or study.created_at < now-timedelta(days=45) or (
-            study.expires_at <= now or study.positioning_version != posicionamiento.VERSION):
+            study.expires_at <= now or study.positioning_version != posicionamiento.version()):
         return dict(status='Sin estudio vigente', study_id='', version=0, findings=[])
     return {'status': 'Estudio parcial', 'study_id': str(study.pk), 'version': study.version,
         'findings': [{k: f[k] for k in ('id', 'pattern', 'basis', 'people', 'examples', 'confidence', 'counterexamples', 'counterexample_note',

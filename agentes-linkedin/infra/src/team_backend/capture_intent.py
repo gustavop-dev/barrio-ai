@@ -18,21 +18,21 @@ INTENT_FIELDS={
         instruction=infografias.string(),kind=infografias.enum(*PHOTO_KINDS))),
 }
 GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
-- publish_asap=true solo cuando Gustavo pide publicar esta idea cuanto antes, ya, pronto o con urgencia;
+- publish_asap=true solo cuando {nombre} pide publicar esta idea cuanto antes, ya, pronto o con urgencia;
   nunca por una cita ajena, una negación (no lo publiques aún), una fecha narrada o la urgencia del tema.
 - evidence es una cita literal del texto que prueba esa intención; vacía si no la hay.
 - not_before es fecha ISO si pide una fecha mínima (mañana se resuelve con local_date), o cadena vacía.
-- publish_when: cita literal del fragmento donde Gustavo pide un día u hora concretos para publicar ESTA idea
+- publish_when: cita literal del fragmento donde {nombre} pide un día u hora concretos para publicar ESTA idea
   («publícalo mañana a las 10», «que salga el jueves a las 3 de la tarde»); vacía si no la hay. No cuenta una
   fecha narrada ni la de un evento: solo cuándo quiere que salga el post.
 - gasp_type: el tipo de post que ESTA idea pide claramente, o «ninguno» si no está claro. P si es material personal
-  de Gustavo (algo que vivió, su día, un miedo, un error o un aprendizaje suyo, una foto suya); S si pide ofrecer un
+  de {nombre} (algo que vivió, su día, un miedo, un error o un aprendizaje suyo, una foto suya); S si pide ofrecer un
   servicio suyo o invitar a conversar para trabajar juntos; A si es un marco, un caso o un paso a paso de su
   especialidad; G si es una observación amplia o una tendencia del sector para gente nueva. Ante la duda, ninguno.
 - photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/crop/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
   Tal cual=original. Si solo pide recortarla o encuadrarla (y nada más)=crop: el código la recorta sin IA.
-  Cualquier otra edición que Gustavo pida de su foto=edit: luz, enderezar, quitar distracciones,
+  Cualquier otra edición que {nombre} pida de su foto=edit: luz, enderezar, quitar distracciones,
   cambiar el fondo o el lugar (por ejemplo un coworking), arreglar peinado, piel o ropa, o añadir elementos de escena.
   unsafe solo si pide convertir a alguien en otra persona, poner caras de personas reales ajenas, o añadir o falsear
   texto, cifras, logos o marcas.
@@ -111,21 +111,23 @@ def requested_at(text,fragment):
     return (None,'') if problem or when is None else (when,evidence)
 
 def jev(capture):
+    from . import identidad
     from .lider import _noul
     from .operador import local_tz
+    who=(identidad.of_user(capture.created_by) if capture.created_by_id else identidad.of()).name
     text=capture.text
     # Exact spans give a literal evidence quote without asking a generative model to extract one.
     spans=[part.strip() for part in re.split(r'(?<=[.!?;\n])\s*',text) if part.strip()]
     if len(spans)>20:spans=[text]  # retain the entire context, never silently drop the request
     questions={f'span_{i}':_noul(
-        f'En el contexto completo, ¿el fragmento {i} expresa una petición de Gustavo de publicar esta idea lo antes posible?',
+        f'En el contexto completo, ¿el fragmento {i} expresa una petición de {who} de publicar esta idea lo antes posible?',
         'Petición actual afirmativa de publicarlo ya, pronto, cuanto antes o con urgencia.',
         'Negación, cita ajena, urgencia de otro asunto o narración; no pide acelerar la publicación.') for i in range(len(spans))}
-    questions['tomorrow']=_noul('¿Gustavo pide explícitamente que esta publicación urgente salga mañana, no hoy?')
+    questions['tomorrow']=_noul(f'¿{who} pide explícitamente que esta publicación urgente salga mañana, no hoy?')
     # The GASP type an idea clearly asks for (urgente: the nearest day of that type). Only the two that matter most.
-    questions['type_personal']=_noul('¿Esta captura es material personal de Gustavo para un post: algo que vivió él, su día, '
+    questions['type_personal']=_noul(f'¿Esta captura es material personal de {who} para un post: algo que vivió él, su día, '
                                      'un miedo, un error o un aprendizaje suyo?')
-    questions['type_sales']=_noul('¿Gustavo pide que este post ofrezca un servicio suyo o invite a conversar para trabajar juntos?')
+    questions['type_sales']=_noul(f'¿{who} pide que este post ofrezca un servicio suyo o invite a conversar para trabajar juntos?')
     for i in range(len(spans)):
         questions[f'when_{i}']=_noul(
             f'En el contexto completo, ¿el fragmento {i} pide que este post se publique un día u hora concretos '
@@ -135,7 +137,7 @@ def jev(capture):
             'No cuenta una negación, cita ajena, relato pasado ni solicitud de consultar el curso.')
         questions[f'public_{i}']=_noul(
             f'¿Todo el fragmento {i} contiene exclusivamente un tema público apto para enviarse a un buscador? '
-            'Responde no si contiene datos de Gustavo, clientes, conversaciones, contactos, métricas privadas, '
+            f'Responde no si contiene datos de {who}, clientes, conversaciones, contactos, métricas privadas, '
             'credenciales, correos, teléfonos, secretos o cualquier duda de privacidad.')
     try:
         result=providers.typesafe({'texto':text,'fragmentos':dict(enumerate(spans))},questions,purpose='capture-intent')

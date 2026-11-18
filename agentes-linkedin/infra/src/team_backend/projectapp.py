@@ -67,8 +67,13 @@ SIZE_LABELS={'menos_de_20':'menos de 20 personas','20_a_200':'20 a 200 personas'
 SIGNAL_KINDS=('contrata_desarrolladores','lanzamiento_digital','sistema_legado','crecimiento')
 TARGET_SIZE='20_a_200'
 OUT_SIZE='mas_de_1000'
-SIZE_RULE=('Empresa de más de 1000 personas: fuera del comprador de ProjectApp (empresas de 20 a 200 personas, Gustavo '
+SIZE_RULE=('Empresa de más de 1000 personas: fuera del comprador de ProjectApp (empresas de 20 a 200 personas, {decisor} '
            '17/11/2026).')
+
+def size_rule(member=None):
+    """SIZE_RULE with who decided it, for the member whose contact leaves."""
+    from . import identidad
+    return identidad.of(member).render(SIZE_RULE)
 
 def _plain(text):
     text=unicodedata.normalize('NFKD',(text or '').lower())
@@ -346,7 +351,7 @@ def ask_case_questions():
     for segment in CASE_SEGMENTS:
         for what,question,purpose,kind,options in CASE_QUESTIONS:
             item=preguntas.ask(CASE_AGENT,question.format(case=CASE_LABELS[segment]),
-                               f'Caso real de ProjectApp ({posicionamiento.CASES[segment]}). {purpose} Se usa solo con '
+                               f'Caso real de ProjectApp ({posicionamiento.cases()[segment]}). {purpose} Se usa solo con '
                                'compradores del mismo segmento y solo con lo que confirmes.',
                                case_key(segment,what),suggested_public=True,origin=CASE_ORIGIN,answer_type=kind,options=options)
             if item is not None:created.append(item)
@@ -357,7 +362,7 @@ def case_facts(segment):
     posicionamiento.CASES; a «no» to `cliente` keeps the client unnamed."""
     from knowledge import memory
     from . import posicionamiento
-    facts={'caso':posicionamiento.CASES[segment]}
+    facts={'caso':posicionamiento.cases()[segment]}
     wanted={case_key(segment,what):(what,question.format(case=CASE_LABELS[segment])) for what,question,*_ in CASE_QUESTIONS}
     for row in memory.latest(True):
         what,question=wanted.get(row['key'],(None,''));value=row['value']
@@ -396,11 +401,13 @@ def case_issues(text,contact):
     if other:
         issues.append('Cita un caso de ProjectApp de otro segmento ('+', '.join(SEGMENT_LABELS[s] for s in other)+
                       '): solo se cita a un comprador del mismo segmento')
-    from . import posicionamiento
-    # The offer's prices (posicionamiento.OFFER) are confirmed facts too; any other figure must come from the case.
-    confirmed=set(re.findall(r'\d+',' '.join([*(allowed or {}).get('hechos',{}).values(),*posicionamiento.OFFER.values()])))
+    from . import identidad, posicionamiento
+    # Who confirms the case's facts: the installation's first person by name, «la organización» for anyone else.
+    ident=identidad.of_account(contact.account) if getattr(contact,'account_id',None) else identidad.of()
+    # The offer's prices (posicionamiento.offer()) are confirmed facts too; any other figure must come from the case.
+    confirmed=set(re.findall(r'\d+',' '.join([*(allowed or {}).get('hechos',{}).values(),*posicionamiento.offer(ident).values()])))
     figures=[m.group(0) for m in FIGURE.finditer(text) if not set(re.findall(r'\d+',m.group(0)))<=confirmed]
-    if figures:issues.append('Cifra del caso que Gustavo no confirmó ('+', '.join(dict.fromkeys(figures))+')')
+    if figures:issues.append(ident.render('Cifra del caso que {decisor} no confirmó (')+', '.join(dict.fromkeys(figures))+')')
     return issues
 
 CASE_RULES='''

@@ -382,8 +382,13 @@ def draft_inputs(post):
         if bridge is not None:return sin_posts.draft_inputs(post,bridge)  # phase 5: the bridge's own purpose
     return {'autor':{'nombre':post.author_name,'titular':(contact.headline if contact else '')[:300]},
             'comentarios_del_equipo_en_sus_posts':journey.warm_comments if journey else 0,
-            'para_que':'Posible cliente de Gustavo al que todavía no le escribió: el comentario es para que lo reconozca antes de '
-                       'la invitación, nunca para venderle.'}
+            'para_que':_of(post).render('Posible cliente de {nombre} al que todavía no le escribió: el comentario es para que '
+                                        'lo reconozca antes de la invitación, nunca para venderle.')}
+
+def _of(post):
+    """The Identity of the member whose account comments (her name in what the drafter reads, never another's)."""
+    from . import identidad
+    return identidad.of_account(post.account)
 
 # --------------------------------------------------------------------------- D. when the warm-up is done
 

@@ -11,7 +11,7 @@ import httpx
 from django.utils import timezone
 
 from knowledge import db, providers
-from team_backend import autopiloto, jobs, notificaciones, operador, voz
+from team_backend import autopiloto, jobs, notificaciones, operador
 from team_backend.models import ActionProposal, AuditEvent, Contact, Job, Notification, ObservedPost
 from team_backend.tests.fakes import FakeAnthropic
 from team_backend.tests.test_operador import OperatorBase
@@ -73,7 +73,7 @@ class CommentDraftTests(OperatorBase):
     def test_the_course_units_are_cached_context_not_part_of_the_message(self):
         proposal,claude=self.propose(draft())
         args,kwargs=claude.call_args
-        self.assertEqual(args[0],voz.with_voice(operador.COMMENT_SYSTEM))
+        self.assertEqual(args[0],operador.comment_system())  # her instructions and her voice
         self.assertNotIn('course_units',json.loads(args[1]))
         self.assertIn(UNIT,kwargs['context']);self.assertTrue(kwargs['context'].startswith('Unidades del curso'))
         self.assertEqual((kwargs['purpose'],kwargs['output_schema']),('propose-comment',operador.COMMENT_SCHEMA))

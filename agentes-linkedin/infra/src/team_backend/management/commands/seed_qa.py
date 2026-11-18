@@ -243,7 +243,7 @@ class Command(BaseCommand):
         study=CommunityStudy.objects.create(id=uid('community:study'),account=self.fake,period=period,
             window_start=end-timedelta(days=90),window_end=end,created_at=self.now,
             completed_at=self.now,expires_at=self.now+timedelta(days=180),state='partial',
-            positioning_version=posicionamiento.VERSION,
+            positioning_version=posicionamiento.version(self.member),
             coverage={'sample_size':6,'potential':9,'since':(end-timedelta(days=3)).isoformat(),
                       'limitations':cm.LIMITATIONS})
         for i in range(6):
@@ -588,6 +588,7 @@ class Command(BaseCommand):
         """Add image examples to existing pieces; keep the old gallery and inbox fixtures intact."""
         from team_backend import imagenes, infografias
         from team_backend.connectors_images import FakeImageConnector
+        name=infografias.author(self.member)  # the QA pieces are qa's: never «whose?» with a second member
         for piece in self.piece.values():
             if piece.state=='ready':imagenes.fallback(piece,'Tarjeta de muestra QA, sin proveedores')
         piece=self.piece['manana'];photo=GalleryPhoto.objects.get(id=uid('photo:elegida'))
@@ -607,10 +608,10 @@ class Command(BaseCommand):
         photo.capture=capture;photo.save(update_fields=['capture'])
         piece=self.piece['aprobacion']
         for row in piece.images.all():row.image.delete(save=False);row.delete()
-        slide=dict(infografias.fallback(),template='pasos',highlight='',label='WORKFLOW',title='The decision comes first',
+        slide=dict(infografias.fallback(name),template='pasos',highlight='',label='WORKFLOW',title='The decision comes first',
             subtitle='',steps=['Name the decision','Compare the options','Record the reason'],
             alt='Three steps: name the decision, compare the options, and record the reason. Make the decision explicit.')
-        raw=infografias.render(slide);review=FakeImageConnector().check([raw],{'design':slide})
+        raw=infografias.render(slide,name=name);review=FakeImageConnector().check([raw],{'design':slide})
         row=PieceImage(id=uid('image:infografia'),piece=piece,kind='infografia',width=1080,height=1080,
             sha256=imagenes.sha(raw),alt=slide['alt'],template='pasos',data=slide,review=review)
         row.image.save('infografia-qa.png',ContentFile(raw),save=False);row.save()
@@ -619,19 +620,19 @@ class Command(BaseCommand):
         # gains four deterministic slides (cover, two interiors, close), with a tagged private PDF.
         piece=self.piece['publicada8']
         for row in piece.images.all():row.image.delete(save=False);row.delete()
-        slides=[dict(infografias.fallback(),template='portada',label='DECISIONS',title='Make the decision explicit',
+        slides=[dict(infografias.fallback(name),template='portada',label='DECISIONS',title='Make the decision explicit',
                      subtitle='A small guide to comparing options.',highlight='',
                      alt='Cover: Make the decision explicit. A small guide to comparing options.'),
-                dict(infografias.fallback(),template='pasos',label='WORKFLOW',title='Compare the options',
+                dict(infografias.fallback(name),template='pasos',label='WORKFLOW',title='Compare the options',
                      subtitle='',highlight='',steps=['Name the decision','Compare the options','Record the reason'],
                      alt='Three steps: name the decision, compare the options, and record the reason.'),
-                dict(infografias.fallback(),template='numero',label='WORKFLOW',title='Keep a reason with each decision',
+                dict(infografias.fallback(name),template='numero',label='WORKFLOW',title='Keep a reason with each decision',
                      subtitle='',highlight='',number='3',unit='steps',
                      alt='Three steps in this guide. Keep a reason with each decision.'),
-                dict(infografias.fallback(),template='cierre',label='YOUR TURN',title='Which decision needs a reason?',
+                dict(infografias.fallback(name),template='cierre',label='YOUR TURN',title='Which decision needs a reason?',
                      subtitle='Start with one question.',highlight='',
                      alt='Closing question: Which decision needs a reason? Start with one question.')]
-        pngs=[infografias.render(slide,i,len(slides),True) for i,slide in enumerate(slides,1)]
+        pngs=[infografias.render(slide,i,len(slides),True,name=name) for i,slide in enumerate(slides,1)]
         review=FakeImageConnector().check(pngs,{'design':{'slides':slides}})
         for i,(slide,raw) in enumerate(zip(slides,pngs),1):
             row=PieceImage(id=uid(f'image:carrusel:{i}'),piece=piece,kind='carrusel',position=i,width=1080,height=1350,

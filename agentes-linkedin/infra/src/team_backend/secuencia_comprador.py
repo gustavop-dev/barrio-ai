@@ -38,7 +38,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import comprador, operador
+from . import comprador, identidad, operador
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation
 
 log=logging.getLogger(__name__)
@@ -233,23 +233,24 @@ def text_issues(number,text,previous=(),reference=''):
 # --------------------------------------------------------------------------- the drafter's part
 
 JOBS={2:'Mensaje 2 de 4: nombra el mismo dolor del primero, contado de otra forma, con una historia corta (un caso típico, '
-        'sin atribuirle a Gustavo experiencias que no estén en public_facts). No repitas el primer mensaje ni te disculpes por '
+        'sin atribuirle a {nombre} experiencias que no estén en public_facts). No repitas el primer mensaje ni te disculpes por '
         'escribir de nuevo; puedes reconocer, sin reproche, que quizá no pudo responder.',
       3:'Mensaje 3 de 4: ya no repitas el dolor. Pregunta si quizá no es la persona indicada y quién se encarga de esto en su '
         'empresa (no «quién me puede ayudar»), para llegar a esa persona. Una sola pregunta.',
       4:'Mensaje 4 de 4, el último: cierra con elegancia. Agradece su tiempo, asume que quizá no es el momento o que ya lo '
         'tienen resuelto y deja la puerta abierta. No preguntes, no pidas nada y no ruegues.'}
 
-SYSTEM='''Eres el agente de Relaciones y comunidad de Barrio AI. Redactas un SEGUIMIENTO privado que Gustavo le enviaría a un
+SYSTEM='''Eres el agente de Relaciones y comunidad de Barrio AI. Redactas un SEGUIMIENTO privado que {nombre} le enviaría a un
 posible cliente (un founder) que aceptó su invitación en LinkedIn y no respondió a sus mensajes anteriores. El equipo nunca
-lo envía: Gustavo lo copia y lo envía él mismo desde LinkedIn. Cada mensaje de la secuencia tiene un trabajo distinto; el
-de este está en `seguimiento.trabajo`. `seguimiento.anteriores` son los mensajes que Gustavo ya le envió: no los repitas.
+lo envía: {nombre} lo copia y lo envía él mismo desde LinkedIn. Cada mensaje de la secuencia tiene un trabajo distinto; el
+de este está en `seguimiento.trabajo`. `seguimiento.anteriores` son los mensajes que {nombre} ya le envió: no los repitas.
 
 Como mucho tres líneas y 500 caracteres. Sin enlaces, correos, teléfonos ni hashtags; sin pedir minutos, llamadas ni
 reuniones; sin fórmulas como «gracias por conectar», «quedo atento» o «espero que estés bien»; sin vender ni decir a quién
-ayuda Gustavo.'''
+ayuda {nombre}.'''
 
 def system(number):
+    """The template of follow-up `number` ({nombre}: mensajes_comprador.system_for renders it for the member)."""
     from .mensajes_comprador import COMMON_RULES
     return SYSTEM+'\n'+JOBS[number]+COMMON_RULES
 
@@ -265,9 +266,9 @@ def inputs(contact,journey,facts,at,number):
     state=comprador._fold(comprador._touches(journey));messages=sent(state)
     earlier=previous(journey,state,messages)
     last=messages[-1].at if messages else None
-    data['momento']={'que_es':f'Mensaje {number} de 4. No respondió a los anteriores; Gustavo lo envía a mano.',
+    data['momento']={'que_es':identidad.of_account(contact.account).render(f'Mensaje {number} de 4. No respondió a los anteriores; {{nombre}} lo envía a mano.'),
                      'dias_desde_el_anterior':round((at-last).total_seconds()/86400,1) if last else None}
-    data['seguimiento']={'numero':number,'de':LAST,'trabajo':JOBS[number],'anteriores':earlier}
+    data['seguimiento']={'numero':number,'de':LAST,'trabajo':identidad.of_account(contact.account).render(JOBS[number]),'anteriores':earlier}
     # BAR-25: message 2 tells the pain with a short story; with the ProjectApp buyer on, the case of her segment (only
     # its confirmed facts) may be that story (projectapp.case_for: None for any other buyer).
     from . import projectapp

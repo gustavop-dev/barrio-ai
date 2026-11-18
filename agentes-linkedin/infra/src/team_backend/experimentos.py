@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.utils import timezone
-from . import evidencia, operador, orientacion, orquestacion, posicionamiento
+from . import evidencia, identidad, operador, orientacion, orquestacion, posicionamiento
 from .jobs import Conflict, audit
 from .models import (ActionExecution, ActionProposal, Notification, Referent, ReferentExperiment,
                      ReferentReview, ReferentAttribution)
@@ -31,7 +31,8 @@ def propose(review, data):
     if not ref:
         return None
     plan = dict(DEFAULTS, hypothesis=data['hypothesis'], audience=data['audience'], comparison=data['comparison'],
-                fit_criterion=posicionamiento.network_criteria(), positioning_version=posicionamiento.VERSION,
+                fit_criterion=posicionamiento.network_criteria(identidad.of_account(review.account)),
+                positioning_version=posicionamiento.version(),
                 orientation_version=orquestacion.digest(orientacion.text()))
     if data.get('control_referent'):
         control = Referent.objects.filter(account=review.account, pk=data['control_referent'], active=True, archived_at__isnull=True).exclude(pk=ref.pk).first()
@@ -84,7 +85,8 @@ def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
               'starts_at': experiment.starts_at.isoformat(), 'actor': str(user.pk), 'at': now.isoformat(), 'decision': decision}
     if decision == 'edit':
         if isinstance(plan,dict):
-            plan=dict(plan,fit_criterion=posicionamiento.network_criteria(),positioning_version=posicionamiento.VERSION,
+            plan=dict(plan,fit_criterion=posicionamiento.network_criteria(identidad.of_account(experiment.account)),
+                      positioning_version=posicionamiento.version(),
                       orientation_version=orquestacion.digest(orientacion.text()))
         validate_plan(plan)
         start = datetime.fromisoformat(starts_at)
@@ -123,7 +125,7 @@ def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
 
 
 def material_change(experiment):
-    return (experiment.plan['positioning_version'] != posicionamiento.VERSION
+    return (experiment.plan['positioning_version'] != posicionamiento.version()
             or experiment.plan['orientation_version'] != orquestacion.digest(orientacion.text()))
 
 

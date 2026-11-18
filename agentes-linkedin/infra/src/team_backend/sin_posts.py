@@ -423,8 +423,8 @@ def draft_inputs(post,bridge):
     buyer=bridge.bridge_for.contact if bridge.bridge_for_id else None
     return {'autor':{'nombre':post.author_name,'titular':(bridge.headline or '')[:300]},
             'comentarios_del_equipo_en_sus_posts':comments_done(bridge),
-            'para_que':('Colega de un posible cliente de Gustavo, de su misma empresa: el comentario es para que lo reconozca '
-                        'antes de la invitación. Nunca le vendas ni menciones a su colega.'),
+            'para_que':calentamiento._of(post).render('Colega de un posible cliente de {nombre}, de su misma empresa: el '
+                        'comentario es para que lo reconozca antes de la invitación. Nunca le vendas ni menciones a su colega.'),
             'no_repitas':[t[:300] for t in _texts_to(buyer)][:5] if buyer else []}
 
 def _fold(bridge):
@@ -465,16 +465,19 @@ def relayed(journey):
                        'perfil':bridge.profile_url}))
     return out
 
-WHAT={'acepto':'aceptó la invitación de Gustavo','respondio_comentario':'respondió un comentario del equipo',
-      'comento_post':'comentó en un post de Gustavo','nos_invito':'invitó a Gustavo a conectar','conversacion':'le escribió a Gustavo'}
+WHAT={'acepto':'aceptó la invitación de {nombre}','respondio_comentario':'respondió un comentario del equipo',
+      'comento_post':'comentó en un post de {nombre}','nos_invito':'invitó a {nombre} a conectar','conversacion':'le escribió a {nombre}'}
 
 def fact(touch):
     """The anchor a senal_puente gives a note or a first message (mensajes_comprador.anchors)."""
     d=touch.detail or {}
     who=d.get('nombre') or 'Un colega suyo';where=f' de {d["empresa"]}' if d.get('empresa') else ''
-    return {'tipo':'puente','texto':f'{who}{where} {WHAT.get(d.get("tipo"),"interactuó con el equipo")}.','interaccion':bool(d.get('interaccion')),
+    from . import identidad
+    ident=identidad.of_account(touch.journey.contact.account)  # her name, never another member's
+    what=ident.render(WHAT.get(d.get('tipo'),'interactuó con el equipo'))
+    return {'tipo':'puente','texto':f'{who}{where} {what}.','interaccion':bool(d.get('interaccion')),
             'puente':d.get('nombre') or '','que_paso':('Su colega (el puente) interactuó con el equipo.' if d.get('interaccion')
-                                                       else 'Su colega (el puente) aceptó la invitación de Gustavo; no hubo conversación.'),
+                                                       else ident.render('Su colega (el puente) aceptó la invitación de {nombre}; no hubo conversación.')),
             'fecha':touch.at.isoformat(),'fuente':d.get('perfil') or 'su colega'}
 
 # --------------------------------------------------------------------------- 4. the note by signal

@@ -45,7 +45,7 @@ from knowledge import db, memory, presupuesto, providers
 from knowledge.clases import METODOLOGIAS_ACTIVAS, legible_por_agentes
 from knowledge.config import live
 from knowledge.ingest import ENC
-from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red, voz
+from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red
 from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, LibraryCatalog, PostMetric
 
 GO_LIVE=date(2026,11,6)  # the machine went live in production
@@ -177,8 +177,8 @@ def _frozen(brief):
 
 def stage_request(run,name,payload,unit_ids=None):
     """editorial._stage without the piece: same system, voice, units, schema, caps and effort."""
-    system,schema,default_units,budget,max_tokens,effort=editorial.STAGES[name][:6]
-    if name in editorial.VOICED_STAGES:system=voz.with_voice(system)
+    _,_,default_units,budget,max_tokens,effort=editorial.STAGES[name][:6]
+    system,schema=editorial.stage_system(name),editorial.stage_schema(name)  # the installation's member (one active)
     units,missing,_=run.context(unit_ids or default_units,budget)
     if missing:raise ValueError(f'Biblioteca no disponible para la etapa {name}.')
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')

@@ -319,14 +319,15 @@ class MonthlyResearchAndConcurrencyTests(MonthlyDataMixin, TransactionTestCase):
             params={'account': str(self.account.pk), 'month': '2026-11-01'})
         ctx = {'positioning': {'version': 'v1'}, 'orientation': {'version': 'o1'}, 'memory': {'version': 'm1'},
             'grounding': {'course_status': 'disponible'}, 'course': 'Synthetic course', 'referents': [refs.snapshot(r) for r in self.main]}
-        gate = Barrier(3)
+        gate = Barrier(3); selected_for = []
         def web(request):
             gate.wait(timeout=10)
             slug = 'incoming-research'
             source = research.Source(request.key, f'https://www.linkedin.com/in/{slug}/', 'Synthetic public source', f'https://www.linkedin.com/in/{slug}/', self.now.isoformat())
             return research.ResearchResult(request.public_question, 'complete', self.now.isoformat(),
                 (research.Finding('Synthetic audience of founders', (source.id,)),), (source,))
-        def select(request):
+        def select(request, account):
+            selected_for.append(account)
             source = request['research'][0]['sources'][0]['id']
             incoming = candidate('Incoming research', 'incoming-research'); incoming['sources'] = [source]
             return {'summary': 'Synthetic dossier', 'changes': [{'kind': 'add', 'incoming': incoming, 'reason': 'Fit first', 'evidence': [source]}], 'continuity': []}
@@ -337,6 +338,7 @@ class MonthlyResearchAndConcurrencyTests(MonthlyDataMixin, TransactionTestCase):
             result = research_cycle.run(job)
             research_cycle.run(job)
         self.assertEqual(tool.call_count, 3)
+        self.assertEqual(selected_for, [self.account])  # the dossier is written with the identity of the account's member
         self.assertEqual(result.changes.count(), 1)
         ledger = CycleLedger.objects.get(cycle='referentes_mensuales')
         self.assertEqual(ledger.calls, 5)
