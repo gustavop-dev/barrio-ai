@@ -77,7 +77,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | --- | --- | --- |
 | 1 | Organización y miembro (**hecha**) | Modelos `Organizacion` y `Miembro`; migración que crea ProjectApp y a Gustavo y le asigna sus dos cuentas; `ConnectorAccount.miembro`; los selectores de «la» cuenta pasan a ser por miembro (`publishing_account`, `reader_account`, `_own_posts_reader`, `analitica.account_for`, `perfil.read_profile`, `publications`); `require_gustavo` → dueño de la cuenta; **la vista remota del navegador solo para el dueño** |
 | 2 | Un miembro de LinkedIn por persona (**hecha**) | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
-| 3 | Identidad fuera del código | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
+| 3 | Identidad fuera del código (**hecha**) | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
 | 4 | Contenido por miembro | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
 | 6 | Registro compartido de personas | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
@@ -234,6 +234,90 @@ miembro, o con el CTO inactivo, nada se detiene):
 - Siguen globales también el hueco del día (`EditorialPiece.slot_date` único), la audiencia diaria de `metricas`,
   `perfil.facts` (piezas recientes) y la memoria (`guardas.blocks`).
 
+## Fase 3: lo construido
+
+Hecho el 17/11/2026 en `feat/organizaciones` (fichas [ORG-14 a ORG-17](funcionalidades/organizaciones.md)). La identidad
+ya no está en el código: vive en la base, por organización y por miembro, y cada prompt se arma para el miembro dueño de
+la cuenta. Para Gustavo todo es byte a byte lo de antes (lo prueban 109 hashes).
+
+**Dónde vive la identidad.**
+
+| Qué | Dónde | Qué guarda |
+| --- | --- | --- |
+| Perfil de la organización | `Organization.profile` (JSON) | versión, fecha y estado del posicionamiento, idioma, pilares, a quién no se busca, ubicación, servicios, oferta, casos, modalidades (propósito y barrio) y el barrio de antes del comprador de ProjectApp |
+| Perfil del miembro | `Member.profile` (JSON) | nombre, identidad, relación con la empresa, límites, si le aplica la modalidad de startups personales, sus propósitos propios, versión de la marca de su perfil |
+| Historial | `IdentityRevision` | cada cambio: quién, cuándo, antes, después, qué campos, origen (`migracion`, `semilla`, `comando`); más un `AuditEvent` `organization.identity_saved` |
+| Su voz | `VoiceDocument` | versiones numeradas: `confirmada`, `propuesta` o `descartada`; texto propio o puntero a `recursos/` con su sha256; las señales que la originaron |
+| Señales de estilo | `VoiceSignal` | referencias (modelo e id, nunca copias) a lo que aprobó, editó, rechazó, respondió o capturó |
+| Semilla | `recursos/identidad-inicial.json` | los textos exactos de antes (ProjectApp, Gustavo y su voz); la migración `0058_identidad_inicial` lleva una copia congelada (una prueba fija que son iguales) |
+
+Migraciones: `0057_identidad` (esquema: los dos JSON, los tres modelos y `voice` en `EditorialPiece`, `ActionProposal` y
+`BuyerDraft`) y `0058_identidad_inicial` (datos: al primer miembro y a su organización les pone la semilla si están vacíos,
+con la revisión 1 de cada uno, y su `VoiceDocument` 1 confirmado apuntando a `tono-de-voz.md`; reversible).
+`miembros.ensure_first_member` hace lo mismo (`identidad.seed_first`) para una base que recibe su primer miembro después.
+
+**Reglas de `identidad.of(member)`** (`identidad.py`): el primer miembro de la instalación (o ninguno) con perfil vacío
+lee la semilla; cualquier otro, valores neutros más su `display_name` hasta que llene su perfil. `{nombre}` es su nombre,
+`{alias}` su ficha de claves (`laura_gomez`) y `{decisor}` su nombre si es el primer miembro o «la organización» si no.
+Con varios miembros activos y ninguno dado, `MiembroRequerido`: nunca se elige uno. Al leer un perfil guardado se
+respeta el orden de claves de la semilla (jsonb no lo guarda y los criterios listan pilares y modalidades en ese orden).
+
+**Prompts convertidos** (plantillas con `{nombre}`, `{alias}`, `{decisor}`; se renderizan con el miembro de la cuenta):
+`posicionamiento` (todas sus funciones reciben al miembro), `editorial.stage_system`/`stage_schema`/`direction`,
+`operador.comment_system`, `respuestas.reply_system`, `red.classify_system`/`stage_system`/`no_fit_rule`/`criterion_version`,
+`lider` (criterios, comprobaciones, preguntas y estados del líder), `mensajes_comprador.system_for`,
+`secuencia_comprador.system`, `respuesta_comprador.system_for`/`_question`, `projectapp.size_rule`/`case_issues`,
+`estrategia.plan_system`/`type_rules`, `capturas.route_system`/`event_details`, `resumen_semanal.system`,
+`revision_mensual.system`, `referentes_industria` (`for_account`), `referentes_research.system`, `editor_visual.system`,
+`imagenes.design_system`, `connectors_images.photo_check`, `perfil_contenido`, `perfil_marca.brand_version`,
+`comunidad` (analista), `research`/`capture_intent` (guías), `conversaciones.lines`, `infografias.author`/`render` y
+`infografias.rule`/`with_rule` (los ejemplos de la regla de infografías firman con su nombre; la versión de la regla es
+la del documento, igual para todos). `research.safe_question` descarta una pregunta web que nombre a cualquier miembro.
+Las claves guardadas que llevan `gustavo` (`questions_for_gustavo`, `ideas_from_gustavo`, `ask_gustavo`…) no cambian en
+la base: `identidad.keyed` se las muestra al modelo con la ficha del miembro y `unkeyed` devuelve su respuesta a los
+nombres guardados.
+
+**La voz** (`voz.py`): su `VoiceDocument` confirmado más reciente; sin él, la inicial si es el primer miembro; sin él, la
+**provisional** (`recursos/voz-provisional.md` con la guía genérica `voz-guia.md`): neutra, sobria, sin rasgos de nadie. Cada
+borrador guarda la voz con que se escribió (`voice`: `{"tipo": "provisional"}` o `{"tipo": "confirmada", "version": N}`).
+Aprendizaje: `collect_signals` registra referencias; `propose` (apagado por defecto, `VOICE_LEARNING_ENABLED`; muestra
+mínima `VOICE_LEARNING_MIN_TEXTS`=12 textos suyos aprobados o editados) hace una sola llamada de pago con su reserva
+(Opus 5.5, `max_tokens` 6000: unos 13 000 tokens de entrada y hasta 6 000 de salida, cerca de 0,17 USD; el peor caso con 60
+señales largas, unos 0,28 USD) y deja una **propuesta** que no se usa hasta que ella la confirma; confirmar crea la
+versión vigente. Solo ella confirma o descarta; ella o el administrador piden la propuesta.
+
+**Comandos** (`manage.py operador --usuario <usuario> …`): `perfil [--miembro U] [--fijar CAMPO=VALOR] [--quitar CAMPO]
+[--historial]` (cambiarlo es solo de ella; verlo, de cualquiera), `perfil-organizacion [--fijar …] [--quitar …]
+[--historial]` (solo el administrador), `voz [--miembro U] [--senales | --proponer | --confirmar N | --descartar N | --ver N]`.
+
+**Textos que ve la persona.** Los mensajes del servidor que nombraban a Gustavo nombran al dueño de la cuenta
+(`identidad.owner_name`: su nombre, o «el dueño de la cuenta» si no se puede nombrar): «Solo {nombre} puede reanudarla»,
+«Decide {nombre}», «no se reinvita sin {nombre}», los retoques y el rescate de piezas, la entrega del lead, «{nombre}
+conversa en este hilo». Para Gustavo dicen lo mismo que antes, salvo «Solo el dueño de la cuenta o el administrador decide
+cambios de referentes y experimentos». En la PWA y la app: «Solo el dueño de la cuenta o el administrador.» (protección de
+referentes), «Tu aporte» (decisión de referente) y «Aplicado por ti» (perfil). El dueño de un paso de la API
+(`next_step.owner = 'gustavo'`) se queda como sinónimo de «tú»: lo leen la PWA y la app y cambiarlo rompería clientes
+instalados; se renombra cuando la fase 5 filtre las vistas por miembro.
+
+**Lo que no cambia para Gustavo** (`tests/test_identidad_prompts.py`): los 109 textos (prompts, esquemas, criterios,
+preguntas del líder, voz, `posicionamiento` version/status, `criterion_version` y el PNG de la infografía) tienen el mismo
+sha256 que en `origin/main`, después de la migración, con perfiles vacíos y sin miembros.
+
+**Pruebas de dos miembros** (`test_organizaciones_e2e.py`): `IdentidadPorMiembroTests` (comentario, respuesta, primer
+mensaje, clasificación y pieza editorial del CTO sin nada de Gustavo y con lo suyo; nombres dibujados;
+`MiembroRequerido`), `VozTests` (provisional y su marca; muestra insuficiente; solo sus señales; la propuesta no se usa sin
+confirmar; confirmada y versionada) y `PerfilComandoTests` (validación, auditoría, permisos).
+
+### Lo que queda para las fases 4 a 7
+
+- Fase 4: la memoria y los hechos (`identidad.facts`/`blocks`/`orientation` son el punto de enganche: hoy un miembro que
+  no es el primero no tiene memoria ni orientación propias) y las guardas de `guardas.py`, que aún dicen «Gustavo» en sus
+  razones.
+- Siguen leyendo `identidad.of()` sin miembro (con varios activos se detienen con `MiembroRequerido`): el plan semanal
+  (`estrategia.run`), el resumen y la revisión mensual, el pipeline de perfil (`perfil_*`), el enrutado de una captura sin
+  autor y `evaluaciones` (el arnés de evaluación es el de Gustavo).
+- Fase 7: el formulario del perfil en la app (hoy, por comando), exponer la marca «voz provisional» en la API y su CTO.
+
 ## Servidor
 
 Cada navegador abierto ocupa cerca de 1 GB; la máquina tiene 4 GB y 1 vCPU, y la documentación del conector dice que
@@ -256,7 +340,8 @@ El CTO no trae textos propios. Su voz se construye con lo que haga en la app (de
   actualiza con sus correcciones.
 - Lo que nunca se hace: usar la voz, los hechos o las fotos de otro miembro.
 
-Esto vive en la fase 3 (documento de voz por miembro) y en la fase 7 (arranque en voz provisional).
+Esto vive en la fase 3 (documento de voz por miembro, voz provisional y aprendizaje: ver «Fase 3: lo construido») y en la
+fase 7 (su arranque con autonomía en «aprobación»).
 
 ## Orden respecto del outbound
 

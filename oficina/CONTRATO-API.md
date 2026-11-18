@@ -12,6 +12,12 @@ del usuario donde se indica. Con un solo miembro (la instalación de hoy) nada c
 ruta que aún no dice de quién es responde 400 `{ detail: "Hay varios miembros activos y esta operación no dice de cuál:
 hay que indicarlo." }` en lugar de adivinar. Un miembro inactivo recibe 400 «Tu miembro está inactivo en la organización.».
 
+**Organizaciones (fase 3, [ORG-14 a ORG-17](../docs/funcionalidades/organizaciones.md#org-14)):** ninguna forma de
+respuesta cambia. Los textos que nombraban a Gustavo nombran al dueño de la cuenta (para él dicen lo mismo); el 403 de
+referentes y experimentos dice «Solo el dueño de la cuenta o el administrador decide cambios de referentes y
+experimentos.» y el 409 de la relectura del perfil «…; sigue «Aplicado por ti».». `next_step.owner: "gustavo"` (y `by:
+"gustavo"` donde aparece) se queda como sinónimo de «tú»: lo leen los clientes instalados; se renombra en la fase 5.
+
 **Organizaciones (fase 2, [ORG-10 a ORG-12](../docs/funcionalidades/organizaciones.md#org-10)):** el ritmo de LinkedIn
 (topes, espaciado, rampa, notas, tier, lecturas de perfil y bloqueos de invitaciones) es de cada miembro. Ninguna forma de
 respuesta cambia; cambian de quién son los números:
@@ -273,7 +279,7 @@ En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, veta
 | `followed` | Seguido | Seguido; se espera al menos 48 h antes de invitar. |
 | `invited` | Invitado | Invitación sin nota enviada. |
 | `connected` | Conectado | Conexión de primer grado. |
-| `closed` | Cerrado | Invitación ignorada o retirada; no se reinvita sin Gustavo. |
+| `closed` | Cerrado | Invitación ignorada o retirada; no se reinvita sin ti. |
 | `incoming` | Te invitó | Te invitó; se aceptará si encaja. |
 
 Valores que muestra la PWA:

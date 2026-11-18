@@ -4,7 +4,8 @@ Una segunda persona de la empresa (el CTO) usa Barrio AI con su propio usuario y
 son las fases 1 y 2 del [plan de organizaciones](../plan-organizaciones.md): el modelo, «de quién es» cada cuenta, los
 selectores por miembro, las pausas por miembro y la sesión del navegador solo para su dueño (fase 1); y un ritmo de
 LinkedIn propio para cada miembro (fase 2: candado, espaciado, topes, lecturas de perfil, rampa, notas, tier, bloqueos
-del proveedor y sus ajustes). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
+del proveedor y sus ajustes); y su identidad fuera del código (fase 3: perfiles de organización y de miembro en la
+base, prompts por miembro, su voz y los textos que la nombran). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
 hasta entonces, un miembro nuevo entra **inactivo**.
 
 - **Código:** backend `models.py` (`Organization`, `Member`, `ConnectorAccount.member`), migración `0055_organizaciones`,
@@ -33,6 +34,10 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 | [ORG-11](#org-11) | Rampa, notas y bloqueos del proveedor por miembro | backend | funciona |
 | [ORG-12](#org-12) | El ritmo de cada miembro se ajusta aparte | backend (servidor) | funciona |
 | [ORG-13](#org-13) | Avisos de Slack del ritmo de cada miembro | backend | funciona |
+| [ORG-14](#org-14) | La identidad de la organización y de cada miembro, en la base | backend | funciona |
+| [ORG-15](#org-15) | Cada texto del equipo se escribe como su miembro | backend | funciona |
+| [ORG-16](#org-16) | La voz de cada miembro: provisional y aprendida | backend (servidor) | funciona (apagada) |
+| [ORG-17](#org-17) | Los textos que ven las personas nombran al dueño | backend, PWA, app | funciona |
 
 ---
 
@@ -316,3 +321,86 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 - **Brechas código/docs:** los avisos van al mismo canal de Slack; avisos y push solo a su dueño son la fase 5.
 - **Cobertura QA:** `test_organizaciones_e2e.VigilantesTests` (1–2), `test_alertas_slack.BuyerSequenceAlertTests`/
   `BuyerReplyAlertTests` (3) · 2026-11-17 · pasa en local
+
+### ORG-14 · La identidad de la organización y de cada miembro, en la base <a id="org-14"></a>
+
+- **Dónde:** backend (servidor)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** lo que el equipo sabe de ProjectApp (posicionamiento, pilares, servicios, oferta, casos,
+  modalidades) y de cada miembro (nombre, identidad, relación con la empresa, límites, modalidades, marca) se cambia sin
+  desplegar, con validación e historial. Al desplegar, su perfil y el de ProjectApp quedan con los textos de siempre.
+- **Código:** `Organization.profile`, `Member.profile`, `IdentityRevision`, `identidad.py` (`of`, `save_profile`,
+  `seed_first`, `validate_*`), migraciones `0057_identidad` y `0058_identidad_inicial`, `recursos/identidad-inicial.json`;
+  comandos `operador perfil` y `operador perfil-organizacion`.
+- **Criterios de aceptación:**
+  1. **Dado** la base de hoy, **cuando** migra, **entonces** ProjectApp y Gustavo tienen los textos exactos de antes (revisión
+     1 de cada perfil) y su voz es su documento «Tono de voz» (versión 1 confirmada); revertir lo deja como estaba.
+  2. **Dado** un miembro, **cuando** fija un campo de su perfil, **entonces** se valida el perfil entero (nombre solo letras,
+     sin llaves, modalidades existentes, longitudes) y queda una revisión con quién, cuándo, antes y después; repetirlo no
+     crea otra.
+  3. **Dado** otro usuario (también el administrador), **cuando** intenta cambiar el perfil de ella, **entonces** se rechaza;
+     el de la organización solo lo cambia su administrador activo.
+  4. **Dado** varios miembros activos, **cuando** algo lee una identidad sin decir de quién, **entonces** `MiembroRequerido`.
+- **Brechas código/docs:** el formulario en la app es de la fase 7; hoy es por comando.
+- **Cobertura QA:** `test_identidad_prompts` (1), `test_organizaciones_e2e.PerfilComandoTests` (2–3),
+  `IdentidadPorMiembroTests.test_without_saying_whose_identity_several_active_members_raise` (4) · 2026-11-17 · pasa en local
+
+### ORG-15 · Cada texto del equipo se escribe como su miembro <a id="org-15"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** comentarios, respuestas, primeros mensajes, clasificaciones, piezas editoriales, el líder, los
+  referentes y las infografías se arman con el nombre, la identidad, los límites y la voz del dueño de la cuenta. Los
+  suyos son byte a byte los de antes, así que la caché de prompts del proveedor sigue valiendo.
+- **Código:** las plantillas `{nombre}`/`{alias}`/`{decisor}` de cada módulo y sus funciones por miembro (lista en el
+  [plan](../plan-organizaciones.md#fase-3-lo-construido)); `identidad.keyed`/`unkeyed` para las claves guardadas.
+- **Criterios de aceptación:**
+  1. **Dado** Gustavo, **cuando** se arma cualquiera de los 109 textos fijados, **entonces** su sha256 es el de `origin/main`.
+  2. **Dado** el CTO con su perfil, **cuando** el equipo redacta un comentario, una respuesta, un primer mensaje, una
+     clasificación o una pieza editorial en su cuenta, **entonces** el prompt, el mensaje y el esquema no llevan el nombre,
+     la identidad, los límites ni la voz de Gustavo y sí los de ella; las claves guardadas vuelven a su nombre de siempre.
+  3. **Dado** su cuenta, **cuando** se dibuja una infografía o se titula un carrusel, **entonces** dice su nombre; la regla
+     de infografías que lee el diseñador firma sus ejemplos con su nombre (misma versión de regla que la de Gustavo).
+  4. **Dado** cualquier miembro, **cuando** una pregunta web lleva su nombre, **entonces** no sale a la web.
+- **Brechas código/docs:** la memoria, los hechos y la orientación de un miembro que no es el primero llegan en la fase 4
+  (hoy, vacíos); el plan semanal, el resumen, la revisión mensual y el perfil siguen siendo de la instalación.
+- **Cobertura QA:** `test_identidad_prompts.GustavoSinCambiosTests` (1), `test_organizaciones_e2e.IdentidadPorMiembroTests`
+  (2–4) · 2026-11-17 · pasa en local
+
+### ORG-16 · La voz de cada miembro: provisional y aprendida <a id="org-16"></a>
+
+- **Dónde:** backend (servidor)
+- **Estado:** funciona; el aprendizaje está apagado (`VOICE_LEARNING_ENABLED=false`)
+- **Qué hace para Gustavo:** su voz sigue siendo su documento. Un miembro sin documento escribe con una voz neutra y sus
+  borradores quedan marcados «voz provisional» (`voice`); con muestra suficiente, una llamada de pago propone su documento
+  desde sus propias señales, que ella revisa y confirma antes de que se use.
+- **Código:** `voz.py` (`current`, `collect_signals`, `sample`, `propose`, `confirm`, `discard`), `VoiceDocument`,
+  `VoiceSignal`, `recursos/voz-provisional.md`, `recursos/voz-guia.md`; comando `operador voz`.
+- **Criterios de aceptación:**
+  1. **Dado** un miembro sin documento confirmado que no es el primero, **cuando** el equipo escribe en su nombre,
+     **entonces** usa la voz provisional con su nombre y el borrador guarda `{"tipo": "provisional"}`.
+  2. **Dado** menos de `VOICE_LEARNING_MIN_TEXTS` textos suyos aprobados o editados (o el aprendizaje apagado),
+     **cuando** se pide una propuesta, **entonces** no se propone nada ni se paga.
+  3. **Dado** la muestra, **cuando** se propone, **entonces** la llamada lee solo sus señales, la propuesta no se usa hasta
+     que ella la confirma, y confirmada pasa a ser su voz con número de versión; nadie más la confirma.
+- **Brechas código/docs:** exponer la marca «voz provisional» en la PWA y la app es de la fase 7.
+- **Cobertura QA:** `test_organizaciones_e2e.VozTests`, `IdentidadPorMiembroTests` (1) · 2026-11-17 · pasa en local
+
+### ORG-17 · Los textos que ven las personas nombran al dueño <a id="org-17"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona
+- **Qué hace para Gustavo:** los avisos y notas que decían «Gustavo» dicen el nombre del dueño de la cuenta (o «el dueño
+  de la cuenta»); para él siguen igual. En la PWA y la app: «Solo el dueño de la cuenta o el administrador.», «Tu aporte» y
+  «Aplicado por ti».
+- **Código:** `identidad.owner_name`; `operador`, `red`, `respuestas`, `referentes`, `rescate`, `retoque`, `entrega_lead`,
+  `calentamiento`, `sin_posts`, `connectors_linkedin`, `perfil_views`; `ProtectedReferent`, `ReferentDecision`,
+  `compartido/src/logic/perfil.ts`.
+- **Criterios de aceptación:**
+  1. **Dado** una cuenta del CTO, **cuando** un texto del servidor nombra a quien decide, **entonces** dice su nombre.
+  2. **Dado** una cuenta de nadie con varios miembros, **cuando** se nombra al dueño, **entonces** «el dueño de la cuenta».
+- **Brechas código/docs:** `next_step.owner = 'gustavo'` en la API se queda como sinónimo de «tú» hasta la fase 5; las
+  etiquetas de las opciones de los modelos (`models.py`) y las razones de `guardas.py` aún dicen «Gustavo».
+- **Cobertura QA:** `IdentidadPorMiembroTests.test_without_saying_whose_identity_several_active_members_raise` (1–2); los
+  textos de Gustavo, sus pruebas de siempre · 2026-11-17 · pasa en local
+
