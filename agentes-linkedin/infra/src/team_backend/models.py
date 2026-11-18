@@ -125,6 +125,35 @@ class UsageEntry(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Organizations (docs/plan-organizaciones.md, phase 1): who each LinkedIn account belongs to. The organization holds what
+# is shared because the goal is the same (ProjectApp); a member is one person with her own login and her own accounts.
+# team_backend/miembros.py is the one way to ask «whose is this»; no code reads these tables directly for that.
+
+class Organization(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    name=models.CharField(max_length=120)
+    slug=models.SlugField(max_length=60,unique=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    def __str__(self):return self.name
+
+class Member(models.Model):
+    """One person of an organization: her Django user (her login), the name the team uses for her and her role. `active`
+    off: she keeps her accounts but nothing resolves to her and she owns nothing (miembros.py). `is_admin`: may add
+    members and decide on the organization's referents; never opens another member's LinkedIn session."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='members')
+    # One login, one member (one organization per user for now; a FK unique per organization if that ever changes).
+    user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='member')
+    display_name=models.CharField(max_length=120)
+    role=models.CharField(max_length=120,blank=True)  # free text: «Fundador», «CTO»
+    active=models.BooleanField(default=True)
+    is_admin=models.BooleanField(default=False)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:ordering=['created_at']
+    def __str__(self):return f'{self.display_name} ({self.organization.slug})'
+
+
+# ---------------------------------------------------------------------------
 # Account operator: the single executor of external LinkedIn actions.
 # Proposal -> approval of an exact payload hash -> one execution -> confirmation.
 
@@ -151,6 +180,9 @@ class ConnectorAccount(models.Model):
     # directo), or null. Ids an audit event kept before then are of the scheme before and are never reused
     # (metricas._known_id, red.search_location).
     ids_since=models.DateTimeField(null=True,blank=True)
+    # Whose LinkedIn this is (organizaciones, phase 1). Null only for an account created before any member existed or by a
+    # test: it belongs to the only active member, and to nobody once there are several (miembros.member_of_account).
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='accounts')
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
