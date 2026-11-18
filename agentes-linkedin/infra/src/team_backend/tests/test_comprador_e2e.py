@@ -68,14 +68,25 @@ class BuyerPathBase(RepliesBase):
 
     # -- steps (production code only)
     def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note='',headline='Founder & CEO at Acme'):
-        """discover_network finds the person in a search; classify_contacts classifies and checks the stage on the web."""
+        """discover_network finds the person in a search; classify_contacts classifies her and check_buyer_stages checks
+        her stage on the web."""
         person=self.fake.seed_person(slug,name,headline=headline,search='founder pre-seed',location=location)
         self.job('discover_network')
         stop=self.providers(note=note)
-        try:job=self.job('classify_contacts')
+        try:
+            job=self.job('classify_contacts')
+            self.step_check()
         finally:stop()
         self.assertEqual(job.state,'complete',job.error)
         return Contact.objects.get(account=self.account,provider_user_id=person['id'])
+
+    def step_check(self):
+        """check_buyer_stages, as the autopilot queues it while a buyer waits for her web check: one check a run, with its
+        own budget apart from the classification (18/11/2026)."""
+        for _ in range(5):
+            if not red.stage_pending(self.account,timezone.now()):return
+            job=self.job('check_buyer_stages')
+            self.assertEqual(job.state,'complete',job.error)
 
     def step_follow(self,contact):
         self.job('plan_network')
@@ -216,6 +227,7 @@ class TodayBuyerPathTests(BuyerPathBase):
         nothing=research.ResearchResult('q','unavailable','2026-11-12T00:00:00+00:00',usage={'model':'claude-sonnet-5-5'})
         with self.classifier({'Beto Acme':(True,0.9)}),patch('team_backend.research.research',return_value=nothing):
             self.job('classify_contacts')
+            self.assertEqual(self.job('check_buyer_stages').result_status,'etapas:0/1')
         beto=Contact.objects.get(display_name='Beto Acme')
         entered=beto.classification['buyer']
         self.assertEqual((beto.stage,beto.classification['stage_check']['state'],entered['level']),('fit','pending','por_confirmar'))
@@ -1883,13 +1895,13 @@ class NoPostsBuyerPathTests(NoPostsPathBase):
         self.assertEqual((journey.step,journey.touches.filter(kind='reverificacion').count()),('descanso',1))
         self.assertTrue(red.stage_pending(self.account,end))
         with patch.object(red,'stage_checks_left',return_value=0):  # no allowance left today: it waits
-            self.job('classify_contacts')
+            self.job('check_buyer_stages')
         self.assertEqual([k for k in self.web_keys if 'reverificacion' in k],[])
         self.stage_signals=[self.signal('contratacion',days=3,url=HIRING_URL,evidence='Acme is hiring its first account executive.')]
         stop=self.providers()
         try:
-            self.job('classify_contacts')
-            self.job('classify_contacts')  # once: a second run does not check her again
+            self.job('check_buyer_stages')
+            self.job('check_buyer_stages')  # once: a second run does not check her again
         finally:stop()
         self.assertEqual(len([k for k in self.web_keys if 'reverificacion' in k]),1)
         ana=Contact.objects.get(pk=ana.pk)
@@ -1917,7 +1929,7 @@ class NoPostsBuyerPathTests(NoPostsPathBase):
         self.plan(now=self.journey(ana).rest_until+MINUTE)
         self.stage_verdict='confirmado'
         stop=self.providers()
-        try:self.job('classify_contacts')
+        try:self.job('check_buyer_stages')
         finally:stop()
         self.assertEqual(len([k for k in self.web_keys if 'reverificacion' in k]),1)
         ana=Contact.objects.get(pk=ana.pk)
@@ -2540,11 +2552,14 @@ class ProjectAppPathTests(WarmupPathBase):
         return lambda:(claude_patch.stop(),web_patch.stop())
 
     def found(self,slug,name,headline,search,location):
-        """discover_network finds her with the search of her audience; classify_contacts classifies and checks the web."""
+        """discover_network finds her with the search of her audience; classify_contacts classifies her and
+        check_buyer_stages checks the web."""
         person=self.fake.seed_person(slug,name,headline=headline,search=search,location=location)
         self.job('discover_network')
         stop=self.providers()
-        try:job=self.job('classify_contacts')
+        try:
+            job=self.job('classify_contacts')
+            self.step_check()
         finally:stop()
         self.assertEqual(job.state,'complete',job.error)
         return Contact.objects.get(account=self.account,provider_user_id=person['id'])

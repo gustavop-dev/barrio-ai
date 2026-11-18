@@ -46,5 +46,6 @@ LEAD_RESULT = {'type': 'object', 'required': ['decision','reasons','at'], 'prope
 OBSERVE_RESULT = dict(READ_RESULT,required=['new_posts','seen_posts','errors'])
 DISCOVER_RESULT = dict(READ_RESULT,required=['new'])
 CLASSIFY_RESULT = dict(READ_RESULT,required=['classified','fit'])
+STAGE_RESULT = dict(READ_RESULT,properties={**READ_RESULT['properties'],'checked':INTEGER,'passed':INTEGER},required=['checked','passed'])
 PLAN_RESULT = dict(READ_RESULT,required=['follow','invite','accept'])
 SYNC_RESULT = dict(READ_RESULT,required=['received','connected'])

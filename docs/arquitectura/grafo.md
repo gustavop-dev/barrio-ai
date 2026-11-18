@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.16-comprador-projectapp` · SHA-256 `22d065a99d4feaf3e93ff720a42a3c9b214b25d073b2859825516e7bd858ab7f`.
+Versión `6.17-verificacion-etapa-propia` · SHA-256 `4aba14a4b2e35f8a60c305c06e32b5ca6519259e609d86b5499523ea562996c9`.
 
-46 nodos (46 activos), 74 aristas y 17 ciclos.
+46 nodos (46 activos), 75 aristas y 17 ciclos.
 
 Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -91,6 +91,7 @@ flowchart TD
   relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
   relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
   relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
+  relaciones_comunidad -->|"verificar_etapa · workflow_step · ≤1"| clasificador_red
   relaciones_comunidad -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
   relaciones_comunidad -->|"planificar_red · workflow_step · ≤1"| plan_red
   relaciones_comunidad -->|"sincronizar · workflow_step · ≤1"| sync_red
@@ -248,7 +249,8 @@ Estado: `active`. Orquestador: `relaciones_comunidad`.
 
 - `observe`: OPERATOR_OBSERVE_EVERY_MINUTES (180 min).
 - `discover_network`: NETWORK_DISCOVER_EVERY_MINUTES (360 min).
-- `classify_contacts`: NETWORK_CLASSIFY_EVERY_MINUTES (30 min), solo backlog.
+- `classify_contacts`: NETWORK_CLASSIFY_EVERY_MINUTES (30 min), solo backlog; solo clasifica.
+- `check_buyer_stages`: NETWORK_STAGE_CHECK_EVERY_MINUTES (20 min), solo con una verificación o reverificación pendiente y cupo NETWORK_STAGE_CHECKS_PER_DAY (6); una por corrida, con su propio presupuesto del ciclo.
 - `plan_network`: NETWORK_PLAN_EVERY_MINUTES (60 min).
 - `sync_network`: NETWORK_SYNC_EVERY_MINUTES (360 min).
 - `propose_comment`: Tick 60 s, hasta un borrador por tick y cupo disponible.
@@ -281,6 +283,7 @@ flowchart TD
   relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
   relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
   relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
+  relaciones_comunidad -->|"verificar_etapa · workflow_step · ≤1"| clasificador_red
   relaciones_comunidad -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
   relaciones_comunidad -->|"planificar_red · workflow_step · ≤1"| plan_red
   relaciones_comunidad -->|"sincronizar · workflow_step · ≤1"| sync_red
@@ -688,6 +691,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `observe_result` | `json_schema` | [team_backend.orquestacion_schemas.OBSERVE_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `discover_result` | `json_schema` | [team_backend.orquestacion_schemas.DISCOVER_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `classify_result` | `json_schema` | [team_backend.orquestacion_schemas.CLASSIFY_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `stage_result` | `json_schema` | [team_backend.orquestacion_schemas.STAGE_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `plan_result` | `json_schema` | [team_backend.orquestacion_schemas.PLAN_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `sync_result` | `json_schema` | [team_backend.orquestacion_schemas.SYNC_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `visual_request` | `json_schema` | [team_backend.editor_visual.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
@@ -749,6 +753,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `observar` | `network_input` | `observe_result` |
 | `descubrir` | `network_input` | `discover_result` |
 | `clasificar` | `network_input` | `classify_result` |
+| `verificar_etapa` | `network_input` | `stage_result` |
 | `comentar` | `network_input` | `proposal` |
 | `planificar_red` | `network_input` | `plan_result` |
 | `sincronizar` | `network_input` | `sync_result` |

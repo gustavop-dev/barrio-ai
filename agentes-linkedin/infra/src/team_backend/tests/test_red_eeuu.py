@@ -96,12 +96,15 @@ class StageCheckTests(NetworkBase):
         env=patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'true','NETWORK_BUYER_REGION':'us'});env.start();self.addCleanup(env.stop)
         self.judged=[]
 
-    def test_the_classify_step_declares_every_paid_purpose_of_the_stage_check(self):
+    def test_the_stage_check_step_declares_every_paid_purpose_of_the_stage_check(self):
         # The job was blocked («undeclared_provider») every time a buyer waited for the web check: nobody was ever checked.
+        # Since 18/11/2026 the check is its own step (check_buyer_stages), apart from the classification.
         from team_backend.grafo import load_graph
-        edge=next(e for e in load_graph()['edges'] if e['id']=='clasificar')
-        self.assertLessEqual({'network-classify','web-research-tool','network-stage'},set(edge['runtime']['purposes']['anthropic']))
-        self.assertGreaterEqual(edge['call_timeout_s'],300)  # one classification and up to three web checks in one call
+        graph=load_graph();edges={e['id']:e for e in graph['edges']}
+        self.assertEqual(graph['code_bindings']['network_edges']['check_buyer_stages'],'verificar_etapa')
+        self.assertEqual(set(edges['verificar_etapa']['runtime']['purposes']['anthropic']),{'web-research-tool','network-stage'})
+        self.assertEqual(edges['clasificar']['runtime']['purposes']['anthropic'],['network-classify'])
+        self.assertGreaterEqual(edges['verificar_etapa']['call_timeout_s'],240)  # one research and its judge, 120 s each at most
 
     def buyer(self,slug,name):
         contact=self.contact(slug,name)
@@ -210,7 +213,7 @@ class StageCheckTests(NetworkBase):
         paused=AuditEvent.objects.filter(action='network.stage_check_paused',target=str(self.account.id))
         self.assertEqual((paused.count(),paused.get().metadata['pending']),(1,1))  # once a day
         self.assertFalse(red.stage_pending(self.account))  # and the autopilot stops queueing it for today
-        self.assertEqual(red.classify(self.bot,self.account)['stopped'],red.STAGE_PAUSED)  # the classify job tells it
+        self.assertEqual(red.check_buyer_stages(self.bot,self.account)['stopped'],red.STAGE_PAUSED)  # its job tells it
 
     def test_the_probe_of_the_day_reopens_the_checks_when_the_web_answers_again(self):
         ana=self.buyer('ana-vuelve','Ana Vuelve');self.silent_runs()

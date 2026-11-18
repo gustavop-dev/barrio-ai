@@ -1250,7 +1250,8 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
 
 # --------------------------------------------------------------------------- worker entry point
 
-NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan_network':'plan','sync_network':'sync'}
+NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','check_buyer_stages':'check_buyer_stages',
+              'plan_network':'plan','sync_network':'sync'}
 
 def run_job(job):
     from . import orquestacion
@@ -1341,6 +1342,7 @@ def _run_job(job):
             r=_network_tool(job,lambda:getattr(red,NETWORK_JOBS[job.kind])(user,account))
             oficina_eventos.job_done(job.kind,r)
             status={'discover_network':lambda:f"nuevos:{r['new']}",'classify_contacts':lambda:f"encajan:{r['fit']}/{r['classified']}",
+                    'check_buyer_stages':lambda:f"etapas:{r['passed']}/{r['checked']}",
                     'plan_network':lambda:f"seg:{r['follow']} inv:{r['invite']} acep:{r['accept']}",
                     'sync_network':lambda:f"recibidas:{r['received']} conexiones:{r['connected']}"}[job.kind]()
             return 'complete',status[:30],r.get('stopped','')
