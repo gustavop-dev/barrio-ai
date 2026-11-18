@@ -404,7 +404,7 @@ class CaseRuleTests(TestCase):  # the cases are the organization's profile (phas
     """G (the fixed rule, without the database): a case only to a buyer of its segment and only with confirmed facts."""
 
     def setUp(self):
-        facts=patch('team_backend.projectapp.case_facts',side_effect=lambda s:{'caso':posicionamiento.cases()[s]})
+        facts=patch('team_backend.projectapp.case_facts',side_effect=lambda s,member=None:{'caso':posicionamiento.cases()[s]})  # its signature
         facts.start();self.addCleanup(facts.stop)
         env=patch.dict(os.environ,ON);env.start();self.addCleanup(env.stop)
 

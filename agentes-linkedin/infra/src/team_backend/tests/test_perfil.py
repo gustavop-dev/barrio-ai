@@ -329,7 +329,7 @@ class ProfileBase(MediaMixin,OperatorBase):
             mock=patch(target,side_effect=AssertionError('No real provider or LinkedIn in profile tests'))
             mock.start();self.addCleanup(mock.stop)
         notices=patch('team_backend.notificaciones.avisar');self.notice=notices.start();self.addCleanup(notices.stop)
-        values=patch('team_backend.perfil.facts',side_effect=lambda mode:dict(context(list(content.MONTHLY) if mode=='monthly' else None),mode=mode,brand_version=content.brand_version()))
+        values=patch('team_backend.perfil.facts',side_effect=lambda mode,owner=None:dict(context(list(content.MONTHLY) if mode=='monthly' else None),mode=mode,brand_version=content.brand_version()))
         values.start();self.addCleanup(values.stop)
 
     def references(self):
@@ -436,7 +436,7 @@ class ProfileCycleTests(ProfileBase):
         at='2026-11-09T08:00:00Z';source='profile:synthetic:headline:'+at
         snapshot={'sections':{'headline':{'text':'Product engineer: useful software for teams','source':source,'at':at}},
                   'evidence':[source],'at':at,'limitations':['El conector no expone todas las secciones.']}
-        def production_facts(mode):
+        def production_facts(mode,owner=None):
             ctx=context();ctx['public_facts']=[{'key':'identidad.rol','fact':'Product engineer: useful software for teams','version':3}]
             ctx['recent_pieces']=[{'id':'piece:12345678-abcd','text':'Synthetic product engineering piece',
                 'url':'https://example.com/published','published_at':at,'metrics':{}}]

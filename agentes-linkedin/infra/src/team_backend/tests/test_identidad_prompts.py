@@ -254,7 +254,7 @@ def capture(member, account):
 def lead_reviews(put, account):
     """lider._questions for each kind of proposal, review_buyer_draft and comment_worthy, as the baseline built them."""
     orientation = 'Más posts sobre arquitectura.'
-    noop = lambda state, questions: {'course_missing': []}
+    noop = lambda state, questions, member=None: {'course_missing': []}  # ground_questions' signature
     post = NS(author_name='Ana Autora', text='Un post sobre arquitectura de software.', account=account)
     piece = NS(brief={'thesis': 'Una tesis'}, final_text='El post publicado.')
     contact = NS(headline='Founder at Acme', display_name='Ana', evidence={'comment': 'Buen punto'}, classification={

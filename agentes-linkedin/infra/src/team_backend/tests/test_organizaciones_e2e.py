@@ -21,18 +21,22 @@ one LinkedIn member with her own rhythm (lock, spacing and day schedule, daily a
 invitation ramp and its health, notes and tier, provider blocks); the total stop, the AI budget and «one person, one
 invitation» stay the organization's; Gustavo's state of before organizations is his first member's, untouched."""
 import hashlib
+import importlib
 import io
 import json
+import logging
 import os
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta
+from datetime import timezone as dt_timezone
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+from django.apps import apps
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -44,18 +48,24 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
 from knowledge import db
-from team_backend import (alertas_slack, analitica, autopiloto, conexion, connectors_linkedin as li, editorial, identidad,
-                          imagenes, metricas, miembros, operador, perfil, posicionamiento, red, referentes, respuestas, voz)
+from team_backend import (alertas_slack, analitica, autopiloto, bucle_resultados, capturas, conexion, connectors_linkedin as li, editor_visual,
+                          editorial, estrategia, guardas, hechos, identidad, imagenes, metricas, miembros, operador, perfil,
+                          posicionamiento, red, referentes, respuestas, voz)
 from team_backend.connectors import ConnectorError, FakeConnector
-from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BrowserLogin, BuyerJourney, Capture,
-                                 ConnectorAccount, Contact, EditorialPiece, IdentityRevision, Job, LinkedInCredential, Member,
-                                 ObservedPost, OperatorControl, Organization, PostComment, Referent,
-                                 VoiceDocument)
+from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, BrowserLogin, BuyerJourney,
+                                 Capture, ConnectorAccount, Contact, EditorialPiece, IdentityRevision, Job, LinkedInCredential,
+                                 Member, MonthlyReview, Notification, ObservedPost, OperatorControl, Organization, PostComment,
+                                 Referent, TeamQuestion, VoiceDocument, WeeklyPlan, WeeklySummary)
+from team_backend.tests import test_capturas as cap
 from team_backend.tests import test_conexion as cx
+from team_backend.tests import test_estrategia as est
 from team_backend.tests import test_metricas as met
 from team_backend.tests import test_operador as op
 from team_backend.tests import test_publicacion as pub
+from team_backend.tests import test_rediseno as rd
 from team_backend.tests import test_respuestas as resp
+from team_backend.tests import test_resumen_semanal as rsm
+from team_backend.tests import test_revision_mensual as rvm
 from team_backend.tests.test_identidad_prompts import PINNED
 from team_backend.tests.test_operador import ALL, OperatorBase
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
@@ -114,8 +124,8 @@ class DosMiembrosBase(EditorialBase):
 
     def piece(self, persona, days_ago=0):
         """A verified piece of `persona` on the account editorial.publishing_account picks for her, and its CONT-09
-        proposal through the autonomy policy. Slot dates are still unique for the whole installation (phase 4): give
-        each member her own day."""
+        proposal through the autonomy policy. Her calendar is hers (phase 4): two members may share a day. While her
+        voice is provisional (the CTO's here) the policy leaves her post waiting and she approves it, as in production."""
         account = editorial.publishing_account(persona.member)
         now, text = timezone.now(), persona.text
         piece = EditorialPiece.objects.create(
@@ -126,6 +136,10 @@ class DosMiembrosBase(EditorialBase):
         proposal = operador.create_proposal(persona.user, None, 'CONT-09', {'text': text}, citations=['LI-04-M005-K01'],
                                             source='agent', piece=piece)
         proposal = autopiloto.policy_review(proposal)
+        if autopiloto.provisional_voice(persona.member):
+            self.assertEqual(proposal.state, 'proposed', proposal.risks)
+            operador.approve(persona.user, proposal.id, proposal.payload_hash)
+            proposal.refresh_from_db()
         self.assertEqual(proposal.state, 'approved', proposal.risks)
         return proposal
 
@@ -191,24 +205,6 @@ class PublicarTests(DosMiembrosBase):
         # Each one's Ajustes › LinkedIn shows her own credential only.
         self.assertFalse(self.g.client().get('/api/v1/linkedin/status').json()['connected'])
         self.assertEqual(self.cto.client().get('/api/v1/linkedin/status').json()['member_urn'], 'urn:li:person:cto123')
-
-    def test_planning_waits_for_phase_4_with_two_active_members_and_is_his_with_the_cto_inactive(self):
-        """The calendar and the queue of ideas are still the installation's (urgente.assign_slots, phase 4): with two
-        active members planning stops with the reason instead of guessing. With the CTO inactive (how `operador miembro`
-        adds her until phase 7) Gustavo plans and publishes on his account, though hers is the newest connected one."""
-        response = self.g.client().post('/api/v1/editorial/plan', {}, format='json')
-        self.assertEqual(response.status_code, 400, response.content)
-        self.assertIn('varios miembros activos', response.json()['detail'])
-        self.assertFalse(Job.objects.filter(kind='prepare_piece').exists())
-        self.assertEqual(self.oauth(self.cto, 'cto123', 'AQ-token-del-cto'), '/ajustes?linkedin=ok')
-        miembros.save_member(self.g.user, self.cto.user.username, 'CTO de prueba', 'CTO', active=False)
-        piece = self.plan_as(self.g, answers())
-        self.assertEqual((piece.state, piece.account_id), ('ready', self.g.official.pk), piece.note)
-        proposal = piece.proposals.get()
-        autopiloto.policy_review(proposal)
-        self.arrive(piece)
-        self.assertEqual(self.publish(proposal).state, 'sent')
-        self.assertEqual(self.writes(), {'gustavo': 1, 'cto': 0})
 
     def test_without_saying_whose_nothing_is_guessed(self):
         """Two active members and no member in the context: MiembroRequerido (a ValueError: 400 in a view), never the
@@ -512,9 +508,8 @@ class UnMiembroTests(UnMiembro, EditorialBase):
 
 # ---------------------------------------------------------------------- migration 0055
 
-class MigracionTests(TransactionTestCase):
-    """Migration 0055 on the historical models: an empty database, today's (Gustavo and his two accounts), no
-    REFERENTS_GUSTAVO_USERNAME user, and back."""
+class Migraciones:
+    """Moves the test database to a migration and back to the latest one when the test ends."""
 
     def setUp(self):
         self.addCleanup(self.latest)
@@ -527,6 +522,11 @@ class MigracionTests(TransactionTestCase):
     def latest(self):
         executor = MigrationExecutor(connection)
         executor.migrate(executor.loader.graph.leaf_nodes())
+
+
+class MigracionTests(Migraciones, TransactionTestCase):
+    """Migration 0055 on the historical models: an empty database, today's (Gustavo and his two accounts), no
+    REFERENTS_GUSTAVO_USERNAME user, and back."""
 
     def users(self, apps, *rows):
         User = apps.get_model('auth', 'User')
@@ -1449,3 +1449,506 @@ class PerfilComandoTests(IdentidadBase):
         with self.assertRaisesMessage(CommandError, 'claves'):
             self.command('gustavo-test', 'perfil-organizacion', '--fijar', 'pillars={"otra": "x"}')
         self.assertEqual(posicionamiento.version(self.g.member), 'posicionamiento-v3')
+
+
+# ---------------------------------------------------------------------- phase 4: each member's content
+
+HIS_WEEK = ['Recortar el alcance de un MVP sin perder clientes', 'Medir la retención antes de escalar el marketing',
+            'Contratar el primer ingeniero senior de producto', 'Validar precios con diez entrevistas reales',
+            'Lanzar una beta cerrada con usuarios exigentes', 'Documentar decisiones técnicas para inversores',
+            'Priorizar deuda técnica frente a nuevas funciones']
+HER_FACT = {'texto': 'Migramos la plataforma a Postgres 17 en 2025 sin una hora de caída.', 'uso_publico': True}
+HER_PRIVATE = {'texto': 'No nombrar nunca al cliente Northwind Retail.', 'uso_publico': False}
+HIS_FACT = {'texto': 'Gustavo acompañó 40 lanzamientos de producto con founders.', 'uso_publico': True}
+COMPANY_FACT = {'texto': 'El caso retail de ProjectApp redujo un 30 % el tiempo de reposición.', 'uso_publico': True}
+
+
+class ContenidoBase(DosMiembrosBase):
+    """Phase 4 (docs/plan-organizaciones.md): each member's content. A frozen clock, never the real hour: Tuesday 10
+    November 2026 at 06:00 local, before both post hours (08:30 his, 08:45 hers by the stagger)."""
+    DAY = date(2026, 11, 10)
+
+    def setUp(self):
+        self.now = datetime.combine(self.DAY, time(6), tzinfo=operador.local_tz())
+        clock = patch('django.utils.timezone.now', side_effect=lambda: self.now)
+        clock.start()
+        self.addCleanup(clock.stop)
+        # Django binds timezone.now when models load: freeze those field defaults too (test_fase2_curso).
+        for model in apps.get_app_config('team_backend').get_models():
+            for field in model._meta.fields:
+                if getattr(field.default, '__module__', '') == 'django.utils.timezone':
+                    frozen = patch.object(field, '_get_default', new=lambda: timezone.now())
+                    frozen.start()
+                    self.addCleanup(frozen.stop)
+        super().setUp()
+        for persona in (self.g, self.cto):
+            self.grant(persona.user, 'confirm_memory', 'propose_memory')
+
+    def at(self, day, hour, minute=0):
+        return datetime.combine(day, time(hour, minute), tzinfo=operador.local_tz())
+
+    def paid(self, **answers_by_purpose):
+        """providers.claude, simulated and recorded: each purpose ('editorial-plan' → 'plan', 'weekly-summary' → 'summary')
+        answers its fixture."""
+        def fake(system, message, max_tokens=None, output_schema=None, effort=None, purpose='agent-run', **kwargs):
+            self.calls.append((purpose, json.loads(message), system))
+            return {'text': json.dumps(answers_by_purpose[purpose.split('-', 1)[1]]), 'model': 'claude-opus-5-5',
+                    'estimated_usd': 0.01, 'request_id': 'req_' + purpose,
+                    'usage': {'input_tokens': 1000, 'output_tokens': 200, 'stop_reason': 'end_turn'}}
+        return patch('knowledge.providers.claude', side_effect=fake)
+
+    def day_pieces(self, plan=None):
+        """CONT-07 for both: one autopilot pass queues each member's post of the day and the worker writes both."""
+        with self.claude(plan or answers()):
+            self.assertEqual(autopiloto._editorial(self.autobot, self.now), 2)
+            self.drain()
+        pieces = {p.member_id: p for p in EditorialPiece.objects.filter(slot_date=self.DAY, second_of_day=False)}
+        self.assertEqual(set(pieces), {self.g.member.pk, self.cto.member.pk})
+        return pieces[self.g.member.pk], pieces[self.cto.member.pk]
+
+    def director(self, persona):
+        """The director's request for `persona`'s piece: her identity keys it (ideas_from_<her>)."""
+        key = identidad.of(persona.member).key('ideas_from_gustavo')
+        [data] = [d for purpose, d, _ in self.calls if purpose == 'editorial-director' and key in d]
+        return data
+
+    def published(self, persona, day):
+        """One of her posts went out that day at 08:30 (its piece, its CONT-09 proposal and the execution)."""
+        when = self.at(day, 8, 30)
+        piece = EditorialPiece.objects.create(account=persona.official, slot_date=day, scheduled_for=when, state='ready',
+                                              final_text=persona.text, brief={'pillar': editorial.PILLARS[0], 'thesis': f'Tesis {day}'})
+        proposal = ActionProposal.objects.create(account=persona.official, piece=piece, capability='CONT-09',
+                                                 payload={'text': piece.final_text}, payload_hash='0' * 64, state='confirmed')
+        ActionExecution.objects.create(proposal=proposal, idempotency_key=uuid.uuid4().hex, provider='linkedin_fake',
+                                       state='confirmed', executed_by=persona.user, started_at=when)
+        return piece
+
+
+class ContenidoTests(ContenidoBase):
+    def test_each_member_has_her_post_of_the_day_on_the_same_day_at_her_own_hour(self):
+        """Catch one calendar for the installation: both posts of the day are prepared, each on her own account, at her
+        own hour (the CTO's EDITORIAL_POST_STAGGER_MINUTES after Gustavo's) and by her own job; his job is the one of before."""
+        mine, hers = self.day_pieces()
+        self.assertEqual((mine.state, hers.state), ('ready', 'ready'), (mine.note, hers.note))
+        self.assertEqual((mine.account_id, hers.account_id), (self.g.official.pk, self.cto.official.pk))
+        self.assertEqual([p.scheduled_for.astimezone(operador.local_tz()).time() for p in (mine, hers)], [time(8, 30), time(8, 45)])
+        queued = {miembros.of_job(job.params).pk: job for job in Job.objects.filter(kind='prepare_piece')}
+        self.assertEqual((queued[self.g.member.pk].params, queued[self.g.member.pk].id),
+                         ({'slot': '2026-11-10'}, autopiloto._job_id('piece', self.DAY)))
+        self.assertEqual((queued[self.cto.member.pk].params, queued[self.cto.member.pk].id),
+                         ({'slot': '2026-11-10', 'member': str(self.cto.member.pk)},
+                          autopiloto._job_id('piece', self.DAY, 'member', self.cto.member.pk)))
+        self.assertEqual(autopiloto._editorial(self.autobot, self.now), 0)  # each day is taken by her own piece
+        with patch.dict(os.environ, {'EDITORIAL_POST_STAGGER_MINUTES': '40'}):  # the first member never moves
+            self.assertEqual((editorial.post_time(self.g.member), editorial.post_time(self.cto.member)), (time(8, 30), time(9, 10)))
+
+    def test_a_post_in_a_provisional_voice_never_goes_out_on_its_own(self):
+        """Catch a provisional voice publishing alone: the CTO's post waits for a person with her CONT-09 set to «auto» and
+        even after she confirms her voice (it was written in the provisional one); Gustavo's goes out at his hour."""
+        miembros.save_settings(self.g.user, self.cto.member, {'OPERATOR_AUTONOMY': 'CONT-09=auto'})
+        self.cto.member.refresh_from_db()
+        self.assertEqual((autopiloto.autonomy('CONT-09', self.g.member), autopiloto.autonomy('CONT-09', self.cto.member)),
+                         ('auto', 'approval'))
+        mine, hers = self.day_pieces()
+        his_post, her_post = mine.proposals.get(), hers.proposals.get()
+        self.assertEqual((hers.voice, her_post.voice), ({'tipo': 'provisional'}, {'tipo': 'provisional'}))
+        self.assertNotEqual(mine.voice.get('tipo'), 'provisional')
+        self.now = self.at(self.DAY, 9)  # both hours have passed
+        autopiloto.tick(self.autobot, self.now)
+        self.drain()
+        his_post.refresh_from_db(), her_post.refresh_from_db()
+        self.assertEqual((his_post.state, her_post.state), ('sent', 'proposed'))
+        self.assertEqual(self.writes(), {'gustavo': 1, 'cto': 0})
+        VoiceDocument.objects.create(member=self.cto.member, number=1, source='aprendida', text='Directa, técnica y sin adornos.')
+        voz.confirm(self.cto.user, self.cto.member, 1)
+        self.assertEqual(autopiloto.autonomy('CONT-09', self.cto.member), 'auto')  # her next posts may go alone
+        autopiloto.tick(self.autobot, self.now)
+        self.drain()
+        her_post.refresh_from_db()
+        self.assertEqual((her_post.state, self.writes()['cto']), ('proposed', 0))
+        operador.approve(self.cto.user, her_post.id, her_post.payload_hash)  # a person decides: then it goes out, on hers
+        self.drain()
+        self.assertEqual(self.writes(), {'gustavo': 1, 'cto': 1})
+        self.assertEqual([p['text'] for p in self.cto.posts_api().state['posts']], [GOOD_POST])
+
+    def test_her_facts_never_reach_his_post_and_his_never_hers_but_the_companys_reach_both(self):
+        """Catch shared memory: each director reads her own facts and guidance only, the experience check of a text
+        backs a claim with its author's facts only, and a fact the admin made the company's reaches both."""
+        hechos.set_fact(self.cto.member, 'stack.migracion', HER_FACT, f'user:{self.cto.user.pk}', 'Prueba')
+        hechos.set_fact(self.cto.member, 'limites.clientes', HER_PRIVATE, f'user:{self.cto.user.pk}', 'Prueba')
+        hechos.set_fact(self.cto.member, 'caso.retail', COMPANY_FACT, f'user:{self.cto.user.pk}', 'Prueba')
+        hechos.set_fact(self.g.member, 'trayectoria.lanzamientos', HIS_FACT, f'user:{self.g.user.pk}', 'Prueba')
+        out = io.StringIO()
+        with self.assertRaisesMessage(CommandError, 'administrador'):
+            call_command('operador', '--usuario', 'cto-test', 'hecho-empresa', '--compartir', 'caso.retail', '--miembro', 'cto-test', stdout=out)
+        call_command('operador', '--usuario', 'gustavo-test', 'hecho-empresa', '--compartir', 'caso.retail', '--miembro', 'cto-test', stdout=out)
+        self.assertIn('Hechos de la empresa ProjectApp: 1.\n  empresa.caso.retail · versión', out.getvalue())
+        self.day_pieces()
+        his, hers = (json.dumps(self.director(p), ensure_ascii=False) for p in (self.g, self.cto))
+        for text in (HER_FACT['texto'], HER_PRIVATE['texto'], 'stack.migracion', 'limites.clientes'):
+            self.assertNotIn(text, his)
+            self.assertIn(text, hers)
+        self.assertNotIn(HIS_FACT['texto'], hers)
+        self.assertIn(HIS_FACT['texto'], his)
+        for request in (his, hers):  # his as the company's; hers as her own (hers wins on the same key)
+            self.assertIn(COMPANY_FACT['texto'], request)
+        self.assertIn('empresa.caso.retail', his)
+        # A decision: her confirmed fact backs the claim in her post and never in his.
+        claim = 'Migramos la plataforma a Postgres 17 en 2025 sin una hora de caída.'
+        self.assertEqual(guardas.text_checks(claim, self.cto.member), [])
+        self.assertTrue(any('Gustavo' in reason for reason in guardas.text_checks(claim, self.g.member)))
+        call_command('operador', '--usuario', 'gustavo-test', 'hecho-empresa', '--retirar', 'caso.retail', stdout=out)
+        self.assertNotIn('empresa.caso.retail', json.dumps(hechos.confirmed_blocks(self.g.member)))
+        self.assertIn('caso.retail', json.dumps(hechos.confirmed_blocks(self.cto.member)))  # still hers
+
+    def test_her_audio_and_her_photos_feed_only_her_pieces(self):
+        """Catch a shared table of ideas or gallery: the CTO's voice note becomes her idea only, each one's photo is
+        offered to her own piece only, and each one lists only what she sent."""
+        self.transcribed = []
+        with cap.CaptureBase.transcriber(self, 'Quiero contar cómo elegimos la base de datos del primer año.'):
+            body = self.cto.client().post('/api/v1/capturas', {'audio': cap.audio(), 'para': 'post'}, format='multipart').json()
+            self.drain()
+        capture = Capture.objects.get(id=body['id'])
+        self.assertEqual((capture.member, capture.state), (self.cto.member, 'idea'))
+        photos = {}
+        for persona in (self.g, self.cto):
+            response = persona.client().post('/api/v1/galeria', {'fotos': [cap.photo()]}, format='multipart')
+            self.assertEqual(response.status_code, 201, response.content)
+            photos[persona.member.pk] = response.json()[0]['id']
+        self.assertEqual([i['id'] for i in capturas.ideas_for_director(self.now, self.cto.member)], [body['id']])
+        self.assertEqual(capturas.ideas_for_director(self.now, self.g.member), [])
+        for persona in (self.g, self.cto):
+            self.assertEqual([p['id'] for p in imagenes.candidates((), persona.member)], [photos[persona.member.pk]])
+            self.assertEqual([p['id'] for p in persona.client().get('/api/v1/galeria').json()['results']], [photos[persona.member.pk]])
+        self.assertEqual([c['id'] for c in self.g.client().get('/api/v1/capturas').json()['results']], [])
+        self.assertEqual([c['id'] for c in self.cto.client().get('/api/v1/capturas').json()['results']], [body['id']])
+        mine, hers = self.day_pieces()
+        his, her = self.director(self.g), self.director(self.cto)
+        self.assertNotIn('base de datos del primer año', json.dumps(his, ensure_ascii=False))
+        self.assertIn('base de datos del primer año', json.dumps(her, ensure_ascii=False))
+        self.assertEqual([p['id'] for p in his['gallery']], [photos[self.g.member.pk]])
+        self.assertEqual([p['id'] for p in her['gallery']], [photos[self.cto.member.pk]])
+        mine.brief = dict(mine.brief, gallery_offered=list(photos.values()))  # even if offered, her photo is not his
+        self.assertEqual([p['id'] for p in editor_visual.gallery(mine)], [photos[self.g.member.pk]])
+
+    def test_a_team_question_goes_to_the_member_who_owns_the_piece(self):
+        """Catch one Tu turno for everyone: each director's question is asked to its piece's member, each sees hers,
+        only she answers it, and her answer is her memory."""
+        ask = {'question': '¿Qué base de datos usa la plataforma?', 'purpose': 'Para el post técnico',
+               'memory_key': 'stack.base_de_datos', 'public': True}
+        plan = answers()
+        plan['director'] = dict(plan['director'], questions_for_gustavo=[ask])
+        mine, hers = self.day_pieces(plan)
+        questions = {q.member_id: q for q in TeamQuestion.objects.filter(memory_key='stack.base_de_datos', state='open')}
+        self.assertEqual(set(questions), {self.g.member.pk, self.cto.member.pk})  # one open question per member and key
+        self.assertEqual((questions[self.cto.member.pk].origin, questions[self.g.member.pk].origin), (f'piece:{hers.id}', f'piece:{mine.id}'))
+        for persona in (self.g, self.cto):
+            listed = persona.client().get('/api/v1/preguntas', {'state': 'open'}).json()['results']
+            self.assertEqual([q['id'] for q in listed], [str(questions[persona.member.pk].id)])
+            turn = persona.client().get('/api/v1/tu-turno')  # Tu turno too: hers only, and it works with two members
+            self.assertEqual(turn.status_code, 200, turn.content)
+            self.assertEqual([c['id'] for c in turn.json()['questions']], [f'question:{questions[persona.member.pk].id}'])
+        hers_q = questions[self.cto.member.pk]
+        self.assertEqual(self.g.client().post(f'/api/v1/preguntas/{hers_q.id}/responder', {'text': 'MySQL'}, format='json').status_code, 403)
+        response = self.cto.client().post(f'/api/v1/preguntas/{hers_q.id}/responder', {'text': 'Postgres 17', 'public_use': True}, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertIn('stack.base_de_datos', {r['key'] for r in hechos.latest(self.cto.member)})
+        self.assertNotIn('stack.base_de_datos', {r['key'] for r in hechos.latest(self.g.member)})
+        self.assertIn('stack.base_de_datos', {f['key'] for f in self.cto.client().get('/api/v1/memoria/hechos').json()})
+        self.assertNotIn('stack.base_de_datos', {f['key'] for f in self.g.client().get('/api/v1/memoria/hechos').json()})
+        self.assertEqual(TeamQuestion.objects.get(pk=questions[self.g.member.pk].pk).state, 'open')  # his is still his to answer
+
+    def test_each_member_plans_her_week_and_the_second_plan_avoids_the_first_ones_topics(self):
+        """Catch two members posting the same topic the same week, or paying for it: each plan is hers (one paid call
+        each); the CTO's sees what Gustavo planned and an option that repeats it is never chosen."""
+        monday = date(2026, 11, 16)
+        days = [monday + timedelta(days=i) for i in range(7)]
+
+        def option(idea):
+            return {'idea': idea, 'reason': 'Encaja con el tipo del día.', 'pillar': editorial.PILLARS[0], 'modality': editorial.MODALITIES[0],
+                    'approach': editorial.APPROACH_UNITS[0], 'format': 'foto', 'reader': editorial.READERS[0],
+                    'reader_need': 'Decidir algo concreto esta semana.', 'audience_evidence': None}
+
+        def week(options):
+            return {'days': [{'date': d.isoformat(), 'options': [option(i) for i in ideas]} for d, ideas in zip(days, options)],
+                    'summary': 'Una semana.', 'signals_read': []}
+        hers = [['Cómo recortar el alcance del MVP sin perder clientes', 'Elegir la base de datos del primer año'],
+                ['Medir la retención antes de escalar el marketing'],  # only his topic: that day stays without an idea
+                ['Automatizar pruebas de integración con contenedores'], ['Observabilidad mínima para un equipo pequeño'],
+                ['Migrar a Postgres sin tiempo de inactividad'], ['Revisar código sin frenar entregas'],
+                ['Presupuestar la nube de una startup']]
+        with patch.dict(os.environ, {'STRATEGY_ENABLED': 'true'}):
+            for persona, options in ((self.g, [[idea] for idea in HIS_WEEK]), (self.cto, hers)):
+                with self.paid(plan=week(options)):
+                    response = persona.client().post('/api/v1/estrategia/planear', {'semana': monday.isoformat()}, format='json')
+                    self.assertEqual(response.status_code, 202, response.content)
+                    self.drain()
+            plans = {p.member_id: p for p in WeeklyPlan.objects.filter(week_start=monday)}
+            weeks = {persona.member.pk: persona.client().get('/api/v1/estrategia/semana', {'dia': monday.isoformat()}).json()
+                     for persona in (self.g, self.cto)}
+        requests = [data for purpose, data, _ in self.calls if purpose == 'editorial-plan']
+        self.assertEqual(len(requests), 2)  # coordinating is free: no extra paid call
+        self.assertNotIn('team_planned', requests[0])  # Gustavo alone that week: his request is the one of before
+        self.assertEqual([t['idea'] for t in requests[1]['team_planned']['topics']], HIS_WEEK)
+        self.assertEqual([s['idea'] for s in plans[self.g.member.pk].slots], HIS_WEEK)
+        planned = [s['idea'] for s in plans[self.cto.member.pk].slots]
+        self.assertEqual(planned[:2], ['Elegir la base de datos del primer año', ''])
+        self.assertFalse(any(estrategia.same_topic(a, b) for a in planned for b in HIS_WEEK))
+        self.assertIn('1 día(s) sin idea: sus opciones repetían un tema que otro miembro ya planeó esta semana.',
+                      plans[self.cto.member.pk].warnings)
+        for persona in (self.g, self.cto):
+            self.assertEqual([d['idea'] or '' for d in weeks[persona.member.pk]['days']], [s['idea'] for s in plans[persona.member.pk].slots])
+        self.assertEqual(Notification.objects.filter(kind='weekly_plan').count(), 2)  # each one hears of her own plan
+
+    def test_each_member_has_her_summary_and_review_with_her_posts_and_her_audience(self):
+        """Catch mixed results: last week's summary and October's review are one per member, each with her own posts and
+        her own audience (one snapshot per member and day), and each notice is hers."""
+        for persona, days in ((self.g, (2, 4)), (self.cto, (3,))):
+            for day in days:
+                self.published(persona, date(2026, 11, day))
+        for persona, first, last in ((self.g, 500, 530), (self.cto, 90, 140)):
+            for day, followers in ((date(2026, 10, 1), first), (date(2026, 10, 31), last)):
+                persona.browser().seed_audience(followers=followers, connections=10, views=5)
+                self.now = self.at(day, 12)
+                self.assertEqual(metricas.collect(self.autobot, persona.reader, now=self.now)['audience'], 'creada')
+        self.assertEqual(AudienceSnapshot.objects.filter(day=date(2026, 10, 31)).count(), 2)
+        self.now = self.at(self.DAY, 9)
+        env = {'WEEKLY_SUMMARY_ENABLED': 'true', 'MONTHLY_REVIEW_ENABLED': 'true', 'WEEKLY_SUMMARY_LLM_USD': '1',
+               'MONTHLY_REVIEW_MAX_USD': '2.00'}
+        with patch.dict(os.environ, env), self.paid(summary=rsm.model_answer(), review=rvm.model_answer()):
+            for persona in (self.g, self.cto):
+                for path in ('resumen-semanal', 'revision-mensual'):
+                    response = persona.client().post(f'/api/v1/resultados/{path}/generar', {}, format='json')
+                    self.assertEqual(response.status_code, 202, response.content)
+            self.drain()
+        summaries = {s.member_id: s for s in WeeklySummary.objects.filter(week_start=date(2026, 11, 2))}
+        reviews = {r.member_id: r for r in MonthlyReview.objects.filter(month_start=date(2026, 10, 1))}
+        self.assertEqual({k: s.stats['semana']['publicaciones']['publicados'] for k, s in summaries.items()},
+                         {self.g.member.pk: 2, self.cto.member.pk: 1})
+        self.assertEqual({k: r.stats['mes']['audiencia']['seguidores']['ganados'] for k, r in reviews.items()},
+                         {self.g.member.pk: 30, self.cto.member.pk: 50})
+        review_requests = [json.dumps(data) for purpose, data, _ in self.calls if purpose == 'monthly-review']
+        self.assertEqual(len(review_requests), 2)
+        self.assertEqual(sorted('"valor": 530' in r for r in review_requests), [False, True])  # his audience in one only
+        self.assertEqual(sorted('"valor": 140' in r for r in review_requests), [False, True])
+        for persona in (self.g, self.cto):  # each one's Resultados shows hers, and «Generar ahora» knows hers is done
+            summary = persona.client().get('/api/v1/resultados/resumen-semanal').json()
+            review = persona.client().get('/api/v1/resultados/revision-mensual').json()
+            self.assertEqual((summary['latest']['id'], summary['previous']), (str(summaries[persona.member.pk].id), []))
+            self.assertEqual((review['latest']['id'], review['previous']), (str(reviews[persona.member.pk].id), []))
+            self.assertEqual((summary['generate']['available'], review['generate']['available']), (False, False))
+        refs = set(Notification.objects.filter(kind__in=['weekly_summary', 'monthly_review']).values_list('ref', flat=True))
+        self.assertEqual(refs, {'weekly_summary:2026-11-02', f'weekly_summary:2026-11-02:{self.cto.member.pk}',
+                                'monthly_review:2026-10-01', f'monthly_review:2026-10-01:{self.cto.member.pk}'})
+
+    def test_one_members_failing_pass_never_stops_the_others(self):
+        """Catch a loop that stops at the first error: a broken post hour fails only its member's pass, whichever of the
+        two it is; when every member fails the error reaches the autopilot's report."""
+        for broken, fine in ((self.cto, self.g), (self.g, self.cto)):
+            with self.subTest(broken=broken.member.display_name):
+                Job.objects.filter(kind='prepare_piece').delete()
+                Member.objects.filter(pk=broken.member.pk).update(settings={'EDITORIAL_POST_TIME': '25:99'})
+                Member.objects.filter(pk=fine.member.pk).update(settings={})
+                with self.assertLogs('team_backend.autopilot', 'ERROR') as logs:
+                    self.assertEqual(autopiloto._editorial(self.autobot, self.now), 1)
+                self.assertIn(f'editorial_failed member={broken.member.pk}', logs.output[0])
+                [job] = Job.objects.filter(kind='prepare_piece')
+                self.assertEqual(miembros.of_job(job.params), fine.member)
+        Job.objects.filter(kind='prepare_piece').delete()
+        Member.objects.update(settings={'EDITORIAL_POST_TIME': '25:99'})
+        with self.assertLogs('team_backend.autopilot', 'ERROR'):
+            report = autopiloto.tick(self.autobot, self.now)
+        self.assertIn('EDITORIAL_POST_TIME inválida', report['editorial_error'])
+
+    def test_each_active_member_plans_her_own_piece_and_an_inactive_one_cannot(self):
+        """POST /editorial/plan is hers: each active member plans her own next piece (the same day, her hour, her account);
+        an inactive member is refused, and alone again Gustavo's hour is the one of before."""
+        mine = self.plan_as(self.g, answers())
+        hers = self.plan_as(self.cto, answers(final=CTO_POST))
+        self.assertEqual([(p.member, p.account_id, p.slot_date) for p in (mine, hers)],
+                         [(self.g.member, self.g.official.pk, self.DAY), (self.cto.member, self.cto.official.pk, self.DAY)])
+        self.assertEqual([p.state for p in (mine, hers)], ['ready', 'ready'], (mine.note, hers.note))
+        miembros.save_member(self.g.user, self.cto.user.username, 'CTO de prueba', 'CTO', active=False)
+        response = self.cto.client().post('/api/v1/editorial/plan', {}, format='json')
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertIn('inactivo', response.json()['detail'])
+        self.assertEqual(editorial.post_time(), time(8, 30))
+
+    def test_the_autopilot_never_asks_whose_content_it_is_with_two_active_members(self):
+        """Catch a periodic job still reading «the» member: ticks on Sunday afternoon (next week's plans), Monday morning
+        (the summaries and October's review are due) and at a post hour never stop at MiembroRequerido, neither in the
+        tick's report nor in one member's logged failure, and each member gets her own weekly plan job."""
+        for persona in (self.g, self.cto):
+            self.published(persona, date(2026, 10, 20))
+            self.published(persona, date(2026, 11, 12))
+        env = {'STRATEGY_ENABLED': 'true', 'WEEKLY_SUMMARY_ENABLED': 'true', 'MONTHLY_REVIEW_ENABLED': 'true'}
+        reports = []
+        with patch.dict(os.environ, env), self.assertLogs(level='INFO') as logs:
+            logging.getLogger('team_backend.autopilot').info('ticks with two active members')  # assertLogs needs one
+            for moment in (self.at(date(2026, 11, 15), 17), self.at(date(2026, 11, 16), 10), self.at(date(2026, 11, 16), 8, 40)):
+                self.now = moment
+                reports.append(autopiloto.tick(self.autobot, self.now))
+        for report in reports:
+            self.assertNotIn('unowned', report)
+            self.assertNotIn('MiembroRequerido', json.dumps(report, default=str))
+        self.assertEqual([r.getMessage() for r in logs.records if r.exc_info and isinstance(r.exc_info[1], miembros.MiembroRequerido)], [])
+        self.assertEqual({miembros.of_job(job.params) for job in Job.objects.filter(kind='plan_week')}, {self.g.member, self.cto.member})
+
+    def test_the_results_loop_reads_the_plan_of_the_member_asked_and_never_picks_one(self):
+        """Catch a diagnosis that guesses: `bucle_resultados` checks the weekly plan of the member it is asked about
+        (--miembro); asked about nobody while two members are active, it says MiembroRequerido instead of picking one."""
+        monday = self.DAY - timedelta(days=self.DAY.weekday())
+        plans = {persona.member.pk: WeeklyPlan.objects.create(member=persona.member, week_start=monday, state='planeada',
+                                                              slots=[{'date': monday.isoformat(), 'type': 'G'}])
+                 for persona in (self.g, self.cto)}
+        with patch.dict(os.environ, {'STRATEGY_ENABLED': 'true'}):
+            for persona in (self.g, self.cto):
+                out = io.StringIO()
+                call_command('bucle_resultados', '--miembro', persona.user.username, '--json', stdout=out)
+                self.assertEqual(json.loads(out.getvalue())['vuelve']['plan_semanal']['plan'], str(plans[persona.member.pk].id))
+            unsaid = bucle_resultados.report(now=self.now)['vuelve']
+        for check in ('plan_semanal', 'recomendaciones'):
+            self.assertEqual(unsaid[check]['estado'], 'error')
+            self.assertIn('MiembroRequerido', unsaid[check]['motivo'])
+        with self.assertRaisesMessage(CommandError, 'no es miembro'):
+            call_command('bucle_resultados', '--miembro', 'nadie', stdout=io.StringIO())
+
+
+class ContenidoMigracionTests(Migraciones, TransactionTestCase):
+    """Migration 0060 on production-like data: Gustavo's history of before organizations and a CTO added later with
+    her own uploads. Every row is the first member's except a capture or a photo of the CTO's; nothing is duplicated;
+    running it again moves nothing; it goes back (to 0058, dropping the columns) and forward again to the same result."""
+    BASE = ('team_backend', '0058_identidad_inicial')
+    BEFORE = ('team_backend', '0059_contenido_por_miembro')
+    AFTER = ('team_backend', '0060_contenido_del_primer_miembro')
+    TABLES = ('EditorialPiece', 'WeeklyPlan', 'WeeklySummary', 'MonthlyReview', 'AudienceSnapshot', 'TeamQuestion',
+              'Capture', 'GalleryPhoto', 'Orientation')
+    T0 = datetime(2026, 5, 4, 13, tzinfo=dt_timezone.utc)
+
+    def production(self, apps):
+        get = lambda name: apps.get_model('team_backend', name)
+        User = apps.get_model('auth', 'User')
+        gustavo, cto, robot = (User.objects.create(username=name, password='pbkdf2$x', date_joined=self.T0)
+                               for name in ('gustavo', 'cto', 'barrio-autopiloto'))
+        organization = get('Organization').objects.create(name='ProjectApp', slug='projectapp')
+        first = get('Member').objects.create(organization=organization, user=gustavo, display_name='Gustavo', role='Fundador',
+                                             is_admin=True, created_at=self.T0)
+        later = get('Member').objects.create(organization=organization, user=cto, display_name='CTO', role='CTO',
+                                             created_at=self.T0 + timedelta(days=180))
+        official = get('ConnectorAccount').objects.create(provider='linkedin', external_account_id='urn:li:person:abc',
+                                                          label='LinkedIn oficial', member=first)
+        start = date(2026, 5, 4)  # a Monday
+        for i in range(60):  # two months of daily pieces; some days a failed first attempt and the published second
+            day = start + timedelta(days=i)
+            if i % 9 == 0:
+                get('EditorialPiece').objects.create(account=official, slot_date=day, scheduled_for=self.T0 + timedelta(days=i),
+                                                     state='failed', created_at=self.T0)
+            get('EditorialPiece').objects.create(account=official, slot_date=day, scheduled_for=self.T0 + timedelta(days=i),
+                                                 state='ready', created_at=self.T0)
+            get('AudienceSnapshot').objects.create(day=day, followers=500 + i, captured_at=self.T0 + timedelta(days=i))
+        for week in range(8):
+            get('WeeklyPlan').objects.create(week_start=start + timedelta(days=7 * week), created_at=self.T0)
+            get('WeeklySummary').objects.create(week_start=start + timedelta(days=7 * week), created_at=self.T0)
+        for month in (date(2026, 5, 1), date(2026, 6, 1)):
+            get('MonthlyReview').objects.create(month_start=month, created_at=self.T0)
+        for n, state in enumerate(('open', 'answered', 'declined')):
+            get('TeamQuestion').objects.create(agent='director_editorial', question=f'Pregunta {n}', memory_key=f'dato.{n}',
+                                               state=state, created_at=self.T0)
+        Capture, Photo = get('Capture'), get('GalleryPhoto')
+        his = [Capture.objects.create(created_by=gustavo, note=f'Idea {n}', created_at=self.T0) for n in range(4)]
+        Capture.objects.create(created_by=robot, note='Del robot', created_at=self.T0)  # nobody's member: the first's
+        Capture.objects.create(created_by=None, note='Sin autor', created_at=self.T0)
+        hers = Capture.objects.create(created_by=cto, note='Su nota de voz', created_at=self.T0)
+        photo = lambda **fields: Photo.objects.create(image='galeria/x.jpg', mime='image/jpeg', size_bytes=10, created_at=self.T0, **fields)
+        photo(created_by=gustavo), photo(created_by=gustavo, capture=his[0])
+        photo(created_by=robot, capture=hers)  # a photo of her capture is hers, whoever stored it
+        photo(created_by=cto)
+        get('Orientation').objects.update_or_create(pk=1, defaults={'text': 'Prioriza IA aplicada.'})
+        return first, later
+
+    def owners(self, apps):
+        return {name: sorted((str(pk), str(member)) for pk, member in
+                             apps.get_model('team_backend', name).objects.values_list('pk', 'member_id'))
+                for name in self.TABLES}
+
+    def test_the_first_member_takes_the_content_of_before_once_and_it_goes_back(self):
+        """Catch a migration that loses, duplicates or misassigns content: every row of before is the first member's (an
+        upload of the CTO's, hers), running it again moves nothing, and reverting leaves the tables as they were."""
+        apps = self.at(self.BEFORE)
+        first, later = self.production(apps)
+        apps = self.at(self.AFTER)
+        owners = self.owners(apps)
+        expected = {str(first.pk): 0, str(later.pk): 0}
+        for name, rows in owners.items():
+            for pk, member in rows:
+                self.assertIn(member, expected, (name, pk))
+                expected[member] += 1
+        Capture, Photo = (apps.get_model('team_backend', n) for n in ('Capture', 'GalleryPhoto'))
+        self.assertEqual(sorted(Capture.objects.filter(member_id=later.pk).values_list('note', flat=True)), ['Su nota de voz'])
+        self.assertEqual(Photo.objects.filter(member_id=later.pk).count(), 2)
+        self.assertEqual(expected[str(later.pk)], 3)
+        counts = {name: len(rows) for name, rows in owners.items()}
+        self.assertEqual(counts, {'EditorialPiece': 67, 'WeeklyPlan': 8, 'WeeklySummary': 8, 'MonthlyReview': 2,
+                                  'AudienceSnapshot': 60, 'TeamQuestion': 3, 'Capture': 7, 'GalleryPhoto': 4, 'Orientation': 1})
+        # Idempotent: running it again on the migrated rows moves nothing.
+        migration = importlib.import_module('team_backend.migrations.0060_contenido_del_primer_miembro')
+        migration.forwards(apps, None)
+        self.assertEqual(self.owners(apps), owners)
+        # Back: the first member's rows lose their member (the state 0059 had), hers stay hers; then 0059 drops the columns.
+        apps = self.at(self.BEFORE)
+        back = self.owners(apps)
+        self.assertEqual({member for rows in back.values() for _, member in rows}, {'None', str(later.pk)})
+        apps = self.at(self.BASE)
+        columns = {c.name for c in connection.introspection.get_table_description(connection.cursor(), 'team_backend_editorialpiece')}
+        self.assertNotIn('member_id', columns)
+        self.assertEqual(apps.get_model('team_backend', 'EditorialPiece').objects.count(), 67)
+        # And forward again: the same owners.
+        apps = self.at(self.AFTER)
+        self.assertEqual(self.owners(apps), owners)
+
+
+# One member behaves as before for her content (phase 4): the suites of the plan, the calendar, Tu turno's questions and
+# facts, the captures, the gallery, the summary and the review run again with one member, expectations untouched.
+
+class UnMiembroWeeklyPlanTests(UnMiembro, est.WeeklyPlanTests):
+    pass
+
+
+class UnMiembroQuestionTests(UnMiembro, rd.QuestionTests):
+    pass
+
+
+class UnMiembroQuestionFlowTests(UnMiembro, rd.QuestionFlowTests):
+    pass
+
+
+class UnMiembroPersonasAndCalendarTests(UnMiembro, rd.PersonasAndCalendarTests):
+    pass
+
+
+class UnMiembroCaptureRoutingTests(UnMiembro, cap.CaptureRoutingTests):
+    pass
+
+
+class UnMiembroGalleryTests(UnMiembro, cap.GalleryTests):
+    pass
+
+
+class UnMiembroDirectorIdeasTests(UnMiembro, cap.DirectorIdeasTests):
+    pass
+
+
+class UnMiembroSummaryRunTests(UnMiembro, rsm.RunTests):
+    pass
+
+
+class UnMiembroSummaryApiTests(UnMiembro, rsm.ApiTests):
+    pass
+
+
+class UnMiembroReviewApiTests(UnMiembro, rvm.ApiTests):
+    pass
+
+
+class UnMiembroReviewDecisionTests(UnMiembro, rvm.DecisionTests):
+    pass
