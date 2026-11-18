@@ -22,6 +22,31 @@ def miembros_lines():
         lines+=[f'  {a.provider}: {a.label} ({a.id})' for a in orphans]
     return lines or ['Sin organizaciones ni miembros: todo funciona como antes de las organizaciones.']
 
+def _pairs(items):
+    values={}
+    for item in items:
+        name,sep,value=item.partition('=')
+        if not sep:raise CommandError(f'--fijar «{item}»: usa CAMPO=VALOR.')
+        values[name.strip()]=value
+    return values
+
+def _shown(value):
+    import json
+    return value if isinstance(value,str) else json.dumps(value,ensure_ascii=False)
+
+def perfil_lines(profile,fields,stored):
+    """A profile as plain lines: each field with its value and whether it is stored or a default."""
+    lines=[]
+    for name,what in fields.items():
+        origin='propio' if name in (stored or {}) else 'por defecto'
+        lines.append(f'  {name} [{origin}]: {_shown(profile.get(name))}')
+        lines.append(f'      ({what})')
+    return lines
+
+def revision_lines(rows):
+    return [f'  #{r.number} · {r.created_at:%Y-%m-%d %H:%M} · {r.source} · '
+            f'{r.actor.get_username() if r.actor_id else "sistema"} · cambió: {", ".join(r.changed) or "—"}' for r in rows]
+
 class Command(BaseCommand):
     help='Primer uso del operador: registrar cuenta, comprobarla, añadir referentes y encolar observación.'
 
@@ -63,6 +88,31 @@ class Command(BaseCommand):
         aju.add_argument('--fijar',action='append',default=[],metavar='VARIABLE=VALOR',
                          help='Fija una variable de su ritmo con el formato del .env (p. ej. OPERATOR_INVITE_RAMP_STAGES=5/25,8/40,10/50); repetible')
         aju.add_argument('--quitar',action='append',default=[],metavar='VARIABLE',help='Vuelve a la del .env; repetible')
+        per=sub.add_parser('perfil',help='Perfil de identidad de un miembro (nombre, identidad, relación con la empresa, límites, '
+                           'modalidad personal, propósitos, marca): sin --fijar ni --quitar solo lo muestra; cambiarlo es solo de '
+                           'ella misma (validado y auditado, con su historial)')
+        per.add_argument('--miembro',default=None,help='Usuario de Django del miembro (por defecto, el tuyo)')
+        per.add_argument('--fijar',action='append',default=[],metavar='CAMPO=VALOR',
+                         help='Fija un campo (p. ej. limits="..."; purposes.projectapp="..."; personal_startups=no); repetible')
+        per.add_argument('--quitar',action='append',default=[],metavar='CAMPO',help='Vuelve al valor neutro; repetible')
+        per.add_argument('--historial',action='store_true',help='Lista sus revisiones (quién, cuándo, qué cambió)')
+        org=sub.add_parser('perfil-organizacion',help='Perfil de la organización (posicionamiento, pilares, servicios, oferta, casos, '
+                           'modalidades): sin --fijar ni --quitar solo lo muestra; cambiarlo es solo del administrador (validado y auditado)')
+        org.add_argument('--fijar',action='append',default=[],metavar='CAMPO=VALOR',
+                         help='Fija un campo (p. ej. version=posicionamiento-v3; services.producto.label="..."; offer=\'{...}\'); repetible')
+        org.add_argument('--quitar',action='append',default=[],metavar='CAMPO',help='Vuelve al valor inicial; repetible')
+        org.add_argument('--historial',action='store_true',help='Lista sus revisiones (quién, cuándo, qué cambió)')
+        voz=sub.add_parser('voz',help='La voz de un miembro: sin opciones muestra cuál usa y sus versiones; --senales registra sus '
+                           'señales de estilo (sin copiarlas); --proponer pide UNA propuesta de pago (VOICE_LEARNING_ENABLED y '
+                           'muestra mínima); --confirmar o --descartar decide ella misma')
+        voz.add_argument('--miembro',default=None,help='Usuario de Django del miembro (por defecto, el tuyo)')
+        accion=voz.add_mutually_exclusive_group()
+        accion.add_argument('--senales',action='store_true',help='Registra y cuenta sus señales de estilo (gratis)')
+        accion.add_argument('--proponer',action='store_true',help='Una propuesta de su documento de voz (una llamada de pago)')
+        accion.add_argument('--confirmar',type=int,default=None,metavar='N',help='Ella confirma la versión N: pasa a ser su voz')
+        accion.add_argument('--descartar',type=int,default=None,metavar='N',help='Ella descarta la propuesta N')
+        accion.add_argument('--ver',type=int,default=None,metavar='N',help='Imprime el texto de la versión N')
+        voz.add_argument('--nota',default='',help='Nota de por qué descarta (opcional)')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -111,6 +161,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'Ritmo de {member.display_name} ({o["miembro"]}) · {member.organization.name}:')
                 for name,value,source in miembros.effective_settings(member):
                     self.stdout.write(f'  {name}={value}  [{source}]')
+                return
+            if o['accion'] in ('perfil','perfil-organizacion','voz'):
+                self.identity(user,o)
                 return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp
@@ -199,6 +252,97 @@ class Command(BaseCommand):
                 job,_=enqueue_operation(user,'observe',{'account':str(account.id),'limit':o['limite'],'referents':[]})
                 self.stdout.write(f'Observación en cola: trabajo {job.id}. El worker la procesará.')
         except (ValueError,PermissionError) as exc:raise CommandError(str(exc)) from None
+        except Exception as exc:
+            detail=getattr(exc,'detail',None)
+            if detail:raise CommandError(str(detail)) from None
+            raise
+
+    def _member(self,user,username):
+        from team_backend import miembros
+        from team_backend.models import Member
+        if username is None:
+            member=miembros.member_of_user(user)
+            if member is None:raise CommandError('No eres miembro de ninguna organización: indica --miembro.')
+            return member
+        member=Member.objects.select_related('organization','user').filter(user__username=username).first()
+        if member is None:raise CommandError(f'«{username}» no es miembro de ninguna organización.')
+        return member
+
+    def identity(self,user,o):
+        """perfil, perfil-organizacion and voz (phase 3): identity and voice out of the code."""
+        from team_backend import identidad, miembros, voz
+        try:
+            if o['accion']=='perfil':
+                member=self._member(user,o['miembro'])
+                values=_pairs(o['fijar'])
+                if values or o['quitar']:
+                    _,revision=identidad.save_profile(user,member=member,values=values,remove=o['quitar'])
+                    self.stdout.write(f'Perfil actualizado: revisión {revision.number} (auditada).' if revision else
+                                      'Sin cambios: ya tenía esos valores.')
+                    member.refresh_from_db()
+                ident=identidad.of(member)
+                self.stdout.write(f'Perfil de {ident.name} ({member.user.get_username()}) · {member.organization.name}'+
+                                  (' · identidad inicial de la instalación' if ident.legacy and not member.profile else '')+':')
+                for line in perfil_lines(ident.member_profile,identidad.MEMBER_FIELDS,member.profile):self.stdout.write(line)
+                if o['historial']:
+                    self.stdout.write('Historial:')
+                    for line in revision_lines(identidad.revisions(member.organization,member)) or ['  (sin cambios)']:self.stdout.write(line)
+                return
+            if o['accion']=='perfil-organizacion':
+                own=miembros.member_of_user(user)
+                if own is None:raise CommandError('No eres miembro de ninguna organización.')
+                organization=own.organization
+                values=_pairs(o['fijar'])
+                if values or o['quitar']:
+                    _,revision=identidad.save_profile(user,organization=organization,values=values,remove=o['quitar'])
+                    self.stdout.write(f'Perfil de la organización actualizado: revisión {revision.number} (auditada).' if revision else
+                                      'Sin cambios: ya tenía esos valores.')
+                    organization.refresh_from_db()
+                self.stdout.write(f'Perfil de {organization.name} ({organization.slug}):')
+                for line in perfil_lines(identidad.organization_profile(organization),identidad.ORGANIZATION_FIELDS,
+                                         organization.profile):self.stdout.write(line)
+                if o['historial']:
+                    self.stdout.write('Historial:')
+                    for line in revision_lines(identidad.revisions(organization)) or ['  (sin cambios)']:self.stdout.write(line)
+                return
+            member=self._member(user,o['miembro'])
+            if o['senales']:
+                if not identidad.can_edit(user,member=member) and not miembros.is_admin(user,member.organization):
+                    raise PermissionError('Solo ella o el administrador de su organización registran sus señales.')
+                found=voz.collect_signals(member);_,_,texts=voz.sample(member)
+                kinds=', '.join(f'{k}: {n}' for k,n in sorted(found['por_tipo'].items())) or 'ninguna'
+                self.stdout.write(f'Señales de {member.display_name}: {kinds} (nuevas ahora: {found["nuevas"]}). '
+                                  f'Textos aprobados o editados: {texts} de {voz.min_texts()} para proponer.')
+                return
+            if o['proponer']:
+                doc=voz.propose(user,member)
+                self.stdout.write(f'Propuesta de voz {doc.number} lista ({doc.usage.get("texts")} textos, {doc.usage.get("signals")} '
+                                  f'señales, ~{doc.usage.get("estimated_usd")} USD). No se usa hasta que ella la confirme: '
+                                  f'«voz --confirmar {doc.number}» o «--descartar {doc.number}»; «--ver {doc.number}» la imprime.')
+                return
+            if o['confirmar'] is not None:
+                doc=voz.confirm(user,member,o['confirmar'])
+                self.stdout.write(f'Voz {doc.number} confirmada: desde ahora el equipo escribe con ella.')
+                return
+            if o['descartar'] is not None:
+                doc=voz.discard(user,member,o['descartar'],o['nota'])
+                self.stdout.write(f'Propuesta {doc.number} descartada. Sigue la voz que tenía.')
+                return
+            if o['ver'] is not None:
+                doc=voz.documents(member).filter(number=o['ver']).first()
+                if doc is None:raise CommandError(f'No hay una versión {o["ver"]} de su voz.')
+                self.stdout.write(voz._text_of(doc))
+                return
+            current=voz.current(member)
+            label={'inicial':'la inicial de la instalación','confirmada':f'la confirmada (versión {current.number})',
+                   'provisional':'PROVISIONAL (neutra, sobria; sus borradores salen marcados «voz provisional»)'}[current.kind]
+            self.stdout.write(f'Voz de {current.author}: {label}. Aprendizaje '+('encendido' if voz.enabled() else 'apagado')+
+                              f' (VOICE_LEARNING_ENABLED); muestra mínima {voz.min_texts()} textos.')
+            for doc in voz.documents(member):
+                self.stdout.write(f'  #{doc.number} · {doc.get_state_display()} · {doc.source} · {doc.created_at:%Y-%m-%d}'+
+                                  (f' · {doc.resource}' if doc.resource else '')+(f' · {doc.note}' if doc.note else ''))
+        except (identidad.IdentidadInvalida,miembros.MiembroRequerido,PermissionError) as exc:raise CommandError(str(exc)) from None
+        except ValueError as exc:raise CommandError(str(exc)) from None
         except Exception as exc:
             detail=getattr(exc,'detail',None)
             if detail:raise CommandError(str(detail)) from None
