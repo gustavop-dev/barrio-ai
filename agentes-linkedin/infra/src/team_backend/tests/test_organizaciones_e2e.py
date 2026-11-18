@@ -422,6 +422,23 @@ class SesionesTests(DosMiembrosBase):
         self.assertEqual(self.g.client().get('/api/v1/linkedin/status').json()['member_urn'], 'urn:li:person:gus123')
         self.assertEqual(self.cto.client().get('/api/v1/linkedin/status').json()['member_urn'], 'urn:li:person:cto123')
 
+    def test_while_being_onboarded_she_opens_her_session_and_reconnects_her_linkedin_and_nobody_elses(self):
+        """Catch an inactive member (in alta, phase 7) locked out of the two connections her activation checks, or let into
+        someone else's: she starts her own browser login and repeats her own OAuth; Gustavo's stay closed to her."""
+        Member.objects.filter(pk=self.cto.member.pk).update(active=False)
+        started = self.start(self.cto, self.cto)
+        self.assertEqual(started.status_code, 201, started.content)
+        self.assertEqual(BrowserLogin.objects.get(pk=started.json()['login']['id']).user, self.cto.user)
+        self.assertEqual(self.start(self.cto, self.g).status_code, 404)
+        self.assertEqual(self.oauth(self.cto, 'cto123', 'AQ-primero'), '/ajustes?linkedin=ok')
+        self.assertEqual(self.oauth(self.cto, 'cto123', 'AQ-de-nuevo'), '/ajustes?linkedin=ok')  # «Ella repite Conectar»
+        hers = LinkedInCredential.objects.select_related('account').get(member_urn='urn:li:person:cto123')
+        self.assertEqual((hers.account.member, li.decrypt(hers.token_encrypted)), (self.cto.member, 'AQ-de-nuevo'))
+        self.assertEqual(self.oauth(self.g, 'gus123', 'AQ-token-de-gustavo'), '/ajustes?linkedin=ok')
+        self.assertEqual(self.oauth(self.cto, 'gus123', 'AQ-token-del-cto'), '/ajustes?linkedin=error&motivo=dueno')
+        self.assertEqual(li.decrypt(LinkedInCredential.objects.get(member_urn='urn:li:person:gus123').token_encrypted),
+                         'AQ-token-de-gustavo')
+
 
 class DecidirTests(DosMiembrosBase):
     def test_referents_and_experiments_are_decided_by_the_owner_or_the_admin(self):
@@ -2903,6 +2920,10 @@ class DesactivacionTests(AltaBase):
         job.refresh_from_db()
         his_job.refresh_from_db()
         self.assertEqual((job.state, job.result_status, his_job.state), ('cancelled', 'inactive_member', 'queued'))
+        # A job of hers that reaches the queue after the deactivation (a race with it) does not run either.
+        late = Job.objects.create(kind='observe', params={'account': str(her.reader.pk)}, owner=self.autobot,
+                                  request_hash='1' * 64, agent='operador', task='Prueba')
+        self.assertEqual(operador.run_job(late), ('cancelled', 'inactive_member', operador.INACTIVE_HOLD))
         with self.assertRaisesMessage(operador.OperatorBlocked, 'está inactivo'):
             operador.execute(self.autobot, follow.id)
         report = autopiloto.tick(self.autobot, timezone.now())
@@ -3380,3 +3401,14 @@ class PendientesDeFase6Tests(RegistroBase):
         self.assertEqual((self.paid, result.get('shared', 0)), ([[uid], [uid]], 0))
         hers.refresh_from_db()
         self.assertNotIn('shared_from', hers.classification)
+        # The other way too: her verdict (no private context) is not his to take, his own private guidance reads his.
+        other = self.person('beto-priv')
+        his = self.known(self.g, other, stage='candidate', classification={})
+        self.known(self.cto, other, stage='candidate', classification={})
+        self.paid.clear()
+        with self.classifier({other: (True, 0.9)}):
+            red.classify(self.cto.user, self.cto.reader, self.now)
+            result = red.classify(self.g.user, self.g.reader, self.now)
+        self.assertEqual((self.paid, result.get('shared', 0)), ([[other], [other]], 0))
+        his.refresh_from_db()
+        self.assertNotIn('shared_from', his.classification)
