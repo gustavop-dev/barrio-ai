@@ -13,14 +13,17 @@ spends its whole reserve. A run whose worst case passes its cost_cap_usd stops h
 import json
 import math
 import os
+from contextlib import ExitStack
 from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
+from django.apps import apps
 from django.conf import settings
 from django.test import override_settings
+from django.utils import timezone
 from knowledge import db, providers
 from knowledge.ingest import ENC
 from team_backend import autopiloto, jobs, operador, orquestacion, red
@@ -29,6 +32,7 @@ from team_backend.models import Contact, CycleLedger, Job, WebResearchRun
 from team_backend.tests.test_red import NetworkBase
 
 BOGOTA=ZoneInfo('America/Bogota')
+MORNING=datetime(2026,11,18,9,30,tzinfo=BOGOTA)  # the morning of the stopped run: a Wednesday, inside the day's allowance
 # Paid calls through providers.claude with the fake SDK client below; the web is on for the research step.
 LIVE={'LIVE_PROVIDERS':'true','ANTHROPIC_API_KEY':'fake-only','ANTHROPIC_LIMIT_USD':'','AI_MONTHLY_LIMIT_USD':'100',
       'AI_DAILY_FUSE_USD':'15','NETWORK_STAGE_CHECK':'true','NETWORK_BUYER_REGION':'us','NETWORK_STAGE_CHECKS_PER_DAY':'6',
@@ -42,6 +46,15 @@ SERVER_TOOLS_TOKENS=7700
 COURSE='Unidades del curso (course_units):'  # operador.course_block
 URL='https://www.acmeoutfitters.com/careers'  # a public host: research keeps no source on .example (web_sources)
 FACT='Acme Outfitters has about 80 employees, sells to paying customers in Texas and lists two Software Engineer openings. '
+
+
+def clock(stack,moment):
+    """The world at `moment`: timezone.now and the models' default dates (Django binds those when models load)."""
+    stack.enter_context(patch('django.utils.timezone.now',return_value=moment))
+    for model in apps.get_app_config('team_backend').get_models():
+        for field in model._meta.fields:
+            if getattr(field.default,'__module__','')=='django.utils.timezone':
+                stack.enter_context(patch.object(field,'_get_default',new=lambda:timezone.now()))
 
 
 def cl100k(text):
@@ -134,6 +147,7 @@ class StageCheckRunBase(NetworkBase):
         env=patch.dict(os.environ,LIVE);env.start();self.addCleanup(env.stop)
         self.claude=WorstCaseClaude()
         client=patch.object(providers,'anthropic_client',return_value=self.claude);client.start();self.addCleanup(client.stop)
+        stack=ExitStack();clock(stack,MORNING);self.addCleanup(stack.close)
         self.cap=Decimal(str(next(c for c in load_graph()['cycles'] if c['id']=='red')['limits']['cost_cap_usd']))
 
     def people(self,n=10):
@@ -173,8 +187,7 @@ class StageCheckRunTests(StageCheckRunBase):
         job,ledger,calls=self.one_run('classify_contacts')
         self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:10/10',''))
         self.assertEqual((ledger.state,ledger.stop_reason,ledger.needs_attention),('complete','',False))
-        self.assertEqual([purpose for purpose,_,_ in calls],['network-classify'])
-        self.assertEqual(self.claude.purposes,['network-classify'])
+        self.assertEqual(([purpose for purpose,_,_ in calls],self.claude.purposes),(['network-classify'],['network-classify']))
         self.assertLessEqual(sum(reserved for _,reserved,_ in calls),self.cap)
         self.assertFalse(WebResearchRun.objects.exists())
         waiting.refresh_from_db();self.assertEqual(waiting.classification['stage_check'],{'state':'pending'})
@@ -187,8 +200,7 @@ class StageCheckRunTests(StageCheckRunBase):
         self.assertEqual((job.state,job.result_status,job.error),('complete','etapas:1/1',''))
         self.assertEqual((ledger.state,ledger.stop_reason,ledger.needs_attention),('complete','',False))
         self.assertEqual([purpose for purpose,_,_ in calls],['web-research-tool','network-stage'])
-        self.assertEqual(self.checked().count(),1)
-        buyer=self.checked().get();check=buyer.classification['stage_check']
+        buyer=self.checked().get();check=buyer.classification['stage_check']  # exactly one checked
         self.assertEqual((check['verdict'],check['sources'],check['tamano'],check['attempts']),('confirmado',[URL],'20_a_200',1))
         self.assertEqual([(s['tipo'],s['fuente']) for s in check['senales']],[('contrata_desarrolladores',URL)])
         self.assertEqual((buyer.classification['buyer']['level'],buyer.classification['buyer']['basis'],buyer.stage),('confirmado','web','fit'))
@@ -200,9 +212,9 @@ class StageCheckRunTests(StageCheckRunBase):
         for n in range(1,7):
             job,ledger,_=self.one_run('check_buyer_stages')
             self.assertEqual((job.result_status,ledger.state,self.checked().count()),('etapas:1/1','complete',n))
-        self.assertEqual(red.stage_checks_left(),0)
-        self.assertFalse(red.stage_pending(self.account))
-        autopiloto._network(self.bot,self.account,datetime.now(BOGOTA))  # READ_WINDOW='': any hour reads
+        self.assertEqual(red.stage_checks_left(MORNING),0)
+        self.assertFalse(red.stage_pending(self.account,MORNING))
+        autopiloto._network(self.bot,self.account,MORNING)
         self.assertFalse(Job.objects.filter(kind='check_buyer_stages',state='queued').exists())  # nothing to queue today
         Job.objects.filter(state='queued').delete()
         job,ledger,calls=self.one_run('check_buyer_stages')  # and a run anyway spends nothing
@@ -214,6 +226,7 @@ class CycleWorstCaseTests(StageCheckRunBase):
     prices and reserves: if a prompt, a price, max_tokens or a WEB_* setting grows past it, this fails here instead of
     stopping a run in production every day."""
     def test_each_paid_run_of_the_network_cycle_fits_its_cost_cap_in_the_worst_case(self):
+        """Each paid network job, run with every call spending its whole reserve, ends complete within the cap."""
         graph=load_graph();edges={e['id']:e for e in graph['edges']}
         paid={kind for kind,edge in graph['code_bindings']['network_edges'].items() if (edges[edge].get('runtime') or {}).get('purposes',{}).get('anthropic')}
         # propose_comment (comentar) is not a network job of the worker: its drafts are not covered here.
@@ -234,21 +247,23 @@ class CycleWorstCaseTests(StageCheckRunBase):
 class RealStopTests(StageCheckRunBase):
     def test_a_run_that_really_passes_its_budget_still_stops_and_tells_gustavo(self):
         """The alert stays as it was: a run that passes its cost_cap_usd stops, leaves its card in Tu turno and pushes
-        (OPERATOR_ALERT_WEBHOOK: Slack). Here a WEB_SEARCH_RESERVED_TOKENS four times larger makes one research reserve
+        (Web Push, Expo and OPERATOR_ALERT_WEBHOOK: Slack). Here a WEB_SEARCH_RESERVED_TOKENS four times larger makes one research reserve
         more than the run's budget."""
         waiting=self.waiting()
         hook=MagicMock();hook.__enter__.return_value.post.return_value.status_code=200
         with override_settings(WEB_SEARCH_RESERVED_TOKENS=100000),patch.dict(os.environ,{'OPERATOR_ALERT_WEBHOOK':'https://hooks.example/barrio'}), \
-             patch('team_backend.alerts.httpx.Client',return_value=hook):
+             patch('team_backend.alerts.httpx.Client',return_value=hook),patch('team_backend.push.broadcast',return_value=1) as web_push, \
+             patch('team_backend.expo.broadcast',return_value=1) as phone_push:
             job,ledger,calls=self.one_run('check_buyer_stages')
         self.assertEqual((job.state,job.result_status,job.error),('failed','blocked','cost_cap'))
         self.assertEqual((ledger.state,ledger.stop_reason,ledger.needs_attention),('stopped','cost_cap',True))
         self.assertEqual(calls,[])  # nothing was reserved, nothing spent
         cards=orquestacion.attention_cards(self.gustavo,lambda key,kind,title,detail,actions,**extra:(key,title,detail))
         self.assertIn((f'cycle:{ledger.pk}','Ciclo detenido: red',orquestacion.REASONS['cost_cap']),cards)
-        sent=hook.__enter__.return_value.post.call_args
-        self.assertEqual(sent.args[0],'https://hooks.example/barrio')
-        self.assertEqual(sent.kwargs['json']['text'],'El ciclo se ha detenido\nSe conserva el progreso. Motivo: cost_cap')
+        hook.__enter__.return_value.post.assert_called_once_with(  # one alert, as before
+            'https://hooks.example/barrio',json={'text':'El ciclo se ha detenido\nSe conserva el progreso. Motivo: cost_cap'})
+        alert=('El ciclo se ha detenido','Se conserva el progreso. Motivo: cost_cap')
+        self.assertEqual([[c.args for c in push.call_args_list] for push in (web_push,phone_push)],[[alert],[alert]])  # PWA and phone, once
         waiting.refresh_from_db();self.assertEqual(waiting.classification['stage_check'],{'state':'pending'})  # no attempt spent
 
 
