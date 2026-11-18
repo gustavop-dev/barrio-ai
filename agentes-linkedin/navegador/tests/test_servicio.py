@@ -585,5 +585,102 @@ class IdleTests(ServiceCase):
         self.assertEqual(await self.service(client).sweep(), 0)
 
 
+class MemoryTests(ServiceCase):
+    """A browser opens only with settings.min_memory_mb MiB free (README «Memoria»), one opening at a time."""
+
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.world.settings = replace(self.world.settings, min_memory_mb=1100)
+        self.client = await self.start()
+
+    async def test_without_room_no_browser_opens_and_nothing_leaves(self):
+        self.world.memory = 1099
+        write = reaction()
+        for body in (call(), write):
+            with self.subTest(write=body['write']):
+                status, answer = await self.post(body)
+                self.assertEqual((status, answer['code']), (503, 'memoria'))
+                self.assertIn('no salió nada', answer['reason'])
+                self.assertIn('1099 MiB libres, hacen falta 1100', answer['reason'])
+                self.assertNotIn('retry_after', answer)  # the backend's own wait applies (DirectoConnector)
+        status, answer = await self.get('prefixes=messengerConversations&variables=mailboxUrn')
+        self.assertEqual((status, answer['code']), (503, 'memoria'))
+        self.assertEqual((self.browser.launches, self.browser.gotos, self.browser.fetches), (0, 0, []))
+        self.assertIsNone(self.store().stopped())  # not LinkedIn's doing: the account is not stopped
+        self.world.memory = 1100  # just enough: the same write, never sent before, goes now
+        self.assertEqual((await self.post(write))[0], 200)
+        self.assertEqual((self.browser.launches, len(self.browser.fetches)), (1, 1))
+        self.world.memory = 50  # with its browser open, an account never asks again
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.assertEqual(self.browser.launches, 1)
+
+    async def test_off_at_zero_and_never_blocked_by_memory_it_cannot_read(self):
+        self.world.memory = None
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.world.settings = replace(self.world.settings, min_memory_mb=0)
+        self.world.memory = 0
+        client = await self.start()
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+        self.assertEqual(self.browser.launches, 2)
+
+    async def test_one_opening_at_a_time_so_the_next_reads_what_the_first_took(self):
+        Store(self.world.settings.account_dir('otra')).profile.mkdir(parents=True)
+        gate, entered = asyncio.Event(), []
+        self.world.memory = 1500
+
+        async def opener(profile, settings):  # a Chromium taking its time to start, ~1 GiB once it is up
+            entered.append(profile.parent.name)
+            await gate.wait()
+            page = await self.world.opener(profile, settings)
+            self.world.memory -= 1000
+            return page
+        client = TestClient(TestServer(build(self.world.settings, **{**self.world.deps(), 'opener': opener})))
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        self.addCleanup(gate.set)  # a failed check never leaves a call hanging on the gate
+        both = asyncio.gather(self.post(call(), client=client), self.post(call(), account='otra', client=client))
+        await until(lambda: entered)
+        await asyncio.sleep(0.1)
+        self.assertEqual(len(entered), 1)  # the other waits for its turn, outside the browser
+        gate.set()
+        answers = await both
+        self.assertEqual(sorted(status for status, _ in answers), [200, 503])
+        self.assertEqual([body.get('code') for status, body in answers if status == 503], ['memoria'])
+        self.assertEqual((len(entered), self.browser.launches), (1, 1))
+
+    async def test_the_turn_to_open_waits_no_longer_than_the_call_may(self):
+        Store(self.world.settings.account_dir('otra')).profile.mkdir(parents=True)
+        self.world.settings = replace(self.world.settings, deadline=0.3)
+        self.world.advance = False  # the fake clock stays: only the real wait for the turn counts
+        gate, entered = asyncio.Event(), []
+
+        async def opener(profile, settings):
+            entered.append(profile.parent.name)
+            await gate.wait()
+            return await self.world.opener(profile, settings)
+        client = TestClient(TestServer(build(self.world.settings, **{**self.world.deps(), 'opener': opener})))
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        self.addCleanup(gate.set)
+        first = asyncio.ensure_future(self.post(call(), client=client))
+        await until(lambda: entered)
+        # bounded: without the shared turn the other account would wait on the gate inside its own browser
+        status, body = await asyncio.wait_for(self.post(call(), account='otra', client=client), 5)
+        self.assertEqual(status, 503)
+        self.assertIn('otra cuenta está abriendo su navegador; no salió nada', body['reason'])
+        gate.set()
+        self.assertEqual((await first)[0], 200)
+        self.assertEqual((entered, self.browser.launches), (['prueba'], 1))
+        self.assertEqual((await self.post(call(), account='otra', client=client))[0], 200)  # its turn came back
+
+    def test_the_setting_is_read_from_the_environment(self):
+        self.assertEqual(ajustes.load({'NAVEGADOR_TOKEN': TOKEN}).min_memory_mb, 0)
+        self.assertEqual(ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_MEMORIA_MINIMA_MB': '1100'}).min_memory_mb,
+                         1100)
+        for bad in ('-1', 'mucho', '1.5'):
+            with self.subTest(bad=bad), self.assertRaises(ajustes.ConfigError):
+                ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_MEMORIA_MINIMA_MB': bad})
+
+
 if __name__ == '__main__':
     unittest.main()

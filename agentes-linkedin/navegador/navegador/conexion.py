@@ -303,6 +303,10 @@ class Connections:
         except asyncio.TimeoutError:
             raise Refused(503, 'cuenta ocupada con otras llamadas; vuelve a intentarlo') from None
         try:
+            if account.page is None:
+                # A browser where none was: the same memory guard as a call's (503 `memoria`). With the account's page
+                # open, the login closes it first and takes about what it held.
+                account.room()
             login = Login(self, account)
             account.connecting = login
             await account.close()

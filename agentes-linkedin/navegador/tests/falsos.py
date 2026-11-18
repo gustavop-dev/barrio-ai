@@ -169,6 +169,7 @@ class World:
         account_dir(self.data)
         self.browser = browser or Browser()
         self.clock, self.pauses, self.advance, self.screen = Clock(), [], True, True
+        self.memory = 8000  # MiB free, as memoria.available_mb says it (None: unreadable)
         self.settings = settings(self.data, **changes)
 
     def opener(self, profile, settings):
@@ -183,4 +184,4 @@ class World:
 
     def deps(self):
         return {'opener': self.opener, 'clock': self.clock, 'sleep': self.sleep, 'rand': lambda low, high: high,
-                'display': lambda: self.screen}
+                'display': lambda: self.screen, 'memory': lambda: self.memory}

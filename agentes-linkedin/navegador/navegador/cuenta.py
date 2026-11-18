@@ -9,7 +9,10 @@
 6. the page, opened on the first call and kept open, only by the internet exit the session last used (a different
    one, 503 until an operator accepts it); no session, 423; profile in use, no browser or no screen for it, 503. Only
    when `idle_minutes` is set (off by default: the backend calls at least hourly, so it would mostly churn) it is
-   closed after that long without calls, and the next call opens it again: one more feed load, as LinkedIn sees it;
+   closed after that long without calls, and the next call opens it again: one more feed load, as LinkedIn sees it.
+   One browser opens at a time in the whole service (`opening`, shared by every account), and only with
+   `min_memory_mb` free (memoria.available_mb, read once the previous one finished opening): else 503 `memoria`
+   and nothing leaves (README «Memoria»);
 7. a random pause, then the page checked (on LinkedIn, the session cookie there, no 429/999 on its own calls);
 8. ONE fetch from inside the page, its answer returned as it came. Never a retry, never a redirect followed.
 
@@ -33,7 +36,7 @@ from linkedin_directo import permitidas, rutas
 from linkedin_directo.errores import LinkedInError, Uncertain
 from linkedin_directo.transporte import HEADERS, Answer, check_answer
 
-from . import pagina
+from . import memoria, pagina
 from .almacen import IMPORTED, Store
 
 log = logging.getLogger('navegador')
@@ -86,10 +89,11 @@ def pushback(request, answer):
 
 class Account:
     def __init__(self, name, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
-                 display=pagina.display_ready):
+                 display=pagina.display_ready, memory=memoria.available_mb, opening=None):
         self.name, self.settings = name, settings
         self.opener = opener or pagina.Page.open
-        self.clock, self.sleep, self.rand, self.display = clock, sleep, rand, display
+        self.clock, self.sleep, self.rand, self.display, self.memory = clock, sleep, rand, display, memory
+        self.opening = opening or asyncio.Lock()  # the service's: one browser opening at a time, whatever the account
         self.store = Store(settings.account_dir(name))
         self.lock = asyncio.Lock()
         self.page = None
@@ -132,7 +136,7 @@ class Account:
         self._not_stopped()
         await self._acquire(arrived)
         try:
-            page = await self._open()
+            page = await self._open(arrived)
             found = pagina.pick_live(page.live, prefixes, variables)
         finally:
             self.used = self.clock()
@@ -215,7 +219,30 @@ class Account:
         log.warning('cuenta=%s DETENIDA: %s', self.name, reason)
         await self.close()
 
-    async def _open(self):
+    def room(self):
+        """Refused(503, code 'memoria') when fewer than settings.min_memory_mb MiB are free to open a browser: ~1 GiB
+        each, and a server that runs out kills a process at random (README «Memoria»). 0 = never checked; free memory
+        that cannot be read never blocks (a guess is not a reason)."""
+        floor = self.settings.min_memory_mb
+        if not floor:
+            return
+        free = self.memory()
+        if free is None or free >= floor:
+            return
+        log.warning('cuenta=%s sin memoria para abrir el navegador: %s MiB libres, hacen falta %s', self.name, free, floor)
+        raise Refused(503, f'el servidor no tiene memoria para abrir otro navegador ({free} MiB libres, hacen falta '
+                           f'{floor}); no salió nada', code='memoria')
+
+    async def _take_opening(self, arrived):
+        """The service's opening turn: one browser opens at a time, so the next one reads the memory the previous one
+        took. Within the call's deadline, else 503 (nothing left)."""
+        left = self.settings.deadline - (self.clock() - arrived)
+        try:
+            await asyncio.wait_for(self.opening.acquire(), max(left, 0.001))
+        except asyncio.TimeoutError:
+            raise Refused(503, 'otra cuenta está abriendo su navegador; no salió nada') from None
+
+    async def _open(self, arrived):
         page = self.page
         if page is not None and not page.alive():
             await self.close()
@@ -236,8 +263,12 @@ class Account:
                 log.warning('cuenta=%s sin pantalla para el navegador (%s no responde)', self.name, pagina.display())
                 raise Refused(503, 'sin pantalla para el navegador (la pantalla virtual no responde); no salió nada. '
                                    'Reinicia el contenedor del servicio')
+            await self._take_opening(arrived)
             try:
+                self.room()
                 self.page = await self.opener(self.store.profile, self.settings)
+            except Refused:
+                raise
             except pagina.NoSession:
                 raise Refused(423, 'sin sesión de LinkedIn en este navegador: alguien tiene que entrar a mano') from None
             except pagina.Busy:
@@ -248,6 +279,8 @@ class Account:
             except Exception as exc:
                 log.warning('cuenta=%s el navegador no abrió (%s)', self.name, type(exc).__name__)
                 raise Refused(503, f'el navegador no abrió ({type(exc).__name__}); no salió nada') from None
+            finally:
+                self.opening.release()
             log.info('cuenta=%s navegador abierto (salida %s)', self.name, label)
         return self.page
 
@@ -266,7 +299,7 @@ class Account:
         kinds = ('write', write_kind(request)) if request.write else ('read',)
         kinds = tuple(k for k in kinds if k)
         self._budget(kinds)
-        page = await self._open()
+        page = await self._open(arrived)
         waited, pause = self.clock() - arrived, self.rand(*self.settings.pause)
         await self.sleep(pause)
         if self.clock() - arrived > self.settings.deadline:

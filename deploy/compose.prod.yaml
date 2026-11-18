@@ -1,6 +1,18 @@
 # Barrio AI en un servidor 24/7: PWA + Django + dos workers (general y acciones) + piloto automático + PostgreSQL.
 # Uso (en el servidor, desde esta carpeta):
 #   docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d
+#
+# Memory (organizaciones, phase 7; deploy/README.md «Memoria del servidor»). The server has 4 GB (about 3.8 GiB for
+# processes) and 1 vCPU. Measured on 13/11/2026 (docs/plan-linkedin-directo.md, «Servidor actual»): about 2.4 GB
+# available with the whole stack up and no browser; one account's browser open took its container to about 1 GiB and
+# left about 1.5 GB available. A second account's browser should leave about 0.5 GB: «two accounts fit, just».
+# The caps below are ceilings, not reservations (their sum is more than the RAM: each only stops ITS service from
+# running away). What they buy: a runaway (a Chromium, a third browser, a leak in a worker) is killed inside its own
+# container, which Docker restarts, before the kernel's global OOM killer picks a victim on the host. PostgreSQL is the
+# one never capped: a hard limit would make it the victim inside its own cgroup; instead it reserves memory
+# (mem_reservation = cgroup memory.low, reclaimed last) and the global OOM killer avoids it (oom_score_adj).
+# Per-service numbers are estimates from the aggregate above (no per-service measurement exists yet): measure with
+# `docker stats --no-stream` on the server and adjust (README «Memoria del servidor»).
 name: barrio-ai
 # Images are built by GitHub Actions (.github/workflows/barrio-ai.yml) and pulled from GHCR;
 # `build` stays only as a local fallback (docker compose build).
@@ -41,16 +53,27 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    # No hard cap: the database must never be the process an OOM kills. 512 MB reserved (memory.low): the image's
+    # shared_buffers is 128 MB, plus one backend per Django process (api ×2, two workers, the autopilot; ~10–20 MB each),
+    # plus maintenance_work_mem for pgvector; under pressure the kernel reclaims the other containers first. And the
+    # global OOM killer scores it far below everything else (-500; not -1000: a runaway query can still be stopped).
+    mem_reservation: 512m
+    oom_score_adj: -500
     restart: unless-stopped
     logging: *logging
   migrate:
     <<: *app
     command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py bootstrap_local"]
     depends_on: {db: {condition: service_healthy}}
+    mem_limit: 512m  # one Django process, once per deploy (migrations and bootstrap_local)
     restart: "no"
   api:
     <<: *app
     command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 300 --forwarded-allow-ips='*'"]
+    # The gunicorn master and 2 workers (each a whole Django with the knowledge library, ~150–250 MB) plus an upload or
+    # an export in flight. Over the cap the kernel kills one worker and gunicorn starts another: a request fails, the
+    # service stays (its healthcheck sees it otherwise).
+    mem_limit: 768m
     depends_on: {migrate: {condition: service_completed_successfully}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
@@ -61,6 +84,8 @@ services:
     <<: *app
     # General lane: LLM work, network reads, metrics and transcriptions. LinkedIn writes go to worker-acciones.
     command: ["python", "manage.py", "runworker", "--lane", "general"]
+    # The heaviest app process: LLM answers, image and infographic rendering, transcription uploads, analytics imports.
+    mem_limit: 768m
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "manage.py", "worker_health", "--lane", "general"]
@@ -72,6 +97,7 @@ services:
     <<: *app
     # Actions lane: execute_action and reconcile_action only, so a write never waits behind slow jobs.
     command: ["python", "manage.py", "runworker", "--lane", "acciones"]
+    mem_limit: 512m  # one write at a time and its read-back; the post's image upload is the largest thing it holds
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "manage.py", "worker_health", "--lane", "acciones"]
@@ -82,6 +108,7 @@ services:
   autopilot:
     <<: *app
     command: ["python", "manage.py", "autopiloto"]
+    mem_limit: 512m  # one Django process that only reads the database and queues jobs
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "-c", "import time,pathlib; assert time.time()-float(pathlib.Path('/tmp/barrio-autopilot-heartbeat').read_text())<180"]
@@ -106,6 +133,7 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     depends_on: {api: {condition: service_healthy}}
+    mem_limit: 256m  # Caddy: TLS, static files and the reverse proxy (tens of MB)
     restart: unless-stopped
     logging: *logging
   navegador:
@@ -134,8 +162,14 @@ services:
       NAVEGADOR_ACEPTACIONES_DIA: ${NAVEGADOR_ACEPTACIONES_DIA:-}
       NAVEGADOR_PAUSA_MIN: ${NAVEGADOR_PAUSA_MIN:-3}
       NAVEGADOR_PAUSA_MAX: ${NAVEGADOR_PAUSA_MAX:-7}
-      # Close an account's browser after this many idle minutes (empty or 0 = never, the default; README «Memoria»).
+      # Close an account's browser after this many idle minutes (empty or 0 = never, the default). Kept off on purpose:
+      # it does not lower the peak and every reopen is one more feed load (deploy/README.md «Memoria del servidor»).
       NAVEGADOR_CIERRE_INACTIVO_MIN: ${NAVEGADOR_CIERRE_INACTIVO_MIN:-}
+      # An account's browser opens only with this many MiB free (the host's MemAvailable and what is left under this
+      # container's cap, the smaller): ~900 MiB a browser takes, plus ~200 MiB that must stay for the database and the
+      # workers. Below it the call gets 503 `memoria` («no salió nada») and the backend retries later. With two browsers
+      # open (~0.5 GB left) a third never opens. 0 turns it off. README «Memoria».
+      NAVEGADOR_MEMORIA_MINIMA_MB: ${NAVEGADOR_MEMORIA_MINIMA_MB:-1100}
       # Internet exit (empty = straight out); a change of exit is refused until accepted (README «Salida a internet»).
       NAVEGADOR_PROXY: ${NAVEGADOR_PROXY:-}
       NAVEGADOR_PROXY_CUENTAS: ${NAVEGADOR_PROXY_CUENTAS:-}
@@ -146,7 +180,14 @@ services:
       NAVEGADOR_CONEXION: ${LINKEDIN_CONEXION_APP:-}
       NAVEGADOR_CONEXION_MIN: ${NAVEGADOR_CONEXION_MIN:-}
     volumes: ["navegador-datos:/datos"]  # browser profiles (sessions), stops, budgets and write records
-    shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
+    shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default (what it uses counts in mem_limit)
+    # Two accounts' browsers: ~1 GiB measured with one open (service, Xvfb and Chromium), ~0.9 GiB more for the second,
+    # so ~1.9–2.0 GiB, plus the login browser of «Conectar desde la app» (it replaces the account's own page). 2.25 GiB
+    # leaves ~10 % for a heavy feed; a third browser or a runaway renderer is killed HERE (Chromium restarts its page,
+    # the call gets 503/504 and is retried) instead of the host's OOM killer reaching the database. The global OOM killer
+    # also prefers this container (oom_score_adj 300; Chromium raises its renderers' own score further).
+    mem_limit: 2304m
+    oom_score_adj: 300
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/health', timeout=5)"]
       interval: 30s
@@ -181,6 +222,7 @@ services:
       RODAJE_LUGAR: ${RODAJE_LUGAR:-}
       RODAJE_BUSQUEDAS: ${RODAJE_BUSQUEDAS:-}
     volumes: ["navegador-datos:/datos"]
+    mem_limit: 256m  # a Python HTTP client of the navegador service: it opens no browser
     # A stop ends the process (3 or 4); started again, it waits for the next day and checks the stop before any call.
     restart: unless-stopped
     logging: *logging
