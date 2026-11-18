@@ -35,7 +35,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [estrategia-perfil.md](estrategia-perfil.md) | `EST` | Propuestas semestrales/mensuales y desde captura: assets de Perfil, previews, Markdown fundamentado y checklist manual |
 | [biblioteca-equipos.md](biblioteca-equipos.md) | `BIB` | Unidades curadas para Observatorio, red, inbox, líder y resumen semanal; política de invitaciones y evaluaciones. Capturas no necesita biblioteca |
 | [arquitectura-agentes.md](arquitectura-agentes.md) | `ARQ` | Registro único ejecutable, orquestadores, especialistas como herramientas, bucles, ledgers, límites, Mermaid y Mapa del equipo |
-| [organizaciones.md](organizaciones.md) | `ORG` | Organización y miembros: de quién es cada cuenta, cada miembro publica y lee con la suya, pausas por miembro y la sesión del navegador solo para su dueño (fase 1 del plan de organizaciones) |
+| [organizaciones.md](organizaciones.md) | `ORG` | Organización y miembros: de quién es cada cuenta, cada miembro publica y lee con la suya, pausas por miembro y la sesión del navegador solo para su dueño (fase 1); un ritmo de LinkedIn por miembro: candado, espaciado, topes, lecturas, rampa, notas, bloqueos y sus ajustes (fase 2) |
 
 Los prefijos no coinciden con los códigos del [catálogo de acciones de LinkedIn](../../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md) (`ADM`, `APRE`, `CHAT`, `CONT`, `DESC`, `INT`, `LI`, `PERF`, `RED`). Por eso la red usa `BAR` (barrio) y Personas usa `PRS`. Cuando una ficha cita `CONT-09` o `RED-02`, habla de una capacidad de LinkedIn, no de otra ficha de este catálogo.
 

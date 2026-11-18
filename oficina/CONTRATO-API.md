@@ -12,6 +12,22 @@ del usuario donde se indica. Con un solo miembro (la instalación de hoy) nada c
 ruta que aún no dice de quién es responde 400 `{ detail: "Hay varios miembros activos y esta operación no dice de cuál:
 hay que indicarlo." }` en lugar de adivinar. Un miembro inactivo recibe 400 «Tu miembro está inactivo en la organización.».
 
+**Organizaciones (fase 2, [ORG-10 a ORG-12](../docs/funcionalidades/organizaciones.md#org-10)):** el ritmo de LinkedIn
+(topes, espaciado, rampa, notas, tier, lecturas de perfil y bloqueos de invitaciones) es de cada miembro. Ninguna forma de
+respuesta cambia; cambian de quién son los números:
+
+- `GET /api/v1/operador/overview`: `accounts[].capacity` son los topes del miembro dueño
+  de esa cuenta y lo que escribieron todas sus cuentas. Con varios miembros activos, una cuenta que no es de nadie trae
+  `capacity: null` (no le aplica ningún ritmo y el autopiloto no la usa); con uno o ninguno, nunca es null.
+- `GET /api/v1/red/summary`: con `account`, el ritmo del miembro dueño de esa cuenta; sin `account`, el del miembro del
+  usuario (`capacity`, `reads_today.profile`, `read_caps.profile`, `invites_blocked`). El gasto de IA (`llm`) sigue siendo
+  de toda la organización.
+- `GET /api/v1/ajustes` (`autonomy`, `limits`) y `GET /api/v1/notificaciones` (`upcoming`: «El equipo invitará…», «Sale la
+  pieza…»): los del miembro del usuario.
+- En las tres, un usuario sin miembro activo con varios miembros activos recibe el 400 de arriba.
+- `ContactOutput.next_step` de una persona seguida desde una cuenta que no es de nadie (con varios miembros activos):
+  `{ owner: "equipo", text: "Su cuenta no es de ningún miembro: nadie la invitará.", at }`.
+
 **Listados:** los paginados devuelven `{ "count", "next", "previous", "results": [...] }` con 25 por página (`?page=`, `?page_size=` hasta 100).
 
 ## Sesión

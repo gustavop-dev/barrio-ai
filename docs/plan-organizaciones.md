@@ -76,7 +76,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | # | Fase | Qué incluye |
 | --- | --- | --- |
 | 1 | Organización y miembro (**hecha**) | Modelos `Organizacion` y `Miembro`; migración que crea ProjectApp y a Gustavo y le asigna sus dos cuentas; `ConnectorAccount.miembro`; los selectores de «la» cuenta pasan a ser por miembro (`publishing_account`, `reader_account`, `_own_posts_reader`, `analitica.account_for`, `perfil.read_profile`, `publications`); `require_gustavo` → dueño de la cuenta; **la vista remota del navegador solo para el dueño** |
-| 2 | Un miembro de LinkedIn por persona | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
+| 2 | Un miembro de LinkedIn por persona (**hecha**) | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
 | 3 | Identidad fuera del código | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
 | 4 | Contenido por miembro | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
@@ -150,26 +150,89 @@ por defecto).
 (`DosMiembrosBase`, `Persona`, pasos `piece`, `publish`, `pause`, `oauth`, `plan_as`). Las clases `UnMiembro*` vuelven a
 correr suites existentes con un solo miembro, sin tocar sus expectativas.
 
-### Lo que sigue siendo de toda la instalación (para las fases 2 a 5)
+## Fase 2: lo construido
 
-Fase 2, un miembro de LinkedIn por persona (en `operador.py` salvo que se diga):
-- `policy_lock` y `policy_event(action, target='member')`, y quienes toman el candado en `red.py`, `urgente.py`,
-  `calentamiento.py` y `experimentos.py`.
-- Espaciado y agenda: `reserve_spacing`, `release_spacing`, `spacing_ok`, `prepare_day_schedule`, `batch_issue`,
-  `post_due`.
-- Topes: `writes`/`capacity_left` (cuentan ejecuciones de toda la instalación), también en `urgente.free_slot`
-  (líneas 74 y 81) y `oficina_views` (línea 88).
-- Lecturas de perfil: `reserve_profile_read` (`operator.profile_baseline`/`profile_read` con `target='member'`) y
-  `alertas_slack` (línea 228).
-- Red: `red.ramp_state` (`network.ramp`), `red.ramp_limits`, `red.note_policy` (`LINKEDIN_ACCOUNT_TIER`),
-  `red.note_blocked` (`network.notes_blocked`), `red.provider_failure` (`network.provider_limit`, `'member'`),
-  `red.invites_blocked`, `red.budget_left`, `red.invitation_reserved`.
+Hecho el 17/11/2026 en `feat/organizaciones` (fichas [ORG-10 a ORG-13](funcionalidades/organizaciones.md)). Cada miembro
+es un miembro de LinkedIn con su propio ritmo; dos miembros no comparten ritmo y las cuentas de un mismo miembro sí.
+Con un solo miembro (o ninguno) los números, los eventos y los avisos son los de antes.
 
-Fases 4 y 5, tareas que aún no dicen de quién son y que con varios miembros activos se detienen con `MiembroRequerido`:
-`urgente.assign_slots` (y con él `editorial.plan`, `next_slot`, `next_extra`), `autopiloto._editorial`, el plan semanal
-(`estrategia`, línea 630), `alertas_slack` (líneas 253, 420, 733 y 867), `perfil.schedule`/`owner()`. Siguen globales
-también el hueco del día (`EditorialPiece.slot_date` único), la audiencia diaria de `metricas`, `perfil.facts`
-(piezas recientes), la memoria (`guardas.blocks`) y las vistas, que aún no filtran por usuario.
+**Su ritmo, por miembro** (`operador.py` y `red.py` salvo que se diga):
+
+| Qué | Dónde |
+| --- | --- |
+| Candado | `operador.policy_lock(member)`: el primer miembro (y una instalación sin miembros) toma la fila de siempre, `OperatorControl` pk=1; cualquier otro, su fila `Member` (`FOR NO KEY UPDATE`). Lo toman `execute`, `final_write_gate`, `release_spacing`, `prepare_day_schedule`, `reserve_profile_read`, `red.review_health`/`provider_failure`/`reserve_note`/`send_invitation`/`_read`/`_signals_read`/`plan`, `calentamiento._reserve`, `experimentos.decide`/`tick`. |
+| Espaciado y agenda del día | `reserve_spacing`, `release_spacing`, `spacing_ok` (su última escritura, no la de cualquiera), `prepare_day_schedule`, `post_due` (sus posts). |
+| Topes diarios y semanales | `limits(now, member)`, `writes(account, capability, member)` (lo que escribieron todas sus cuentas), `capacity_left`; también `urgente.free_slot`, `calentamiento.rooms`, `reparto.weekly_invitations`, `oficina_views._capacity`, `alertas_slack.write_caps`, `red.summary`/`weekly_rhythm`. |
+| Lecturas de perfil | `profile_read_cap(member)`, `profile_reads_used(member, now)`, `reserve_profile_read` (atómico bajo su candado; la línea base del día también es suya). |
+| Rampa y su salud | `red.ramp_start`, `ramp_state`, `invitation_health` (sus invitaciones), `review_health`, `ramp_limits`, `health_snapshot`, `invites_blocked`. |
+| Notas y tier | `red.note_policy(member)`, `note_blocked`, `note_room` (sus propuestas), `reserve_note`, `send_invitation`; `mensajes_comprador._notes`/`note_hold(contacts, now, member)`. |
+| 429 y bloqueos del proveedor | `red.provider_failure`: baja y congela (o pausa) su rampa y pausa su cuenta; el `cannot_resend_yet` repetido cuenta destinatarios distintos rechazados **a ella** en 24 h. |
+| Autonomía | `autopiloto.autonomy(capability, member)`, `autonomy_of(proposal)`; `respuestas.enabled(member)`. |
+| Hora del post | `editorial.post_time(member)`, `scheduled_for(day, member)`. |
+
+**Claves de auditoría.** El ritmo sigue viviendo en `AuditEvent` (`operator.schedule`, `operator.day_schedule`,
+`operator.profile_baseline`/`profile_read`, `network.ramp`, `network.account_tier`, `network.note_capability`,
+`network.notes_blocked`, `network.notes_reset_verified`, `network.provider_limit`). `miembros.policy_key(member)` da su
+`target`: `'member'` para el **primer miembro** (el más antiguo por `created_at`, `pk`; Gustavo en producción) y para una
+instalación sin miembros; `'member:<id>'` para cualquier otro.
+
+**El estado de Gustavo se conserva sin migrar datos.** La migración `0056_ritmo_por_miembro` solo añade `Member.settings`
+(vacío para todos). Sus eventos con `target='member'` siguen siendo suyos: su rampa, las notas del mes, la agenda de hoy y
+las lecturas de perfil de hoy continúan donde estaban (lo fija `EstadoDeGustavoTests`). Si se revierte la migración o se
+vuelve a desplegar el código anterior, todo lee las mismas filas. Mientras un despliegue convive con un worker viejo, los
+dos toman el mismo candado (pk=1) para el ritmo de Gustavo.
+
+**Ajustes por miembro** (`Member.settings`, con el nombre y el formato del `.env`; sin ajuste propio vale el del `.env` y,
+sin él, el de siempre): `LINKEDIN_ACCOUNT_TIER` (free), `LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT` (3), `OPERATOR_DAILY_LIMITS` y
+`OPERATOR_WEEKLY_LIMITS` (por capacidad, encima de los del `.env`), `OPERATOR_INVITE_RAMP_STAGES` (8/40,16/80,20/100; solo
+puede bajar cada etapa), `OPERATOR_INVITE_RAMP_START` (1; variable nueva, también en el `.env`), `OPERATOR_PROFILE_READ_DAILY_LIMIT`
+(80), `OPERATOR_AUTONOMY` (por capacidad, encima de la del `.env`) y `EDITORIAL_POST_TIME` (08:30, dentro de
+`OPERATOR_WINDOW`). Se ven y se cambian con `manage.py operador --usuario <admin> ajustes --miembro <usuario>
+[--fijar VARIABLE=VALOR …] [--quitar VARIABLE …]` (solo el administrador activo de su organización; validado entero antes
+de cambiar nada; auditado como `organization.member_settings` con el antes y el después; idempotente). Para la fase 7, el
+CTO: `--fijar OPERATOR_INVITE_RAMP_STAGES=5/25,8/40,10/50 --fijar OPERATOR_INVITE_RAMP_START=0 --fijar
+OPERATOR_AUTONOMY=INT-03=approval,INT-04=approval,RED-01=approval,RED-02=approval,RED-04=approval,CONT-09=approval`.
+
+**Lo que sigue siendo de toda la organización, a propósito:** la parada total (`OPERATOR_PAUSED`, `OperatorControl`); el
+presupuesto de IA (`AI_MONTHLY_LIMIT_USD`, fusible diario, `red.budget_left`/`spent_today`: Gustavo no quiere un tope por
+miembro); los topes propios del servicio navegador (ya son por cuenta); «una persona, una invitación»
+(`red.invitation_reserved`, `recipient_blocked`: nadie vuelve a invitar a quien LinkedIn rechazó). Los topes de lectura
+de cada módulo (`REPLIES_READ_CAPS`, `NETWORK_READ_CAPS`…) ya eran por cuenta.
+
+**Avisos de Slack.** Los vigilantes del ritmo de un miembro (`cupos_de_lectura`, `cupos_de_escritura`, `rampa_en_pausa`,
+`aceptacion_baja`, `lecturas_detenidas`, `propuestas_por_caducar`, `post_del_dia`, `sin_comentarios`, `sin_invitaciones`)
+son `@por_miembro`: corren para cada miembro activo; con uno solo emiten exactamente lo de antes; con varios, el texto
+dice «Barrio · <nombre> · …» y la clave de un miembro que no es el primero lleva `:<id>`. `cuenta_en_pausa` nombra al
+dueño con varios miembros. El resumen diario cuenta lo de toda la organización y los cupos de cada miembro. El fallo de
+un miembro no silencia al otro.
+
+**Autopiloto con varios miembros.** Cada cuenta trabaja con el ritmo de su dueño. Una cuenta sin miembro con varios
+activos no es de nadie: el ciclo la salta (y sus propuestas), y lo cuenta en `report['unowned']`.
+
+**Cambios de la API** (con un solo miembro, ninguno): `GET /api/v1/operador/overview` devuelve `capacity: null` para una
+cuenta de nadie; `GET /api/v1/ajustes`, `GET /api/v1/notificaciones` y `GET /api/v1/red/summary` sin `account` responden
+con el ritmo del miembro del usuario (y 400 `MiembroRequerido` si no se puede nombrar). Detalle en
+[CONTRATO-API](../oficina/CONTRATO-API.md).
+
+**Pruebas.** En `test_organizaciones_e2e.py`: `RitmoPorMiembroTests` (post del día con su tope, espaciado y agenda,
+topes, lecturas de perfil, rampa del CTO baja y la de Gustavo la suya, salud, notas y tier, `cannot_resend_yet` repetido
+y 429 solo de ella, una persona nunca invitada por los dos, el ciclo con una cuenta de nadie), `ConcurrenciaTests`
+(dos reservas a la vez de un miembro no pasan el tope; el candado de uno no frena al otro), `AjustesTests`,
+`EstadoDeGustavoTests` y `VigilantesTests` (todos los vigilantes sin miembros, con uno y con dos).
+
+### Lo que sigue siendo de toda la instalación (para las fases 3 a 5)
+
+Tareas que aún no dicen de quién son y que con varios miembros activos se detienen con `MiembroRequerido` (con un
+miembro, o con el CTO inactivo, nada se detiene):
+- Fase 4, contenido: `urgente.assign_slots` (y con él `editorial.plan`, `next_slot`, `next_extra`), `urgente._honor_legacy`
+  y `confirm_day` (su `policy_lock()` sin miembro), `urgente.tick_day_requests`, `autopiloto._editorial` (su autonomía y
+  `publishing_account()`), el plan semanal (`estrategia.queue`, línea 630), `editorial.next_slot` (`scheduled_for(day)`),
+  el resumen semanal (`resumen_semanal.network`: `health_snapshot` y `weekly_rhythm` sin miembro).
+- Fase 5, vistas: `perfil.schedule`/`owner()`; `rediseno_views.next_execution_time` estima con la última escritura de
+  todos; las vistas aún no filtran por usuario (Tu turno lista las propuestas de todos los miembros, cada una con la
+  autonomía de su dueño).
+- Siguen globales también el hueco del día (`EditorialPiece.slot_date` único), la audiencia diaria de `metricas`,
+  `perfil.facts` (piezas recientes) y la memoria (`guardas.blocks`).
 
 ## Servidor
 
