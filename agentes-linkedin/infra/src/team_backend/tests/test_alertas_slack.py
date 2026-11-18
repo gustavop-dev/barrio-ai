@@ -564,7 +564,7 @@ class BuyerSequenceAlertTests(SlackBase):
         self.assertEqual(len([t for t in self.texts() if 'detenida' in t]),1)
 
     def test_a_notice_just_before_midnight_is_not_lost_nor_repeated(self):
-        """La ventana del día no pierde el aviso de las 23:58 que ningún vistazo vio ese día (CI del 18/11/2026)."""
+        """La ventana del día no pierde el aviso de las 23:58 que ningún vistazo vio ese día (CI del 17/11/2026)."""
         def waiting(when):
             AuditEvent.objects.create(action='buyer.sequence_waiting',target=str(self.account.id),created_at=when,
                                       metadata={'motivo':'no se leyó el inbox','personas':1})
@@ -598,7 +598,7 @@ class BuyerReplyAlertTests(SlackBase):
     """Fase 6 (BUYER_REPLY_ENABLED): la respuesta de un comprador sin enlace de agenda, una vez al día."""
 
     def test_a_reply_without_the_booking_link_just_before_midnight_is_reported_once(self):
-        """El fallo del CI del 18/11/2026 (test_6 de ReplyBuyerPathTests): la respuesta se clasificó a las 23:xx y el vigilante
+        """El fallo del CI del 17/11/2026 (test_6 de ReplyBuyerPathTests): la respuesta se clasificó a las 23:xx y el vigilante
         miró a las 00:xx; contar solo el día local la perdía."""
         with patch.dict('os.environ',{'BUYER_REPLY_ENABLED':'true','CALCOM_BOOKING_URL':''}):
             AuditEvent.objects.create(action='buyer.reply_no_link',target=str(uuid.uuid4()),created_at=at(23,59),

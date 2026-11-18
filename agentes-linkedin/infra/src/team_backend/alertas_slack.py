@@ -8,6 +8,10 @@ audited (`slack.alert_failed`) and the work goes on; the alert is not sent again
 
 Most alerts are watchers (@vigilante): functions that READ the state (caps, pauses, comments, reads…) and return what to
 send. vigilar() runs them all from the autopilot tick, at most every WATCH_EVERY; adding one is writing one function.
+A watcher of a member's own rhythm (organizaciones, phase 2: her caps, reads, ramp, posts) is also @por_miembro: it runs
+for each active member; with one member (or none) its alerts are exactly those of before, with several each one names
+her and a later member's key carries her id. The machine's (the queue, the navegador, the AI budget, the buyers' events)
+stay one for the installation.
 Only what no table records is sent where it happens: a paid provider refusing its credentials
 (knowledge.providers.CREDENTIAL_LISTENERS, registered in apps.ready). The push alerts of alerts.py and notificaciones.py
 are another channel and stay as they are.
@@ -17,6 +21,7 @@ healthcheck sees the heartbeat file (/tmp/barrio-autopilot-heartbeat) and Docker
 That needs a watcher outside it, on the host (a cron that reads `docker inspect` health and posts to the same webhook,
 or an external uptime check); it is not built here. The daily backup runs outside Django too: deploy/backup.sh posts its
 own failure to SLACK_WEBHOOK_URL."""
+import functools
 import logging
 import math
 import os
@@ -48,6 +53,36 @@ def vigilante(function):
     """Register a watcher: function(now) -> iterable of Aviso. A watcher only reads; vigilar sends."""
     WATCHERS.append(function)
     return function
+
+def por_miembro(function):
+    """A watcher of a member's own rhythm: function(now, member) runs for every active member (None without members).
+    With one member, or none, its alerts are those of before organizations, untouched. With several, each one names her
+    after «Barrio ·» and a later member's key carries her id (the first member keeps the keys she always had, so nothing
+    already sent goes again). One member's failure never silences another's."""
+    @functools.wraps(function)
+    def watcher(now):
+        from . import miembros
+        members=miembros.active_members();several=len(members)>1;alerts=[]
+        for member in members:
+            try:found=list(function(now,member) or ())
+            except Exception as exc:  # noqa: BLE001 - logged like vigilar's; the other members still get theirs
+                logger.warning('slack_watcher_failed watcher=%s member=%s error=%s',function.__name__,getattr(member,'pk',None),
+                               type(exc).__name__)
+                continue
+            alerts+=[hers(alert,member) for alert in found] if several else found
+        return alerts
+    return watcher
+
+def named(text,member):
+    """«Barrio · Ana · …»: the alert says whose it is."""
+    return text.replace('Barrio · ',f'Barrio · {member.display_name} · ',1)
+
+def hers(alert,member):
+    """The alert of one member among several: her name in the text, her id in the key unless she is the first member."""
+    from . import miembros
+    key=alert.key if miembros.is_first(member) else f'{alert.key}:{member.pk}'
+    text=alert.text
+    return alert._replace(key=key,text=(lambda:named(text(),member)) if callable(text) else named(text,member))
 
 # --------------------------------------------------------------------------- settings
 
@@ -190,7 +225,7 @@ def unreported(events,key,now):
     """The events (AuditEvent rows) a once-a-day watcher reports under `key`: those of the local day up to `now`, as
     always; and while that alert went out neither today nor yesterday, those of the last 24 hours. An event a few
     minutes before midnight that no tick saw that day is then reported the next day instead of lost, and once it was
-    reported (or yesterday's alert already covered its day) nothing repeats. (The CI of 18/11/2026: a buyer's reply
+    reported (or yesterday's alert already covered its day) nothing repeats. (The CI of 17/11/2026: a buyer's reply
     classified at 23:xx and the watcher at 00:xx found nothing.)"""
     from .operador import period_starts
     day,_=period_starts(now)
@@ -223,31 +258,30 @@ READS={
 }
 
 def _reader(member=None):
-    """The account that reads LinkedIn for the member (her first directo or simulated one). The watchers do not say whose
-    yet (phase 5: per-member alerts): miembros.default_member(), which raises with several members, and the watcher
-    then fails alone (vigilar)."""
+    """The account that reads LinkedIn for the member (her first directo or simulated one). Without a member,
+    miembros.default_member(), which raises with several members: the per-member watchers always say whose."""
     from . import miembros
     return miembros.accounts(miembros.resolve(member),miembros.READERS).order_by('created_at').first()
 
-def profile_cap():
-    return max(0,min(100,int(setting('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
+def profile_cap(member=None):
+    """The member's daily profile reads (OPERATOR_PROFILE_READ_DAILY_LIMIT, hers or the .env's)."""
+    from . import operador
+    return operador.profile_read_cap(operador.member_of(member=member))
 
-def profile_reads_today(now):
-    """The shared profile reads of the day as operador.reserve_profile_read counts them (read only)."""
-    from .operador import period_starts
-    day,_=period_starts(now);period={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
-    baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target='member',
-                                       metadata__day=day.date().isoformat()).order_by('created_at','id').first()
-    return int((baseline.metadata or {}).get('used',0) if baseline else 0)+AuditEvent.objects.filter(action='operator.profile_read',**period).count()
+def profile_reads_today(now,member=None):
+    """The member's profile reads of the day as operador.reserve_profile_read counts them (read only)."""
+    from . import operador
+    return operador.profile_reads_used(operador.member_of(member=member),now)
 
-def read_caps(account,now):
-    """[(scope, kind, used, cap)] of every daily read cap, for the account that reads LinkedIn."""
-    from . import conversaciones, desenlaces_captura, metricas, red, respuestas
-    rows=[]
+def read_caps(account,now,member=None):
+    """[(scope, kind, used, cap)] of every daily read cap, for the account that reads LinkedIn (the profile reads: of
+    its member, every connector of hers)."""
+    from . import conversaciones, desenlaces_captura, metricas, operador, red, respuestas
+    member=operador.member_of(account,member);rows=[]
     for scope,module in (('respuestas',respuestas),('red',red),('metricas',metricas),('desenlaces',desenlaces_captura),
                          ('bandeja',conversaciones)):
         for kind,cap in module.read_caps().items():rows.append((scope,kind,module.reads_today(account,kind,now),cap))
-    rows.append(('perfiles','profile',profile_reads_today(now),profile_cap()))
+    rows.append(('perfiles','profile',profile_reads_today(now,member),profile_cap(member)))
     return rows
 
 def _knob(scope,kind):
@@ -259,12 +293,13 @@ def _what(scope,kind):
     return READS.get(scope,('',{}))[1].get(kind,(f'{scope}.{kind}','esas lecturas esperan'))
 
 @vigilante
-def cupos_de_lectura(now):
-    """A daily read cap at ALERT_CAP_THRESHOLD and spent: once a day each."""
-    account=_reader()
+@por_miembro
+def cupos_de_lectura(now,member):
+    """A daily read cap of the member at ALERT_CAP_THRESHOLD and spent: once a day each."""
+    account=_reader(member)
     if account is None:return []
     threshold=cap_threshold();pct=round(threshold*100);alerts=[]
-    for scope,kind,used,cap in read_caps(account,now):
+    for scope,kind,used,cap in read_caps(account,now,member):
         if cap<=0:continue
         label,stops=_what(scope,kind)
         if used>=cap:
@@ -277,15 +312,16 @@ def cupos_de_lectura(now):
                 f'Si se agota, hasta mañana {stops}. Se sube con {_knob(scope,kind)}.'))
     return alerts
 
-def write_caps(now):
-    """[(capability, used, daily)] of the daily write caps that are not zero today (operador.limits, the ramp)."""
+def write_caps(now,member=None):
+    """[(capability, used, daily)] of the member's daily write caps that are not zero today (operador.limits, her ramp),
+    with what every connector of hers wrote."""
     from . import operador
     from .red import ramp_limits
-    day,_=operador.period_starts(now);rows=[]
-    for capability,(daily,_) in operador.limits(now).items():
-        if capability=='RED-02':daily=min(daily,ramp_limits(None,now)[0])
+    day,_=operador.period_starts(now);rows=[];member=operador.member_of(member=member)
+    for capability,(daily,_) in operador.limits(now,member).items():
+        if capability=='RED-02':daily=min(daily,ramp_limits(None,now,member)[0])
         if daily<=0:continue
-        done=operador.writes(None,capability).filter(started_at__gte=day)
+        done=operador.writes(None,capability,member).filter(started_at__gte=day)
         if capability=='CONT-09':done=done.exclude(proposal__piece__second_of_day=True)
         rows.append((capability,done.count(),daily))
     return rows
@@ -295,12 +331,14 @@ def capability_label(capability):
     return ActionProposal.Capability(capability).label if capability in ActionProposal.Capability.values else capability
 
 @vigilante
-def cupos_de_escritura(now):
-    """A daily write cap spent: once a day each. Not CONT-09: one post a day is the plan, and filling it is the good news."""
+@por_miembro
+def cupos_de_escritura(now,member):
+    """A daily write cap of the member spent: once a day each. Not CONT-09: one post a day is the plan, and filling it is
+    the good news."""
     return [Aviso(f'cupo:escritura.{capability}:agotado',
                   f'Barrio · Cupo diario de escrituras agotado: {capability_label(capability)} ({capability}) llegó a '
                   f'{used}/{daily} a las {hhmm(now)}. Lo aprobado espera a mañana. Se sube con OPERATOR_DAILY_LIMITS={capability}=N.')
-            for capability,used,daily in write_caps(now) if used>=daily and capability!='CONT-09']
+            for capability,used,daily in write_caps(now,member) if used>=daily and capability!='CONT-09']
 
 # --------------------------------------------------------------------------- pauses
 
@@ -308,10 +346,12 @@ SESSION=re.compile(r'sesi[oó]n|login',re.I)
 
 @vigilante
 def cuenta_en_pausa(now):
-    """A paused account: once per pause (the first pause after its last resume)."""
+    """A paused account: once per pause (the first pause after its last resume). With several active members, the text
+    names its member (the key already names the account)."""
+    from . import miembros
     from .models import ConnectorAccount
-    alerts=[]
-    for account in ConnectorAccount.objects.filter(paused=True):
+    alerts=[];several=len(miembros.active_members())>1
+    for account in ConnectorAccount.objects.select_related('member').filter(paused=True):
         events=AuditEvent.objects.filter(target=str(account.id))
         resumed=events.filter(action='operator.account_resumed').order_by('-created_at').values_list('created_at',flat=True).first()
         paused=events.filter(action='operator.account_paused')
@@ -320,16 +360,18 @@ def cuenta_en_pausa(now):
         reason=(account.paused_reason or 'sin motivo registrado').strip()
         title='Sesión de LinkedIn cerrada' if SESSION.search(reason) else 'Cuenta de LinkedIn en pausa'
         since=f' desde {since_text(first.created_at,now)}' if first else ''
-        alerts.append(Aviso(f'pausa:cuenta:{account.id}:{first.pk if first else "sin-registro"}',
-            f'Barrio · {title}: «{account.label}» está en pausa{since}. Motivo: {reason[:500]} Mientras siga en pausa no se lee '
-            'ni se escribe con ella; reanúdala desde la app cuando esté resuelto.',once='ever'))
+        text=(f'Barrio · {title}: «{account.label}» está en pausa{since}. Motivo: {reason[:500]} Mientras siga en pausa no se '
+              'lee ni se escribe con ella; reanúdala desde la app cuando esté resuelto.')
+        if several and account.member_id:text=named(text,account.member)
+        alerts.append(Aviso(f'pausa:cuenta:{account.id}:{first.pk if first else "sin-registro"}',text,once='ever'))
     return alerts
 
 @vigilante
-def rampa_en_pausa(now):
-    """The invitation ramp paused (low acceptance or a provider limit): once per pause."""
+@por_miembro
+def rampa_en_pausa(now,member):
+    """The member's invitation ramp paused (low acceptance or a provider limit): once per pause."""
     from .red import ramp_state
-    state=ramp_state(now);until=state.get('pause_until')
+    state=ramp_state(now,member);until=state.get('pause_until')
     if not until or datetime.fromisoformat(until)<=now:return []
     return [Aviso(f'pausa:rampa:{until}',
                   f'Barrio · Invitaciones en pausa hasta {since_text(datetime.fromisoformat(until),now)}. Hasta entonces no se '
@@ -403,16 +445,19 @@ def comentario_sin_responder(now):
             f'en tu post «{post}»: «{_words(row.text,14)}». Atascado en: {stage}.{read}',once='ever'))
     return alerts
 
-def _why_not_reading(reader,now):
+def _why_not_reading(reader,now,member=None):
     from . import operador, respuestas
     from .models import Job
     if operador.globally_paused():return 'la máquina está detenida (OPERATOR_PAUSED o el interruptor de la oficina)'
-    if not respuestas.enabled():return 'las respuestas están apagadas (REPLIES_ENABLED=false u OPERATOR_AUTONOMY con INT-04=off)'
+    if not respuestas.enabled(operador.member_of(member=member)):return 'las respuestas están apagadas (REPLIES_ENABLED=false u OPERATOR_AUTONOMY con INT-04=off)'
     if reader is None:return 'no hay una cuenta de LinkedIn directo que lea tus posts'
     if reader.paused:return f'la cuenta está en pausa ({(reader.paused_reason or "sin motivo")[:200]})'
     used,cap=respuestas.reads_today(reader,'comments',now),respuestas.read_caps()['comments']
     if used>=cap:return f'se agotó el cupo diario de lecturas ({used}/{cap}; REPLIES_READ_CAPS)'
-    job=Job.objects.filter(kind='read_own_comments').order_by('-created_at').first()
+    jobs=Job.objects.filter(kind='read_own_comments')
+    from . import miembros
+    if reader is not None and len(miembros.active_members())>1:jobs=jobs.filter(params__account=str(reader.id))  # hers only
+    job=jobs.order_by('-created_at').first()
     if job and job.state in (Job.State.QUEUED,Job.State.RUNNING):
         return f'la lectura está en cola desde {since_text(job.created_at,now)} sin terminar: revisa que el worker esté corriendo'
     if job and job.state==Job.State.FAILED:return f'la última lectura falló ({(job.error or "sin detalle")[:200]})'
@@ -420,15 +465,16 @@ def _why_not_reading(reader,now):
     return 'no se encontró la causa; revisa el registro del autopiloto'
 
 @vigilante
-def lecturas_detenidas(now):
-    """Inside READ_WINDOW, more than ALERT_READS_GAP_HOURS of window hours without reading the comments of his posts
-    while a post's read was due more than an hour ago: once a day, with the likely reason. (With the adaptive cadence a
-    quiet day may go 4 h without reads and nothing is wrong: hence the due post.)"""
+@por_miembro
+def lecturas_detenidas(now,member):
+    """Inside READ_WINDOW, more than ALERT_READS_GAP_HOURS of window hours without reading the comments of the member's
+    posts while a post's read was due more than an hour ago: once a day, with the likely reason. (With the adaptive
+    cadence a quiet day may go 4 h without reads and nothing is wrong: hence the due post.)"""
     from . import operador, respuestas
     if not operador.within_read_window(now):return []
-    rows=respuestas.plan(now)
+    rows=respuestas.plan(now,member)
     if not rows:return []
-    reader=respuestas.reader_account()
+    reader=respuestas.reader_account(member)
     reads=AuditEvent.objects.filter(action='replies.read',metadata__kind='comments')
     if reader:reads=reads.filter(target=str(reader.id))
     last=reads.order_by('-created_at').values_list('created_at',flat=True).first()
@@ -439,7 +485,7 @@ def lecturas_detenidas(now):
     overdue=[r for r in rows if r.due and window_time(r.last+r.every if r.last else r.execution.started_at,now)>=timedelta(hours=1)]
     if not overdue:return []
     return [Aviso('lecturas:detenidas',
-        f'Barrio · No se están leyendo los comentarios de tus posts {when}: {_why_not_reading(reader,now)}. '
+        f'Barrio · No se están leyendo los comentarios de tus posts {when}: {_why_not_reading(reader,now,member)}. '
         f'{len(overdue)} {"post espera" if len(overdue)==1 else "posts esperan"} su lectura; mientras tanto nadie responde '
         'los comentarios nuevos.')]
 
@@ -542,11 +588,12 @@ def gasto_ia(now):
     return []
 
 @vigilante
-def aceptacion_baja(now):
-    """The ramp's last saved health cut (red.review_health) with enough mature invitations and an acceptance under
-    OPERATOR_INVITE_ACCEPTANCE_MIN: once per sample."""
+@por_miembro
+def aceptacion_baja(now,member):
+    """The member's ramp's last saved health cut (red.review_health) with enough mature invitations and an acceptance
+    under OPERATOR_INVITE_ACCEPTANCE_MIN: once per sample."""
     from . import red
-    health=red.ramp_state(now).get('health') or {}
+    health=red.ramp_state(now,member).get('health') or {}
     minimum=max(0.4,float(setting('OPERATOR_INVITE_ACCEPTANCE_MIN','0.40')))
     enough=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20')))
     rate=health.get('rate')
@@ -703,14 +750,16 @@ def expiry_hours():
     return timedelta(hours=_number('ALERT_PROPOSAL_EXPIRY_HOURS',12,1,48))
 
 @vigilante
-def propuestas_por_caducar(now):
-    """Proposals that only Gustavo approves (OPERATOR_AUTONOMY=approval) expiring within ALERT_PROPOSAL_EXPIRY_HOURS
-    (OPERATOR_PROPOSAL_TTL_HOURS, as autopiloto.tick expires them): one grouped message a day."""
+@por_miembro
+def propuestas_por_caducar(now,member):
+    """The member's proposals that only she approves (her OPERATOR_AUTONOMY=approval) expiring within
+    ALERT_PROPOSAL_EXPIRY_HOURS (OPERATOR_PROPOSAL_TTL_HOURS, as autopiloto.tick expires them): one grouped message a day."""
+    from . import miembros
     from .autopiloto import autonomy
     from .models import ActionProposal
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')));soon=[]
-    for proposal in ActionProposal.objects.select_related('piece').filter(state='proposed',execution__isnull=True):
-        if autonomy(proposal.capability)!='approval':continue
+    for proposal in miembros.mine(ActionProposal.objects.select_related('piece').filter(state='proposed',execution__isnull=True),member):
+        if autonomy(proposal.capability,member)!='approval':continue
         expires=(proposal.piece.scheduled_for if proposal.piece_id else proposal.created_at)+ttl
         if now<expires<=now+expiry_hours():soon.append((expires,proposal))
     if not soon:return []
@@ -734,18 +783,20 @@ PIECE_STAGE={'preparing':'sigue preparándose','ready':'está lista pero sin pub
              'expired':'caducó sin publicarse','superseded':'se reemplazó por otra versión'}
 
 @vigilante
-def post_del_dia(now):
-    """The day's post (EDITORIAL_POST_TIME) not out ALERT_POST_LATE_MINUTES after its hour, when the editorial runs
-    (CONT-09 not off and an account that can publish). A day skipped on purpose says nothing. Once a day."""
-    from . import editorial
+@por_miembro
+def post_del_dia(now,member):
+    """The member's post of the day (her EDITORIAL_POST_TIME) not out ALERT_POST_LATE_MINUTES after its hour, when her
+    editorial runs (CONT-09 not off and an account of hers that can publish). A day skipped on purpose says nothing. Once
+    a day."""
+    from . import editorial, miembros
     from .autopiloto import autonomy
     from .models import EditorialPiece
-    if autonomy('CONT-09')=='off' or not editorial.can_publish(editorial.publishing_account()):return []
+    if autonomy('CONT-09',member)=='off' or not editorial.can_publish(editorial.publishing_account(member)):return []
     today=_local(now).date()
-    try:hour=editorial.scheduled_for(today)
+    try:hour=editorial.scheduled_for(today,member)
     except ValueError:return []
     if now<hour+post_late_minutes():return []
-    piece=EditorialPiece.objects.filter(slot_date=today,second_of_day=False).order_by('-created_at').first()
+    piece=miembros.mine(EditorialPiece.objects.filter(slot_date=today,second_of_day=False),member).order_by('-created_at').first()
     if piece is None:stage='no hay pieza preparada para hoy'
     elif piece.state==EditorialPiece.State.SKIPPED:return []
     else:
@@ -766,17 +817,20 @@ def _operator_window():
     return operador._minutes(start),operador._minutes(end)
 
 @vigilante
-def sin_comentarios(now):
-    """No INT-03 comment written in the last ALERT_NO_COMMENTS_HOURS hours of OPERATOR_WINDOW, when they are expected
-    (INT-03 not off and active referents to comment on): once a day, with what happened to the drafts of that time."""
+@por_miembro
+def sin_comentarios(now,member):
+    """No INT-03 comment of the member written in the last ALERT_NO_COMMENTS_HOURS hours of OPERATOR_WINDOW, when they
+    are expected (her INT-03 not off and active referents to comment on): once a day, with what happened to her drafts of
+    that time."""
+    from . import miembros
     from .autopiloto import autonomy
     from .models import ActionExecution, ActionProposal, Referent
-    if autonomy('INT-03')=='off' or not Referent.objects.filter(active=True).exists():return []
-    last=(ActionExecution.objects.filter(proposal__capability='INT-03',wrote=True,state__in=['confirmed','sent','uncertain'])
-          .order_by('-started_at').values_list('started_at',flat=True).first())
+    if autonomy('INT-03',member)=='off' or not Referent.objects.filter(active=True).exists():return []
+    last=(miembros.mine(ActionExecution.objects.filter(proposal__capability='INT-03',wrote=True,state__in=['confirmed','sent','uncertain']),
+                        member,'proposal__account').order_by('-started_at').values_list('started_at',flat=True).first())
     since=max(last or now-timedelta(days=7),now-timedelta(days=7))
     if window_time(since,now,_operator_window())<no_comments_hours():return []
-    drafts=ActionProposal.objects.filter(capability='INT-03',created_at__gte=since)
+    drafts=miembros.mine(ActionProposal.objects.filter(capability='INT-03',created_at__gte=since),member)
     counts={label:drafts.filter(state=state).count() for state,label in (('discarded','descartados'),('proposed','esperando'),
             ('approved','aprobados sin salir'),('expired','caducados'),('rejected','vetados'),('failed','fallidos'))}
     seen=', '.join(f'{n} {label}' for label,n in counts.items() if n) or 'ninguno'
@@ -786,19 +840,21 @@ def sin_comentarios(now):
         f'de ventana ({when}). Borradores desde entonces: {seen}. Revisa el calendario («Mostrar lo que no salió»).')]
 
 @vigilante
-def sin_invitaciones(now):
-    """A weekday with the invitation ramp running (red on, RED-02 not off, ramp enabled, neither paused nor at 0, and
-    invitations sent in the last 7 days) that closes without one: once, at the close of the window."""
-    from . import operador, red
+@por_miembro
+def sin_invitaciones(now,member):
+    """A weekday with the member's invitation ramp running (red on, her RED-02 not off, ramp enabled, neither paused nor
+    at 0, and invitations of hers sent in the last 7 days) that closes without one: once, at the close of the window."""
+    from . import miembros, operador, red
     from .autopiloto import autonomy
-    if now<close_of_day(now) or operador.is_weekend(now) or not red.enabled() or autonomy('RED-02')=='off':return []
+    if now<close_of_day(now) or operador.is_weekend(now) or not red.enabled() or autonomy('RED-02',member)=='off':return []
     if setting('OPERATOR_INVITE_RAMP_ENABLED','true').strip().lower()!='true':return []
-    daily=min(operador.limits(now)['RED-02'][0],red.ramp_limits(None,now)[0])
+    daily=min(operador.limits(now,member)['RED-02'][0],red.ramp_limits(None,now,member)[0])
     if daily<=0:return []
-    day,_=operador.period_starts(now);sent=operador.writes(None,'RED-02')
+    day,_=operador.period_starts(now);sent=operador.writes(None,'RED-02',member)
     if sent.filter(started_at__gte=day).exists() or not sent.filter(started_at__gte=now-timedelta(days=7)).exists():return []
     from .models import ActionProposal
-    waiting=ActionProposal.objects.filter(capability='RED-02',state__in=['proposed','approved'],execution__isnull=True).count()
+    waiting=miembros.mine(ActionProposal.objects.filter(capability='RED-02',state__in=['proposed','approved'],execution__isnull=True),
+                          member).count()
     return [Aviso('nada:invitaciones',
         f'Barrio · Hoy no salió ninguna invitación con la rampa abierta (cupo {daily}). Propuestas de invitación sin salir: '
         f'{waiting}. Si no hay ninguna, no hay candidatos que encajen: revisa Personas y el descubrimiento.')]
@@ -827,10 +883,12 @@ def activity_lines(now):
     """The day in a few lines: comments on his posts, what went out, AI spend, errors and alerts."""
     from knowledge import presupuesto
     from . import operador, respuestas
-    from .models import Contact, Job, PostComment
+    from .models import ActionExecution, Contact, Job, PostComment
     day,_=operador.period_starts(now);today={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
     received=PostComment.objects.filter(own=False,commented_at__gte=day,commented_at__lt=day+timedelta(days=1)).count()
-    written=lambda capability:operador.writes(None,capability).filter(started_at__gte=day,started_at__lt=day+timedelta(days=1)).count()
+    # What the whole organization wrote today (every member's; what the caps count, operador.writes).
+    written=lambda capability:ActionExecution.objects.filter(proposal__capability=capability,wrote=True,
+                                                             started_at__gte=day,started_at__lt=day+timedelta(days=1)).count()
     pending=0
     for row in PostComment.objects.select_related('piece').filter(own=False,state__in=['new','asked','reply'],
                                                                   commented_at__gte=now-respuestas.window()):
@@ -873,11 +931,20 @@ def buyer_lines(now):
 
 
 def summary_lines(now):
-    """One line per cap with used/cap, then the hours the comments of his posts were read."""
-    account=_reader();lines=[]
+    """One line per cap with used/cap, then the hours the comments of his posts were read: of each active member, under
+    her name when there are several (one member, or none: exactly the lines of before)."""
+    from . import miembros
+    members=miembros.active_members();lines=[]
+    for member in members:
+        if len(members)>1:lines.append(f'{member.display_name}:')
+        lines+=_member_summary_lines(now,member)
+    return lines
+
+def _member_summary_lines(now,member):
+    account=_reader(member);lines=[]
     if account is not None:
-        for scope,kind,used,cap in read_caps(account,now):lines.append(f'• Lecturas {scope}.{kind}: {used}/{cap}')
-    for capability,used,daily in write_caps(now):lines.append(f'• Escrituras {capability} ({capability_label(capability)}): {used}/{daily}')
+        for scope,kind,used,cap in read_caps(account,now,member):lines.append(f'• Lecturas {scope}.{kind}: {used}/{cap}')
+    for capability,used,daily in write_caps(now,member):lines.append(f'• Escrituras {capability} ({capability_label(capability)}): {used}/{daily}')
     if account is not None:
         from .operador import period_starts
         day,_=period_starts(now);hours={}
