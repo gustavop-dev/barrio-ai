@@ -2339,10 +2339,10 @@ class RegistroTests(RegistroBase):
         given = gustavo.post(f'/api/v1/red/contacts/{bea.id}/reasignar', {'member': str(self.cto.member.pk),
                                                                           'reason': 'Es de su red.'}, format='json')
         self.assertEqual(given.status_code, 200, given.content)
-        self.assertEqual((given.json()['display_name'], given.json()['assigned_to']['display_name']),
-                         (bea.display_name, 'CTO de prueba'))
         self.assertNotIn('NOTA-PRIVADA-DE-LA-CTO', given.content.decode())
         self.assertNotIn('notes', given.json())
+        self.assertEqual((given.json()['display_name'], given.json()['assigned_to']['display_name']),
+                         (bea.display_name, 'CTO de prueba'))
 
     def test_excluded_for_everyone_nobody_touches_her(self):
         """Catch an exclusion that stays with one member: the CTO discards her for the whole organization (with a reason);
