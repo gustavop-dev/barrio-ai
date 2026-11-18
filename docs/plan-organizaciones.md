@@ -676,6 +676,16 @@ comprador corridas con un solo miembro (`UnMiembroDiscoveryAndFollowTests`, `UnM
 `UnMiembroVetoAndSafetyTests`, `UnMiembroTodayBuyerPathTests`). Identidad con un miembro: las lecturas de todas las rutas GET
 y las colas de `red.plan`, `autopiloto._propose` y `autopiloto._observe` comparadas contra `feda285`.
 
+En local (18/11/2026, en serie, PostgreSQL desechable; las pruebas de la fase con el reloj congelado):
+`test_organizaciones_e2e`, `test_alcance` y `test_red`, 248 OK con el código final; otros 40 archivos que importan los
+módulos tocados (en cinco lotes, el primero con `test_red` antes de los arreglos de seguridad), 824 OK (145, 155, 226, 189 y
+109 por lote); vitest `Persona.test.tsx` 11 OK; jest `PersonaScreen.test.tsx` y `barrio.test.ts` 38 OK; `tsc` y `eslint` de
+la PWA y la app; `check`, `makemigrations --check` y `mermaid.py --check`. Identidad con un miembro: 254 lecturas y colas
+contra `feda285`; las únicas diferencias (el orden de dos eventos de auditoría con la misma hora, el `payload_hash` de una
+pieza y el sha del documento del perfil) cambian igual entre dos corridas del mismo código. Doce mutaciones, todas detectadas
+(una, pasar copiando la clasificación privada, después de reforzar la prueba). Sin correr en local: los otros 40 archivos de
+`team_backend/tests`, el pytest de infraestructura y Maestro; la regresión completa queda para el CI.
+
 ### Lo que queda para la fase 7
 
 - El alta real del CTO (activarlo, su OAuth y su sesión del navegador): hasta entonces nada de esta fase actúa.
