@@ -295,6 +295,9 @@ def tick(now=None):
                 experiment.state = 'completed'
                 cancel_pending(experiment)
             experiment.save()
+            # Organizaciones, phase 7: the notice is the account's owner's (she or the admin decides, ORG-07), never
+            # left without a member (with several members only the first one would see it).
             Notification.objects.get_or_create(ref=f'experiment:{experiment.pk}:{key}', defaults={
+                'member': miembros.member_of_account(experiment.account),
                 'kind': 'referents_review', 'layer': 'conversaciones', 'title': 'Experimento de referentes: '+output['outcome'],
                 'detail': 'La decisión depende del encaje y la cobertura de personas observadas. '+experiment.plan['limitations'], 'link': '/personas?pestana=referentes'})

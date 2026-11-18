@@ -643,6 +643,8 @@ def release_ideas(piece,why):
 def piece_comments(piece):
     """`team_comments` of the piece detail: what Gustavo told the team about it."""
     rows=Capture.objects.select_related('created_by').filter(context_type='pieza',context_id=str(piece.id),state=Capture.State.NOTED).order_by('created_at')
+    # Organizaciones, phase 7: only the piece's member's notes (a capture names a piece by id; another member's never shows).
+    if piece.member_id:rows=miembros.own(rows,piece.member)
     return [{'id':str(c.id),'text':c.text,'note':c.note,'transcript':c.transcript,'has_audio':bool(c.audio),
              'investigation':c.investigation,
              'audio_url':f'/api/v1/capturas/{c.id}/audio' if c.audio else None,'created_at':c.created_at,

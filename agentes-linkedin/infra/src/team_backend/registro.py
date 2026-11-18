@@ -82,8 +82,9 @@ def release_after():
 
 
 def role_preference():
-    """PEOPLE_ROLE_PREFERENCE: {papel or role: member role}, e.g. «lider_tecnologia=CTO,dueno=Fundador»: an untouched buyer
-    with that papel (or role) goes to the member whose role matches. Empty (the default): only affinity and the hash."""
+    """PEOPLE_ROLE_PREFERENCE: {papel or role: member role or username}, e.g. «lider_tecnologia=CTO,dueno=Fundador» or
+    «lider_tecnologia=<the CTO's username>»: an untouched buyer with that papel (or role) goes to the member whose role
+    (or username) matches. Empty (the default): only affinity and the hash."""
     out = {}
     for item in filter(None, (x.strip() for x in setting('PEOPLE_ROLE_PREFERENCE', '').split(','))):
         key, sep, role = item.partition('=')
@@ -411,7 +412,7 @@ def claim(proposal, member, now=None):
     if proposal.capability not in TOUCHES:
         return ''
     if proposal.capability == 'INT-03' and proposal.post_id and proposal.post.referent_id:
-        return post_issue(proposal.post, member)
+        return claim_post(proposal.post, member, proposal)  # a claim that no longer holds passes to the one who writes
     uid, account = person_of(proposal)
     org = organization_id(account)
     if member is None or org is None or not uid:
@@ -455,22 +456,66 @@ def unclaim(proposal):
     Person.objects.filter(touch_proposal=proposal.pk).update(owner=None, owned_since=None, touch='', touch_proposal=None)
 
 
+# A claim on a referent's post holds while its member may still comment it (organizaciones, phase 7, the risk phase 6
+# left): her comment went out (or may have: executing, sent, confirmed, uncertain); or she is active and has a live
+# proposal on it (proposed, approved); or she is active and has no proposal on it at all yet, for
+# PEOPLE_POST_CLAIM_GRACE_MINUTES after the claim (create_proposal claims the post just before writing its row). A claim
+# whose proposals all died (rejected, discarded, expired, failed, superseded) or whose member is inactive no longer
+# holds: another member may comment the post, and her claim_post takes it over (audited).
+WRITTEN_COMMENT = ('executing', 'sent', 'confirmed', 'uncertain')
+PENDING_COMMENT = ('proposed', 'approved')
+
+
+def claim_grace():
+    try:
+        return timedelta(minutes=max(0, int(setting('PEOPLE_POST_CLAIM_GRACE_MINUTES', '10'))))
+    except ValueError:
+        return timedelta(minutes=10)
+
+
+def _holding(claims, now=None):
+    """The claims among `claims` (PostClaim rows with their member) that still hold their post (see above). Two queries
+    whatever their number."""
+    claims = list(claims)
+    if not claims:
+        return []
+    from .models import ActionProposal
+    now = now or timezone.now()
+    first = miembros.first_member_id()
+    states = {}
+    for post_id, member_id, state in ActionProposal.objects.filter(
+            capability='INT-03', post__provider_post_id__in={c.provider_post_id for c in claims}) \
+            .values_list('post__provider_post_id', 'account__member_id', 'state'):
+        states.setdefault((post_id, member_id or first), set()).add(state)
+    out = []
+    for claim in claims:
+        hers = states.get((claim.provider_post_id, claim.member_id), set())
+        if hers & set(WRITTEN_COMMENT):
+            out.append(claim)  # her comment is (or may be) on the post: never a second one
+        elif not claim.member.active:
+            continue
+        elif hers & set(PENDING_COMMENT) or (not hers and claim.claimed_at >= now - claim_grace()):
+            out.append(claim)
+    return out
+
+
 def post_issue(post, member):
-    """Why `member` may not comment on this referent's post ('' when she may): another member has a proposal on it."""
+    """Why `member` may not comment on this referent's post ('' when she may): another member holds it (_holding)."""
     if member is None or post is None or post.referent_id is None:
         return ''
     org = organization_id(post.account)
     if org is None:
         return ''
     _, _, _, _, PostClaim = _models()
-    other = PostClaim.objects.filter(organization_id=org, provider_post_id=post.provider_post_id).exclude(member=member) \
-        .select_related('member').first()
-    return f'Este post ya lo comenta {other.member.display_name}.' if other else ''
+    others = PostClaim.objects.filter(organization_id=org, provider_post_id=post.provider_post_id).exclude(member=member) \
+        .select_related('member')
+    held = _holding(others)
+    return f'Este post ya lo comenta {held[0].member.display_name}.' if held else ''
 
 
 def claim_post(post, member, proposal=None):
-    """The first member with a proposal on a referent's post keeps it (unique per organization and post id). Returns ''
-    or why not."""
+    """The first member with a proposal on a referent's post keeps it (unique per organization and post id); a claim that
+    no longer holds (_holding) passes to her. Returns '' or why not."""
     if member is None or post is None or post.referent_id is None:
         return ''
     org = organization_id(post.account)
@@ -479,21 +524,30 @@ def claim_post(post, member, proposal=None):
     _, _, _, _, PostClaim = _models()
     try:
         with transaction.atomic():
-            PostClaim.objects.get_or_create(organization_id=org, provider_post_id=post.provider_post_id,
-                                            defaults={'member': member, 'proposal': getattr(proposal, 'pk', None)})
+            claim, created = PostClaim.objects.select_for_update().select_related('member').get_or_create(
+                organization_id=org, provider_post_id=post.provider_post_id,
+                defaults={'member': member, 'proposal': getattr(proposal, 'pk', None)})
+            if not created and claim.member_id != member.pk and not _holding([claim]):
+                previous = claim.member_id
+                claim.member, claim.proposal, claim.claimed_at = member, getattr(proposal, 'pk', None), timezone.now()
+                claim.save(update_fields=['member', 'proposal', 'claimed_at'])
+                from .jobs import audit
+                audit(None, 'people.post_claim_passed', post.provider_post_id, organization=str(org),
+                      before=str(previous), after=str(member.pk))
     except IntegrityError:
         pass
     return post_issue(post, member)
 
 
 def claimed_by_others(account):
-    """Post ids of the organization's referents' posts another member already comments."""
+    """Post ids of the organization's referents' posts another member still holds (_holding)."""
     member = miembros.member_of_account(account)
     org = organization_id(account)
     if member is None or org is None:
         return []
     _, _, _, _, PostClaim = _models()
-    return list(PostClaim.objects.filter(organization_id=org).exclude(member=member).values_list('provider_post_id', flat=True))
+    return [c.provider_post_id for c in _holding(PostClaim.objects.filter(organization_id=org).exclude(member=member)
+                                                 .select_related('member'))]
 
 
 def check_proposal(account, capability, post=None, contact=None, comment=None, proposal=None, claim=True):
@@ -568,7 +622,9 @@ def taker(card, members=None):
     preference = role_preference()
     if preference:
         wanted = preference.get(_papel(card.classification)) or preference.get((card.classification or {}).get('role') or '')
-        match = next((m.pk for m in members if wanted and (m.role or '').strip().lower() == wanted), None)
+        # Her role (CTO) or, more precise when two share a role, her username (phase 7: lider_tecnologia=<her user>).
+        match = next((m.pk for m in members if wanted and wanted in ((m.role or '').strip().lower(),
+                                                                     m.user.get_username().lower())), None)
         if match:
             return match
     return ids[_stable(card.organization_id, card.provider_user_id) % len(ids)]
