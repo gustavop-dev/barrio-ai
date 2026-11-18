@@ -12,7 +12,7 @@ from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas
+from . import capturas, miembros
 from .jobs import audit
 from .models import AIEdit, Capture, GalleryPhoto, OfficePreference
 from .operador_views import get_or_404, human_session, valid
@@ -111,7 +111,8 @@ class Captures(ListAPIView):
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
         capturas.reconcile_stale();capturas.expire_ideas()
-        qs=Capture.objects.exclude(state=Capture.State.UNDONE).prefetch_related('photos')
+        # Her captures (organizaciones, phase 4): «Lo que enviaste» never lists another member's.
+        qs=miembros.own(Capture.objects.exclude(state=Capture.State.UNDONE),miembros.member_for(self.request.user)).prefetch_related('photos')
         state=self.request.query_params.get('estado')
         return qs.filter(state=state) if state else qs
     def post(self,request):
@@ -163,7 +164,7 @@ class Gallery(ListAPIView):
         require(self.request.user,'operate_linkedin')
         key=self.request.query_params.get('filtro') or 'todas'
         if key not in GALLERY_FILTERS:raise ValidationError({'filtro':'Usa todas, sin_usar, elegidas, publicadas o perfil.'})
-        qs=GalleryPhoto.objects.select_related('chosen_piece')
+        qs=miembros.own(GalleryPhoto.objects.select_related('chosen_piece'),miembros.member_for(self.request.user))  # her photos
         if key=='perfil':return qs.filter(category='perfil')
         return qs.filter(state__in=GALLERY_FILTERS[key]) if GALLERY_FILTERS[key] else qs
     def post(self,request):

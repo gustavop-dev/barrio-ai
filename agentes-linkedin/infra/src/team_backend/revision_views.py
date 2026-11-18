@@ -5,7 +5,7 @@ Every decision needs a human session (a service token gets 403) and approve_acti
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import revision_mensual
+from . import miembros, revision_mensual
 from .models import MonthlyReview, StrategyChange
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
@@ -21,7 +21,7 @@ class RejectInput(serializers.Serializer):
 class MonthlyReviews(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(revision_mensual.overview())
+        return Response(revision_mensual.overview(member=miembros.member_for(request.user)))  # hers (phase 4)
 
 class MonthlyReviewDetail(APIView):
     """GET …/<id>: one review with the figures it was written from."""
@@ -45,7 +45,7 @@ class MonthlyReviewSeen(APIView):
 def _decided(change,**extra):
     """A decided change and the orientation as it is now, so the screen shows what changed."""
     change.refresh_from_db()
-    return Response(dict({'change':revision_mensual.change_payload(change),'orientation':_orientation_payload()},**extra))
+    return Response(dict({'change':revision_mensual.change_payload(change),'orientation':_orientation_payload(change.review.member)},**extra))
 
 class StrategyChangeApprove(APIView):
     """POST …/cambios/<id>/aprobar {text?}: «Aprobar». POST …/cambios/<id>/editar {text}: «Editar y aprobar», which

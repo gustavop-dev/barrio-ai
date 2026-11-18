@@ -128,12 +128,12 @@ def _card(id,kind,title,body,actions,critical=False,tone=None,agent='operador_cu
                  'agent_label':'Operador de cuenta' if agent=='operador_cuenta' else preguntas.agent_label(agent),
                  'title':title,'body':body,'deadline':deadline,'actions':actions,'created_at':created_at,'state':'nueva'},**extra)
 
-def alerts(now=None):
+def alerts(now=None,member=None):
     """Tu turno → Avisos: only what breaks without Gustavo, each with its action (DISENO-VISTAS, sección 2.A).
     Informative states (invitations limited, a blocked piece, the budget) live in Personas, Calendario and Ajustes."""
     from . import connectors_linkedin as li
     now=now or timezone.now();out=[]
-    status=li.status_payload()
+    status=li.status_payload(member=member)  # her own connection (organizaciones, phase 2)
     # status_payload reports `connected` only while the token is valid: an expired one has `expired` alone.
     if status.get('expired'):
         out.append(_card('linkedin_expired','aviso','Reconecta LinkedIn','El acceso caducó y la publicación diaria está en pausa.',
@@ -301,17 +301,18 @@ class TuTurno(APIView):
         require(request.user,'operate_linkedin')
         from . import notificaciones
         from .models import InboxSeen
-        preguntas.sync_memory_proposals()
-        now=timezone.now();warnings=alerts(now)
+        member=miembros.member_for(request.user)  # her questions, her memory and her summary (organizaciones, phase 4)
+        preguntas.sync_memory_proposals(member)
+        now=timezone.now();warnings=alerts(now,member)
         from .orquestacion import attention_cards
         warnings+=attention_cards(request.user,_card)
-        open_questions=list(TeamQuestion.objects.filter(state='open').order_by('deadline','created_at'))
+        open_questions=list(miembros.own(TeamQuestion.objects.filter(state='open'),member).order_by('deadline','created_at'))
         pending=[q for q in open_questions if preguntas.is_pending(q,now)]
         later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]
         from . import conversaciones
         conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now)]
         from . import resumen_semanal
-        summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
+        summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal(member)] if s]
         from .perfil import cards as profile_cards
         from .referentes_views import cards as referent_cards
         profile=profile_cards(request.user,_card)
@@ -347,7 +348,7 @@ class TuTurno(APIView):
                                    'aprobaciones':len(approval_cards)},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
-                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
+                         'tasks':tasks,'recent':preguntas.recently_resolved(member=member)+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
                                    +mensajes_comprador.recently_resolved()+respuesta_comprador.recently_resolved()+urgente.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
@@ -453,7 +454,8 @@ class Questions(ListAPIView):
     serializer_class=QuestionOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=TeamQuestion.objects.all();state=self.request.query_params.get('state')
+        # Her questions (organizaciones, phase 4): the ones the team asked her, never another member's.
+        qs=miembros.own(TeamQuestion.objects.all(),miembros.member_for(self.request.user));state=self.request.query_params.get('state')
         return qs.filter(state=state) if state else qs
 
 def _question_action(func):
@@ -476,39 +478,40 @@ QuestionDecline=_question_action(lambda request:lambda qid:preguntas.decline(req
 class Facts(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(miembros.member_for(request.user)))  # what the team knows of her
     def post(self,request):
         human_session(request);data=valid(AddFactInput,request)
         preguntas.add_fact(request.user,data['text'],data['public_use'],data.get('topic',''))
-        return Response(preguntas.facts(),status=201)
+        return Response(preguntas.facts(miembros.member_for(request.user)),status=201)
 
 class FactCorrect(APIView):
     def post(self,request,key):
         human_session(request);data=valid(FactInput,request)
         preguntas.correct(request.user,key,data['text'],data['public_use'])
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(miembros.member_for(request.user)))
 
 class FactRetire(APIView):
     def post(self,request,key):
         human_session(request);data=valid(RetireInput,request)
         preguntas.retire(request.user,key,data.get('reason',''))
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(miembros.member_for(request.user)))
 
 # --------------------------------------------------------------------------- orientation
 
-def _orientation_payload():
+def _orientation_payload(member):
+    """Her orientation (organizaciones, phase 4): the member's whose screen or decision it is."""
     from .models import Orientation
-    current=Orientation.current()
+    current=Orientation.current(member)
     return {'text':current.text,'updated_at':current.updated_at,'updated_by':current.updated_by.get_username() if current.updated_by else None}
 
 class OrientationView(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(_orientation_payload())
+        return Response(_orientation_payload(miembros.member_for(request.user)))
     def put(self,request):
         human_session(request);data=valid(OrientationInput,request)
         orientacion.update(request.user,data['text'])
-        return Response(_orientation_payload())
+        return Response(_orientation_payload(miembros.member_for(request.user)))
 
 # --------------------------------------------------------------------------- opportunities
 
@@ -715,7 +718,7 @@ class Calendar(APIView):
             value['events'].sort(key=lambda e:(priority[e['layer']],str(e['at'] or '')))
         # The GASP type of each day (estrategia.py): the plan's, the structure's for coming days, or its post's.
         from . import estrategia
-        gasp=estrategia.calendar_days(start,end)
+        gasp=estrategia.calendar_days(start,end,member=miembros.member_for(request.user))  # her plan's types (phase 4)
         for day,value in days.items():value['gasp']=gasp.get(day)
         return Response({'timezone':str(operador.local_tz()),'today':today,'lead_hours':editorial.lead_time().total_seconds()/3600,
                          'days':[{'date':day,**value} for day,value in sorted(days.items())],
@@ -755,7 +758,7 @@ class Settings(APIView):
                              'month_usd':float(budget['month_usd']),'total_usd':_spend('%'),'limit_usd':float(budget['monthly_limit_usd']),
                              'lead_month_usd':_spend('%',month,provider='typesafe'),
                              'transcription_month_usd':_spend('%',month,provider='assemblyai')},
-                         'facts_count':len(preguntas.facts()),'push_types':notificaciones.push_types(),
-                         'orientation':_orientation_payload(),
+                         'facts_count':len(preguntas.facts(miembros.member_for(request.user))),'push_types':notificaciones.push_types(),
+                         'orientation':_orientation_payload(miembros.member_for(request.user)),
                          # «Dispositivos con la app» (docs/app-movil-backend.md).
                          'devices':devices_payload(request),'expo_push':expo.status(request.user)})

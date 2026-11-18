@@ -39,7 +39,7 @@ class WeeklySummaries(APIView):
     """GET /api/v1/resultados/resumen-semanal: the latest summary, the previous weeks and «Generar ahora»."""
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(resumen_semanal.overview())
+        return Response(resumen_semanal.overview(member=miembros.member_for(request.user)))  # hers (phase 4)
 
 class WeeklySummaryDetail(APIView):
     """GET /api/v1/resultados/resumen-semanal/<id>: one summary with the figures it was written from."""
@@ -61,7 +61,7 @@ def _decision(func,with_orientation=False):
             result=func(request.user,sid)
             summary,previous=result if isinstance(result,tuple) else (result,None)
             body={'summary':resumen_semanal.payload(summary)}
-            if with_orientation:body.update(orientation=_orientation_payload(),previous_orientation=previous)
+            if with_orientation:body.update(orientation=_orientation_payload(summary.member),previous_orientation=previous)  # hers
             return Response(body)
     return View
 
