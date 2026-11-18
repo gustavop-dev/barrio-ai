@@ -109,7 +109,7 @@ def ticket(login):
 
 def require_owner(user, account):
     """403 unless `user` is the member who owns the account; the admin of the organization is not enough."""
-    if not miembros.is_owner(user, account):
+    if not miembros.is_owner(user, account, alta=True):  # also while she is being onboarded (phase 7)
         raise PermissionDenied('Solo el miembro dueño de esta cuenta abre o maneja su sesión de LinkedIn.')
 
 
@@ -235,7 +235,7 @@ def _usable(login):
     user = login.user
     return (user is not None and user.is_active and user.has_perm('team_backend.operate_linkedin')
             and login.state == BrowserLogin.State.WAITING and login.finished_at is None
-            and login.expires_at > timezone.now() and miembros.is_owner(user, login.account))
+            and login.expires_at > timezone.now() and miembros.is_owner(user, login.account, alta=True))
 
 
 def redeem(raw):

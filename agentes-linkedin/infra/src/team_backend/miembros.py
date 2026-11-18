@@ -157,14 +157,16 @@ def _human(user):
     return bool(user is not None and getattr(user, 'is_authenticated', False) and user.is_active)
 
 
-def is_owner(user, account):
+def is_owner(user, account, alta=False):
     """Whether `user` is the active member who owns this account. Without members at all, the legacy identity
-    (legacy_owner_username), so an installation before organizations keeps working and nobody else gets in."""
+    (legacy_owner_username), so an installation before organizations keeps working and nobody else gets in.
+    `alta=True` (organizaciones, phase 7): her own LinkedIn connection (the official credential and the browser session)
+    also while she is inactive, being onboarded: activating her asks for both (alta.checks), and it is only ever hers."""
     if not _human(user):
         return False
     owner = member_of_account(account)
     if owner is not None:
-        return owner.active and owner.user_id == user.pk
+        return (owner.active or alta) and owner.user_id == user.pk
     if exist():
         return False  # an account of nobody among several members
     return user.get_username() == legacy_owner_username()

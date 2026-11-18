@@ -131,10 +131,12 @@ def connect_member(user,token,profile):
         # Only its owner connects (or reconnects) a member's LinkedIn; a new one belongs to whoever connects it
         # (organizaciones, phase 1). Nothing is stored when either fails.
         account=ConnectorAccount.objects.select_for_update().filter(provider='linkedin',external_account_id=urn).first()
-        if account is not None and not miembros.is_owner(user,account):
+        if account is not None and not miembros.is_owner(user,account,alta=True):
             raise ConnectorError('Esta cuenta de LinkedIn es de otro miembro: solo su dueño la conecta.',kind='owner')
         if account is None:
-            try:member=miembros.member_for(user)
+            # Her own member, also while she is being onboarded (organizaciones, phase 7); else the default one.
+            own=miembros.member_of_user(user)
+            try:member=own if own is not None else miembros.member_for(user)
             except miembros.MiembroRequerido as exc:raise ConnectorError(str(exc),kind='owner') from None
             account=ConnectorAccount.objects.create(provider='linkedin',external_account_id=urn,member=member,
                 label='LinkedIn · API oficial'+(f' ({profile["name"]})' if profile['name'] else ''))

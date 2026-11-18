@@ -82,6 +82,29 @@ class Command(BaseCommand):
         mie.add_argument('--admin',action=argparse.BooleanOptionalAction,default=None,help='Administrador de la organización o no')
         mie.add_argument('--grupo',action='append',default=[],help='Grupo de permisos que se le añade (lectura, operacion, revision); repetible')
         sub.add_parser('miembros',help='Lista las organizaciones, sus miembros y las cuentas de LinkedIn de cada uno (solo lectura)')
+        alta=sub.add_parser('alta-miembro',help='Alta guiada de un miembro (fase 7): su usuario y su miembro INACTIVO, los ajustes '
+                            'prudentes de una cuenta gratuita y dormida, su perfil mínimo y su voz provisional; al final, lo que '
+                            'falta a mano. Idempotente; sin --confirmar es un ensayo que no cambia nada')
+        alta.add_argument('--usuario-nuevo',required=True,dest='usuario_nuevo',help='Usuario de Django de la persona')
+        alta.add_argument('--nombre',required=True,help='Nombre para mostrar (p. ej. «Ana Pérez»)')
+        alta.add_argument('--rol',required=True,help='Rol (p. ej. «CTO»)')
+        alta.add_argument('--relacion',default='',help='Su relación con la empresa (por defecto «Es <rol> de <organización>.»)')
+        alta.add_argument('--presentacion',default='',help='Cómo se presenta, en una o dos frases (opcional; lo completa ella)')
+        alta.add_argument('--cuenta-directo',default='',dest='cuenta_directo',help='Id de su cuenta en el servicio navegador (opcional)')
+        alta.add_argument('--grupo',action='append',default=None,help='Grupos de permisos (por defecto operacion y revision)')
+        alta.add_argument('--confirmar',action='store_true',help='Aplica el alta (sin esta opción, solo el ensayo)')
+        act=sub.add_parser('activar-miembro',help='Activa a un miembro en alta SOLO si pasan todas las comprobaciones previas (sus '
+                           'cuentas, su hora, su autonomía, su rampa, una pasada en seco y la memoria del servidor); sin '
+                           '--confirmar solo comprueba')
+        act.add_argument('--miembro',required=True,help='Usuario de Django del miembro')
+        act.add_argument('--confirmar',action='store_true',help='Activa si todo pasa')
+        des=sub.add_parser('desactivar-miembro',help='Detiene a un miembro: sus cuentas no leen ni escriben, sus trabajos en cola se '
+                           'cancelan, sus datos quedan y nada de los demás cambia; reversible con activar-miembro. Sin '
+                           '--confirmar solo cuenta lo que haría')
+        des.add_argument('--miembro',required=True,help='Usuario de Django del miembro')
+        des.add_argument('--motivo',required=True,help='Por qué (queda auditado)')
+        des.add_argument('--sin-acceso',action='store_true',dest='sin_acceso',help='Además desactiva su usuario: no puede entrar')
+        des.add_argument('--confirmar',action='store_true',help='Desactiva')
         aju=sub.add_parser('ajustes',help='El ritmo de LinkedIn de un miembro (tier, topes, rampa, lecturas de perfil, autonomía, hora del '
                            'post): sin --fijar ni --quitar solo lo muestra con su origen; fijar o quitar es del administrador (auditado)')
         aju.add_argument('--miembro',required=True,help='Usuario de Django del miembro')
@@ -152,6 +175,9 @@ class Command(BaseCommand):
                 return
             if o['accion']=='miembros':
                 for line in miembros_lines():self.stdout.write(line)
+                return
+            if o['accion'] in ('alta-miembro','activar-miembro','desactivar-miembro'):
+                self.onboarding(user,o)
                 return
             if o['accion']=='ajustes':
                 from team_backend import miembros
@@ -268,6 +294,46 @@ class Command(BaseCommand):
             detail=getattr(exc,'detail',None)
             if detail:raise CommandError(str(detail)) from None
             raise
+
+    def onboarding(self,user,o):
+        """alta-miembro, activar-miembro and desactivar-miembro (organizaciones, phase 7: team_backend/alta.py)."""
+        from team_backend import alta
+        if o['accion']=='alta-miembro':
+            groups=tuple(o['grupo']) if o['grupo'] else alta.GROUPS
+            result=alta.alta(user,o['usuario_nuevo'],o['nombre'],o['rol'],company_relation=o['relacion'],
+                             identity=o['presentacion'],directo=o['cuenta_directo'],groups=groups,confirm=o['confirmar'])
+            self.stdout.write(('Alta aplicada' if result.confirmed else 'ENSAYO (nada cambió; repite con --confirmar)')+
+                              f': {o["nombre"]} ({o["usuario_nuevo"]}), inactivo hasta activar-miembro.')
+            for step in result.steps:
+                self.stdout.write(f'  [{step.state}] {step.what}'+(f' — {step.detail}' if step.detail else ''))
+            if result.confirmed:
+                member=self._member(user,o['usuario_nuevo'])
+                self.stdout.write('Lo que falta a mano:')
+                for done,what in alta.checklist(member):
+                    mark='x' if done else ' ' if done is False else '?'
+                    self.stdout.write(f'  [{mark}] {what}')
+            return
+        member=self._member(user,o['miembro'])
+        if o['accion']=='activar-miembro':
+            activated,found=alta.activate(user,member,confirm=o['confirmar'])
+            for check in found:
+                self.stdout.write(f'  [{"ok" if check.ok else "FALLA"}] {check.label}'+(f' — {check.detail}' if check.detail else ''))
+            failing=[c for c in found if not c.ok]
+            if activated:
+                self.stdout.write(f'{member.display_name} está activa: el autopiloto trabaja sus cuentas con su ritmo.')
+            elif failing:
+                raise CommandError(f'No se activa: fallan {len(failing)} comprobaciones ({", ".join(c.code for c in failing)}).')
+            else:
+                self.stdout.write('Todo pasa. Repite con --confirmar para activarla.')
+            return
+        summary=alta.deactivate(user,member,o['motivo'],confirm=o['confirmar'],block_access=o['sin_acceso'])
+        verb='Desactivada' if o['confirmar'] else 'ENSAYO: se desactivaría'
+        self.stdout.write(f'{verb}: {member.display_name}. Trabajos en cola cancelados: {summary["jobs"]}. Propuestas suyas que '
+                          f'esperan (quedan como están): {summary["proposals"]}. '+('Puede seguir entrando.' if summary['access']
+                          else 'Su usuario queda sin acceso.'))
+        if o['confirmar']:
+            self.stdout.write('Sus datos quedan. Para volver: activar-miembro (con sus comprobaciones). Su navegador sigue abierto '
+                              'en el servicio hasta que se cierre o se reinicie el contenedor.')
 
     def _member(self,user,username):
         from team_backend import miembros

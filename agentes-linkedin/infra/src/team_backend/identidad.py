@@ -492,25 +492,38 @@ def _record(actor, organization, member, before, after, changed, source):
 
 
 def can_edit(actor, organization=None, member=None):
-    """Her own profile: only she, active. The organization's: only its active admin."""
+    """Her own profile: only she (also while she is being onboarded, inactive: phase 7, «Mi perfil» in the apps). The
+    organization's: only its active admin."""
     if member is not None:
         own = miembros.member_of_user(actor)
-        return bool(own is not None and own.active and own.pk == member.pk and miembros._human(actor))
+        return bool(own is not None and own.pk == member.pk and miembros._human(actor))
     return miembros.is_admin(actor, organization)
 
 
+def may_start(actor, member):
+    """Organizaciones, phase 7: the admin writes the minimal profile of a member she is onboarding (alta.py): only while
+    that member is inactive and has never saved her profile herself. From then on it is only hers."""
+    from .models import IdentityRevision
+    return (member is not None and not member.active and miembros.is_admin(actor, member.organization)
+            and not IdentityRevision.objects.filter(member=member, actor=member.user).exists())
+
+
 @transaction.atomic
-def save_profile(actor, *, organization=None, member=None, values=None, remove=(), source='comando'):
+def save_profile(actor, *, organization=None, member=None, values=None, remove=(), source='comando', on_behalf=False):
     """Set (or bring back to the initial or neutral value) fields of a profile: the organization's or a member's.
     Validated as a whole before anything changes; idempotent; each change is an IdentityRevision with the profile
-    before and after, and an audit event. Returns (profile, revision or None)."""
+    before and after, and an audit event. `on_behalf`: the admin onboarding an inactive member (may_start). Returns
+    (profile, revision or None)."""
     from .models import Member, Organization
     if member is not None:
         member = Member.objects.select_for_update().select_related('organization').get(pk=member.pk)
         organization = member.organization
     else:
         organization = Organization.objects.select_for_update().get(pk=organization.pk)
-    if not can_edit(actor, organization, member):
+    if on_behalf and not may_start(actor, member):
+        raise PermissionError('Solo el administrador escribe el perfil inicial de un miembro en alta (inactivo y sin '
+                              'cambios propios); después, solo ella lo cambia.')
+    if not on_behalf and not can_edit(actor, organization, member):
         raise PermissionError('Solo el propio miembro cambia su perfil.' if member is not None else
                               'Solo el administrador activo de la organización cambia su perfil.')
     values = dict(values or {})
