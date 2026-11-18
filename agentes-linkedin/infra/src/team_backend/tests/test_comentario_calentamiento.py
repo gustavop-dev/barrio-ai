@@ -103,10 +103,11 @@ class WarmupCommentBase(BuyerPathBase):
         self.job('discover_network')
         stop = self.providers()
         try:
-            for _ in range(len(people)):
-                self.job('classify_contacts')
+            self.job('classify_contacts')
+            for _ in range(len(people)):  # check_buyer_stages: one web check a run
                 if not Contact.objects.filter(classification__stage_check__state='pending').exists():
                     break
+                self.job('check_buyer_stages')
         finally:
             stop()
         contacts = {v: Contact.objects.get(account=self.account, provider_user_id=p['id']) for v, p in people.items()}

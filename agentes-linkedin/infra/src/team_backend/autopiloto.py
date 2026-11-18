@@ -661,9 +661,11 @@ def _every(name,default):
     return timedelta(minutes=int(setting(name,default)))
 
 def _network(user,account,now):
-    """DESC/RED: queue discovery, classification, planning and sync for the operating account, each on its own clock.
-    Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals. Discovery,
-    classification (profile reads, web checks) and sync read LinkedIn: only inside READ_WINDOW. The plan reads nothing."""
+    """DESC/RED: queue discovery, classification, the buyers' web check, planning and sync for the operating account,
+    each on its own clock. Reads and the cheaper classifier run on their own; follows, invitations and acceptances become
+    proposals. Discovery, classification (profile reads), the web check and sync read: only inside READ_WINDOW. The plan
+    reads nothing. The web check is its own job (its own run of the cycle and its own budget): inside the classification's
+    run its reserve passed the run's cost_cap_usd every morning (18/11/2026)."""
     if not red.enabled() or account.provider not in ('fake','directo'):return 0
     queued=0;reading=operador.within_read_window(now)
     def enqueue(kind,every,condition=True):
@@ -674,8 +676,9 @@ def _network(user,account,now):
         queued+=int(created)
     enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),reading and red.discovery_room(account)>0)  # B4
     unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
-    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),
-            reading and (unclassified or red.stage_pending(account,now)) and red.budget_left(now)>0)
+    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),reading and unclassified and red.budget_left(now)>0)
+    enqueue('check_buyer_stages',_every('NETWORK_STAGE_CHECK_EVERY_MINUTES','20'),
+            reading and red.budget_left(now)>0 and red.stage_pending(account,now))
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
     enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'),reading)
     return queued

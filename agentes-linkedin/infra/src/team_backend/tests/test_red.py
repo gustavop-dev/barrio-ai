@@ -572,7 +572,7 @@ class UncitedVerdictTests(NetworkBase):
         with self.answer({'Sin Cita'}),patch('team_backend.red.check_stages',wraps=red.check_stages) as stages:
             job=self.job('classify_contacts')
         self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:2/2',''))
-        stages.assert_called_once()
+        stages.assert_not_called()  # the classification only classifies: the web check is check_buyer_stages (18/11/2026)
         self.assertEqual(AuditEvent.objects.get(action='network.classified').metadata['uncited'],1)
         self.assertEqual({c.display_name:c.stage for c in Contact.objects.all()},{'Ana Cita':'fit','Bea Cita':'fit','Sin Cita':'candidate'})
         waiting=Contact.objects.get(display_name='Sin Cita')
@@ -585,9 +585,10 @@ class UncitedVerdictTests(NetworkBase):
 
 
 class ClassifyJobStageCheckTests(NetworkBase):
-    def test_the_classify_job_checks_a_buyer_stage_inside_its_declared_purposes(self):
+    def test_the_check_job_checks_a_buyer_stage_inside_its_declared_purposes(self):
         # Each fake call reserves in the usage ledger as the real ones do, so a purpose the graph does not declare for
-        # «clasificar» stops the job («undeclared_provider») as it did in production.
+        # its step stops the job («undeclared_provider») as it did in production. Since 18/11/2026 the classification
+        # pays only for itself and check_buyer_stages pays for the web check, each run with its own budget.
         from decimal import Decimal
         from knowledge import providers
         from team_backend import research
@@ -612,7 +613,11 @@ class ClassifyJobStageCheckTests(NetworkBase):
         with patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'true'}),patch('knowledge.providers.claude',side_effect=claude), \
              patch('team_backend.research.research',side_effect=web):
             job=self.job('classify_contacts')
-        self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:1/1',''))
+            self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:1/1',''))
+            self.assertEqual(purposes,['network-classify'])
+            self.assertEqual(Contact.objects.get(display_name='Ana Acme').classification['stage_check']['state'],'pending')
+            job=self.job('check_buyer_stages')
+        self.assertEqual((job.state,job.result_status,job.error),('complete','etapas:1/1',''))
         self.assertEqual(purposes,['network-classify','web-research-tool','network-stage'])
         ana=Contact.objects.get(display_name='Ana Acme')
         self.assertEqual((ana.stage,ana.classification['stage_check']['state']),('fit','ok'))
