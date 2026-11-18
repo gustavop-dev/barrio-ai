@@ -212,10 +212,11 @@ class ImageConnector:
 
 
 def _author(author):
-    """The member's name the check was given; None: the only member's."""
+    """The member's name the check was given (imagenes passes the piece owner's). A check never reads the database:
+    None, the initial identity's name, the one of always."""
     if author is None:
         from . import identidad
-        author=identidad.of().name
+        author=identidad.initial_identity().name
     return author
 
 

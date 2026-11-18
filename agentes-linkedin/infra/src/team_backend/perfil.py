@@ -4,6 +4,7 @@ Every tool runs under Runtime (3b). Same proposal, retries, questions and one
 adjustment share the $10 bucket; an uncertain call is never automatically paid again.
 """
 import calendar
+import functools
 import io
 import os
 import re
@@ -220,9 +221,14 @@ def cached_person(request,checkpoints):
     return raw,{'cycle':str(ledger.id),'call':key,'sha256':imagenes.sha(raw)}
 
 
+def identity_of(proposal):
+    """Whose profile a proposal is: its owner's identity (perfil_visual draws and checks with it, without the database)."""
+    return identidad.of_user(proposal.owner)
+
 def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','banner'),reuse_from=None,evidence_context=None):
     """Finish and persist each asset before attempting the next; no group failure."""
-    client=client or imagenes.connector.ImageConnector();checker=checker or visual.check
+    ident=identity_of(proposal)
+    client=client or imagenes.connector.ImageConnector();checker=checker or functools.partial(visual.check,ident=ident)
     evidence_context=proposal.context if evidence_context is None else evidence_context
     errors={};checkpoints=asset_checkpoints(proposal,reuse_from)
     for kind in kinds:
@@ -233,7 +239,7 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
         try:
             gallery.roles(scoped,needed=('01','03') if kind!='banner' else ('01','02','03'))
             refs=gallery.raw_references(scoped,proposal.owner)
-            instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''))
+            instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''),ident=ident)
             request={'proposal':str(proposal.id),'kind':kind,'references':scoped,'instruction':instruction}
             cached,reused=cached_person(request,checkpoints)
             edited=runtime.call('perfil_editar_persona',request,
@@ -332,7 +338,7 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                     fit=None
                     if proposal.mode=='full' and 'banner' in context['section_ids']:
                         # Recompute for EVERY draft, before review or any paid person edit. Never trust model measurements.
-                        fit=visual.banner_fit(data['banner'])
+                        fit=visual.banner_fit(data['banner'],identity_of(proposal))
                         context=dict(context,render_evidence=[fit])
                         context['evidence_catalog']=content.evidence_catalog(context)
                         data['banner']['evidence']=list(dict.fromkeys(data['banner']['evidence']+[fit['id']]))

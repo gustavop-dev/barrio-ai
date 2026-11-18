@@ -183,7 +183,7 @@ def review_context(proposal,refs):
     data=content.prepare_draft(data,ctx)
     # Save the recovered layout before measuring/reviewing it, even if a later stage fails.
     perfil._persist(proposal,context=dict(proposal.context,banner=copy.deepcopy(data['banner'])))
-    fit=visual.banner_fit(data['banner'])
+    fit=visual.banner_fit(data['banner'],perfil.identity_of(proposal))
     ctx['render_evidence']=[fit]
     if 'banner' in ctx['section_ids']:
         data['banner']['evidence']=list(dict.fromkeys(data['banner']['evidence']+current_ids+[fit['id']]))

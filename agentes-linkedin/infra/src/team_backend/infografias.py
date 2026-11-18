@@ -23,6 +23,14 @@ def author(member=None):
     return identidad.of(member).name
 
 
+def _signer(name):
+    """Who signs a slide: `name` (its caller's member, author(member)). Drawing never reads the database: without one,
+    the initial identity's name, the one of always."""
+    if name is not None:return name
+    from . import identidad
+    return identidad.initial_identity().name
+
+
 class _Text(HTMLParser):
     def __init__(self):super().__init__();self.parts=[]
     def handle_data(self,data):self.parts.append(data)
@@ -201,8 +209,8 @@ def contrast(a,b):
 
 
 def render(slide,position=1,total=1,carousel=False,name=None):
-    """PNG bytes of one slide. `name`: who signs it (author(member)); None reads the only member's."""
-    name=name if name is not None else author()
+    """PNG bytes of one slide. `name`: who signs it (author(member)); None, the initial identity's (_signer)."""
+    name=_signer(name)
     height=1350 if carousel else 1080;template=slide['template']
     dark=template in ('portada','numero');bg=INK if dark else PAPER;fg=PAPER if dark else INK
     accent=ACCENT if dark else DEEP;muted='#B9BCCB' if dark else SOFT
@@ -312,8 +320,9 @@ def document(pngs,alts):
 
 
 def fallback(name=None):
-    """Fixed, non-factual brand card; safe even when every optional image provider is unavailable. `name`: who signs it."""
-    name=name if name is not None else author()
+    """Fixed, non-factual brand card; safe even when every optional image provider is unavailable. `name`: who signs it
+    (_signer)."""
+    name=_signer(name)
     return {'template':'portada','label':'0ff1ce','title':'A question worth exploring','subtitle':'Ideas, tradeoffs and practical decisions.',
             'body':'','number':'','unit':'','steps':[],'bars':[],
             'source':{'ref':'','label':'','date':'','estimate':False},

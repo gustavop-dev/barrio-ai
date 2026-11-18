@@ -6,7 +6,7 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from psycopg import OperationalError
 
-from team_backend import editorial, evaluaciones, operador, resumen_semanal
+from team_backend import editorial, evaluaciones, identidad, operador, resumen_semanal
 
 
 class CourseBudgetTests(SimpleTestCase):
@@ -78,7 +78,8 @@ class CourseBudgetTests(SimpleTestCase):
     def test_evaluation_classifier_uses_complete_curated_context_but_rejects_real_absences(self):
         # Use the real evaluation cache without constructing a run that reads memory.
         cache=SimpleNamespace(_units={})
-        run=SimpleNamespace(private=[],orientation='',context=lambda *args,**kwargs:evaluaciones.Run.context(cache,*args,**kwargs))
+        run=SimpleNamespace(private=[],orientation='',identity=identidad.initial_identity(),
+                            context=lambda *args,**kwargs:evaluaciones.Run.context(cache,*args,**kwargs))
         request=evaluaciones.classify_request(run,[])
         units=json.loads(request['context'].split('\n',1)[1])
         self.assertEqual([u['unit_id'] for u in units],operador.NETWORK_UNITS)

@@ -45,7 +45,7 @@ from knowledge import db, memory, presupuesto, providers
 from knowledge.clases import METODOLOGIAS_ACTIVAS, legible_por_agentes
 from knowledge.config import live
 from knowledge.ingest import ENC
-from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red
+from . import autopiloto, catalogo, compuertas, editorial, guardas, identidad, lider, operador, orientacion, red
 from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, LibraryCatalog, PostMetric
 
 GO_LIVE=date(2026,11,6)  # the machine went live in production
@@ -178,7 +178,7 @@ def _frozen(brief):
 def stage_request(run,name,payload,unit_ids=None):
     """editorial._stage without the piece: same system, voice, units, schema, caps and effort."""
     _,_,default_units,budget,max_tokens,effort=editorial.STAGES[name][:6]
-    system,schema=editorial.stage_system(name),editorial.stage_schema(name)  # the installation's member (one active)
+    system,schema=editorial.stage_system(name,run.identity),editorial.stage_schema(name,run.identity)  # the run's member
     units,missing,_=run.context(unit_ids or default_units,budget)
     if missing:raise ValueError(f'Biblioteca no disponible para la etapa {name}.')
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')
@@ -231,7 +231,7 @@ def classify_request(run,contacts):
     unit_ids,methodology=red.classify_units()  # BAR-25: the same prompt, schema and units as red.classify today
     units,missing,_=run.context(unit_ids,metodologia=methodology)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
-    return {'system':red.classify_system(),'message':message,'max_tokens':16000,'output_schema':red.classify_schema(),'effort':'medium',
+    return {'system':red.classify_system(run.identity),'message':message,'max_tokens':16000,'output_schema':red.classify_schema(),'effort':'medium',
             'context':operador.course_block(units)}
 
 def lead_request(post,text,orientation):
@@ -361,6 +361,7 @@ class Run:
         self.public,self.private=guardas.blocks()  # editorial and the classifier read these
         self.comment_facts,self.comment_guidance=memory.confirmed_blocks()  # propose_comment reads these
         self.orientation=orientacion.text()
+        self.identity=identidad.of()  # whose prompts the requests are written with (the request builders read no member)
 
     def pieces(self):
         return EditorialPiece.objects.filter(created_at__gte=self.since).order_by('-created_at')

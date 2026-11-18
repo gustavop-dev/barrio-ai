@@ -250,6 +250,13 @@ def of(member=None):
     return Identity(member, organization_profile(_organization_of(member)), member_profile(member, legacy), legacy)
 
 
+def initial_identity():
+    """The initial identity (the seed's organization and person, legacy) without reading the database: what a pure
+    function (drawing, validation) uses when its caller passes no identity. Callers that know the member pass hers."""
+    seed = initial()
+    return Identity(None, seed['organization'], seed['member'], True)
+
+
 def of_user(user):
     """The Identity of the member a person acts as (miembros.member_for: hers, else the default member)."""
     return of(miembros.member_for(user))
