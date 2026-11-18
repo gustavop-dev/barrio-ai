@@ -793,7 +793,8 @@ total medido el 13/11: hay que medir en el servidor.
   uno paga la suya. Los prompts no cambian.
 - Los avisos de experimentos de referentes son del miembro de la cuenta; las notas del equipo en una pieza son solo las de su
   miembro; un administrador que no es el primer miembro no ve los trabajos de contenido del primero.
-- `PEOPLE_ROLE_PREFERENCE` acepta el usuario del miembro (`lider_tecnologia=<usuario del CTO>`); sigue apagada.
+- `PEOPLE_ROLE_PREFERENCE` acepta el usuario del miembro (`lider_tecnologia=<usuario del CTO>`), que gana sobre un rol
+  (el rol lo edita cada miembro en «Mi perfil»); sigue apagada.
 - La lista de alta recuerda verificar que `OPERATOR_ALERT_WEBHOOK` sea un canal privado del primer miembro.
 
 ### Pruebas
@@ -802,6 +803,18 @@ total medido el 13/11: hay que medir en el servidor.
 recorrido entero con funciones de producción, reloj congelado y conectores falsos, y el estado de Gustavo igual antes y
 después), `VozProvisionalTests` (una prueba por capacidad), `AjustesDelMiembroTests`, `PendientesDeFase6Tests`;
 `tests/test_memoria_servidor.py` (el script sin red). Números y lo que no se corrió: `tasks/active_context.md`.
+
+**Pasada de seguridad** (diagnóstico sobre el diff de la fase, con un revisor aparte): dos arreglos. Pedir la propuesta de
+voz por la API ya no paga otra llamada mientras una espera su decisión o se está preparando otra (409); en
+`PEOPLE_ROLE_PREFERENCE` el usuario gana sobre el rol, que cada miembro edita. Queda para decidir (Gustavo): un miembro
+desactivado sin `--sin-acceso` aún puede abrir la sesión de su navegador (la necesita para volver); con `--sin-acceso` no.
+
+**Con un solo miembro, nada cambia:** las 249 lecturas de la API (cada ruta GET sin id y cada ruta con id una vez por fila de
+`seed_qa`) y las 5 colas (`red.plan`, `autopiloto._propose` y `_observe` y lo que dejan) con el reloj congelado, comparadas
+contra `8dbec26` (el final de la fase 6): iguales salvo los cinco valores que también cambian entre dos corridas del mismo
+código (el `payload_hash`/`approved_hash` de una propuesta de la semilla con un id aleatorio y el sha del documento de una
+propuesta de perfil). Lo nuevo son tres lecturas: `organizacion` (Gustavo solo, activo, administrador, voz «inicial»),
+`yo/perfil` y `yo/voz` («Inicial de la instalación»: la de Gustavo no es provisional, así que su autonomía no cambia).
 
 ## Servidor
 

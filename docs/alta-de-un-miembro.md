@@ -120,6 +120,7 @@ dc exec api python manage.py operador --usuario gustavo desactivar-miembro --mie
 ```
 
 **Qué pasa:** su cuenta deja de leer y escribir, su cola se cancela, lo que tenía aprobado espera, y todo lo suyo se queda
-guardado. Nada tuyo cambia. Con `--sin-acceso` además no puede entrar.
+guardado. Nada tuyo cambia. Sin `--sin-acceso` ella aún entra a sus ajustes y puede volver a conectar su LinkedIn (lo
+necesita para volver); con `--sin-acceso` no puede entrar.
 
 **Para volver:** el alta otra vez (paso 2, le devuelve el acceso) y la activación (pasos 5 y 6), con todas sus comprobaciones.
