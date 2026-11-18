@@ -225,9 +225,9 @@ def policy_review(proposal,lead_budget=None):
         if proposal.piece_id:
             from . import capturas
             capturas.release_ideas(proposal.piece,'la política no la aprobó')
-            from .notificaciones import avisar
+            from .notificaciones import avisar, de_contenido
             avisar('piece_discarded',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}','; '.join(issues)[:300],
-                   link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}')
+                   link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}',member=de_contenido(proposal.piece))
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
@@ -243,9 +243,9 @@ def policy_review(proposal,lead_budget=None):
     operador._audit(None,'operator.policy_approved',proposal.id,payload_hash=proposal.payload_hash)
     if proposal.piece_id:
         when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_contenido
         avisar('piece_scheduled',f'La pieza del {when:%d/%m} está lista',f'Sale a las {when:%H:%M}. Puedes vetarla en el detalle hasta esa hora.',
-               link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_scheduled:{proposal.id}')
+               link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_scheduled:{proposal.id}',member=de_contenido(proposal.piece))
     return proposal
 
 def llm_spent_today(now=None,purpose='propose-comment'):
@@ -285,7 +285,7 @@ def lead_silence(now=None):
     if not lider.enabled():return 0
     now=now or timezone.now();minimum=int(setting('LEAD_SILENCE_MIN_REVIEWS','5'));sent=0
     year,week,_=now.astimezone(operador.local_tz()).isocalendar()
-    from .notificaciones import avisar
+    from .notificaciones import ORGANIZACION, avisar
     members=miembros.active_members()
     for capability in lider.capabilities():
         # The lead is the organization's; what it reviews in `auto` is the proposals of the members who have it in `auto`.
@@ -302,7 +302,7 @@ def lead_silence(now=None):
                        f'{label}: revisó {total} propuestas y descartó todas.'+(f' Lo que más falla: {top}.' if top else '')+
                        ' Revisa los umbrales del líder, la orientación o lo que proponen los agentes.',
                        link=f'/calendario?vista=lista&tipo={ACTIVITY_TYPE.get(capability,"red")}&no_salio=1',
-                       ref=f'lead_silent:{capability}:{year}-W{week:02d}')
+                       ref=f'lead_silent:{capability}:{year}-W{week:02d}',member=ORGANIZACION)  # the lead is the organization's
         sent+=int(created is not None)
     return sent
 

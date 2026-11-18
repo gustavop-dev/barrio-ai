@@ -1060,6 +1060,11 @@ class Opportunity(models.Model):
     notes=models.TextField(blank=True)
     history=models.JSONField(default=list,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # The organization's one funnel (organizaciones, phase 5): every member sees and moves every opportunity, and each says
+    # which member registered it (`member`) and whose person or journey it came from (`origin_member`). Empty: the first
+    # member's (registered before organizations; migration 0061 fills them).
+    member=models.ForeignKey(Member,on_delete=models.SET_NULL,null=True,blank=True,related_name='registered_opportunities')
+    origin_member=models.ForeignKey(Member,on_delete=models.SET_NULL,null=True,blank=True,related_name='brought_opportunities')
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
     stage_changed_at=models.DateTimeField(default=timezone.now)
@@ -1244,8 +1249,11 @@ class PieceImage(models.Model):
         constraints=[models.UniqueConstraint(fields=['piece','position'],name='one_image_per_piece_position')]
 
 class OfficePreference(models.Model):
-    """Singleton of Gustavo's office preferences (Ajustes)."""
+    """One person's office preferences (Ajustes): which pushes she gets and her gallery's AI edit. Each user her own
+    (organizaciones, phase 5): row 1 is the first member's user's, the preferences of before organizations (and the only
+    row of an installation without members); anyone else gets hers with the defaults (OfficePreference.of)."""
     id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,null=True,blank=True,related_name='office_preference')
     gallery_ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
     # Ajustes › Notificaciones: event kinds whose push Gustavo turned off, and those he turned on although their default
     # is off (notificaciones.INBOX_KINDS and FEED_KINDS hold the defaults; off wins if a kind is in both).
@@ -1254,8 +1262,28 @@ class OfficePreference(models.Model):
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     updated_at=models.DateTimeField(null=True,blank=True)
     @classmethod
-    def current(cls):
-        return cls.objects.get_or_create(pk=1)[0]
+    def of(cls,user):
+        """Her preferences: her own row; row 1 for the first member's user (and everyone without members), else a new row
+        of hers with the defaults. Never another person's."""
+        from django.db import IntegrityError, transaction
+        from . import miembros
+        if user is not None and getattr(user,'pk',None):
+            row=cls.objects.filter(user_id=user.pk).first()
+            if row is not None:return row
+        first=Member.objects.filter(pk=miembros.first_member_id()).values_list('user_id',flat=True).first()
+        if first is None or (user is not None and user.pk==first):
+            return cls.objects.get_or_create(pk=1)[0]
+        if user is None or not getattr(user,'pk',None):
+            raise miembros.MiembroRequerido('Las preferencias son de una persona: hay que decir de quién.')
+        for _ in range(3):
+            try:
+                with transaction.atomic():
+                    top=cls.objects.aggregate(top=models.Max('id'))['top'] or 1
+                    return cls.objects.create(id=top+1,user=user)
+            except IntegrityError:
+                row=cls.objects.filter(user_id=user.pk).first()
+                if row is not None:return row
+        raise RuntimeError('No se pudieron crear tus preferencias; vuelve a intentarlo.')
 
     @property
     def gallery_ai_edit_default(self):return self.gallery_ai_edit!=AIEdit.NO
@@ -1265,8 +1293,11 @@ class OfficePreference(models.Model):
 
 class Notification(models.Model):
     """Notificaciones: what is coming or already happened and asks nothing of Gustavo (kept 7 days).
-    Anything only he can solve lives in Tu turno instead (notificaciones.INBOX_KINDS)."""
+    Anything only he can solve lives in Tu turno instead (notificaciones.INBOX_KINDS). Each one is a member's
+    (organizaciones, phase 5): an organization's notice is one row per member, each with its own read state. Empty: the
+    first member's (migration 0061 marks the rows of before)."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.CASCADE,null=True,blank=True,related_name='notifications')
     kind=models.CharField(max_length=40)
     layer=models.CharField(max_length=20)
     title=models.CharField(max_length=300)
@@ -1278,8 +1309,9 @@ class Notification(models.Model):
     class Meta:ordering=['-created_at']
 
 class InboxSeen(models.Model):
-    """Tu turno: an item Gustavo already opened («Vista»), keyed by the card id the API returns."""
-    item_id=models.CharField(max_length=120,primary_key=True)
+    """Tu turno: an item she already opened («Vista»), keyed by the card id the API returns; per user (alcance.vista:
+    the first member's user keeps the bare ids of before organizations, anyone else's carry «u:<user id>:»)."""
+    item_id=models.CharField(max_length=200,primary_key=True)
     seen_at=models.DateTimeField(default=timezone.now)
 
 

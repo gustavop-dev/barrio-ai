@@ -401,9 +401,9 @@ def check_env_pause():
     if env_paused():
         if last=='operator.env_paused':return False
         _audit(None,'operator.env_paused','machine')
-        from .notificaciones import avisar
+        from .notificaciones import ORGANIZACION, avisar
         avisar('machine_paused_env','Máquina detenida desde el servidor','La parada viene de OPERATOR_PAUSED y no se levanta desde la app.',
-               link='/notificaciones')
+               link='/notificaciones',member=ORGANIZACION)  # the total stop is everyone's
         return True
     if last=='operator.env_paused':_audit(None,'operator.env_resumed','machine')
     return False
@@ -418,8 +418,9 @@ def set_global_pause(user,paused,reason=''):
     control.save()
     _audit(user,'operator.machine_'+('paused' if paused else 'resumed'),'machine',reason=control.reason)
     if paused:
-        from .notificaciones import avisar
-        avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde la Bandeja.')
+        from .notificaciones import ORGANIZACION, avisar
+        avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde la Bandeja.',
+               member=ORGANIZACION)  # the total stop is everyone's
     return control
 
 def validate_payload(capability,payload,account=None):
@@ -634,11 +635,11 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
             summary['partners']=projectapp.read_partner_posts(account,connector)
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_cuenta
         n=summary['new_posts']
         avisar('observatory',f'Observatorio encontró {n} {"post nuevo" if n==1 else "posts nuevos"} de tus referentes',
                'El equipo comentará en los que encajen, dentro de la ventana horaria.',
-               link=f'/calendario?fecha={timezone.now().astimezone(local_tz()).date().isoformat()}')
+               link=f'/calendario?fecha={timezone.now().astimezone(local_tz()).date().isoformat()}',member=de_cuenta(account))
     return summary
 
 def set_account_pause(account,reason,actor=None,notify=True):
@@ -650,8 +651,9 @@ def set_account_pause(account,reason,actor=None,notify=True):
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
     if notify and first:
-        from .notificaciones import avisar
-        avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo {identidad.owner_name(account)} puede reanudarla.')
+        from .notificaciones import avisar, de_cuenta
+        avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo {identidad.owner_name(account)} puede reanudarla.',
+               member=de_cuenta(account))  # her account
 
 # --------------------------------------------------------------------------- proposals
 
@@ -871,10 +873,10 @@ def _publish(execution,proposal,connector,user):
     elif readable:result=_finish(execution,'sent',user,note='Publicada (201 con URN); aún no visible al releer. Se conciliará sin repetir.')
     else:result=_finish(execution,'confirmed',user,note='Confirmada por la respuesta 201 de la Posts API (x-restli-id); '
                         'w_member_social no permite releer y no hay cuenta de LinkedIn directo.')
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     thesis=(proposal.piece.brief or {}).get('thesis') if proposal.piece_id else ''
     avisar('piece_published',f'Publicaste «{thesis or text[:80]}»','Las impresiones a las 24 h llegan mañana.',
-           link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_published:{proposal.id}')
+           link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_published:{proposal.id}',member=de_cuenta(proposal.account))
     return result
 
 def deferred_until(account,capability,now=None):
@@ -972,8 +974,9 @@ def execute(user,proposal_id):
             from .autopiloto import post_issues
             issues=post_issues(proposal)
             if issues:
-                from .notificaciones import avisar
-                avisar('piece_blocked','No se publicó la pieza','; '.join(issues)[:300],link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_gate:{proposal.id}')
+                from .notificaciones import avisar, de_cuenta
+                avisar('piece_blocked','No se publicó la pieza','; '.join(issues)[:300],link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_gate:{proposal.id}',
+                       member=de_cuenta(proposal.account))
                 return _finish(execution,'failed',user,error_kind='content_gate',note='; '.join(issues),wrote=False)
             return _publish(execution,proposal,connector,user)
         if proposal.capability in NETWORK:
@@ -1009,8 +1012,9 @@ def execute(user,proposal_id):
         confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
-        from .notificaciones import avisar
-        avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en la Bandeja.')
+        from .notificaciones import avisar, de_cuenta
+        avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en la Bandeja.',
+               member=de_cuenta(proposal.account))
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         # Before the write was accepted, nothing left: no failure, no limit rule, no pause; it waits (an own post keeps
@@ -1024,8 +1028,9 @@ def execute(user,proposal_id):
         if proposal.payload.get('note'):
             _audit(user,'network.note_rejected',proposal.id,kind=exc.kind,provider_consumption='not_consumed')
         if proposal.piece_id:
-            from .notificaciones import avisar
-            avisar('piece_blocked','La pieza no pudo publicarse',str(exc),link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_failed:{proposal.id}')
+            from .notificaciones import avisar, de_cuenta
+            avisar('piece_blocked','La pieza no pudo publicarse',str(exc),link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_failed:{proposal.id}',
+                   member=de_cuenta(proposal.account))
         # A failed read before the write proves nothing was sent; a rejected write was not applied.
         return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc),wrote=False)
     except ProfileReadCapReached as exc:

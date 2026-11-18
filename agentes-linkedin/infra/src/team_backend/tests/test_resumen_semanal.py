@@ -665,8 +665,8 @@ class CardAndNoticeTests(SummaryBase):
 
     def test_the_notification_kind_pushes_by_default(self):
         self.assertEqual(notificaciones.FEED_KINDS['weekly_summary'],('tuyo',True,'Resumen de la semana listo'))
-        self.assertTrue(notificaciones.push_enabled('weekly_summary'))
-        self.assertIn('weekly_summary',[row['kind'] for row in notificaciones.push_types() if row['goes_to']=='notificaciones'])
+        self.assertTrue(notificaciones.push_enabled('weekly_summary',None))  # an installation without members
+        self.assertIn('weekly_summary',[row['kind'] for row in notificaciones.push_types(None) if row['goes_to']=='notificaciones'])
 
 
 class DirectorInputTests(SummaryBase):

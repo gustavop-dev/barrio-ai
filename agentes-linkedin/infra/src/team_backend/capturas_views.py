@@ -201,8 +201,9 @@ class PhotoImage(FileView):
 
 # --------------------------------------------------------------------------- preferences
 
-def _preferences():
-    current=OfficePreference.current()
+def _preferences(user):
+    """Her own preferences (OfficePreference.of: each user hers; organizaciones, phase 5)."""
+    current=OfficePreference.of(user)
     return {'gallery_ai_edit':current.gallery_ai_edit,'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'push_enabled':current.push_enabled,
             'updated_at':current.updated_at}
 
@@ -211,10 +212,10 @@ class Preferences(APIView):
     (push_disabled: turned off; push_enabled: turned on although off by default)."""
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(_preferences())
+        return Response(_preferences(request.user))
     def patch(self,request):
         human_session(request);require(request.user,'approve_actions')
-        data=valid(PreferencesInput,request);current=OfficePreference.current()
+        data=valid(PreferencesInput,request);current=OfficePreference.of(request.user)
         if not data:raise ValidationError('Envía gallery_ai_edit_default, push_disabled o push_enabled')
         if 'gallery_ai_edit_default' in data:current.gallery_ai_edit_default=data['gallery_ai_edit_default']
         if 'gallery_ai_edit' in data and 'gallery_ai_edit_default' in data:raise ValidationError('Envía solo gallery_ai_edit')
@@ -230,6 +231,6 @@ class Preferences(APIView):
             if 'push_enabled' not in data:on=set(current.push_enabled or [])-off
             current.push_disabled=sorted(off);current.push_enabled=sorted(on)
         current.updated_by=request.user;current.updated_at=timezone.now();current.save()
-        audit(request.user,'office.preferences',1,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled,
+        audit(request.user,'office.preferences',current.pk,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled,
               push_enabled=current.push_enabled)
-        return Response(_preferences())
+        return Response(_preferences(request.user))

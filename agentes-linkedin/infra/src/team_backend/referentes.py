@@ -9,7 +9,7 @@ from urllib.parse import urlsplit
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
-from . import identidad
+from . import identidad, miembros
 from .jobs import Conflict, audit
 from .models import (AuditEvent, ConnectorAccount, Notification, Referent, ReferentChange,
                      ReferentControl, ReferentNotice, ReferentReview)
@@ -192,8 +192,11 @@ def notice(review, event, title, detail, now):
     payload = {'title': title, 'detail': detail, 'deadline': review.deadline.isoformat()}
     row, created = ReferentNotice.objects.get_or_create(review=review, event=event, defaults={'payload': payload, 'created_at': now})
     if created:
-        Notification.objects.create(kind='referents_review', layer='conversaciones', title=title, detail=detail,
-            link='/personas?pestana=referentes' if event=='closed' else '/tu-turno', ref=f'referents:{review.pk}:{event}', created_at=now)
+        # The decision is the account owner's (or the admin's): the notice is hers (organizaciones, phase 5).
+        from .notificaciones import _ref
+        owner = miembros.member_of_account(review.account)
+        Notification.objects.create(kind='referents_review', layer='conversaciones', title=title, detail=detail, member=owner,
+            link='/personas?pestana=referentes' if event=='closed' else '/tu-turno', ref=_ref(f'referents:{review.pk}:{event}', owner), created_at=now)
     return row
 
 
@@ -381,18 +384,17 @@ def tick(user, now=None):
     if ReferentExperiment.objects.filter(state='approved').exists():
         enqueue_operation(user,'advance_experiments',{},request_id=uuid.uuid5(uuid.NAMESPACE_URL,f'experiments:{local:%Y-%m-%d-%H}'))
     if operador.within_window(now):
-        from .alerts import notify
-        from .notificaciones import push_enabled
-        for pending in ReferentNotice.objects.filter(pushed_at__isnull=True).select_related('review'):
+        from .notificaciones import empujar
+        for pending in ReferentNotice.objects.filter(pushed_at__isnull=True).select_related('review__account'):
             if pending.event == 'day1' and now < bounds(pending.review.month)[0] + timedelta(hours=9):
                 continue
             with transaction.atomic():
                 pending = ReferentNotice.objects.select_for_update().get(pk=pending.pk)
                 if pending.pushed_at:
                     continue
-                if push_enabled('referents_review'):
-                    notify(pending.payload['title'], pending.payload['detail'][:200],
-                           url='/personas?pestana=referentes' if pending.event=='closed' else '/tu-turno', tag=f'referents-{pending.pk}')
+                empujar('referents_review', pending.payload['title'], pending.payload['detail'][:200],
+                        '/personas?pestana=referentes' if pending.event=='closed' else '/tu-turno', f'referents-{pending.pk}',
+                        member=miembros.member_of_account(pending.review.account))  # the account owner's devices
                 pending.pushed_at = now
                 pending.save(update_fields=['pushed_at'])
     tomorrow = (local + timedelta(days=1)).date()

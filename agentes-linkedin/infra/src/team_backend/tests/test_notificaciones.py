@@ -14,9 +14,9 @@ class NotificationTests(OperatorBase):
         push=patch('team_backend.alerts.notify');self.push=push.start();self.addCleanup(push.stop)
 
     def test_feed_events_are_recorded_once_and_push_follows_the_table(self):
-        notificaciones.avisar('piece_published','Publicaste «X»','Las impresiones a las 24 h llegan mañana.',link='/calendario/pieza/1',ref='piece_published:1')
-        notificaciones.avisar('piece_published','Publicaste «X»',ref='piece_published:1')  # same event: recorded once
-        notificaciones.avisar('connection_fit','Ana aceptó tu invitación','Founder · Comprador',link='/personas/1',ref='connection:1')
+        notificaciones.avisar('piece_published','Publicaste «X»','Las impresiones a las 24 h llegan mañana.',link='/calendario/pieza/1',ref='piece_published:1',member=None)
+        notificaciones.avisar('piece_published','Publicaste «X»',ref='piece_published:1',member=None)  # same event: recorded once
+        notificaciones.avisar('connection_fit','Ana aceptó tu invitación','Founder · Comprador',link='/personas/1',ref='connection:1',member=None)
         self.assertEqual(Notification.objects.count(),2)
         self.assertEqual(self.push.call_count,1)  # published pushes by default; a new connection does not
         self.assertEqual(self.push.call_args.kwargs['url'],'/calendario/pieza/1')
@@ -104,23 +104,23 @@ class PushSwitchTests(OperatorBase):
         self.assertEqual(saved.status_code,200,saved.content)
         self.assertEqual((saved.json()['push_disabled'],saved.json()['push_enabled']),([],['connection_fit']))
         self.assertTrue(self.kinds()['connection_fit']['enabled'])
-        notificaciones.avisar('connection_fit','Ana aceptó tu invitación','Founder · Comprador',link='/personas/1',ref='connection:1')
+        notificaciones.avisar('connection_fit','Ana aceptó tu invitación','Founder · Comprador',link='/personas/1',ref='connection:1',member=None)
         self.assertEqual(self.push.call_count,1);self.assertEqual(self.push.call_args.kwargs['url'],'/personas/1')
         # An older client sends push_disabled only: what was turned on stays on, unless it is in that list.
         self.patch_preferences({'push_disabled':['question']})
         kinds=self.kinds();self.assertEqual((kinds['connection_fit']['enabled'],kinds['question']['enabled']),(True,False))
         self.patch_preferences({'push_disabled':['connection_fit']})
         kinds=self.kinds();self.assertEqual((kinds['connection_fit']['enabled'],kinds['question']['enabled']),(False,True))
-        self.assertEqual(OfficePreference.current().push_enabled,[])
+        self.assertEqual(OfficePreference.of(self.gustavo).push_enabled,[])
         self.push.reset_mock()
-        notificaciones.avisar('connection_fit','Luis aceptó tu invitación',ref='connection:2')
+        notificaciones.avisar('connection_fit','Luis aceptó tu invitación',ref='connection:2',member=None)
         self.push.assert_not_called()
 
     def test_bad_bodies_are_refused(self):
         self.assertEqual(self.patch_preferences({'push_enabled':['nope']}).status_code,400)
         self.assertEqual(self.patch_preferences({'push_disabled':['question'],'push_enabled':['question']}).status_code,400)
         self.assertEqual(self.api.patch('/api/v1/ajustes/preferencias',{'push_enabled':['connection_fit']},format='json').status_code,403)
-        self.assertEqual(OfficePreference.current().push_enabled,[])
+        self.assertEqual(OfficePreference.of(self.gustavo).push_enabled,[])
 
 
 class PushEmitterTests(OperatorBase):

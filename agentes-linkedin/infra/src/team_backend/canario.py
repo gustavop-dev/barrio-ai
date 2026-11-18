@@ -103,8 +103,8 @@ def run(account,now=None,connector=None):
     return log
 
 def _notify(account,log,now):
-    from .notificaciones import avisar
-    today=tries(account,now)
+    from .notificaciones import avisar, de_cuenta
+    today=tries(account,now);owner=de_cuenta(account)  # her account's test: her notice
     if log.state==CanaryRun.State.NOT_RUN and today<TRIES:return  # it will be tried again: nothing to say yet
     before=CanaryRun.objects.filter(account=account,started_at__lt=_midnight(now)).exclude(state=CanaryRun.State.RUNNING).first()
     previous=before.state if before else CanaryRun.State.OK
@@ -113,10 +113,10 @@ def _notify(account,log,now):
     if log.state==CanaryRun.State.BROKEN:
         avisar('linkedin_canary','La prueba diaria de LinkedIn encontró lecturas rotas',
                f'{account.label}: {", ".join(failing(log))}. LinkedIn cambió algo; lo que dependa de esas lecturas puede '
-               'fallar o quedarse sin datos hasta que se ajuste el conector directo.',ref=ref)
+               'fallar o quedarse sin datos hasta que se ajuste el conector directo.',ref=ref,member=owner)
     elif log.state==CanaryRun.State.NOT_RUN:
         avisar('linkedin_canary','La prueba diaria de LinkedIn no pudo correr hoy',
-               f'{account.label}: {log.error or "sin detalle"} Se intentó {today} veces; mañana vuelve a intentarlo.',ref=ref)
+               f'{account.label}: {log.error or "sin detalle"} Se intentó {today} veces; mañana vuelve a intentarlo.',ref=ref,member=owner)
     elif log.state==CanaryRun.State.OK:
         avisar('linkedin_canary','La prueba diaria de LinkedIn vuelve a pasar',
-               f'{account.label}: las {len(log.operations)} lecturas traen sus campos otra vez.',ref=ref)
+               f'{account.label}: las {len(log.operations)} lecturas traen sus campos otra vez.',ref=ref,member=owner)

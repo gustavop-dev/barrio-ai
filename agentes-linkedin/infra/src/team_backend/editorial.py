@@ -912,18 +912,19 @@ def _run(piece,user,now,origin_job):
                             day_attempt=attempt,context=context_hashes(memory),**({'repair':repair} if repair else {}))
     piece.save(update_fields=['final_text','verification','updated_at'])
     if reasons:
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_contenido
         who='El verificador bloqueó' if review is not None else 'Las reglas de publicación bloquearon'
         again=' Habrá un segundo intento para ese día.' if compuertas.retry_left(piece,timezone.now()) else ''
         avisar('piece_blocked',f'{who} la pieza del {piece.slot_date:%d/%m}',reasons[0][:300-len(again)]+again,
-               link=f'/calendario/pieza/{piece.id}',ref=f'piece_blocked:{piece.id}')
+               link=f'/calendario/pieza/{piece.id}',ref=f'piece_blocked:{piece.id}',member=de_contenido(piece))
         return _close(piece,EditorialPiece.State.BLOCKED,'; '.join(reasons))
     try:
         _visual(piece,public,private)
         urgente.ensure_veto(piece)
     except ValueError as exc:
-        from .notificaciones import avisar
-        avisar('piece_blocked','Pieza bloqueada: imagen',str(exc)[:300],link=f'/calendario/pieza/{piece.id}',ref=f'piece_image_blocked:{piece.id}')
+        from .notificaciones import avisar, de_contenido
+        avisar('piece_blocked','Pieza bloqueada: imagen',str(exc)[:300],link=f'/calendario/pieza/{piece.id}',ref=f'piece_image_blocked:{piece.id}',
+               member=de_contenido(piece))
         return _close(piece,EditorialPiece.State.BLOCKED,str(exc))
     risks=[f'Observación menor: {f.get("detail") or f.get("issue")}' for f in review.get('findings',[]) if f.get('severity')=='minor']
     risks+=compuertas.observation_risks(observations)

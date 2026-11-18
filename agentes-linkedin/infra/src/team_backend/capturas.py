@@ -150,7 +150,7 @@ def _remove_files(names):
 
 def _save_photos(user,checked,saved,capture=None):
     """Store each photo; `saved` collects the file names so a failure can remove them."""
-    ai_edit=capture.ai_edit if capture else OfficePreference.current().gallery_ai_edit;photos=[]
+    ai_edit=capture.ai_edit if capture else OfficePreference.of(user).gallery_ai_edit;photos=[]  # her own default
     for upload,mime,ext in checked:
         photo=GalleryPhoto(mime=mime,size_bytes=upload.size,ai_edit=ai_edit,note=_clip(capture.text,2000) if capture else '',capture=capture,created_by=user)
         photo.image.save('foto'+ext,upload,save=False);saved.append(photo.image.name)
@@ -247,7 +247,7 @@ def create(user,data,audio=None,photos=()):
     if kind=='pregunta' or purpose in ('dato','respuesta'):require(user,'confirm_memory')
     audio_mime,audio_ext=check_audio(audio) if audio is not None else ('','')
     checked=check_photos(photos)
-    capture=Capture(created_by=user,note=note,purpose=purpose,ai_edit=data.get('ai_edit',OfficePreference.current().gallery_ai_edit),context_type=kind,context_id=ident,public_use=data.get('public_use'),
+    capture=Capture(created_by=user,note=note,purpose=purpose,ai_edit=data.get('ai_edit',OfficePreference.of(user).gallery_ai_edit),context_type=kind,context_id=ident,public_use=data.get('public_use'),
                     audio_mime=audio_mime,audio_duration_s=data.get('audio_duration_s') if audio is not None else None,
                     outcome=_outcome('recibida','El equipo lo recibió'))
     saved=[]
@@ -471,9 +471,9 @@ def process(capture_id):
             urgente.assign_slots(member=locked.member)  # her calendar (every member's for a capture without one)
             locked.refresh_from_db()
         if role:oficina_eventos.emit('entrega','operador_cuenta',role,event_details(locked).get(kind,''))
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_contenido
         avisar('capture_processed',outcome.get('text') or 'Tu envío ya tiene destino','Míralo en «Lo que enviaste».',link='/?enviado=1',
-               ref=f'capture:{locked.id}')
+               ref=f'capture:{locked.id}',member=de_contenido(locked))
         audit(user,'capture.routed',locked.id,kind=kind,classified=classified)
         if locked.routed_to.get('rework')=='pending':
             from . import retoque
@@ -606,7 +606,7 @@ def mark_used(ids,piece):
 def decline_reserved(capture_id,piece,why=''):
     """The director did not take the idea reserved for this piece: it stays on the table for later briefs, without a
     window of its own (it is not prepared again automatically), and Gustavo is told."""
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_contenido
     capture=Capture.objects.filter(id=capture_id,state=Capture.State.IDEA).first()
     if capture is None:return
     text=f'El director no la usó para el {day_label(piece.slot_date)}'+(f': {why}' if why else '')+'. Sigue en la mesa editorial.'
@@ -614,7 +614,8 @@ def decline_reserved(capture_id,piece,why=''):
     capture.publish_asap_expected_slot=None;capture.publish_asap_reason=text[:2000]
     capture.outcome=_outcome('idea',text[:500])
     capture.save(update_fields=['routed_to','publish_asap_expected_slot','publish_asap_reason','outcome'])
-    avisar('capture_scheduled','Tu idea no salió en su fecha',text[:300],link=f'/calendario/pieza/{piece.id}',ref=f'capture_declined:{capture.id}:{piece.id}')
+    avisar('capture_scheduled','Tu idea no salió en su fecha',text[:300],link=f'/calendario/pieza/{piece.id}',ref=f'capture_declined:{capture.id}:{piece.id}',
+           member=de_contenido(capture))
 
 def release_ideas(piece,why):
     """The piece that used Gustavo's ideas did not go out (skipped, blocked, failed, discarded or vetoed): they go back

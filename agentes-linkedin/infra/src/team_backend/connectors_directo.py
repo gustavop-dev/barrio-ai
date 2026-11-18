@@ -33,7 +33,7 @@ def egress_notice(account_id,since,detail):
     from django.db import transaction
     from . import operador
     from .models import AuditEvent,ConnectorAccount
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     episode=str(since or '')[:40]
     try:
         with transaction.atomic():  # a savepoint: a failure here never spoils the caller's transaction
@@ -44,7 +44,7 @@ def egress_notice(account_id,since,detail):
     except Exception:return  # a notice never breaks the work that saw it (avisar never raises either)
     avisar('navegador_salida','LinkedIn directo: el servicio no abre la cuenta por otra salida a internet',
            f'{account.label}: {detail} Mientras tanto no sale nada a LinkedIn con esta cuenta; lo pendiente espera y '
-           'vuelve a intentarse solo.',ref=f'navegador_salida:{account.id}:{episode}')
+           'vuelve a intentarse solo.',ref=f'navegador_salida:{account.id}:{episode}',member=de_cuenta(account))
 
 def live():
     return os.environ.get('LIVE_LINKEDIN_DIRECTO','false').lower()=='true'

@@ -427,14 +427,15 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
 
 def notify(proposal):
     if proposal.state in ('cancelled','superseded'):return
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_usuario
+    whose=de_usuario(proposal.owner)  # her profile
     if no_changes(proposal):
         detail=' · '.join(s['title']+': '+s['reason']+' '+', '.join(c['unit_id'] for c in s['citations']) for s in proposal.sections)
         avisar('profile_reviewed','Revisión mensual del perfil: sin cambios recomendados',detail,
-            ref=f'profile:{proposal.id}:v{proposal.version}:{proposal.state}')
+            ref=f'profile:{proposal.id}:v{proposal.version}:{proposal.state}',member=whose)
     else:
         avisar('profile_task','Tu propuesta de perfil está disponible','Revisa el documento y aplica cada sección cuando decidas.',
-            link=f'/tu-turno#turno-perfil:{proposal.id}',ref=f'profile:{proposal.id}:v{proposal.version}:{proposal.state}')
+            link=f'/tu-turno#turno-perfil:{proposal.id}',ref=f'profile:{proposal.id}:v{proposal.version}:{proposal.state}',member=whose)
     for trigger in proposal.triggers:
         if trigger.get('capture'):
             Capture.objects.filter(pk=trigger['capture']).exclude(state='deshecha').update(outcome={'kind':'perfil',

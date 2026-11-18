@@ -167,6 +167,7 @@ def base_for_change(piece, capture):
 
 
 def _notice(piece, title, detail, kind='piece_blocked'):
-    from .notificaciones import avisar
-    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=f'piece_override:{piece.id}:{timezone.now():%Y%m%d%H%M}')
+    from .notificaciones import avisar, de_contenido
+    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=f'piece_override:{piece.id}:{timezone.now():%Y%m%d%H%M}',
+           member=de_contenido(piece))
 

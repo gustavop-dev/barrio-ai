@@ -69,7 +69,7 @@ def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answe
     except IntegrityError:return None
     audit(None,'team.question_asked',item.id,agent=agent,key=key)
     from .notificaciones import avisar
-    avisar('question',f'{agent_label(agent)} te pregunta',question[:200])
+    avisar('question',f'{agent_label(agent)} te pregunta',question[:200],member=member)  # hers
     return item
 
 

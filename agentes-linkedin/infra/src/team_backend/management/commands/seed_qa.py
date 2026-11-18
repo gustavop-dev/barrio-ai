@@ -779,7 +779,7 @@ class Command(BaseCommand):
         orientation.text='Habla a fundadores de startups latinoamericanas en etapa temprana. Evita el tono de vendedor.'
         orientation.updated_by=self.user;orientation.updated_at=self.ago(days=12);orientation.save()
         control=OperatorControl.current();control.paused=False;control.reason='';control.updated_by=None;control.updated_at=None;control.save()
-        preference=OfficePreference.current();preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
+        preference=OfficePreference.of(self.user);preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
         preference.updated_by=None;preference.updated_at=None;preference.save()
 
     def office(self):

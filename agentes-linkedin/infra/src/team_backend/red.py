@@ -218,7 +218,7 @@ def review_health(account,now=None):
                 if account is not None:operador.set_account_pause(account,'Aceptación de invitaciones bajo 25%; mínimo siete días de pausa.')
             else:
                 from .notificaciones import avisar
-                avisar('invitation_health','Rampa de invitaciones reducida',reason)
+                avisar('invitation_health','Rampa de invitaciones reducida',reason,member=member)
         elif (setting('OPERATOR_INVITE_RAMP_ENABLED','true').lower()=='true' and not account.paused and not account.is_locked and rate>=minimum and not fallen and
               now>=datetime.fromisoformat(state['freeze_until']) and now>=datetime.fromisoformat(state['stage_since'])+timedelta(days=days)):
             state['stage']=min(2,state['stage']+1);state['stage_since']=now.isoformat();reason='Etapa saludable tras al menos siete días'
@@ -285,8 +285,9 @@ def provider_failure(account,proposal,exc,actor=None):
             state['pause_until']=(now+timedelta(days=7)).isoformat();_save_ramp(state,'cannot_resend_yet repetido',now,member)
             operador.set_account_pause(account,'cannot_resend_yet en dos destinatarios: mínimo siete días de pausa.',actor)
         else:
-            from .notificaciones import avisar
-            avisar('invitation_blocked','Destinatario bloqueado; rampa reducida','No se reenvía la invitación. Crecimiento congelado siete días.')
+            from .notificaciones import avisar, de_cuenta
+            avisar('invitation_blocked','Destinatario bloqueado; rampa reducida','No se reenvía la invitación. Crecimiento congelado siete días.',
+                   member=de_cuenta(account))
     elif restricted or limit:
         operador.set_account_pause(account,f'Restricción o límite del proveedor: {exc}. Mínimo siete días; requiere revisión.',actor)
 
@@ -1733,11 +1734,11 @@ def on_lead_discard(proposal):
     were possible buyers (12/11/2026). One notice per person; his «Sí, encaja» lifts the rest (confirm_fit)."""
     contact=proposal.contact
     if contact is None or proposal.capability not in NETWORK_CAPABILITIES or not (contact.classification or {}).get('fit'):return
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     reasons='; '.join((proposal.review or {}).get('reasons') or [])[:240]
     avisar('network_doubt',f'El líder dudó de {contact.display_name}',
            f'El clasificador dice que encaja; el líder lo frenó ({reasons or "sin motivo"}). Descansa {lead_rest().days} días '
-           'salvo que confirmes que encaja.',link=f'/personas/{contact.pk}',ref=f'network_doubt:{contact.pk}')
+           'salvo que confirmes que encaja.',link=f'/personas/{contact.pk}',ref=f'network_doubt:{contact.pk}',member=de_cuenta(proposal.account))
 
 def confirm_fit(user,contact_id):
     """Gustavo says the person fits: the lead stops reviewing actions for them, and the rest after its doubt ends."""
@@ -1763,9 +1764,10 @@ ROLE_LABELS={'par':'Par','recomendador':'Recomendador','lider':'Líder','comprad
 def notify_connection(contact,title):
     """Notificaciones: a new connection that fits (no push by default)."""
     if not (contact.classification or {}).get('fit'):return
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     role=ROLE_LABELS.get(contact.classification.get('role'),'')
-    avisar('connection_fit',title,' · '.join(x for x in (contact.headline[:120],role) if x),link=f'/personas/{contact.id}',ref=f'connection:{contact.id}')
+    avisar('connection_fit',title,' · '.join(x for x in (contact.headline[:120],role) if x),link=f'/personas/{contact.id}',ref=f'connection:{contact.id}',
+           member=de_cuenta(contact.account))
 
 def network_issues(proposal):
     """Autonomous gate for RED-*: the person still fits, nothing extra is sent, LinkedIn has not pushed back."""

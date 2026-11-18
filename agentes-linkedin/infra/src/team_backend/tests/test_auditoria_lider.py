@@ -308,7 +308,7 @@ class LeadSilenceTests(LeadBase):
         self.assertIn('revisó 5 propuestas',notification.detail);self.assertIn('aporta (5)',notification.detail)
         self.assertEqual(notification.link,'/calendario?vista=lista&tipo=comentarios&no_salio=1')
         notify.assert_called_once()
-        push={t['kind']:t for t in notificaciones.push_types()}['lead_silent']
+        push={t['kind']:t for t in notificaciones.push_types(None)}['lead_silent']
         self.assertEqual((push['goes_to'],push['default']),('notificaciones',True))
 
     def test_no_alert_with_an_approval_too_few_reviews_or_outside_auto(self):

@@ -668,7 +668,7 @@ def run(user,monday,origin_job='',member=None):
     oficina_eventos.emit('entrega','director_editorial','gustavo',f'Plan de la semana del {monday:%d/%m}')
     avisar('weekly_plan','La semana ya tiene plan',plan.summary or 'Mira los tipos de cada día en el Calendario.',
            link='/calendario?vista=semana',ref=f'weekly_plan:{monday.isoformat()}:{len(plan.usage)}'
-           +('' if miembros.is_first(member) else f':{member.pk}'))  # hers: never deduplicated by another member's
+           +('' if miembros.is_first(member) else f':{member.pk}'),member=member)  # hers: never deduplicated by another member's
     operador._audit(user,'strategy.planned',plan.id,week=monday.isoformat(),warnings=len(plan.warnings))
     return plan
 

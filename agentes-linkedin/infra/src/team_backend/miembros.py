@@ -377,6 +377,12 @@ def adopt_content(member):
     for name in CONTENT_MODELS:
         moved += apps.get_model('team_backend', name).objects.filter(member__isnull=True).update(member=member)
     moved += apps.get_model('team_backend', 'Orientation').objects.filter(pk=1, member__isnull=True).update(member=member)
+    # Phase 5 (migration 0061's rule): her notices, her preferences of before and the opportunities she registered.
+    moved += apps.get_model('team_backend', 'Notification').objects.filter(member__isnull=True).update(member=member)
+    moved += apps.get_model('team_backend', 'OfficePreference').objects.filter(pk=1, user__isnull=True).update(user=member.user)
+    Opportunity = apps.get_model('team_backend', 'Opportunity')
+    moved += Opportunity.objects.filter(member__isnull=True).update(member=member)
+    moved += Opportunity.objects.filter(origin_member__isnull=True).update(origin_member=member)
     return moved
 
 

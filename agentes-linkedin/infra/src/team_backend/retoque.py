@@ -94,8 +94,8 @@ def _record(capture, state, text, **extra):
 
 
 def _notice(kind, title, detail, piece, ref):
-    from .notificaciones import avisar
-    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=ref)
+    from .notificaciones import avisar, de_contenido
+    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=ref, member=de_contenido(piece))
 
 
 # --------------------------------------------------------------------------- entry point (job process_capture)
