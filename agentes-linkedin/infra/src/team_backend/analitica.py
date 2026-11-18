@@ -29,7 +29,7 @@ from django.db.models import F, Max, Min, Q
 from django.utils import timezone
 from linkedin_directo.analitica import post_urn
 from linkedin_directo.permitidas import ANALYTICS_DAYS
-from . import operador
+from . import miembros, operador
 from .connectors import ConnectorError, get_connector
 from .resultados import kpi, ratio_kpi
 from .models import (ActionExecution, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
@@ -299,14 +299,17 @@ def _day(value,name):
     try:return date.fromisoformat(str(value))
     except ValueError:raise ValueError(f'{name} debe ser una fecha AAAA-MM-DD.') from None
 
-def account_for(account_id=None):
-    accounts=ConnectorAccount.objects.filter(provider='directo')
+def account_for(account_id=None,member=None):
+    """The member's directo account whose analytics are shown: `account_id` if it is one of hers, else the one imported
+    last. Without a member, miembros.default_member() (organizaciones, phase 1); another member's account is refused like
+    an unknown one."""
+    accounts=miembros.accounts(miembros.resolve(member),['directo'])
     if account_id:
         try:found=accounts.filter(id=uuid.UUID(str(account_id))).first()
         except ValueError:found=None
         if not found:raise ValueError('cuenta debe ser el id de una cuenta «directo».')
         return found
-    # Several directo accounts: the one imported last (single workspace: normally there is one).
+    # Several directo accounts of the member: the one imported last (normally there is one).
     return accounts.annotate(last=Max('analytics_imports__finished_at',filter=Q(analytics_imports__state='ok'))).order_by(
         F('last').desc(nulls_last=True),'created_at').first()
 
@@ -377,9 +380,9 @@ def _content(account,first,last):
     return {'desde':best.start,'hasta':best.end,'exacto':(best.start,best.end)==(first,last),'captured_at':best.captured_at,
             'groups':grouped(best.content)}
 
-def overview(account_id=None,periodo=None,desde=None,hasta=None,now=None):
+def overview(account_id=None,periodo=None,desde=None,hasta=None,now=None,member=None):
     now=now or timezone.now()
-    account=account_for(account_id)
+    account=account_for(account_id,member)
     if account is None:return {'disponible':False,'motivo':NO_ACCOUNT}
     bounds=AnalyticsDay.objects.filter(account=account).aggregate(first=Min('day'),last=Max('day'))
     first,last,preset=period(periodo,desde,hasta,bounds['last'],now)

@@ -18,7 +18,7 @@ from django.db.models import Case, Count, Max, Q, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, idioma, lider, oficina_eventos, operador, red
+from . import guardas, idioma, lider, miembros, oficina_eventos, operador, red
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, CycleLedger, EditorialPiece, Job, ObservedPost
 
@@ -630,7 +630,7 @@ def _metrics(user,account,now):
     every=_every('METRICS_EVERY_MINUTES','180')
     if not operador.within_read_window(now):return 0
     if account.provider not in metricas.PROVIDERS or every<=timedelta(0) or _pending('collect_metrics',account=str(account.id)):return 0
-    if not metricas.due(now):return 0
+    if not metricas.due(now,miembros.member_for_account(account)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
     return int(created)

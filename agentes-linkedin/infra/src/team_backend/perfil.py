@@ -14,8 +14,8 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 from PIL import Image
-from . import guardas, imagenes, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
-from .models import ActionExecution, Capture, ConnectorAccount, CycleLedger, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
+from . import guardas, imagenes, miembros, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
+from .models import ActionExecution, Capture, CycleLedger, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
 from .jobs import audit, enqueue_operation
 
 NS=uuid.UUID('0ff1ce08-0000-4000-8000-000000000008')
@@ -35,12 +35,14 @@ SECTION_ASSETS={'photo':{'A','B'},'banner':{'banner'}}
 PUBLIC_QUESTION='LinkedIn Help personal profile headline About character limits custom profile URL requirements'
 
 
-def read_profile():
-    """Only the connected owner's reduced profile; missing fields remain explicitly unreadable."""
+def read_profile(member=None):
+    """Only the member's own reduced profile, through her first directo (or simulated) account that is neither paused nor
+    locked; missing fields remain explicitly unreadable. Without a member, miembros.default_member()."""
     from .connectors import get_connector, ConnectorError
     from .red import _read, ReadCapReached
     at=timezone.now().isoformat();result={'sections':{},'evidence':[],'at':at,'limitations':['El conector no expone todas las secciones.']}
-    account=ConnectorAccount.objects.filter(provider__in=['fake','directo'],paused=False,is_locked=False).order_by('created_at').first()
+    account=(miembros.accounts(miembros.resolve(member),miembros.READERS).filter(paused=False,is_locked=False)
+             .order_by('created_at').first())
     if not account:return result
     try:
         _read(account,'profile',purpose='profile-strategy')
@@ -100,12 +102,21 @@ def add_months(day,n):
     return day.replace(year=year,month=month,day=min(day.day,calendar.monthrange(year,month)[1]))
 
 
+def owner():
+    """Whose profile the periodic cycle prepares: PROFILE_OWNER_USERNAME's active user when it is set (as before
+    organizations), else the user of the only active member (miembros.default_member). None when neither names one: no
+    members, or several active members (phase 3 gives each member her profile cycle)."""
+    username=os.environ.get('PROFILE_OWNER_USERNAME','').strip()
+    if username:return get_user_model().objects.filter(username=username,is_active=True).first()
+    try:member=miembros.default_member()
+    except miembros.MiembroRequerido:return None
+    return member.user if member is not None and member.user.is_active else None
+
+
 @transaction.atomic
 def schedule(user,now=None):
     if os.environ.get('PROFILE_ENABLED','false').lower()!='true':return 0
-    username=os.environ.get('PROFILE_OWNER_USERNAME','').strip()
-    if not username:return 0
-    user=get_user_model().objects.filter(username=username,is_active=True).first()
+    user=owner()
     if user is None:return 0
     from .operador import local_tz
     day=(now or timezone.now()).astimezone(local_tz()).date();month=day.strftime('%Y-%m')
@@ -295,7 +306,9 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
             affected=previous_context.get('affected',[])
             if affected:context['section_ids']=affected
             context['library']=runtime.call('perfil_biblioteca',{'mode':proposal.mode},lambda:(library or content.library)(proposal.mode),key=prefix+'library')
-            context['snapshot']=runtime.call('perfil_lectura',{},reader or read_profile,key=prefix+'read')
+            # The profile read is the proposal owner's own, never another member's.
+            context['snapshot']=runtime.call('perfil_lectura',{},reader or (lambda:read_profile(miembros.member_for(proposal.owner))),
+                                             key=prefix+'read')
             web_request=research.ResearchRequest(key=f'profile:{proposal.id}',public_question=PUBLIC_QUESTION,search=True)
             try:
                 web=runtime.call('perfil_web',web_request,lambda:(researcher or research.research)(web_request),key='web')

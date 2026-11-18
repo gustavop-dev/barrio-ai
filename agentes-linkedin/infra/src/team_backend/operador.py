@@ -24,7 +24,7 @@ from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, deferred,
 from .exceptions import Conflict
 from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, PostComment, Referent)
 from .permissions import require
-from . import orientacion, voz
+from . import miembros, orientacion, voz
 
 COMMENT_MAX_CHARS=1250
 USER_ID=re.compile(r'[A-Za-z0-9_\-]{3,200}')
@@ -420,8 +420,14 @@ def current_hash(proposal):
 # --------------------------------------------------------------------------- accounts and observation
 
 def register_account(user,provider,external_account_id,label):
+    """A new account belongs to the member of whoever registers it (miembros.member_for: her own, or the only member);
+    an existing one keeps its owner."""
     require(user,'manage_jobs')
-    account,created=ConnectorAccount.objects.get_or_create(provider=provider,external_account_id=external_account_id,defaults={'label':label})
+    account=ConnectorAccount.objects.filter(provider=provider,external_account_id=external_account_id).first()
+    if account is not None:return account
+    member=miembros.member_for(user)
+    account,created=ConnectorAccount.objects.get_or_create(provider=provider,external_account_id=external_account_id,
+                                                           defaults={'label':label,'member':member})
     if created:_audit(user,'operator.account_registered',account.id,provider=provider)
     return account
 
@@ -458,7 +464,7 @@ def add_referent(user,account,identifier,reason,kind='nicho'):
             existing=Referent.objects.filter(account=account,public_identifier=slug).first()
             if existing:
                 if existing.archived_at:
-                    if existing.protected:referentes.require_gustavo(user)
+                    if existing.protected:referentes.require_gustavo(user,account)
                     before=referentes.snapshot(existing)
                     existing.archived_at=None;existing.active=True;existing.reason=reason.strip()
                     referentes.changed(control,user,existing,before,'personas','Restaurar referente')
@@ -503,7 +509,7 @@ def set_referent_kind(user,account,identifier,kind,reason,confirm=False):
         if referent is None:raise ValueError('No es referente de esta cuenta; añádelo con «referente».')
         previous=referent.kind
         if previous==kind or not confirm:return referent,previous,False
-        if referent.protected:referentes.require_gustavo(user)
+        if referent.protected:referentes.require_gustavo(user,account)
         before=referentes.snapshot(referent)
         referent.kind=kind;referent.revision+=1;referent.save(update_fields=['kind','revision'])
         _audit(user,'referents.changed',referent.id,source='operador',reason=f'Tipo {previous} → {kind}: {reason.strip()[:300]}',
@@ -741,16 +747,17 @@ def _find_own_comment(connector,post_id,text,comment_id=None):
             return comment
     return None
 
-def _own_posts_reader():
-    """The directo account (or the simulated one) can read Gustavo's own posts; w_member_social cannot. None without one."""
-    for account in ConnectorAccount.objects.filter(provider__in=['fake','directo']).order_by('created_at'):
+def _own_posts_reader(member=None):
+    """The member's directo account (or the simulated one) can read her own posts; w_member_social cannot. Never another
+    member's: it would not see her post, or would see an identical one of someone else. None without one."""
+    for account in miembros.accounts(miembros.resolve(member),miembros.READERS).order_by('created_at'):
         try:return get_connector(account)
         except ConnectorError:continue
     return None
 
-def _find_own_post(text):
-    """(post, readable): the member's recent post with this exact text, by reading back through the directo account."""
-    reader=_own_posts_reader()
+def _find_own_post(text,member=None):
+    """(post, readable): the member's recent post with this exact text, by reading back through her directo account."""
+    reader=_own_posts_reader(member)
     if reader is None:return None,False
     try:posts=reader.list_user_posts('me',limit=20)
     except ConnectorError:return None,False
@@ -771,7 +778,8 @@ def final_write_gate(execution,proposal,user):
     issues=cycle_issues(proposal)
     from . import experimentos
     issues.extend(experimentos.execution_issues(proposal))
-    if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
+    # One person's pause stops only her own writes (organizaciones, phase 1); the total stop is the whole machine's.
+    if globally_paused() or miembros.same_member(proposal.account).filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
     if not within_window():issues.append('Fuera de ventana')
     if capped(proposal) and capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
     if proposal.capability in NETWORK:
@@ -786,8 +794,8 @@ def final_write_gate(execution,proposal,user):
 
 def _publish(execution,proposal,connector,user):
     """CONT-09 through the Posts API: one request, never repeated; confirmed by reading back when possible."""
-    text=proposal.payload['text'];now=timezone.now
-    already,_=_find_own_post(text)
+    text=proposal.payload['text'];now=timezone.now;member=miembros.member_for_account(proposal.account)
+    already,_=_find_own_post(text,member)
     if already:
         return _finish(execution,'confirmed',user,external_id=already['id'],external_url=already['share_url'],reconciled_at=now(),wrote=False,
                        note='Ya existía una publicación propia idéntica; no se publicó otra.')
@@ -798,7 +806,7 @@ def _publish(execution,proposal,connector,user):
     created=connector.create_post(text,media=media)
     execution._write_accepted=True
     execution.external_id=created['id'];execution.external_url=created['url']
-    found,readable=_find_own_post(text)
+    found,readable=_find_own_post(text,member)
     if found:
         _record_metrics(proposal,found)
         result=_finish(execution,'confirmed',user,reconciled_at=now(),note='Publicada (201) y vista al releer con la cuenta de LinkedIn.')
@@ -860,7 +868,7 @@ def execute(user,proposal_id):
         if not (proposal.approved_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
         account=ConnectorAccount.objects.select_for_update().get(pk=proposal.account_id)
-        if ConnectorAccount.objects.filter(paused=True).exclude(pk=account.pk).exists():
+        if miembros.same_member(account).filter(paused=True).exclude(pk=account.pk).exists():
             raise OperatorBlocked('Otro conector de la misma cuenta está en pausa.')
         if globally_paused():raise OperatorBlocked('Operación global pausada.')
         if account.paused:raise OperatorBlocked(f'Cuenta en pausa: {account.paused_reason or "sin motivo registrado"}')
@@ -972,7 +980,7 @@ def reconcile(user,proposal_id):
     stale=execution.state=='executing' and execution.started_at<timezone.now()-STALE_EXECUTION
     if execution.state not in ('sent','uncertain') and not stale:return execution
     if proposal.capability==ActionProposal.Capability.PUBLISH:
-        found,readable=_find_own_post(proposal.payload['text'])
+        found,readable=_find_own_post(proposal.payload['text'],miembros.member_for_account(proposal.account))
         if found:
             _record_metrics(proposal,found)
             return _finish(execution,'confirmed',user,external_id=execution.external_id or found['id'],

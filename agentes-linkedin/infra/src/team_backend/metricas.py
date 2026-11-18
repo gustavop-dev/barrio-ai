@@ -16,7 +16,7 @@ from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import operador
+from . import miembros, operador
 from .connectors import ConnectorError, get_connector, same_text
 from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, PostMetric
 from .permissions import require
@@ -88,21 +88,24 @@ def _read(account,kind,now=None):
 
 # --------------------------------------------------------------------------- what is due
 
-def publications(now=None):
-    """Published CONT-09 executions (PUBLISHED) within max_age, each with the snapshot ages it reached and still lacks."""
-    now=now or timezone.now();rows=[]
+def publications(now=None,member=None):
+    """Published CONT-09 executions (PUBLISHED) within max_age of the member's accounts, each with the snapshot ages it
+    reached and still lacks. Without a member, miembros.default_member() (organizaciones, phase 1)."""
+    now=now or timezone.now();rows=[];member=miembros.resolve(member)
     executions=(ActionExecution.objects.select_related('proposal__piece').prefetch_related('proposal__piece__post_metrics')
                 .filter(PUBLISHED,proposal__capability='CONT-09',proposal__piece__isnull=False,started_at__gte=now-max_age())
                 .order_by('started_at'))
+    if member is not None:executions=executions.filter(proposal__account__in=miembros.accounts(member))
     for execution in executions:
         done={m.kind for m in execution.proposal.piece.post_metrics.all()}
         due=[kind for kind,age in AGES.items() if now-execution.started_at>=age and kind not in done]
         rows.append((execution,due))
     return rows
 
-def due(now=None):
-    """Cheap check for the autopilot (no reads): a snapshot age reached and missing, or no audience snapshot today."""
-    return any(d for _,d in publications(now)) or not AudienceSnapshot.objects.filter(day=local_day(now)).exists()
+def due(now=None,member=None):
+    """Cheap check for the autopilot (no reads): a snapshot age of the member's posts reached and missing, or no
+    audience snapshot today (the audience snapshot is still one per day for the whole installation: phase 4)."""
+    return any(d for _,d in publications(now,member)) or not AudienceSnapshot.objects.filter(day=local_day(now)).exists()
 
 # --------------------------------------------------------------------------- own posts
 
@@ -200,8 +203,8 @@ def collect_posts(account,connector,now,summary):
     """Find each recent publication among Gustavo's own posts: by an id already known (_known_id), by the urn of its
     write like with like, by its exact text, or as the only own post LinkedIn dates within NEAR of the write. Capture
     the snapshots it is due and refresh EditorialPiece.metrics with the latest values read; a due cut not captured is
-    listed in summary['pending'] with its reason (PENDING_REASONS)."""
-    rows=publications(now)
+    listed in summary['pending'] with its reason (PENDING_REASONS). Only the posts of the reading account's member."""
+    rows=publications(now,miembros.member_for_account(account))
     if not any(d for _,d in rows):return
     try:
         _read(account,'posts',now)

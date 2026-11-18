@@ -211,9 +211,12 @@ READS={
         'messages':('los mensajes de la bandeja','no se leen los hilos con mensajes nuevos')}),
 }
 
-def _reader():
-    from .models import ConnectorAccount
-    return ConnectorAccount.objects.filter(provider__in=['fake','directo']).order_by('created_at').first()
+def _reader(member=None):
+    """The account that reads LinkedIn for the member (her first directo or simulated one). The watchers do not say whose
+    yet (phase 5: per-member alerts): miembros.default_member(), which raises with several members, and the watcher
+    then fails alone (vigilar)."""
+    from . import miembros
+    return miembros.accounts(miembros.resolve(member),miembros.READERS).order_by('created_at').first()
 
 def profile_cap():
     return max(0,min(100,int(setting('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))

@@ -35,10 +35,10 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers
-from . import idioma, operador, orientacion, voz
+from . import idioma, miembros, operador, orientacion, voz
 from .connectors import ConnectorError, deferred, get_connector, same_text
 from .exceptions import Conflict
-from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, PostComment, TeamQuestion
+from .models import ActionExecution, ActionProposal, AuditEvent, Contact, PostComment, TeamQuestion
 from .permissions import require
 
 PROVIDERS=('fake','directo')
@@ -157,17 +157,23 @@ def _read(account,kind,now=None):
     if used>=cap:raise ReadCapReached(f'Tope diario de lecturas «{kind}» de respuestas alcanzado ({cap}).')
     AuditEvent.objects.create(action='replies.read',target=str(account.id),metadata={'kind':kind},created_at=now)
 
-def reader_account():
-    """The operating account that reads and answers on his posts (the first one); the official API cannot."""
-    return ConnectorAccount.objects.filter(provider__in=PROVIDERS).order_by('created_at').first()
+def reader_account(member=None):
+    """The operating account that reads and answers on the member's posts (her first one); the official API cannot.
+    Without a member, miembros.default_member() (organizaciones, phase 1)."""
+    return miembros.accounts(miembros.resolve(member),PROVIDERS).order_by('created_at').first()
 
-def publications(now=None):
-    """(execution, piece) of the own posts published in the last 7 days (metricas.PUBLISHED: confirmed, or sent after
-    writing), oldest first."""
+def _member(account):
+    """The member whose posts this reading account reads (miembros.member_for_account)."""
+    return miembros.member_for_account(account)
+
+def publications(now=None,member=None):
+    """(execution, piece) of the member's own posts published in the last 7 days (metricas.PUBLISHED: confirmed, or sent
+    after writing), oldest first: only those her accounts published. Without a member, miembros.default_member()."""
     from .metricas import PUBLISHED
-    now=now or timezone.now()
+    now=now or timezone.now();member=miembros.resolve(member)
     rows=(ActionExecution.objects.select_related('proposal__piece').filter(PUBLISHED,proposal__capability='CONT-09',
           proposal__piece__isnull=False,started_at__gte=now-timedelta(days=7)).order_by('started_at'))
+    if member is not None:rows=rows.filter(proposal__account__in=miembros.accounts(member))
     return [(e,e.proposal.piece) for e in rows]
 
 def cadence(age,idle=0,newest=False):
@@ -204,11 +210,11 @@ class Scan(NamedTuple):
     due:bool
     last:object=None  # when it was last read (None: never)
 
-def plan(now=None):
-    """Every recent own post with its cadence, in reading order: the newest first, then those whose latest read brought
-    new comments, then the rest from the most recent; old posts without activity go last."""
+def plan(now=None,member=None):
+    """Every recent own post of the member with its cadence, in reading order: the newest first, then those whose latest
+    read brought new comments, then the rest from the most recent; old posts without activity go last."""
     now=now or timezone.now();rows=[]
-    published=publications(now)
+    published=publications(now,member)
     newest=published[-1][1].pk if published else None
     for execution,piece in published:
         scans=list(AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id)).order_by('-created_at')
@@ -220,9 +226,9 @@ def plan(now=None):
     rows.sort(key=lambda r:(not r.newest,not r.active,-r.execution.started_at.timestamp()))
     return rows
 
-def due_pieces(now=None):
-    """(execution, piece) of the posts whose read is due, in reading order."""
-    return [(r.execution,r.piece) for r in plan(now) if r.due]
+def due_pieces(now=None,member=None):
+    """(execution, piece) of the member's posts whose read is due, in reading order."""
+    return [(r.execution,r.piece) for r in plan(now,member) if r.due]
 
 def reading_room(account,rows,now=None):
     """(newest, others): «comments» reads that may still be spent now. The newest post only needs the daily cap. The
@@ -239,7 +245,7 @@ def reading_room(account,rows,now=None):
 def to_read(account,now=None,rows=None):
     """(execution, piece) of the due posts this run reads: in reading order, within reading_room, at most
     REPLIES_PIECES_PER_RUN."""
-    now=now or timezone.now();rows=plan(now) if rows is None else rows
+    now=now or timezone.now();rows=plan(now,_member(account)) if rows is None else rows
     newest,others=reading_room(account,rows,now);chosen=[]
     for row in rows:
         if len(chosen)>=pieces_per_run():break
@@ -251,9 +257,9 @@ def reading_due(account,now=None):
     """What the autopilot's read would read now ([] when nothing): a post is due and the day's share leaves room for it.
     With the cap spent it records that once a day (replies.read_cap_reached) and waits for the next day: it no longer
     queues a read every 30 min that only records the stop."""
-    reader=reader_account()
+    member=_member(account);reader=reader_account(member)
     if not (reader and reader.pk==account.pk and not account.paused):return []
-    now=now or timezone.now();rows=plan(now);chosen=to_read(account,now,rows)
+    now=now or timezone.now();rows=plan(now,member);chosen=to_read(account,now,rows)
     if chosen:return chosen
     if any(r.due for r in rows) and reads_today(account,'comments',now)>=read_caps()['comments']:
         day,_=operador.period_starts(now)

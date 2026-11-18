@@ -29,10 +29,10 @@ from decimal import Decimal
 from django.db import IntegrityError
 from django.utils import timezone
 from knowledge import providers
-from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research, orquestacion, editor_visual, compuertas
+from . import guardas, miembros, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research, orquestacion, editor_visual, compuertas
 from .exceptions import Conflict
 from .jobs import enqueue_operation
-from .models import OPEN_PIECE_STATES, ConnectorAccount, EditorialPiece, Job, ObservedPost, TeamQuestion
+from .models import OPEN_PIECE_STATES, EditorialPiece, Job, ObservedPost, TeamQuestion
 from .permissions import require
 
 PURPOSE='editorial-%'
@@ -438,9 +438,12 @@ def scheduled_for(day):
     if not operador.within_window(when):raise ValueError('EDITORIAL_POST_TIME queda fuera de OPERATOR_WINDOW.')
     return when
 
-def publishing_account():
-    """The official API account (or its fake in tests) that publishes CONT-09."""
-    return ConnectorAccount.objects.filter(provider__in=['linkedin','linkedin_fake']).order_by('-created_at').first()
+def publishing_account(member=None):
+    """The official API account (or its fake in tests) that publishes CONT-09 for `member`: the newest of HER official
+    accounts, never another member's (organizaciones, phase 1). Without a member, miembros.default_member(): the only
+    active one, or MiembroRequerido when there are several; with no members at all, the newest of every account, as
+    before."""
+    return miembros.accounts(miembros.resolve(member),miembros.OFFICIAL).order_by('-created_at').first()
 
 def can_publish(account):
     """Pieces are only prepared (and paid for) when they could actually be published."""
@@ -523,7 +526,7 @@ def plan(user,request_id=None,audit_request_id=''):
         # A retry of the same request returns its job; never recompute the slot (that would be a 409).
         previous=Job.objects.filter(id=request_id,owner=user,kind='prepare_piece').first()
         if previous:return previous,False,date.fromisoformat(previous.params['slot'])
-    account=publishing_account()
+    account=publishing_account(miembros.member_for(user))
     if account is None:raise Conflict('Conecta LinkedIn (API oficial) antes de planificar piezas.')
     if not can_publish(account):raise Conflict('La publicación está en pausa o desactivada (LIVE_LINKEDIN_OFFICIAL); no se prepara una pieza que no saldría.')
     from .autopiloto import autonomy
@@ -685,7 +688,7 @@ def prepare(user,slot,origin_job='',extra=False):
     """Run the whole circuit for one slot. Each stage is saved as it completes and never repeated. `extra`: the post
     Gustavo asked for at a day and hour, next to the day's own (urgente.py)."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
-    account=publishing_account()
+    account=publishing_account(miembros.member_for(user))
     if account is None:raise ValueError('LinkedIn (API oficial) no está conectado; no se prepara la pieza.')
     from .autopiloto import autonomy
     if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('Publicación detenida antes de preparar.')

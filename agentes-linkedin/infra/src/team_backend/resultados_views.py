@@ -5,7 +5,7 @@ GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d or ?desde&hasta: Li
 GET /api/v1/resultados/embudo-comprador?semanas=1..26 (default 8): the buyer's funnel (comprador.funnel), read-only."""
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import analitica, comprador, resultados, resumen_semanal
+from . import analitica, comprador, miembros, resultados, resumen_semanal
 from .models import WeeklySummary
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
@@ -24,7 +24,8 @@ class Analitica(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
         p=request.query_params
-        return Response(analitica.overview(p.get('cuenta'),p.get('periodo'),p.get('desde'),p.get('hasta')))
+        return Response(analitica.overview(p.get('cuenta'),p.get('periodo'),p.get('desde'),p.get('hasta'),
+                                           member=miembros.member_for(request.user)))
 
 class EmbudoComprador(APIView):
     """The buyer's funnel by week and cumulative (docs/plan-outbound.md, phase 1). Read-only; never calls LinkedIn."""
