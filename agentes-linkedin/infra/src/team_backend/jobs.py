@@ -60,6 +60,7 @@ OPERATION_PERMISSIONS={
     'override_piece':['operate_linkedin','approve_actions','execute_actions','run_agents','use_paid_providers'],
     'discover_network':['operate_linkedin'],
     'classify_contacts':['operate_linkedin','run_agents','use_paid_providers'],
+    'check_buyer_stages':['operate_linkedin','run_agents','use_paid_providers'],
     'plan_network':['operate_linkedin'],
     'sync_network':['operate_linkedin'],
     'collect_metrics':['operate_linkedin'],
@@ -75,7 +76,7 @@ OPERATION_PERMISSIONS={
     'plan_week':['operate_linkedin','run_agents','use_paid_providers'],
     'monthly_review':['operate_linkedin','run_agents','use_paid_providers'],
 }
-PAID_OPERATIONS=('propose_comment','propose_reply','prepare_buyer_draft','prepare_piece','override_piece','classify_contacts','process_capture','read_inbox','weekly_summary','review_referents','community_study','prepare_profile','prepare_profile_assets','plan_week','monthly_review')
+PAID_OPERATIONS=('propose_comment','propose_reply','prepare_buyer_draft','prepare_piece','override_piece','classify_contacts','check_buyer_stages','process_capture','read_inbox','weekly_summary','review_referents','community_study','prepare_profile','prepare_profile_assets','plan_week','monthly_review')
 
 def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
     """Queue an account-operator step with the same idempotency rules as agent runs."""

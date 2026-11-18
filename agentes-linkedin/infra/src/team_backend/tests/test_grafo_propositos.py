@@ -18,7 +18,8 @@ PAID = {'claude': ('anthropic', 5), 'typesafe': ('typesafe', 2), 'assemblyai_tra
 # checked together: each declares part of what it pays with, and together all of it. The editorial stages pay with
 # 'editorial-'+name (editorial._stage) and have their own test.
 EDGE_PURPOSES = {
-    ('clasificar',): ('red:_classify_batch', 'red:check_stages', 'red:_judge_stage'),
+    ('clasificar',): ('red:_classify_batch',),
+    ('verificar_etapa',): ('red:check_stages', 'red:_recheck_signals', 'red:_judge_stage'),
     ('comentar',): ('operador:_draft_comment',),
     ('pieza_diaria_gate_0', 'politica_red'): ('lider:_review',),
     ('investigar_pieza',): ('editorial:_run', 'editorial:_story_research'),

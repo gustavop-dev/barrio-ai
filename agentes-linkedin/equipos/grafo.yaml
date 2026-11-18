@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.16-comprador-projectapp",
+  "graph_version": "6.17-verificacion-etapa-propia",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -539,6 +539,11 @@
     },
     "classify_result": {
       "binding": "team_backend.orquestacion_schemas.CLASSIFY_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "stage_result": {
+      "binding": "team_backend.orquestacion_schemas.STAGE_RESULT",
       "kind": "json_schema",
       "description": "Contrato ejecutable del adapter de fase 3b."
     },
@@ -1382,7 +1387,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.red.classify",
-      "description": "Clasifica encaje y rol con evidencia del curso; no envía invitaciones. Consume procedencias de evidencia_compartida entregadas por el orquestador; no invoca especialistas.",
+      "description": "Clasifica encaje y rol con evidencia del curso; no envía invitaciones. Consume procedencias de evidencia_compartida entregadas por el orquestador; no invoca especialistas. La verificación web de la etapa de un comprador (y la reverificación al terminar un descanso) es otro paso, en su propia corrida del ciclo: check_buyer_stages, una por corrida.",
       "skills": [
         "Clasifica encaje y rol con evidencia del curso; no envía invitaciones"
       ],
@@ -1416,11 +1421,13 @@
       ],
       "output_schemas": [
         "classification",
-        "classify_result"
+        "classify_result",
+        "stage_result"
       ],
       "activity": {
         "job_kinds": [
-          "classify_contacts"
+          "classify_contacts",
+          "check_buyer_stages"
         ],
         "event_roles": []
       }
@@ -3214,7 +3221,28 @@
       "runtime": {
         "purposes": {
           "anthropic": [
-            "network-classify",
+            "network-classify"
+          ]
+        }
+      }
+    },
+    {
+      "id": "verificar_etapa",
+      "from": "relaciones_comunidad",
+      "to": "clasificador_red",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "network_input",
+      "response_schema": "stage_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
             "web-research-tool",
             "network-stage"
           ]
@@ -4384,7 +4412,13 @@
         },
         {
           "kind": "classify_contacts",
-          "cadence": "NETWORK_CLASSIFY_EVERY_MINUTES (30 min), solo backlog.",
+          "cadence": "NETWORK_CLASSIFY_EVERY_MINUTES (30 min), solo backlog; solo clasifica.",
+          "binding": "team_backend.autopiloto._network",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "check_buyer_stages",
+          "cadence": "NETWORK_STAGE_CHECK_EVERY_MINUTES (20 min), solo con una verificación o reverificación pendiente y cupo NETWORK_STAGE_CHECKS_PER_DAY (6); una por corrida, con su propio presupuesto del ciclo.",
           "binding": "team_backend.autopiloto._network",
           "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
         },
@@ -5191,6 +5225,7 @@
       "reconcile_action": "operador_cuenta",
       "discover_network": "investigador_referentes",
       "classify_contacts": "investigador_referentes",
+      "check_buyer_stages": "investigador_referentes",
       "plan_network": "relaciones_comunidad",
       "sync_network": "relaciones_comunidad",
       "collect_metrics": "analista_barrio_resultados",
@@ -5241,6 +5276,7 @@
       ]
     },
     "autopilot_direct_kinds": [
+      "check_buyer_stages",
       "check_linkedin",
       "classify_contacts",
       "collect_metrics",
@@ -5291,6 +5327,7 @@
       "observe": "observar",
       "discover_network": "descubrir",
       "classify_contacts": "clasificar",
+      "check_buyer_stages": "verificar_etapa",
       "propose_comment": "comentar",
       "plan_network": "planificar_red",
       "sync_network": "sincronizar"
