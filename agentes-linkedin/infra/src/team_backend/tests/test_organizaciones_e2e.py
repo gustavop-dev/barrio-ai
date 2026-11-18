@@ -32,6 +32,8 @@ import io
 import json
 import logging
 import os
+import shutil
+import tempfile
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -54,6 +56,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
 from knowledge import db
+from team_backend import alta as alta_mod
 from team_backend import (alertas_slack, analitica, autopiloto, bucle_resultados, capturas, conexion, connectors_linkedin as li, editor_visual,
                           mensajes_comprador, registro,
                           editorial, estrategia, guardas, hechos, identidad, imagenes, metricas, miembros, operador, perfil,
@@ -63,7 +66,7 @@ from team_backend.models import BuyerDraft, Person, PostClaim
 from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, BrowserLogin, BuyerJourney,
                                  Capture, ConnectorAccount, Contact, EditorialPiece, IdentityRevision, Job, LinkedInCredential,
                                  Member, MonthlyReview, Notification, ObservedPost, OperatorControl, Organization, PostComment,
-                                 Referent, TeamQuestion, VoiceDocument, WeeklyPlan, WeeklySummary)
+                                 Referent, ReferentExperiment, TeamQuestion, VoiceDocument, WeeklyPlan, WeeklySummary)
 from team_backend.tests import test_capturas as cap
 from team_backend.tests import test_conexion as cx
 from team_backend.tests import test_estrategia as est
@@ -961,8 +964,11 @@ class AjustesTests(RitmoBase):
         self.assertEqual((Member.objects.get(pk=self.cto.member.pk).settings, Member.objects.get(pk=self.g.member.pk).settings),
                          (wanted, {}))
         self.assertEqual(AuditEvent.objects.filter(action='organization.member_settings').count(), 1)
-        self.run_command('--quitar', 'OPERATOR_AUTONOMY')  # back to the .env's
-        self.assertEqual(autopiloto.autonomy('INT-03', Member.objects.get(pk=self.cto.member.pk)), 'auto')
+        self.run_command('--quitar', 'OPERATOR_AUTONOMY')  # back to the .env's (auto) ...
+        cto = Member.objects.get(pk=self.cto.member.pk)
+        self.assertEqual(autopiloto._configured('INT-03', cto), 'auto')
+        # ... but phase 7: what she writes waits for her while her voice is provisional, whatever the setting says.
+        self.assertEqual((autopiloto.autonomy('INT-03', cto), autopiloto.autonomy('INT-02', cto)), ('approval', 'auto'))
 
 
 class EstadoDeGustavoTests(OperatorBase):
@@ -2149,12 +2155,13 @@ class RegistroBase(RitmoBase):
 
 class RegistroTests(RegistroBase):
     def test_the_same_person_found_by_both_is_classified_once_and_not_discovered_again(self):
-        """Catch a second paid classification of the same person: the CTO's contact takes Gustavo's verdict (without his
-        private note), the card is one, and her search does not add someone the organization already has."""
+        """Catch a second paid classification of the same person: with the same private context (here, none: phase 7),
+        the CTO's contact takes Gustavo's verdict (without his private note), the card is one, and her search does not
+        add someone the organization already has."""
         uid = self.person('ana-seed')
         his = self.known(self.g, uid, stage='candidate', classification={})
         hers = self.known(self.cto, uid, stage='candidate', classification={})
-        with self.classifier({uid: (True, 0.9)}):
+        with self.classifier({uid: (True, 0.9)}), patch('team_backend.guardas.BASELINE_GUIDANCE', []):
             self.assertEqual(red.classify(self.g.user, self.g.reader, self.now)['classified'], 1)
             result = red.classify(self.cto.user, self.cto.reader, self.now)
         self.assertEqual((self.paid, result['classified'], result['shared']), ([[uid]], 1, 1))
@@ -2606,3 +2613,768 @@ class UnMiembroRegistroTests(UnMiembro, EditorialBase):
         self.assertEqual(list(referentes.to_read(self.account)), [ref])
         self.assertEqual(referentes.share_posts(self.account, ['activity:ref-0']), 0)
         self.assertEqual(registro.release_stale(self.member.organization_id, now), 0)
+
+
+# ---------------------------------------------------------------------- phase 7: onboarding the second member
+
+HALF_CAPS = 'INT-03=7,INT-04=5,RED-01=10'  # half of the general 15, 10 and 20 (operador.DEFAULT_LIMITS)
+ALL_APPROVAL = 'INT-03=approval,INT-04=approval,INT-02=approval,CONT-09=approval,RED-01=approval,RED-02=approval,RED-04=approval'
+PRUDENT = {'LINKEDIN_ACCOUNT_TIER': 'free', 'OPERATOR_INVITE_RAMP_STAGES': '5/25,8/40,10/50', 'OPERATOR_INVITE_RAMP_START': '0',
+           'OPERATOR_DAILY_LIMITS': HALF_CAPS, 'OPERATOR_PROFILE_READ_DAILY_LIMIT': '40', 'OPERATOR_AUTONOMY': ALL_APPROVAL,
+           'EDITORIAL_POST_TIME': '09:30'}
+CHECKS = ['acceso', 'cuenta_oficial', 'cuenta_directo', 'hora_post', 'autonomia', 'rampa', 'sin_miembro_requerido', 'memoria']
+
+
+class AltaBase(EditorialBase):
+    """Phase 7: ProjectApp with Gustavo alone (his accounts of always, his identity of migration 0058, the roles and the
+    robot of bootstrap_local) on a frozen clock (REGISTRO_NOW, a Wednesday at 10:00). Laura, the new member, is onboarded
+    through the commands an admin runs on the server; what only she does (her password from the admin, her LinkedIn
+    OAuth, her browser session) goes through the same routes as in production, with fakes. The server's free memory is
+    a file (SERVER_MEMINFO), never this machine's."""
+
+    oauth = DosMiembrosBase.oauth
+    model = IdentidadBase.model
+    maxDiff = None
+
+    def setUp(self):
+        freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
+        super().setUp()
+        self.organization = Organization.objects.create(name='ProjectApp', slug='projectapp')
+        gustavo = Member.objects.create(organization=self.organization, user=self.gustavo, display_name='Gustavo',
+                                        role='Fundador', is_admin=True, created_at=timezone.now() - timedelta(days=90))
+        ConnectorAccount.objects.filter(pk__in=[self.account.pk, self.official.pk]).update(member=gustavo)
+        self.account.refresh_from_db()
+        self.official.refresh_from_db()
+        identidad.seed_first(gustavo)
+        self.g = Persona(gustavo, self.gustavo, self.account, self.official, GOOD_POST)
+        call_command('bootstrap_local', stdout=io.StringIO())
+        self.autobot = self.bot()
+        folder = tempfile.mkdtemp(prefix='meminfo-')
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        self.meminfo = os.path.join(folder, 'meminfo')
+        self.free_memory(1500)
+        env = patch.dict(os.environ, {'SERVER_MEMINFO': self.meminfo, 'MEMBER_ACTIVATION_MIN_FREE_MB': '400',
+                                      'EDITORIAL_POST_TIME': '08:30', 'EDITORIAL_POST_STAGGER_MINUTES': '15',
+                                      'PEOPLE_ROLE_PREFERENCE': '', 'VOICE_LEARNING_ENABLED': 'true',
+                                      'VOICE_LEARNING_MIN_TEXTS': '2'})
+        env.start()
+        self.addCleanup(env.stop)
+        self.sent = []
+
+    # ------------------------------------------------------------------ steps
+
+    def command(self, *args, user='gustavo-test'):
+        out = io.StringIO()
+        call_command('operador', '--usuario', user, *args, stdout=out)
+        return out.getvalue()
+
+    def free_memory(self, mb):
+        with open(self.meminfo, 'w', encoding='ascii') as handle:
+            handle.write(f'MemTotal:        4015000 kB\nMemFree:          200000 kB\nMemAvailable:    {mb * 1024} kB\n')
+
+    def alta(self, *extra, confirm=True):
+        return self.command('alta-miembro', '--usuario-nuevo', 'laura-cto', '--nombre', 'Laura Gómez', '--rol', 'CTO',
+                            *extra, *(('--confirmar',) if confirm else ()))
+
+    def laura(self):
+        """Laura as the tests drive her, read fresh: her member, her user and her accounts (None until they exist)."""
+        member = Member.objects.select_related('user', 'organization').get(user__username='laura-cto')
+        reader = miembros.accounts(member, miembros.READERS).first()
+        official = miembros.accounts(member, ('linkedin_fake',)).first()
+        return Persona(member, member.user, reader, official, CTO_POST)
+
+    def failing(self, *args):
+        """activar-miembro (a rehearsal unless --confirmar) refused: the codes of the checks that fail."""
+        with self.assertRaises(CommandError) as raised:
+            self.command('activar-miembro', '--miembro', 'laura-cto', *args)
+        return str(raised.exception).split('(', 1)[1].rstrip(').').split(', ')
+
+    def password(self):
+        """What the admin does on the server (`manage.py changepassword laura-cto`) and hands her in person."""
+        user = User.objects.get(username='laura-cto')
+        user.set_password('clave-local-de-laura')
+        user.save()
+
+    def official_account(self):
+        """She connects her LinkedIn (Ajustes › LinkedIn › Conectar, OAuth). The posts of the tests go out through her
+        official account's fake, registered after it (in production her 'linkedin' account publishes)."""
+        her = self.laura()
+        self.assertEqual(self.oauth(her, 'laura123', 'AQ-token-de-laura'), '/ajustes?linkedin=ok')
+        fake = ConnectorAccount.objects.create(provider='linkedin_fake', external_account_id='urn:li:person:laura123',
+                                               label='LinkedIn simulado de Laura', member=her.member)
+        ConnectorAccount.objects.filter(pk=fake.pk).update(created_at=timezone.now() + timedelta(seconds=1))
+
+    def browser_session(self):
+        """Her `directo` account with a live session (alta-miembro --cuenta-directo, then «Conectar LinkedIn» from her
+        phone); in the tests its fake, as DosMiembrosBase does."""
+        her = self.laura()
+        ConnectorAccount.objects.create(provider='fake', external_account_id='acc_fake_laura', label='Navegador de Laura',
+                                        member=her.member)
+        FakeConnector('acc_fake_laura').seed_person('me', 'Laura Gómez', headline='CTO at ProjectApp')
+
+    def onboard(self):
+        """The whole onboarding, as docs/alta-de-un-miembro.md tells it: alta, what is left by hand, activation."""
+        self.alta('--presentacion', CTO_PROFILE['identity'])
+        self.password()
+        self.official_account()
+        self.browser_session()
+        self.assertIn('Laura Gómez está activa', self.command('activar-miembro', '--miembro', 'laura-cto', '--confirmar'))
+        return self.laura()
+
+    def office(self, persona):
+        client = APIClient()
+        entered = client.post('/api/v1/auth/login', {'username': persona.user.get_username(),
+                                                     'password': 'clave-local-de-laura'}, format='json')
+        self.assertEqual(entered.status_code, 200, entered.content)
+        return client
+
+    def gustavo_state(self):
+        """Everything of Gustavo's that her onboarding, her week or her deactivation could move: his member and
+        settings, ramp, invitations and caps left today, calendar, post hour, voice, memory, notices, questions, queues
+        and autonomy."""
+        g = Member.objects.get(pk=self.g.member.pk)
+        now = timezone.now()
+        mine = list(miembros.accounts(g).values_list('pk', flat=True))
+        return {
+            'member': (g.active, g.is_admin, g.role, g.settings, g.profile),
+            'ramp': red.ramp_state(now, g)['stage'], 'invitations': red.ramp_limits(None, now, g),
+            'caps': {cap: operador.capacity_left(self.g.reader, cap, now) for cap in ('INT-03', 'INT-04', 'INT-02', 'RED-01', 'RED-02')},
+            'post_time': editorial.post_time(g), 'voice': voz.current(g).meta,
+            'autonomy': {cap: autopiloto.autonomy(cap, g) for cap in alta_mod.WRITE_CAPABILITIES},
+            'calendar': sorted(EditorialPiece.objects.filter(account__in=mine).values_list('id', 'state', 'scheduled_for')),
+            'memory': sorted((r['key'], json.dumps(r['value'], sort_keys=True, default=str)) for r in hechos.latest(g)),
+            'notices': sorted(Notification.objects.filter(member=g).values_list('id', 'kind', 'read_at')),
+            'questions': sorted(TeamQuestion.objects.filter(member=g).values_list('id', 'state')),
+            'queue': sorted(ActionProposal.objects.filter(account__in=mine).values_list('id', 'state', 'approved_hash')),
+            'jobs': sorted(Job.objects.filter(owner=self.gustavo).values_list('id', 'state')),
+        }
+
+
+class AltaGuiadaTests(AltaBase):
+    def test_the_alta_rehearses_then_prepares_her_inactive_with_the_prudent_settings_once(self):
+        """Catch an onboarding that changes something without --confirmar, activates her, sets a password or a LinkedIn
+        credential, applies the role preference, repeats itself, or touches Gustavo: the rehearsal leaves no trace; the
+        confirmed alta leaves her inactive with the settings of a free, dormant account, her minimal profile and her
+        provisional voice, and lists what is left by hand."""
+        before = self.gustavo_state()
+        audits = AuditEvent.objects.count()
+        rehearsal = self.alta('--relacion', 'Es la CTO de ProjectApp.', confirm=False)
+        self.assertIn('ENSAYO (nada cambió; repite con --confirmar): Laura Gómez (laura-cto)', rehearsal)
+        self.assertIn('[hecho] OPERATOR_INVITE_RAMP_STAGES=5/25,8/40,10/50', rehearsal)
+        self.assertFalse(User.objects.filter(username='laura-cto').exists())
+        self.assertEqual((Member.objects.count(), AuditEvent.objects.count()), (1, audits))
+
+        out = self.alta('--relacion', 'Es la CTO de ProjectApp.', '--cuenta-directo', 'laura')
+        self.assertIn('Alta aplicada: Laura Gómez (laura-cto), inactivo hasta activar-miembro.', out)
+        her = self.laura()
+        self.assertEqual((her.member.active, her.member.is_admin, her.member.role, her.member.organization),
+                         (False, False, 'CTO', self.organization))
+        self.assertEqual(her.member.settings, PRUDENT)
+        self.assertEqual(sorted(her.user.groups.values_list('name', flat=True)), ['operacion', 'revision'])
+        self.assertFalse(her.user.has_usable_password())
+        self.assertFalse(LinkedInCredential.objects.filter(account__member=her.member).exists())
+        self.assertEqual(list(miembros.accounts(her.member).values_list('provider', 'external_account_id')), [('directo', 'laura')])
+        profile = identidad.of(her.member).member_profile
+        self.assertEqual((profile['name'], profile['company_relation']), ('Laura Gómez', 'Es la CTO de ProjectApp.'))
+        self.assertEqual(IdentityRevision.objects.get(subject=f'member:{her.member.pk}').source, 'alta')
+        self.assertTrue(voz.current(her.member).provisional)
+        for line in ('[propuesto] PEOPLE_ROLE_PREFERENCE=lider_tecnologia=laura-cto', 'Lo que falta a mano:',
+                     '[ ] Su contraseña: `manage.py changepassword laura-cto`', '[x] Su cuenta del navegador',
+                     '[ ] Ella entra en la PWA y conecta su LinkedIn oficial', '[?] `OPERATOR_ALERT_WEBHOOK` del servidor debe ser un canal privado'):
+            self.assertIn(line, out)
+        self.assertEqual(registro.role_preference(), {})  # proposed, never applied
+        self.assertEqual(miembros.default_member(), self.g.member)  # inactive: nothing asks «which member» yet
+        # Again: nothing is duplicated, and what the admin changed meanwhile is kept.
+        miembros.save_settings(self.gustavo, her.member, {'OPERATOR_INVITE_RAMP_START': '1'})
+        again = self.alta('--relacion', 'Es la CTO de ProjectApp.', '--cuenta-directo', 'laura')
+        self.assertIn('[ya estaba] Usuario y miembro (inactivo)', again)
+        self.assertIn('[se dejó] OPERATOR_INVITE_RAMP_START=1 — lo fijó el administrador; el prudente sería 0', again)
+        self.assertEqual((Member.objects.count(), User.objects.filter(username='laura-cto').count(),
+                          IdentityRevision.objects.filter(subject=f'member:{her.member.pk}').count(),
+                          ConnectorAccount.objects.filter(member=her.member).count()), (2, 1, 1, 1))
+        self.assertEqual(self.laura().member.settings, dict(PRUDENT, OPERATOR_INVITE_RAMP_START='1'))
+        self.assertEqual(self.gustavo_state(), before)
+
+    def test_only_an_active_admin_onboards_and_never_an_active_member_or_anothers_account(self):
+        """Catch the alta in the wrong hands or over the wrong rows, and any write when it is refused."""
+        self.alta()
+        ConnectorAccount.objects.create(provider='directo', external_account_id='gustavo-directo', label='Suya', member=self.g.member)
+        rows = (Member.objects.count(), ConnectorAccount.objects.count(), AuditEvent.objects.count())
+        for args, user, message in ((('alta-miembro', '--usuario-nuevo', 'otro', '--nombre', 'Otro', '--rol', 'CTO', '--confirmar'),
+                                     'laura-cto', 'Solo el administrador activo'),
+                                    (('alta-miembro', '--usuario-nuevo', 'gustavo-test', '--nombre', 'Gustavo', '--rol', 'X',
+                                      '--confirmar'), 'gustavo-test', 'ya es un miembro activo'),
+                                    (('alta-miembro', '--usuario-nuevo', 'laura-cto', '--nombre', 'Laura Gómez', '--rol', 'CTO',
+                                      '--cuenta-directo', 'gustavo-directo', '--confirmar'), 'gustavo-test', 'ya es de otro miembro'),
+                                    (('activar-miembro', '--miembro', 'laura-cto', '--confirmar'), 'laura-cto', 'Solo el administrador'),
+                                    (('desactivar-miembro', '--miembro', 'gustavo-test', '--motivo', 'x', '--confirmar'),
+                                     'gustavo-test', 'No puedes desactivarte'),
+                                    (('desactivar-miembro', '--miembro', 'laura-cto', '--confirmar'), 'gustavo-test', 'motivo')):
+            with self.subTest(args=args[0:3]), self.assertRaisesMessage(CommandError, message):
+                self.command(*args, user=user)
+        self.assertEqual((Member.objects.count(), ConnectorAccount.objects.count(), AuditEvent.objects.count()), rows)
+        self.assertFalse(self.laura().member.active)
+
+
+class ActivacionTests(AltaBase):
+    def test_activation_is_refused_by_each_missing_check_until_every_one_passes(self):
+        """Catch an activation that lets her in with any check failing: each check fails alone and is named; when she
+        has her password, her LinkedIn and her session and the server has memory, she is activated, audited, and
+        Gustavo's state is the same as before."""
+        before = self.gustavo_state()
+        self.alta()
+        self.assertEqual(self.failing(), ['acceso', 'cuenta_oficial', 'cuenta_directo'])
+        self.password()
+        self.assertEqual(self.failing(), ['cuenta_oficial', 'cuenta_directo'])
+        # While inactive she enters only her settings, her profile, her voice and her LinkedIn.
+        office = self.office(self.laura())
+        self.assertEqual(office.get('/api/v1/yo/perfil').status_code, 200)
+        self.assertEqual(office.get('/api/v1/tu-turno').status_code, 400)
+        self.official_account()
+        self.assertEqual(self.failing(), ['cuenta_directo'])
+        self.browser_session()
+        out = self.command('activar-miembro', '--miembro', 'laura-cto')
+        self.assertIn('Todo pasa. Repite con --confirmar para activarla.', out)
+        self.assertEqual(out.count('[ok]'), len(CHECKS))
+        self.assertFalse(self.laura().member.active)  # a rehearsal
+
+        her = self.laura()
+        breaks = {
+            'hora_post': lambda: miembros.save_settings(self.gustavo, her.member, {'EDITORIAL_POST_TIME': '08:35'}),
+            'autonomia': lambda: miembros.save_settings(self.gustavo, her.member, {'OPERATOR_AUTONOMY': 'INT-03=auto'}),
+            'rampa': lambda: miembros.save_settings(self.gustavo, her.member, {'OPERATOR_INVITE_RAMP_START': '2'}),
+            'memoria': lambda: self.free_memory(300),
+            'cuenta_directo': lambda: operador.set_paused(self.gustavo, her.reader, True, 'Prueba: sesión caducada'),
+            'cuenta_oficial': lambda: LinkedInCredential.objects.filter(account__member=her.member).update(
+                expires_at=timezone.now() - timedelta(minutes=1)),
+        }
+        for code, broken in breaks.items():
+            with self.subTest(code=code):
+                state = (Member.objects.get(pk=her.member.pk).settings, ConnectorAccount.objects.get(pk=her.reader.pk).paused)
+                with transaction.atomic():
+                    broken()
+                    self.assertEqual(self.failing('--confirmar'), [code])
+                    transaction.set_rollback(True)
+                self.free_memory(1500)
+                self.assertEqual((Member.objects.get(pk=her.member.pk).settings, ConnectorAccount.objects.get(pk=her.reader.pk).paused), state)
+        # A route or a job that asks for «the» member once she is active stops the activation (the dry run finds it).
+        with patch('team_backend.autopiloto.tick', side_effect=lambda *a, **k: identidad.of()):
+            self.assertEqual(self.failing('--confirmar'), ['sin_miembro_requerido'])
+        self.assertFalse(self.laura().member.active)
+
+        out = self.command('activar-miembro', '--miembro', 'laura-cto', '--confirmar')
+        self.assertIn('Laura Gómez está activa: el autopiloto trabaja sus cuentas con su ritmo.', out)
+        self.assertTrue(self.laura().member.active)
+        self.assertEqual(AuditEvent.objects.get(action='organization.member_activated').metadata['checks'], CHECKS)
+        with self.assertRaises(miembros.MiembroRequerido):
+            miembros.default_member()  # two active members: nothing guesses whose
+        self.assertEqual(self.gustavo_state(), before)
+        with self.assertRaisesMessage(CommandError, 'ya está activa'):
+            self.command('activar-miembro', '--miembro', 'laura-cto', '--confirmar')
+
+
+class DesactivacionTests(AltaBase):
+    def test_deactivating_her_stops_her_jobs_and_writes_keeps_her_rows_changes_nothing_of_his_and_goes_back(self):
+        """Catch a deactivation that leaves her running (a queued job, an approved action, the autopilot on her
+        accounts), deletes anything, or moves something of Gustavo's; and one that cannot be undone."""
+        her = self.onboard()
+        contact = Contact.objects.create(account=her.reader, provider_user_id='ACoana', display_name='Ana', source='manual',
+                                         stage='fit', classification={'fit': True, 'role': 'comprador'})
+        FakeConnector('acc_fake_laura').seed_person('ana', 'Ana', headline='Founder at Seedco')
+        follow = operador.create_proposal(her.user, None, 'RED-01', {'user_id': contact.provider_user_id}, contact=contact,
+                                          source='agent')
+        operador.approve(her.user, follow.id, follow.payload_hash)
+        job, his_job = (Job.objects.create(kind='prepare_piece', params=params, owner=self.autobot, request_hash='0' * 64,
+                                           agent='editorial', task='Prueba')
+                        for params in ({'slot': '2026-11-19', 'member': str(her.member.pk)}, {'slot': '2026-11-19'}))
+        before = self.gustavo_state()
+        rows = (ActionProposal.objects.count(), Contact.objects.count(), ConnectorAccount.objects.count())
+
+        rehearsal = self.command('desactivar-miembro', '--miembro', 'laura-cto', '--motivo', 'Prueba')
+        # Her queue: the piece job of hers and the execution her approval queued; one approved follow waits.
+        self.assertIn('ENSAYO: se desactivaría: Laura Gómez. Trabajos en cola cancelados: 2. Propuestas suyas que esperan '
+                      '(quedan como están): 1.', rehearsal)
+        self.assertTrue(self.laura().member.active)
+        out = self.command('desactivar-miembro', '--miembro', 'laura-cto', '--motivo', 'Se va de vacaciones', '--sin-acceso', '--confirmar')
+        self.assertIn('Desactivada: Laura Gómez.', out)
+        self.assertIn('Su usuario queda sin acceso.', out)
+        her = self.laura()
+        self.assertEqual((her.member.active, her.user.is_active), (False, False))
+        job.refresh_from_db()
+        his_job.refresh_from_db()
+        self.assertEqual((job.state, job.result_status, his_job.state), ('cancelled', 'inactive_member', 'queued'))
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'está inactivo'):
+            operador.execute(self.autobot, follow.id)
+        report = autopiloto.tick(self.autobot, timezone.now())
+        self.assertGreaterEqual(report.get('inactive', 0), 1, report)
+        self.assertEqual(FakeConnector('acc_fake_laura').state['writes'], 0)
+        self.assertEqual(miembros.default_member(), self.g.member)  # alone again: Gustavo's day as before her
+        self.assertEqual(APIClient().post('/api/v1/auth/login', {'username': 'laura-cto', 'password': 'clave-local-de-laura'},
+                                          format='json').status_code, 400)
+        self.assertEqual((ActionProposal.objects.count(), Contact.objects.count(), ConnectorAccount.objects.count()), rows)
+        self.assertEqual(ActionProposal.objects.get(pk=follow.pk).state, 'approved')  # kept as it was
+        self.assertEqual(self.gustavo_state(), before)
+        self.assertEqual(AuditEvent.objects.get(action='organization.member_deactivated').metadata['reason'], 'Se va de vacaciones')
+
+        # Back: the alta gives her access again, the activation checks everything again, and her approved follow goes out.
+        self.assertIn('[hecho] Acceso', self.alta())
+        self.assertIn('Laura Gómez está activa', self.command('activar-miembro', '--miembro', 'laura-cto', '--confirmar'))
+        self.assertEqual(operador.execute(self.autobot, follow.id).state, 'confirmed')
+        self.assertEqual(FakeConnector('acc_fake_laura').state['writes'], 1)
+        self.assertEqual(self.gustavo_state()['caps'], before['caps'])
+
+
+class VozProvisionalTests(RitmoBase):
+    """Phase 7's hard rule: nothing the CTO's provisional voice wrote goes out without HER approval, in any capability
+    that writes a text in her name (post, comment, reply, invitation note), even with that capability in «auto».
+    Approval by the autopilot's policy or by Gustavo (the admin) is not hers: execute and its last gate refuse it."""
+
+    def setUp(self):
+        super().setUp()
+        self.set(self.cto, OPERATOR_AUTONOMY='CONT-09=auto,INT-03=auto,INT-04=auto,RED-02=auto')
+        self.autobot = self.bot()
+        self.note_review = patch('team_backend.lider.review', return_value={'note_approved': True, 'reasons': []})
+        self.note_review.start()
+        self.addCleanup(self.note_review.stop)
+
+    def post(self, persona):
+        """A post of someone else on her feed (not a referent's), on her browser too."""
+        persona.browser().seed_user('autora', 'Ana Autora', posts=['Most teams skip evals until the first incident.'])
+        return ObservedPost.objects.create(account=persona.reader, provider_post_id='activity:autora-0', author_name='Ana Autora',
+                                           share_url='https://www.linkedin.com/feed/update/urn:li:activity:autora-0',
+                                           text='Most teams skip evals until the first incident.')
+
+    def held_until_she_approves(self, proposal):
+        """The policy (in «auto») leaves it waiting and Tu turno shows it to her marked; the policy's approval and
+        Gustavo's are refused at execution and nothing is written; once she approves it the voice hold is gone. Returns
+        what execute then does (the proposal, or the reason another gate gave)."""
+        persona = self.cto
+        reviewed = autopiloto.policy_review(proposal)
+        self.assertEqual(reviewed.state, 'proposed', reviewed.risks)
+        cards = [c for c in persona.client().get('/api/v1/tu-turno').json()['items'] if c['id'] == f'approval:{proposal.id}']
+        self.assertEqual([c['approval'].get('provisional_voice') for c in cards], [True])
+        operador.approve(self.g.user, proposal.id, proposal.payload_hash)  # the admin may approve; it is not hers
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'voz provisional'):
+            operador.execute(self.autobot, proposal.id)
+        ActionProposal.objects.filter(pk=proposal.pk).update(decided_by=None)  # as a policy approval leaves it
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'voz provisional'):
+            operador.execute(self.autobot, proposal.id)
+        self.assertFalse(ActionExecution.objects.filter(proposal=proposal).exists())
+        ActionProposal.objects.filter(pk=proposal.pk).update(state='proposed', approved_hash='', decided_at=None)
+        operador.approve(persona.user, proposal.id, proposal.payload_hash)
+        proposal.refresh_from_db()
+        self.assertEqual(autopiloto.voice_hold(proposal), '')
+        try:
+            return operador.execute(self.autobot, proposal.id)
+        except operador.OperatorBlocked as exc:
+            self.assertNotIn('voz provisional', str(exc))
+            return str(exc)
+
+    def test_her_post(self):
+        account = editorial.publishing_account(self.cto.member)
+        text = self.cto.text
+        piece = EditorialPiece.objects.create(
+            account=account, slot_date=timezone.now().astimezone(operador.local_tz()).date(),
+            scheduled_for=timezone.now() - timedelta(hours=1), state='ready', final_text=text, voice=voz.meta(self.cto.member),
+            verification={'verdict': 'ready_for_execution', 'text_sha256': hashlib.sha256(text.encode()).hexdigest()})
+        imagenes.fallback(piece, 'Fixture sin proveedores')
+        proposal = operador.create_proposal(self.cto.user, None, 'CONT-09', {'text': text}, citations=['LI-04-M005-K01'],
+                                            source='agent', piece=piece)
+        self.assertEqual(self.held_until_she_approves(proposal).state, 'sent')
+        self.assertEqual(self.writes(), {'gustavo': 0, 'cto': 1})
+        self.assertEqual(self.g.client().get(f'/api/v1/editorial/pieces/{self.piece(self.g).piece_id}').json().get('provisional_voice'),
+                         None)  # his piece reads as before
+        self.assertTrue(self.cto.client().get(f'/api/v1/editorial/pieces/{piece.id}').json()['provisional_voice'])
+
+    def test_her_comment(self):
+        post = self.post(self.cto)
+        proposal = operador.create_proposal(self.cto.user, post, 'INT-03', {'text': 'Evals first, then the model.'},
+                                            source='agent', voice=voz.meta(self.cto.member))
+        self.assertIn(self.held_until_she_approves(proposal).state, ('sent', 'confirmed'))
+        self.assertEqual(self.cto.browser().state['writes'], 1)
+
+    def test_her_reply(self):
+        piece = EditorialPiece.objects.create(account=self.cto.official, slot_date=timezone.now().date() - timedelta(days=1),
+                                              scheduled_for=timezone.now() - timedelta(days=1), state='ready', final_text=CTO_POST)
+        comment = PostComment.objects.create(account=self.cto.reader, piece=piece, provider_post_id='urn:li:share:cto1',
+                                             provider_comment_id='c-cto-1', author_name='María PM', text=resp.QUESTION,
+                                             commented_at=timezone.now() - timedelta(hours=1))
+        proposal = operador.create_proposal(self.cto.user, None, 'INT-04', {'text': resp.REPLY}, source='agent', comment=comment,
+                                            voice=voz.meta(self.cto.member))
+        self.held_until_she_approves(proposal)
+
+    def test_her_invitation_note_even_from_a_buyers_draft(self):
+        """A note is a text in her name: an invitation with one waits for her (and Tu turno shows the note); without a
+        note it is not a text and follows its autonomy. The buyer's note draft carries its own voice to the proposal."""
+        contact = self.contact(self.cto, stage='followed', classification={'fit': True, 'role': 'comprador'})
+        draft = BuyerDraft.objects.create(contact=contact, kind=BuyerDraft.Kind.NOTE, state=BuyerDraft.State.READY,
+                                          text='Your post on evals was useful.', voice=voz.meta(self.cto.member))
+        self.assertEqual((red.note_voice(self.cto.reader, draft), red.note_voice(self.g.reader)), ({'tipo': 'provisional'}, None))
+        proposal = operador.create_proposal(self.cto.user, None, 'RED-02', {'user_id': contact.provider_user_id,
+                                                                            'note': draft.text, 'note_reason': 'Su post.',
+                                                                            'without_note_fallback': True},
+                                            contact=contact, source='agent', voice=red.note_voice(self.cto.reader, draft))
+        card = [c for c in self.cto.client().get('/api/v1/tu-turno').json()['items'] if c['id'] == f'approval:{proposal.id}']
+        self.assertEqual(card[0]['approval']['note'], 'Your post on evals was useful.')
+        self.held_until_she_approves(proposal)
+        bare = operador.create_proposal(self.cto.user, None, 'RED-02', {'user_id': contact.provider_user_id + '-2'},
+                                        contact=self.contact(self.cto), source='agent')
+        self.assertFalse(autopiloto.provisional_draft(bare))
+
+    def test_the_system_never_sends_a_message_in_her_name(self):
+        """A buyer's first message or reply is a draft she copies and sends herself: there is no capability that sends a
+        message, whatever her voice."""
+        self.assertFalse({'message', 'MSG-01', 'INT-05'} & set(ActionProposal.Capability.values))
+        self.assertEqual(sorted(autopiloto.TEXT_CAPABILITIES), ['CONT-09', 'INT-03', 'INT-04', 'RED-02'])
+
+    def test_his_texts_go_out_as_before(self):
+        """Gustavo's (his confirmed voice) are never held: his comment approved by the policy executes."""
+        post = self.post(self.g)
+        proposal = operador.create_proposal(self.g.user, post, 'INT-03', {'text': 'Evals first, then the model.'},
+                                            source='agent', voice=voz.meta(self.g.member))
+        ActionProposal.objects.filter(pk=proposal.pk).update(state='approved', approved_hash=proposal.payload_hash)
+        proposal.refresh_from_db()
+        self.assertEqual((autopiloto.provisional_draft(proposal), autopiloto.voice_hold(proposal)), (False, ''))
+        self.assertIn(operador.execute(self.autobot, proposal.id).state, ('sent', 'confirmed'))
+
+
+class AjustesDelMiembroTests(IdentidadBase):
+    """Phase 7's screens in Ajustes: «Mi perfil», «Mi voz» and, for the admin, «Organización» (GET/PATCH yo/perfil,
+    GET yo/voz, POST yo/voz/proponer and yo/voz/decidir, GET organizacion)."""
+
+    def setUp(self):
+        super().setUp()
+        env = patch.dict(os.environ, {'VOICE_LEARNING_ENABLED': 'true', 'VOICE_LEARNING_MIN_TEXTS': '2'})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_her_profile_is_read_and_saved_by_her_only_validated_and_with_its_history(self):
+        office = self.cto.client()
+        shown = office.get('/api/v1/yo/perfil').json()
+        self.assertEqual((shown['profile']['name'], shown['profile']['role'], shown['profile']['limits'], shown['own']),
+                         ('Laura Gómez', 'CTO', CTO_PROFILE['limits'], True))
+        self.assertEqual([h['number'] for h in shown['history']], [1])
+        self.assertEqual(self.g.client().get('/api/v1/yo/perfil').json()['profile']['name'], 'Gustavo')  # his, never hers
+        saved = office.patch('/api/v1/yo/perfil', {'limits': 'precios; diseño visual', 'role': 'CTO y socia'}, format='json')
+        self.assertEqual(saved.status_code, 200, saved.content)
+        body = saved.json()
+        self.assertEqual((body['saved'], body['profile']['limits'], body['profile']['role']), (True, 'precios; diseño visual', 'CTO y socia'))
+        latest = body['history'][0]
+        self.assertEqual(([h['number'] for h in body['history']], latest['changed'], latest['source'], latest['by']),
+                         ([2, 1], ['limits'], 'app', Member.objects.get(pk=self.cto.member.pk).display_name))
+        role = AuditEvent.objects.get(action='organization.member_role')
+        self.assertEqual((role.actor, role.metadata['before'], role.metadata['after']), (self.cto.user, 'CTO', 'CTO y socia'))
+        for data, reason in (({'name': 'L4ura'}, 'solo letras'), ({'color': 'azul'}, 'Campo desconocido'),
+                             ({'role': 'x' * 121}, 'role'), ({'limits': '{nombre} no inventa'}, 'llaves')):
+            with self.subTest(data=data):
+                refused = office.patch('/api/v1/yo/perfil', data, format='json')
+                self.assertEqual(refused.status_code, 400, refused.content)
+                self.assertIn(reason, refused.json()['detail'])
+        self.assertEqual(IdentityRevision.objects.filter(subject=f'member:{self.cto.member.pk}').count(), 2)
+        self.assertEqual(self.api.patch('/api/v1/yo/perfil', {'limits': 'x'}, format='json').status_code, 403)  # a service, never
+
+    def test_her_voice_shows_her_signals_and_only_her_decision_confirms_it_without_lifting_any_approval(self):
+        office = self.cto.client()
+        shown = office.get('/api/v1/yo/voz').json()
+        self.assertEqual((shown['state'], shown['label'], shown['signals']['texts'], shown['signals']['minimum'],
+                          shown['can_propose'], shown['proposal']), ('provisional', 'Provisional', 0, 2, False, None))
+        self.assertEqual(office.post('/api/v1/yo/voz/proponer', {}, format='json').status_code, 400)  # 0 of 2: nothing paid
+        for text in ('Medimos antes de opinar.', 'Primero el dato, luego la decisión.'):
+            ActionProposal.objects.create(account=self.cto.reader, post=self.observed(self.cto, uuid.uuid4().int % 10**9),
+                                          capability='INT-03', payload={'text': text}, payload_hash=uuid.uuid4().hex * 2,
+                                          source='agent', state='confirmed', decided_by=self.cto.user, decided_at=timezone.now())
+        shown = office.get('/api/v1/yo/voz').json()
+        self.assertEqual((shown['signals']['texts'], shown['can_propose']), (2, True))
+        settings_before = Member.objects.get(pk=self.cto.member.pk).settings
+        document = '# Tono de voz de Laura Gómez\n\nFrases cortas y precisas; primero el dato.'
+        with self.model({'documento': document, 'notas': 'Muestra pequeña.'}):
+            proposed = office.post('/api/v1/yo/voz/proponer', {}, format='json')
+        self.assertEqual(proposed.status_code, 201, proposed.content)
+        self.assertEqual((proposed.json()['proposal']['number'], proposed.json()['state']), (1, 'provisional'))
+        self.assertIn('primero el dato', proposed.json()['proposal']['text'])
+        for data in ({'number': 'uno', 'decision': 'confirmar'}, {'number': 1, 'decision': 'quizá'}, {'number': 1, 'decision': 'descartar', 'note': 'x' * 1001}):
+            with self.subTest(data=data):
+                self.assertEqual(office.post('/api/v1/yo/voz/decidir', data, format='json').status_code, 400)
+        self.assertEqual(self.api.post('/api/v1/yo/voz/decidir', {'number': 1, 'decision': 'confirmar'}, format='json').status_code, 403)
+        decided = office.post('/api/v1/yo/voz/decidir', {'number': 1, 'decision': 'confirmar'}, format='json').json()
+        self.assertEqual((decided['state'], decided['label'], decided['proposal'], [v['number'] for v in decided['versions']]),
+                         ('confirmada', 'Confirmada v1', None, [1]))
+        cto = Member.objects.get(pk=self.cto.member.pk)
+        self.assertEqual(cto.settings, settings_before)  # confirming her voice lifts no approval: the admin decides
+        self.assertEqual(self.g.client().get('/api/v1/yo/voz').json()['label'], 'Confirmada v1')  # his own voice 1
+
+    def test_the_admin_sees_the_organization_with_each_members_state_and_nothing_private(self):
+        shown = self.g.client().get('/api/v1/organizacion')
+        self.assertEqual(shown.status_code, 200, shown.content)
+        body = shown.json()
+        self.assertEqual(body['organization']['name'], 'ProjectApp')
+        self.assertEqual([(m['display_name'], m['role'], m['active'], m['is_admin'], m['first'], m['voice'], m['accounts'])
+                          for m in body['members']],
+                         [('Gustavo', 'Fundador', True, True, True, 'confirmada', {'official': True, 'reader': True}),
+                          (Member.objects.get(pk=self.cto.member.pk).display_name, 'CTO', True, False, False, 'provisional',
+                           {'official': True, 'reader': True})])
+        text = shown.content.decode()
+        for private in (CTO_PROFILE['limits'], CTO_PROFILE['identity'], 'settings', 'email', 'cto-test', 'token'):
+            self.assertNotIn(private, text)
+        self.assertEqual(self.cto.client().get('/api/v1/organizacion').status_code, 403)
+
+    def test_while_being_onboarded_she_reaches_only_her_settings_profile_voice_and_linkedin(self):
+        """Catch an inactive member reading or writing the organization's day, or one locked out of connecting her own
+        LinkedIn: the DE_ALTA routes answer her (as herself), every other member route says she is inactive."""
+        from team_backend import alcance
+        Member.objects.filter(pk=self.cto.member.pk).update(active=False)
+        office = self.cto.client()
+        for route in alcance.DE_ALTA:
+            if '<' in route or 'GET' not in alcance.DE_ALTA[route]:
+                continue
+            with self.subTest(route=route):
+                answer = office.get(f'/api/v1/{route}')
+                self.assertNotIn(answer.status_code, (400, 403, 500), answer.content[:300])
+        self.assertEqual(office.get('/api/v1/yo').json()['member']['id'], str(self.cto.member.pk))
+        self.assertEqual(office.get('/api/v1/yo/perfil').json()['profile']['name'], 'Laura Gómez')
+        self.assertEqual(office.patch('/api/v1/yo/perfil', {'limits': 'precios'}, format='json').status_code, 200)
+        conexion_route = office.get(f'/api/v1/operador/accounts/{self.cto.reader.id}/conexion')
+        self.assertNotEqual(conexion_route.status_code, 400, conexion_route.content[:300])
+        self.assertEqual(office.get(f'/api/v1/operador/accounts/{self.g.reader.id}/conexion').status_code, 404)  # never his
+        for route in ('tu-turno', 'calendario', 'notificaciones', 'capturas', 'red/contacts', 'preguntas', 'editorial/calendar'):
+            with self.subTest(route=route):
+                answer = office.get(f'/api/v1/{route}')
+                self.assertEqual(answer.status_code, 400, answer.content[:300])
+                self.assertIn('inactivo', answer.json()['detail'])
+        self.assertEqual(office.post('/api/v1/yo/voz/proponer', {}, format='json').status_code, 400)  # not while inactive
+
+
+class PrimeraSemanaTests(AltaBase):
+    """Phase 7: the new member's first week, after her onboarding, through the routes her phone and the office use and
+    the functions the autopilot and the worker run."""
+
+    paid = ContenidoBase.paid
+
+    def approve(self, office, proposal):
+        answer = office.post(f'/api/v1/operador/actions/{proposal.id}/approve', {'expected_hash': proposal.payload_hash}, format='json')
+        self.assertEqual(answer.status_code, 202, answer.content)
+        return operador.execute(self.autobot, proposal.id)
+
+    def card(self, office, proposal):
+        [card] = [c for c in office.get('/api/v1/tu-turno').json()['items'] if c['id'] == f'approval:{proposal.id}']
+        return card['approval']
+
+    def test_her_first_week_waits_for_her_and_her_confirmed_voice_takes_over_without_touching_gustavo(self):
+        """Catch a first week that writes in her provisional voice without her, lets her reach a person Gustavo attends,
+        goes over her low ramp, or moves anything of Gustavo's; and a confirmed voice that is not used, or that lifts her
+        approvals by itself."""
+        self.calls = []
+        # Gustavo, alone, already follows Bea: she is his.
+        self.fake.seed_person('bea', 'Bea', headline='Founder at Seedco')
+        his = Contact.objects.create(account=self.g.reader, provider_user_id='ACobea', display_name='Bea', source='manual',
+                                     stage='fit', classification={'fit': True, 'role': 'comprador'})
+        followed = operador.create_proposal(self.gustavo, None, 'RED-01', {'user_id': 'ACobea'}, contact=his, source='agent')
+        operador.approve(self.gustavo, followed.id, followed.payload_hash)
+        self.assertEqual(operador.execute(self.autobot, followed.id).state, 'confirmed')
+        self.drain()  # his queue is done before she arrives
+        before = self.gustavo_state()
+
+        her = self.onboard()
+        office = self.office(her)
+        browser = FakeConnector('acc_fake_laura')
+
+        # Monday: an audio of hers becomes her idea; she answers the team's question; she plans her week.
+        self.transcribed = []
+        with cap.CaptureBase.transcriber(self, 'Quiero contar cómo elegimos la base de datos del primer año.'):
+            body = office.post('/api/v1/capturas', {'audio': cap.audio(), 'para': 'post'}, format='multipart').json()
+            self.drain()
+        self.assertEqual(Capture.objects.get(id=body['id']).member, her.member)
+        question = TeamQuestion.objects.create(member=her.member, agent='director', question='¿Qué base de datos usa la plataforma?',
+                                               purpose='Para el post técnico', memory_key='stack.base_de_datos', origin='prueba')
+        answered = office.post(f'/api/v1/preguntas/{question.id}/responder', {'text': 'Postgres 17', 'public_use': True}, format='json')
+        self.assertEqual(answered.status_code, 200, answered.content)
+        self.assertIn('stack.base_de_datos', {r['key'] for r in hechos.latest(her.member)})
+        monday = date(2026, 11, 23)
+        option = {'idea': 'Elegir la base de datos del primer año', 'reason': 'Encaja.', 'pillar': editorial.PILLARS[0],
+                  'modality': editorial.MODALITIES[0], 'approach': editorial.APPROACH_UNITS[0], 'format': 'foto',
+                  'reader': editorial.READERS[0], 'reader_need': 'Decidir algo concreto esta semana.', 'audience_evidence': None}
+        week = {'days': [{'date': (monday + timedelta(days=i)).isoformat(), 'options': [dict(option, idea=f'{option["idea"]} ({i})')]}
+                         for i in range(7)], 'summary': 'Una semana.', 'signals_read': []}
+        with patch.dict(os.environ, {'STRATEGY_ENABLED': 'true'}), self.paid(plan=week):
+            planned = office.post('/api/v1/estrategia/planear', {'semana': monday.isoformat()}, format='json')
+            self.assertEqual(planned.status_code, 202, planned.content)
+            self.drain()
+        self.assertEqual(WeeklyPlan.objects.get(week_start=monday).member, her.member)
+
+        # Her post, in her provisional voice: it waits for her, marked, and goes out only when she approves it.
+        account = editorial.publishing_account(her.member)
+        piece = EditorialPiece.objects.create(
+            account=account, slot_date=timezone.now().date(), scheduled_for=timezone.now() - timedelta(minutes=30), state='ready',
+            final_text=CTO_POST, voice=voz.meta(her.member),
+            verification={'verdict': 'ready_for_execution', 'text_sha256': hashlib.sha256(CTO_POST.encode()).hexdigest()})
+        imagenes.fallback(piece, 'Fixture sin proveedores')
+        post = autopiloto.policy_review(operador.create_proposal(her.user, None, 'CONT-09', {'text': CTO_POST},
+                                                                 citations=['LI-04-M005-K01'], source='agent', piece=piece))
+        self.assertEqual(post.state, 'proposed')
+        self.assertTrue(self.card(office, post)['provisional_voice'])
+        autopiloto.tick(self.autobot, timezone.now())
+        self.assertEqual(li.FakeLinkedInOfficial(account).state['writes'], 0)
+        self.assertEqual(self.approve(office, post).state, 'sent')
+        self.assertEqual(li.FakeLinkedInOfficial(account).state['writes'], 1)
+
+        # She comments on a referent of the organization (the post is hers to comment), approving it.
+        ref = Referent.objects.create(account=self.g.reader, public_identifier='ref-ai', provider_user_id='ACoref-ai',
+                                      display_name='Ref AI', reason='Pertinente para el barrio.', active=True)
+        browser.seed_user('ref-ai', 'Ref AI', posts=[SUBSTANTIVE])
+        observed = ObservedPost.objects.create(account=her.reader, referent=ref, provider_post_id='activity:ref-ai-0',
+                                               author_name='Ref AI', text=SUBSTANTIVE,
+                                               share_url='https://www.linkedin.com/feed/update/urn:li:activity:ref-ai-0')
+        with self.model(COMMENT):
+            comment = operador.propose_comment(her.user, observed.id)
+        self.assertEqual((comment.state, comment.voice), ('proposed', {'tipo': 'provisional'}))
+        self.assertEqual(PostClaim.objects.get(provider_post_id='activity:ref-ai-0').member, her.member)
+        self.assertTrue(self.card(office, comment)['provisional_voice'])
+        self.assertIn(self.approve(office, comment).state, ('sent', 'confirmed'))
+
+        # She follows within her caps (half of the general ones) and her ramp is the low one; Bea is Gustavo's.
+        self.assertEqual((red.ramp_limits(her.reader, timezone.now()), operador.capacity_left(her.reader, 'RED-01')), ((5, 25), 10))
+        browser.seed_person('ana', 'Ana', headline='Founder at Seedco')
+        ana = Contact.objects.create(account=her.reader, provider_user_id='ACoana', display_name='Ana', source='manual', stage='fit',
+                                     classification={'fit': True, 'role': 'comprador'})
+        follow = operador.create_proposal(her.user, None, 'RED-01', {'user_id': 'ACoana'}, contact=ana, source='agent')
+        self.assertEqual(self.approve(office, follow).state, 'confirmed')
+        self.assertEqual(operador.capacity_left(her.reader, 'RED-01'), 9)
+        bea = Contact.objects.create(account=her.reader, provider_user_id='ACobea', display_name='Bea', source='manual', stage='fit',
+                                     classification={'fit': True, 'role': 'comprador'})
+        with self.assertRaisesMessage(registro.Atendida, 'La atiende Gustavo'):
+            operador.create_proposal(her.user, None, 'RED-01', {'user_id': 'ACobea'}, contact=bea, source='agent')
+
+        # Her signals reach the minimum; she asks for her voice, reads it and confirms it.
+        other = ObservedPost.objects.create(account=her.reader, provider_post_id='activity:otra-0', author_name='Otra', text='Otro post.')
+        pending = operador.create_proposal(her.user, other, 'INT-03', {'text': 'Written before her voice.'}, source='agent',
+                                           voice=voz.meta(her.member))
+        voice = office.get('/api/v1/yo/voz').json()
+        self.assertGreaterEqual(voice['signals']['texts'], 2)
+        self.assertTrue(voice['can_propose'])
+        document = '# Tono de voz de Laura Gómez\n\nFrases cortas y precisas; primero el dato.'
+        with self.model({'documento': document, 'notas': 'Su primera semana.'}):
+            self.assertEqual(office.post('/api/v1/yo/voz/proponer', {}, format='json').status_code, 201)
+        decided = office.post('/api/v1/yo/voz/decidir', {'number': 1, 'decision': 'confirmar'}, format='json').json()
+        self.assertEqual(decided['label'], 'Confirmada v1')
+
+        # Her next text is in her voice and no longer marked; her approvals stay (the admin decides); what was written
+        # in the provisional voice still waits for her.
+        observed2 = ObservedPost.objects.create(account=her.reader, provider_post_id='activity:ref-ai-1', author_name='Ref AI',
+                                                text=SUBSTANTIVE + ' (2)')
+        with self.model(COMMENT):
+            mine = operador.propose_comment(her.user, observed2.id)
+        self.assertEqual(mine.voice, {'tipo': 'confirmada', 'version': 1})
+        self.assertIn('primero el dato', self.sent[-1]['system'])
+        self.assertNotIn('estado="provisional"', self.sent[-1]['system'])
+        self.assertNotIn('provisional_voice', self.card(office, mine))
+        self.assertEqual(autopiloto.autonomy('INT-03', Member.objects.get(pk=her.member.pk)), 'approval')
+        self.assertTrue(autopiloto.provisional_draft(pending))
+        self.assertEqual(self.gustavo_state(), before)
+
+
+class PendientesDeFase6Tests(RegistroBase):
+    """What phases 5 and 6 left open, closed in phase 7."""
+
+    def referent_post(self, slug='ref-0'):
+        ref = self.referent(slug, [SUBSTANTIVE])
+        pid = f'activity:{slug}-0'
+        return pid, [ObservedPost.objects.create(account=p.reader, referent=ref, provider_post_id=pid, author_name=slug, text=SUBSTANTIVE,
+                                                 share_url=f'https://www.linkedin.com/feed/update/urn:li:{pid}') for p in (self.g, self.cto)]
+
+    def test_a_referents_post_is_freed_when_its_comment_dies_and_never_once_it_was_written(self):
+        """Catch a post blocked forever by a dead proposal (rejected, discarded, expired, failed), or a second comment on
+        a post whose first comment went out (even if its member is no longer active)."""
+        pid, (his, hers) = self.referent_post()
+        first = operador.create_proposal(self.g.user, his, 'INT-03', {'text': 'Una opinión con fundamento.'}, source='agent')
+        with self.assertRaisesMessage(registro.Atendida, 'Este post ya lo comenta Gustavo.'):
+            operador.create_proposal(self.cto.user, hers, 'INT-03', {'text': 'Otra opinión.'}, source='agent')
+        self.assertEqual(registro.claimed_by_others(self.cto.reader), [pid])
+        for dead in ('rejected', 'discarded', 'expired', 'failed', 'superseded'):
+            with self.subTest(dead=dead):
+                ActionProposal.objects.filter(pk=first.pk).update(state=dead)
+                self.assertEqual((registro.post_issue(hers, self.cto.member), registro.claimed_by_others(self.cto.reader)), ('', []))
+        mine = operador.create_proposal(self.cto.user, hers, 'INT-03', {'text': 'Otra opinión.'}, source='agent')
+        self.assertEqual(PostClaim.objects.get(provider_post_id=pid).member, self.cto.member)
+        passed = AuditEvent.objects.get(action='people.post_claim_passed', target=pid)
+        self.assertEqual((passed.metadata['before'], passed.metadata['after']), (str(self.g.member.pk), str(self.cto.member.pk)))
+        with self.assertRaisesMessage(registro.Atendida, 'Este post ya lo comenta CTO de prueba.'):
+            operador.create_proposal(self.g.user, his, 'INT-03', {'text': 'De nuevo.'}, source='agent')
+        # An inactive member's pending comment frees the post; a written one never does.
+        Member.objects.filter(pk=self.cto.member.pk).update(active=False)
+        self.assertEqual(registro.post_issue(his, self.g.member), '')
+        ActionProposal.objects.filter(pk=mine.pk).update(state='uncertain')
+        self.assertEqual(registro.post_issue(his, self.g.member), 'Este post ya lo comenta CTO de prueba.')
+
+    def test_a_claim_without_its_proposal_yet_holds_only_for_the_grace(self):
+        pid, (his, hers) = self.referent_post('ref-1')
+        registro.claim_post(his, self.g.member)  # create_proposal claims just before writing its row
+        self.assertEqual(registro.post_issue(hers, self.cto.member), 'Este post ya lo comenta Gustavo.')
+        self.now += registro.claim_grace() + timedelta(minutes=1)
+        self.assertEqual(registro.post_issue(hers, self.cto.member), '')
+
+    def test_an_experiments_notice_is_its_accounts_member(self):
+        """Catch a referents' experiment notice without a member (only the first member would see it)."""
+        ref = Referent.objects.create(account=self.cto.reader, public_identifier='suyo', reason='r', active=True)
+        start = self.now - timedelta(days=8)
+        ReferentExperiment.objects.create(account=self.cto.reader, referent=ref, state='approved', approved_by=self.cto.user,
+                                          plan={'limitations': 'Muestra pequeña.'}, starts_at=start, focus_at=start,
+                                          followup_at=start + timedelta(days=14), ends_at=start + timedelta(days=28))
+        from team_backend import experimentos
+        with patch('team_backend.experimentos.result', return_value={'outcome': 'seguimiento', 'limitations': 'Muestra pequeña.'}), \
+                patch('team_backend.experimentos.material_change', return_value=False):
+            experimentos.tick(self.now)
+        notice = Notification.objects.get(kind='referents_review')
+        self.assertEqual(notice.member, self.cto.member)
+        kinds = lambda persona: [n['kind'] for n in persona.client().get('/api/v1/notificaciones').json()['items']]
+        self.assertEqual((kinds(self.cto), kinds(self.g)), (['referents_review'], []))
+
+    def test_the_team_notes_on_a_piece_are_only_its_members(self):
+        """Catch a note of another member on a piece (a capture names a piece by its id) showing in its detail."""
+        piece = EditorialPiece.objects.create(account=self.cto.official, slot_date=self.now.date(), scheduled_for=self.now,
+                                              state='ready', final_text=CTO_POST)
+        for persona, note in ((self.cto, 'Nota de ella'), (self.g, 'Nota de él')):
+            Capture.objects.create(created_by=persona.user, note=note, state='anotado', context_type='pieza', context_id=str(piece.id))
+        self.assertEqual([c['note'] for c in capturas.piece_comments(piece)], ['Nota de ella'])
+
+    def test_an_admin_who_is_not_the_first_member_never_sees_the_first_members_content_jobs(self):
+        from team_backend import alcance
+        Member.objects.filter(pk=self.cto.member.pk).update(is_admin=True)
+        self.grant(self.cto.user, 'manage_jobs')
+        his, hers = (Job.objects.create(kind='prepare_piece', params=params, owner=self.autobot, request_hash='0' * 64,
+                                        agent='editorial', task='Prueba')
+                     for params in ({'slot': '2026-11-19'}, {'slot': '2026-11-19', 'member': str(self.cto.member.pk)}))
+        machine = Job.objects.create(kind='observe', params={}, owner=self.autobot, request_hash='1' * 64, agent='operador', task='Prueba')
+
+        def seen(persona):
+            request = APIClient().get('/').wsgi_request
+            request.user = User.objects.get(pk=persona.user.pk)
+            return set(alcance.trabajos(request).values_list('pk', flat=True)) & {his.pk, hers.pk, machine.pk}
+        self.grant(self.gustavo, 'manage_jobs')
+        self.assertEqual(seen(self.cto), {hers.pk, machine.pk})
+        self.assertEqual(seen(self.g), {his.pk, machine.pk})
+
+    def test_the_role_preference_may_name_the_members_user(self):
+        """PEOPLE_ROLE_PREFERENCE=lider_tecnologia=<her user> (what alta-miembro proposes): an untouched technology leader
+        goes to that member; off by default, the stable share decides as before."""
+        uid = self.person('tech-lead')
+        self.known(self.g, uid, stage='fit')
+        Person.objects.filter(provider_user_id=uid).update(classification={'fit': True, 'buyer': {'papel': 'lider_tecnologia'}})
+        card = self.card(uid)
+        members = [self.g.member, self.cto.member]
+        for username, member in (('cto-test', self.cto.member), ('gustavo-test', self.g.member)):
+            with self.subTest(username=username), patch.dict(os.environ, {'PEOPLE_ROLE_PREFERENCE': f'lider_tecnologia={username}'}):
+                self.assertEqual(registro.taker(card, members), member.pk)
+        self.assertEqual(registro.role_preference(), {})
+
+    def test_a_classification_shaped_by_the_payers_private_guidance_is_not_reused(self):
+        """Catch the CTO taking a verdict Gustavo's private guidance (his brief) shaped: she pays for her own; between
+        members with the same private context it is still reused (RegistroTests)."""
+        uid = self.person('ana-priv')
+        self.known(self.g, uid, stage='candidate', classification={})
+        hers = self.known(self.cto, uid, stage='candidate', classification={})
+        with self.classifier({uid: (True, 0.9)}):
+            red.classify(self.g.user, self.g.reader, self.now)
+            result = red.classify(self.cto.user, self.cto.reader, self.now)
+        self.assertEqual((self.paid, result.get('shared', 0)), ([[uid], [uid]], 0))
+        hers.refresh_from_db()
+        self.assertNotIn('shared_from', hers.classification)
