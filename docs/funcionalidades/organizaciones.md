@@ -832,6 +832,7 @@ hoy) nada cambia. Un miembro nuevo entra **inactivo** y solo `activar-miembro` l
 - **Estado:** funciona
 - **Qué hace para el miembro:** ve y edita su nombre, su rol, cómo se presenta, su relación con la empresa, los temas que no
   domina y si le aplican las startups personales; cada cambio se valida, se audita y queda en su historial. Solo ella lo cambia.
+  En la app, el campo en que escribe sube bajo la barra superior, por encima del teclado (también cuando el teclado vuelve).
 - **Código:** `identidad_views.Profile` (`GET/PATCH /api/v1/yo/perfil`); `oficina/src/pages/ajustes/MiPerfil.tsx`,
   `movil/src/ajustes/MiPerfil.tsx`, `compartido/src/logic/miembro.ts`.
 - **Criterios de aceptación:**
@@ -847,7 +848,8 @@ hoy) nada cambia. Un miembro nuevo entra **inactivo** y solo `activar-miembro` l
 
 - **Dónde:** backend, PWA, app (Ajustes)
 - **Estado:** funciona
-- **Qué hace para el miembro:** ve con qué voz escribe el equipo (provisional, propuesta lista o confirmada vN), cuántos textos
+- **Qué hace para el miembro:** ve con qué voz escribe el equipo (provisional, propuesta lista, confirmada vN o, para el primer
+  miembro sin voz propia, la inicial de la instalación), cuántos textos
   suyos aprobados o editados lleva contra el mínimo, pide una propuesta cuando llega (una llamada pagada), la lee y la confirma o
   la descarta. Solo ella decide. Confirmarla no levanta ninguna aprobación.
 - **Código:** `identidad_views.Voice`, `VoicePropose`, `VoiceDecide`; `voz.progress`, `pending_proposal`;
@@ -858,7 +860,9 @@ hoy) nada cambia. Un miembro nuevo entra **inactivo** y solo `activar-miembro` l
   2. **Dado** el mínimo de textos, **cuando** pide y confirma, **entonces** queda «Confirmada v1» y sus ajustes no cambian.
   3. **Dado** una decisión mal formada o una credencial de servicio, **cuando** decide, **entonces** 400 o 403.
 - **Brechas código/docs:** —
-- **Cobertura QA:** `AjustesDelMiembroTests.test_her_voice_…` (1–3), `PrimeraSemanaTests` · 2026-11-18 · pasa en local
+- **Cobertura QA:** `AjustesDelMiembroTests.test_her_voice_…` (1–3), `PrimeraSemanaTests` · Maestro
+  `20-ajustes-perfil-voz.yaml` (la voz inicial del seed QA: aprendizaje apagado, nada que pagar) · 2026-11-18 · pasa en local
+  (Maestro sin correr)
 
 ### ORG-38 · Organización y sus miembros (administrador) <a id="org-38"></a>
 
@@ -871,7 +875,8 @@ hoy) nada cambia. Un miembro nuevo entra **inactivo** y solo `activar-miembro` l
   1. **Dado** el administrador, **cuando** la abre, **entonces** ve a los dos con su estado y nada de sus perfiles privados ni
      ajustes; el CTO recibe 403.
 - **Brechas código/docs:** —
-- **Cobertura QA:** `AjustesDelMiembroTests.test_the_admin_sees_…` (1) · 2026-11-18 · pasa en local
+- **Cobertura QA:** `AjustesDelMiembroTests.test_the_admin_sees_…` (1) · Maestro `20-ajustes-perfil-voz.yaml` (el seed QA
+  tiene un solo miembro) · 2026-11-18 · pasa en local (Maestro sin correr)
 
 ### ORG-39 · Lo escrito con voz provisional nunca sale sin ella <a id="org-39"></a>
 
