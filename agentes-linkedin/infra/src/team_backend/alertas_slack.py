@@ -186,6 +186,17 @@ def close_of_day(now):
     day,_=period_starts(now)
     return day+timedelta(minutes=min(_hours_window()[1],23*60+59))
 
+def unreported(events,key,now):
+    """The events (AuditEvent rows) a once-a-day watcher reports under `key`: those of the local day up to `now`, as
+    always; and while that alert went out neither today nor yesterday, those of the last 24 hours. An event a few
+    minutes before midnight that no tick saw that day is then reported the next day instead of lost, and once it was
+    reported (or yesterday's alert already covered its day) nothing repeats. (The CI of 18/11/2026: a buyer's reply
+    classified at 23:xx and the watcher at 00:xx found nothing.)"""
+    from .operador import period_starts
+    day,_=period_starts(now)
+    went=AuditEvent.objects.filter(action=ACTION,target=str(key)[:120],created_at__gte=day-timedelta(days=1),created_at__lte=now).exists()
+    return events.filter(created_at__gte=day if went else min(day,now-timedelta(days=1)),created_at__lte=now)
+
 # --------------------------------------------------------------------------- daily caps
 
 # scope: (variable that raises it, {kind: (what it reads, what stops while it is spent)})
@@ -605,11 +616,10 @@ def comprador_respondio(now):
 @vigilante
 def secuencia_sin_inbox(now):
     """Phase 4: follow-ups were due but the sequence waited because the inbox is off or was not read lately (it never
-    assumes «she did not answer»): once a day, with the reason."""
-    from . import operador, secuencia_comprador
+    assumes «she did not answer»): once a day, with the reason (unreported: the notice of just before midnight too)."""
+    from . import secuencia_comprador
     if not secuencia_comprador.enabled():return []
-    day,_=operador.period_starts(now)
-    event=(AuditEvent.objects.filter(action=secuencia_comprador.WAITING,created_at__gte=day,created_at__lt=day+timedelta(days=1))
+    event=(unreported(AuditEvent.objects.filter(action=secuencia_comprador.WAITING),'comprador:secuencia_sin_inbox',now)
            .order_by('-created_at').first())
     if event is None:return []
     meta=event.metadata or {}
@@ -667,11 +677,11 @@ def reserva_sin_emparejar(now):
 
 @vigilante
 def falta_enlace_agenda(now):
-    """Phase 6: an interested buyer got no draft because CALCOM_BOOKING_URL is empty: once a day."""
-    from . import operador, respuesta_comprador
+    """Phase 6: an interested buyer got no draft because CALCOM_BOOKING_URL is empty: once a day (unreported: the reply
+    classified just before midnight too)."""
+    from . import respuesta_comprador
     if not respuesta_comprador.enabled():return []
-    day,_=operador.period_starts(now)
-    count=AuditEvent.objects.filter(action=respuesta_comprador.NO_LINK,created_at__gte=day,created_at__lt=day+timedelta(days=1)).count()
+    count=unreported(AuditEvent.objects.filter(action=respuesta_comprador.NO_LINK),'comprador:falta_enlace_agenda',now).count()
     if not count:return []
     return [Aviso('comprador:falta_enlace_agenda',
         f'Barrio · Falta tu enlace de agenda (CALCOM_BOOKING_URL): {count} respuesta(s) de compradores que quieren hablar o piden '

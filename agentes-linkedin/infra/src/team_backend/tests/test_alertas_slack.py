@@ -563,6 +563,23 @@ class BuyerSequenceAlertTests(SlackBase):
         self.watch(at(9,5,1))  # the next day without a new notice: nothing
         self.assertEqual(len([t for t in self.texts() if 'detenida' in t]),1)
 
+    def test_a_notice_just_before_midnight_is_not_lost_nor_repeated(self):
+        """La ventana del día no pierde el aviso de las 23:58 que ningún vistazo vio ese día (CI del 18/11/2026)."""
+        def waiting(when):
+            AuditEvent.objects.create(action='buyer.sequence_waiting',target=str(self.account.id),created_at=when,
+                                      metadata={'motivo':'no se leyó el inbox','personas':1})
+        def stopped():
+            return [t for t in self.texts() if 'detenida' in t]
+        waiting(at(23,58))
+        self.watch(at(23,55))  # the last tick of the day ran before it
+        self.assertEqual(stopped(),[])
+        self.watch(at(0,3,1));self.watch(at(10,0,1));self.watch(at(10,0,2))
+        self.assertEqual(len(stopped()),1)  # the next morning's first tick reports it, once
+        waiting(at(23,50,3))
+        self.watch(at(23,55,3));self.watch(at(0,0,4))
+        self.assertEqual(len(stopped()),2)  # seen the same day: the day after does not repeat it
+        self.assertEqual(AuditEvent.objects.filter(action='slack.alert',target='comprador:secuencia_sin_inbox').count(),2)
+
     def test_the_daily_summary_counts_the_journey_messages(self):
         from team_backend.models import BuyerDraft
         ana=self.buyer('Ana Uno');bea=self.buyer('Bea Dos',step='mensaje_2',sent=2)
@@ -575,3 +592,21 @@ class BuyerSequenceAlertTests(SlackBase):
                       '1 seguimientos); 1 seguimientos cancelados porque respondieron',self.texts()[-1])
         with patch.dict('os.environ',{'BUYER_SEQUENCE_ENABLED':'false','BUYER_FIRST_MESSAGE_ENABLED':'false'}):
             self.assertFalse([l for l in alertas_slack.activity_lines(at(21)) if 'Compradores' in l])
+
+
+class BuyerReplyAlertTests(SlackBase):
+    """Fase 6 (BUYER_REPLY_ENABLED): la respuesta de un comprador sin enlace de agenda, una vez al día."""
+
+    def test_a_reply_without_the_booking_link_just_before_midnight_is_reported_once(self):
+        """El fallo del CI del 18/11/2026 (test_6 de ReplyBuyerPathTests): la respuesta se clasificó a las 23:xx y el vigilante
+        miró a las 00:xx; contar solo el día local la perdía."""
+        with patch.dict('os.environ',{'BUYER_REPLY_ENABLED':'true','CALCOM_BOOKING_URL':''}):
+            AuditEvent.objects.create(action='buyer.reply_no_link',target=str(uuid.uuid4()),created_at=at(23,59),
+                                      metadata={'tipo':'interesado'})
+            self.assertEqual(alertas_slack.falta_enlace_agenda(at(23,30)),[])  # before it happened
+            self.assertEqual([a.key for a in alertas_slack.falta_enlace_agenda(at(0,59,1))],['comprador:falta_enlace_agenda'])
+            self.watch(at(0,5,1));self.watch(at(9,0,1));self.watch(at(9,0,2))
+        self.assertEqual([t for t in self.texts() if 'enlace de agenda' in t],
+                         ['Barrio · Falta tu enlace de agenda (CALCOM_BOOKING_URL): 1 respuesta(s) de compradores que quieren hablar '
+                          'o piden información quedaron sin borrador. Están en Tu turno para que respondas tú; configura el enlace '
+                          'para que el equipo las redacte.'])
