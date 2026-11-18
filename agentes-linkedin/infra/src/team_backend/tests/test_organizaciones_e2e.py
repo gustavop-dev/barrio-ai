@@ -2254,7 +2254,10 @@ class RegistroTests(RegistroBase):
         the CTO with a reason (she starts with the basic card), the CTO releases her; reasons are required and audited;
         the admin reassigns only someone untouched."""
         uid = self.person('ana-seed')
-        his = self.known(self.g, uid, notes=[{'id': 'n1', 'text': 'NOTA-PRIVADA-DE-GUSTAVO', 'at': self.now.isoformat()}])
+        his = self.known(self.g, uid, notes=[{'id': 'n1', 'text': 'NOTA-PRIVADA-DE-GUSTAVO', 'at': self.now.isoformat()}],
+                         classification={'fit': True, 'role': 'comprador', 'confidence': 0.9, 'reason': 'Encaja.',
+                                         'classified_at': self.now.isoformat(), 'evidence': {'post': 'EVIDENCIA-DE-GUSTAVO'},
+                                         'invitation_note': 'INVITACION-DE-GUSTAVO'})
         self.execute(self.approved(self.g, his))
         gustavo, office = self.g.client(), self.cto.client()
         self.assertEqual(gustavo.post(f'/api/v1/red/contacts/{his.id}/pasar', {'member': str(self.cto.member.pk)},
@@ -2266,7 +2269,10 @@ class RegistroTests(RegistroBase):
         hers = Contact.objects.get(account=self.cto.reader, provider_user_id=uid)
         self.assertEqual((self.card(uid).owner, self.card(uid).touch), (self.cto.member, 'traspaso'))
         self.assertEqual(hers.notes, [])
-        self.assertNotIn('NOTA-PRIVADA-DE-GUSTAVO', json.dumps(hers.history) + json.dumps(hers.classification))
+        private = json.dumps(hers.history) + json.dumps(hers.classification)
+        for text in ('NOTA-PRIVADA-DE-GUSTAVO', 'EVIDENCIA-DE-GUSTAVO', 'INVITACION-DE-GUSTAVO'):
+            self.assertNotIn(text, private)
+        self.assertEqual((hers.classification['fit'], hers.classification['role']), (True, 'comprador'))  # the shared part
         event = AuditEvent.objects.get(action='people.passed')
         self.assertEqual((event.metadata['reason'], event.metadata['to'], event.actor), ('Ella habla con CTOs.', str(self.cto.member.pk), self.g.user))
         # He no longer attends her: he cannot release her; she can, with a reason.
