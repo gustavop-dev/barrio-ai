@@ -175,8 +175,8 @@ class MuestraInsuficiente(ValueError):
     """Not enough of her own texts to propose a voice: nothing is proposed and nothing is paid."""
 
 
-def collect_signals(member):
-    """Record (idempotently) the references to the rows that show her style. Returns {kind: count recorded now}."""
+def _found(member):
+    """[(kind, model, pk, when)] of the rows that show her style (see collect_signals), read only."""
     from .models import ActionProposal, Capture, TeamQuestion, VoiceSignal
     user = member.user
     mine = miembros.accounts(member)
@@ -193,6 +193,13 @@ def collect_signals(member):
     for row in Capture.objects.filter(created_by=user).exclude(state=Capture.State.UNDONE):
         if (row.transcript or row.note or '').strip():
             found.append((VoiceSignal.Kind.CAPTURE, 'Capture', row.pk, row.created_at))
+    return found
+
+
+def collect_signals(member):
+    """Record (idempotently) the references to the rows that show her style. Returns {kind: count recorded now}."""
+    from .models import VoiceSignal
+    found = _found(member)
     rows = [VoiceSignal(member=member, kind=kind, source_model=model, source_id=str(pk), occurred_at=at)
             for kind, model, pk, at in found]
     before = VoiceSignal.objects.filter(member=member).count()
@@ -201,6 +208,24 @@ def collect_signals(member):
     for kind, *_ in found:
         counts[kind] = counts.get(kind, 0) + 1
     return {'nuevas': VoiceSignal.objects.filter(member=member).count() - before, 'por_tipo': counts}
+
+
+def progress(member):
+    """Her progress toward a proposal, read only (organizaciones, phase 7: «Mi voz» in the apps): {'texts': texts she
+    approved or edited (what min_texts() asks for), 'minimum', 'by_kind': {kind: count}}. Counted from the rows
+    themselves, as collect_signals would record them."""
+    from .models import VoiceSignal
+    by_kind = {kind: 0 for kind in VoiceSignal.Kind.values}
+    for kind, *_ in _found(member):
+        by_kind[kind] += 1
+    texts = by_kind[VoiceSignal.Kind.APPROVED] + by_kind[VoiceSignal.Kind.EDITED]
+    return {'texts': texts, 'minimum': min_texts(), 'by_kind': by_kind}
+
+
+def pending_proposal(member):
+    """Her proposal waiting for her decision (the newest), or None."""
+    from .models import VoiceDocument
+    return documents(member).filter(state=VoiceDocument.State.PROPOSED).order_by('-number').first()
 
 
 def _clip(text):

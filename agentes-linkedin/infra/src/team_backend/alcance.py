@@ -68,6 +68,11 @@ RUTAS = {
     'auth/login': (SERVICIO, 'La credencial es el usuario y la contraseña; después, cada uno entra como sí mismo.'),
     'auth/logout': (MIEMBRO, _SES),
     'yo': (MIEMBRO, 'Quién es: su miembro, su rol, su organización y si su voz es provisional.'),
+    'yo/perfil': (MIEMBRO, 'Su perfil de identidad: lo ve y lo cambia solo ella (fase 7).'),
+    'yo/voz': (MIEMBRO, 'Su voz: cuál usa el equipo, sus señales y su propuesta (fase 7).'),
+    'yo/voz/proponer': (MIEMBRO, 'Pide la propuesta de su propia voz (una llamada de pago).'),
+    'yo/voz/decidir': (MIEMBRO, 'Solo ella confirma o descarta la propuesta de su voz.'),
+    'organizacion': (ADMINISTRADOR, 'El perfil de la empresa y sus miembros con su estado, sin nada privado: lo ve el administrador.'),
     'operador/overview': (MIEMBRO, 'Sus cuentas, sus cupos y sus propuestas; la parada total y el gasto de IA son de la organización.'),
     'operador/control': (ORGANIZACION, 'La parada total es de toda la máquina: cualquier miembro la detiene y la reanuda.'),
     'operador/feed': (MIEMBRO, 'Los eventos de sus propuestas, sus cuentas y sus trabajos.'),
@@ -474,16 +479,59 @@ def trabajos(request):
     # has_key first: a job without the key is nobody else's (NOT (NULL IN …) would drop it too).
     rows = rows.exclude(Q(params__has_key='member') & Q(params__member__in=[str(pk) for pk in others.values_list('pk', flat=True)]))
     foreign = ConnectorAccount.objects.exclude(pk__in=accounts(member).values('pk')).values_list('pk', flat=True)
-    return rows.exclude(Q(params__has_key='account') & Q(params__account__in=[str(pk) for pk in foreign]))
+    rows = rows.exclude(Q(params__has_key='account') & Q(params__account__in=[str(pk) for pk in foreign]))
+    if not miembros.is_first(member):
+        # A content job without `member` is the first member's (miembros.job_params): an admin who is not the first
+        # member (manage_jobs) never sees it (organizaciones, phase 7).
+        rows = rows.exclude(Q(kind__in=CONTENT_JOBS) & ~Q(params__has_key='member'))
+    return rows
+
+
+# The periodic content jobs queued with miembros.job_params (the first member's carry no `member`).
+CONTENT_JOBS = ('prepare_piece', 'plan_week', 'weekly_summary', 'monthly_review')
+
+
+# Organizaciones, phase 7: what an INACTIVE member (being onboarded, or deactivated) may still do for herself: see who she
+# is, her profile and her voice, and connect her own LinkedIn (the official credential and the browser session), which
+# activating her asks for (alta.checks). Every other route answers her 400 «Tu miembro está inactivo». Each is only ever
+# hers: her own member, her own accounts (an inactive member never owns the accounts without a member).
+DE_ALTA = {
+    'yo': ('GET',),
+    'yo/perfil': ('GET', 'PATCH'),
+    'yo/voz': ('GET',),
+    'ajustes': ('GET',),
+    'linkedin/oauth/start': ('GET',),
+    'linkedin/status': ('GET',),
+    'operador/overview': ('GET',),
+    'operador/accounts': ('GET',),
+    'operador/accounts/<uuid:aid>/conexion': ('GET', 'POST'),
+    'operador/conexiones/<uuid:lid>': ('GET',),
+    'operador/conexiones/<uuid:lid>/enlace': ('POST',),
+    'operador/conexiones/<uuid:lid>/cancelar': ('POST',),
+}
+
+
+def en_alta(request):
+    """Whether this request is one of DE_ALTA (its route and method)."""
+    holder = getattr(request, '_request', request)
+    match = getattr(holder, 'resolver_match', None)
+    route = (match.route or '') if match is not None else ''
+    route = route[len('api/v1/'):] if route.startswith('api/v1/') else route
+    return holder.method.upper() in DE_ALTA.get(route, ())
 
 
 def miembro(request):
     """The member whose data this request reads or writes: the authenticated user's own member (inactive:
-    MiembroRequerido). A user without a member acts for the only active member (as before organizations) and gets
-    MiembroRequerido among several; None without members. Kept on the request: one lookup per request."""
+    MiembroRequerido, except on the DE_ALTA routes, where she acts for herself). A user without a member acts for the only
+    active member (as before organizations) and gets MiembroRequerido among several; None without members. Kept on the
+    request: one lookup per request."""
     holder = getattr(request, '_request', request)
     if not hasattr(holder, '_alcance_miembro'):
-        holder._alcance_miembro = miembros.member_for(request.user)
+        own = miembros.member_of_user(request.user)
+        if own is not None and not own.active and en_alta(request):
+            holder._alcance_miembro = own
+        else:
+            holder._alcance_miembro = miembros.member_for(request.user)
     return holder._alcance_miembro
 
 
