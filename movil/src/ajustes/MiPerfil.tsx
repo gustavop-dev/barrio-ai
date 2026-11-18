@@ -43,7 +43,7 @@ export function MiPerfilSection({ onFieldFocus }: { onFieldFocus?: () => void })
   };
 
   return (
-    <View testID="ajustes-mi-perfil">
+    <View testID="ajustes-mi-perfil" collapsable={false}>
       <Section label="Mi perfil" intro="Quién eres para el equipo: cómo te nombra, cómo te presenta y lo que nunca escribe en tu nombre. Solo tú lo cambias.">
         {perfil.isPending ? <Skeleton variant="card" label="Cargando tu perfil…" /> : null}
         {isUnavailable(perfil.error) ? <Unavailable>El servidor todavía no guarda tu perfil.</Unavailable> : <ErrorRetry error={perfil.error} onRetry={() => void perfil.refetch()} />}

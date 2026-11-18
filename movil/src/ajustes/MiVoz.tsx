@@ -44,7 +44,7 @@ export function MiVozSection() {
   };
 
   return (
-    <View testID="ajustes-mi-voz">
+    <View testID="ajustes-mi-voz" collapsable={false}>
       <Section label="Mi voz" intro="El equipo aprende tu estilo de lo que apruebas, corriges, respondes y grabas. Tu voz solo cambia cuando tú confirmas una propuesta.">
         {voz.isPending ? <Skeleton variant="card" label="Cargando tu voz…" /> : null}
         {isUnavailable(voz.error) ? <Unavailable>El servidor todavía no muestra tu voz.</Unavailable> : <ErrorRetry error={voz.error} onRetry={() => void voz.refetch()} />}
