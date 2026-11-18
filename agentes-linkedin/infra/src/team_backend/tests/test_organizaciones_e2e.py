@@ -2930,6 +2930,7 @@ class VozProvisionalTests(RitmoBase):
     Approval by the autopilot's policy or by Gustavo (the admin) is not hers: execute and its last gate refuse it."""
 
     def setUp(self):
+        freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
         super().setUp()
         self.set(self.cto, OPERATOR_AUTONOMY='CONT-09=auto,INT-03=auto,INT-04=auto,RED-02=auto')
         self.autobot = self.bot()
@@ -3043,6 +3044,7 @@ class AjustesDelMiembroTests(IdentidadBase):
     GET yo/voz, POST yo/voz/proponer and yo/voz/decidir, GET organizacion)."""
 
     def setUp(self):
+        freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
         super().setUp()
         env = patch.dict(os.environ, {'VOICE_LEARNING_ENABLED': 'true', 'VOICE_LEARNING_MIN_TEXTS': '2'})
         env.start()
