@@ -13,7 +13,7 @@ Una pieza detenida por presupuesto o por un ciclo detenido no ofrece nada: la re
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from . import editorial, guardas, imagenes, operador, retoque
+from . import editorial, guardas, identidad, imagenes, operador, retoque
 from .models import ActionProposal, CycleLedger, EditorialPiece, OPEN_PIECE_STATES
 
 KIND_LABEL = {'verificador': 'el verificador', 'imagen': 'la imagen', 'lider': 'el líder'}
@@ -140,15 +140,16 @@ def _approve(user, piece, kind, why, old, note):
         piece.verification = dict(piece.verification or {}, override={
             'by': str(user.pk), 'at': now.isoformat(), 'kind': kind, 'reasons': [str(r)[:500] for r in why[:5]],
             'note': (note or '')[:500], 'text_sha256': editorial._sha(piece.final_text.strip())})  # the proposal stores it stripped
-        piece.note = f'Gustavo desestimó el bloqueo de {KIND_LABEL[kind]}.'
+        owner = identidad.owner_name(piece.account)
+        piece.note = f'{owner} desestimó el bloqueo de {KIND_LABEL[kind]}.'
         piece.save(update_fields=['verification', 'note', 'updated_at'])
         brief = piece.brief or {}
-        risk = f'Gustavo desestimó el bloqueo de {KIND_LABEL[kind]}: ' + '; '.join(str(r) for r in why)
+        risk = f'{owner} desestimó el bloqueo de {KIND_LABEL[kind]}: ' + '; '.join(str(r) for r in why)
         proposal = operador.create_proposal(user, None, 'CONT-09', {'text': piece.final_text, 'media': imagenes.manifest(piece)},
             rationale=(old.rationale if old else brief.get('thesis') or '')[:4000], citations=piece.citations or (old.citations if old else []),
             risks=[risk[:1000]], source='human', previous=old, piece=piece)
         # Approved in the same transaction: the autopilot never sees it pending, so the leader does not review it.
-        operador.approve(user, proposal.id, proposal.payload_hash, note='Gustavo desestimó el bloqueo' + (f': {note}' if note else ''))
+        operador.approve(user, proposal.id, proposal.payload_hash, note=f'{owner} desestimó el bloqueo' + (f': {note}' if note else ''))
         operador._audit(user, 'editorial.block_overridden', piece.id, kind=kind, proposal=str(proposal.id))
     return proposal
 

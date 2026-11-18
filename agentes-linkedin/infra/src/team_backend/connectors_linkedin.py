@@ -153,17 +153,24 @@ def connect_member(user,token,profile):
 
 # --------------------------------------------------------------------------- publishing
 
-def post_body(author,text,media=None):
+def post_body(author,text,media=None,title=''):
+    """`title`: a single media's title when it has none (the account's member name, as LinkedIn shows it)."""
     body={'author':author,'commentary':little_text(text),'visibility':'PUBLIC',
             'distribution':{'feedDistribution':'MAIN_FEED','targetEntities':[],'thirdPartyDistributionChannels':[]},
             'lifecycleState':'PUBLISHED','isReshareDisabledByAuthor':False}
     if media:
         if len(media)==1:
             item=media[0]
-            body['content']={'media':{'id':item['id'],'title':item.get('title') or 'Gustavo'}}
+            body['content']={'media':{'id':item['id'],'title':item.get('title') or title}}
             if not item['id'].startswith('urn:li:document:'):body['content']['media']['altText']=item['alt']
         else:body['content']={'multiImage':{'images':[{'id':item['id'],'altText':item['alt']} for item in media]}}
     return body
+
+def _owner(account):
+    """The name of the account's member: the fallback title of a single media (identidad)."""
+    from . import identidad
+    return identidad.owner_name(account)
+
 
 class LinkedInOfficialConnector:
     """Writes only. w_member_social cannot read posts back; confirmation comes from the 201 response
@@ -222,7 +229,7 @@ class LinkedInOfficialConnector:
         headers={'Authorization':'Bearer '+decrypt(self.credential.token_encrypted),'LinkedIn-Version':self.version,
                  'X-Restli-Protocol-Version':'2.0.0','Content-Type':'application/json'}
         try:
-            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text,media),headers=headers)
+            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text,media,_owner(self.account)),headers=headers)
         except (httpx.ConnectError,httpx.ConnectTimeout):
             raise ConnectorError('LinkedIn: no fue posible conectar; la publicación no se envió.',kind='not_sent') from None
         except httpx.HTTPError as exc:
@@ -272,7 +279,7 @@ class FakeLinkedInOfficial:
         if mode=='not_sent':raise ConnectorError('Simulado: sin conexión.',kind='not_sent')
         urn=f'urn:li:share:{7400000000000000000+len(self.state["posts"])+1}'
         if mode!='uncertain_not_applied':
-            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text,media)});self.state['writes']+=1
+            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text,media,_owner(self.account))});self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras publicar.')
         return {'id':urn,'url':post_url(urn)}
 

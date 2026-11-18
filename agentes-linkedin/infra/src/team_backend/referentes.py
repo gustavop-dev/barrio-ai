@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
+from . import identidad
 from .jobs import Conflict, audit
 from .models import (AuditEvent, ConnectorAccount, Notification, Referent, ReferentChange,
                      ReferentControl, ReferentNotice, ReferentReview)
@@ -35,7 +36,7 @@ def require_gustavo(user, account=None):
     from .orquestacion import current
     require(user, 'operate_linkedin')
     if not is_gustavo(user, account) or current() is not None:
-        raise PermissionDenied('Solo Gustavo puede decidir cambios de referentes y experimentos.')
+        raise PermissionDenied('Solo el dueño de la cuenta o el administrador decide cambios de referentes y experimentos.')
 
 
 def month_start(now):
@@ -103,7 +104,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
         target_before = snapshot(target)
         target.protected, target.position, target.active = ref.protected, ref.position, True
         ref.protected, ref.active, ref.archived_at = False, False, timezone.now()
-        changed(control, user, target, target_before, source, 'Reemplazo explícito de Gustavo')
+        changed(control, user, target, target_before, source, f'Reemplazo explícito de {identidad.owner_name(ref.account)}')
         audit(user,'referents.main_replaced',ref.pk,source=source,outgoing=str(ref.pk),incoming=str(target.pk),
               outgoing_before=before,incoming_before=target_before,incoming_after=snapshot(target))
     for field, value in changes.items():
@@ -112,7 +113,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
                 ref.active, ref.archived_at = False, timezone.now()
         else:
             setattr(ref, field, value)
-    changed(control, user, ref, before, source, 'Decisión explícita de Gustavo')
+    changed(control, user, ref, before, source, f'Decisión explícita de {identidad.owner_name(ref.account)}')
     capacity(ref.account)
     return ref
 

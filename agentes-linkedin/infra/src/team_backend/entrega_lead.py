@@ -12,7 +12,7 @@ Only Gustavo creates the opportunity (PRS-09): the handoff's Tu turno card «Cre
 that person. An opportunity he creates by hand from Personas links the handoff too (on_opportunity)."""
 from django.db import transaction
 from django.utils import timezone
-from . import comprador, operador
+from . import comprador, identidad, operador
 from .exceptions import Conflict
 from .models import BuyerDraft, BuyerTouch, Contact, LeadHandoff, Opportunity
 from .permissions import require
@@ -85,14 +85,15 @@ def _business(contact,journey):
         if f['hecho'] and f['hecho'] not in seen:seen.add(f['hecho']);unique.append(f)
     return unique[:8]
 
-def _lines(sent,reply,booking):
-    """The conversation in three lines, from what happened (no model): his first message, her reply, the booking."""
+def _lines(sent,reply,booking,owner):
+    """The conversation in three lines, from what happened (no model): the member's first message (`owner`: her name,
+    identidad.owner_name), her reply, the booking."""
     first=sent[0] if sent else None
-    one=(f'Gustavo le escribió el {_day(comprador._when(first["enviado"]))}: «{_short(first["texto"],140)}»' if first and first['texto']
-         else 'Gustavo le escribió por LinkedIn.')
+    one=(f'{owner} le escribió el {_day(comprador._when(first["enviado"]))}: «{_short(first["texto"],140)}»' if first and first['texto']
+         else f'{owner} le escribió por LinkedIn.')
     two=(f'Ella respondió el {_day(comprador._when(reply["fecha"]))} ({reply["tipo"] or "sin clasificar"}): «{_short(reply["texto"],140)}»'
          if reply and reply.get('texto') else 'Ella respondió en LinkedIn.')
-    how='la reunión por Cal.com' if booking.provider=='calcom' else 'la reunión (Gustavo marcó «Agendó»)'
+    how='la reunión por Cal.com' if booking.provider=='calcom' else f'la reunión ({owner} marcó «Agendó»)'
     three=f'Agendó {how} para el {_day(booking.start_at)}.' if booking.start_at else f'Agendó {how}.'
     return [_short(one),_short(two),_short(three)]
 
@@ -115,7 +116,7 @@ def data(journey,booking):
                          'puente':_bridge(journey),
                          'referido_por':{'contacto':str(referrer.contact_id),'nombre':referrer.contact.display_name} if referrer else None,
                          'intento':journey.attempt},
-            'conversacion':_lines(sent,reply,booking),
+            'conversacion':_lines(sent,reply,booking,identidad.owner_name(contact.account)),
             'reunion':{'inicio':_iso(booking.start_at),'fin':_iso(booking.end_at),'proveedor':booking.provider,'reserva':booking.uid,
                        'emparejada_por':booking.matched_by,'correo':booking.attendee_email,'nombre':booking.attendee_name},
             'negocio':_business(contact,journey)}

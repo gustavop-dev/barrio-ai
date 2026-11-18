@@ -15,7 +15,7 @@ export function ProtectedReferent({ referent, candidates }: { referent: Referent
   return <>
     <Button size="small" onClick={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(referent.position ?? 0); setReplacement(''); setOpen(true); }}>{`Gestionar protección de ${referentName(referent)}`}</Button>
     {open ? <Modal title={`Gestionar a ${referent.display_name}`} onClose={() => setOpen(false)} busy={update.isPending}>
-      <p>Solo Gustavo. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</p>
+      <p>Solo el dueño de la cuenta o el administrador. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</p>
       <label className="field"><input type="checkbox" checked={protectedFlag} onChange={e => setProtected(e.target.checked)} />Main protegido</label>
       <label className="field"><input type="checkbox" checked={active} onChange={e => setActive(e.target.checked)} />Activo</label>
       <label className="field">Posición<input aria-label="Posición" type="number" min={0} max={15} value={position} onChange={e => setPosition(Number(e.target.value))} /></label>

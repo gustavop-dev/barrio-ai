@@ -44,7 +44,7 @@ it('opens a private proposal, cites each recommendation and distinguishes manual
   expect(screen.getByText(/\[LI-02-V015-K03\]/)).toBeOnTheScreen();
   await fireEvent.press(screen.getByTestId('profile-headline-accept'));
   await fireEvent.press(await screen.findByTestId('profile-headline-applied'));
-  await waitFor(() => expect(screen.getByText('Aplicado por Gustavo, pendiente de comprobar')).toBeOnTheScreen());
+  await waitFor(() => expect(screen.getByText('Aplicado por ti, pendiente de comprobar')).toBeOnTheScreen());
   expect(screen.queryByText(/^Comprobado$/)).not.toBeOnTheScreen();
   expect(server.find('POST', '/api/v1/perfil/profile-qa/decision').map((r) => (r.body as { action: string }).action)).toEqual(['accept', 'applied']);
 });

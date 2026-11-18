@@ -173,7 +173,7 @@ def verify(request,pid,data):
                 proposal.history.append({'action':'verify_mismatch','section':section['id'],'actor':request.user.pk,
                     'at':current['at'],'version':proposal.version,'observed':observed})
                 proposal.save()
-        raise Conflict('La relectura no coincide o no está disponible; sigue Aplicado por Gustavo.')
+        raise Conflict('La relectura no coincide o no está disponible; sigue «Aplicado por ti».')
     with transaction.atomic():
         proposal=get(request.user,pid,True)
         if proposal.revision!=data['revision']:raise Conflict('La propuesta cambió durante la comprobación.')

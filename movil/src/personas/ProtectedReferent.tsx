@@ -16,7 +16,7 @@ export function ProtectedReferent({ referent, candidates }: { referent: Referent
   return <>
     <Button size="small" onPress={() => { setProtected(Boolean(referent.protected)); setActive(referent.active !== false); setPosition(String(referent.position ?? 0)); setReplacement(''); setOpen(true); }} testID={`protect-${referent.id}`}>{`Gestionar protección de ${referentName(referent)}`}</Button>
     {open ? <Sheet label={`Gestionar a ${referent.display_name}`} onClose={() => setOpen(false)} suspended={update.isPending} testID="referent-protection">
-      <T>Solo Gustavo. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</T>
+      <T>Solo el dueño de la cuenta o el administrador. El equipo conserva la evidencia y no cambia seguimientos en LinkedIn.</T>
       <Select label="Protección" testID="protection-protected" value={protectedFlag ? 'main' : 'variable'} onChange={v => setProtected(v === 'main')}
         options={[{ value: 'main', label: 'Main protegido' }, { value: 'variable', label: 'Variable' }]} />
       <Select label="Actividad" testID="protection-active" value={active ? 'active' : 'inactive'} onChange={v => setActive(v === 'active')}

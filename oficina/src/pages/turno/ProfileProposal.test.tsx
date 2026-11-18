@@ -49,7 +49,7 @@ describe('Private profile proposal', () => {
     expect(screen.getByRole('link', { name: 'Descargar Markdown' })).toHaveAttribute('href', '/api/v1/perfil/profile-qa/documento');
     await user.click(screen.getByRole('button', { name: 'Aceptar propuesta' }));
     await user.click(await screen.findByRole('button', { name: 'Hecho, lo apliqué' }));
-    await waitFor(() => expect(screen.getByText(/Titular · Aplicado por Gustavo, pendiente de comprobar/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Titular · Aplicado por ti, pendiente de comprobar/)).toBeInTheDocument());
     expect(screen.queryByText(/^Comprobado$/)).not.toBeInTheDocument();
     expect(server.requests.filter((r) => r.method === 'POST').map((r) => (r.body as { action: string }).action)).toEqual(['accept', 'applied']);
   });
