@@ -9,7 +9,14 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 ## Resumen
 
 | ID | Función | Dónde | Estado |
-| --- | --- | --- | --- |
+| Organizaciones, fase 6 (18/11/2026, [ORG-28 a ORG-33](organizaciones.md#org-28)): con dos o más miembros activos el barrio
+es de la organización. Una persona es una ficha (`registro.py`): se descubre y se clasifica una vez, la atiende quien la
+toca primero (seguir, invitar, aceptar, comentar su post, responderle) y el otro miembro no la toca; dos o tres por empresa,
+nunca dos del mismo cargo; los referentes se leen una vez y cada post lo comenta un solo miembro; los candidatos sin dueño se
+reparten (afinidad, preferencia de rol opcional, hash estable); los perfiles de los colegas nunca son prospectos. Con un solo
+miembro todo lo de esta página sigue igual.
+
+--- | --- | --- | --- |
 | [BAR-01](#bar-01) | Descubrir personas en los comentarios de los referentes | backend | funciona |
 | [BAR-02](#bar-02) | Descubrir personas por búsqueda | backend | funciona |
 | [BAR-03](#bar-03) | Clasificar a cada persona | backend | funciona |

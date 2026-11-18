@@ -8,7 +8,9 @@ del proveedor y sus ajustes); y su identidad fuera del código (fase 3: perfiles
 base, prompts por miembro, su voz y los textos que la nombran); y su contenido (fase 4: calendario y piezas, plan,
 resumen, revisión, audiencia, memoria, orientación, preguntas, capturas y galería de cada miembro, con la hora de los posts
 escalonada y los temas coordinados); y sus vistas y sus avisos (fase 5: cada ruta dice de quién son sus datos, el id de otro
-miembro es un 404, el embudo de oportunidades es de la empresa y dice quién trajo cada una, cada aviso tiene dueño). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
+miembro es un 404, el embudo de oportunidades es de la empresa y dice quién trajo cada una, cada aviso tiene dueño); y el
+registro compartido de personas (fase 6: una ficha por persona en la organización, quien la toca primero se la queda, dos o
+tres por empresa, un comentario por post de referente, el reparto de candidatos y los colegas). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
 hasta entonces, un miembro nuevo entra **inactivo**.
 
 - **Código:** backend `models.py` (`Organization`, `Member`, `ConnectorAccount.member`), migración `0055_organizaciones`,
@@ -51,6 +53,12 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 | [ORG-25](#org-25) | Cada aviso tiene dueño: push, preferencias y «Vista» por persona | backend | funciona |
 | [ORG-26](#org-26) | «Quién soy» y la marca de voz provisional en las apps | backend, PWA, app | funciona |
 | [ORG-27](#org-27) | Cada miembro entra con su usuario y solo lee lo suyo | backend (servidor), PWA, app | funciona |
+| [ORG-28](#org-28) | Una ficha por persona en la organización | backend | funciona (actúa desde dos miembros) |
+| [ORG-29](#org-29) | Quien toca primero a una persona se la queda | backend, PWA, app | funciona (actúa desde dos miembros) |
+| [ORG-30](#org-30) | Dos o tres personas por empresa, nunca dos del mismo cargo | backend | funciona (actúa desde dos miembros) |
+| [ORG-31](#org-31) | Liberar, pasar y reasignar una persona | backend, PWA, app | funciona (actúa desde dos miembros) |
+| [ORG-32](#org-32) | Referentes de la organización: una lectura y un comentario por post | backend | funciona (actúa desde dos miembros) |
+| [ORG-33](#org-33) | El reparto de candidatos y los colegas | backend | funciona (actúa desde dos miembros) |
 
 ---
 
@@ -635,3 +643,127 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 - **Brechas código/docs:** activarlo es de la fase 7.
 - **Cobertura QA:** `RecorridoDelCtoTests.test_the_cto_logs_in_works_her_account_and_never_sees_gustavos` (1–3) · 2026-11-18 ·
   pasa en local
+
+### ORG-28 · Una ficha por persona en la organización <a id="org-28"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona; actúa con dos o más miembros activos (con uno, solo registra)
+- **Qué hace para Gustavo:** nada cambia para él. Con el CTO activo, una persona de LinkedIn es una sola ficha de ProjectApp:
+  se descubre y se clasifica una vez, y cada uno ve en la suya quién la atiende, sin nada privado del otro.
+- **Código:** `Person`, `Contact.person` (migración `0062_registro_de_personas`), `registro.py` (`sync`, `card_of`, `view`,
+  `known_uids`, `reusable`, `classified`), `red.shared_criterion`, `red._shared_classifications`, `red.discover`,
+  `serializers.ContactOutput` (`registro`), migración `0063_registro_inicial`, `miembros.ensure_first_member` → `registro.adopt`.
+- **Criterios de aceptación:**
+  1. **Dado** la misma persona descubierta por los dos, **cuando** clasifican, **entonces** se paga una sola llamada y el otro
+     contacto toma la clasificación de la organización sin la nota ni la evidencia privada; la ficha es una.
+  2. **Dado** una persona que la organización ya tiene, **cuando** la búsqueda del otro miembro la encuentra, **entonces** no se
+     vuelve a descubrir; una nueva sí.
+  3. **Dado** los datos de hoy, **cuando** corre la migración, **entonces** Gustavo atiende a quien ya tocó, los no tocados quedan
+     libres, rechazos y salidas definitivas excluyen para todos, y otra corrida no cambia nada; la vuelta deja el registro vacío.
+  4. **Dado** un solo miembro, **cuando** lee cualquier ruta o corre un planificador, **entonces** responde lo de antes.
+- **Brechas código/docs:** la clasificación reutilizada lleva la orientación privada de quien la pagó (el criterio compartido
+  no la incluye).
+- **Cobertura QA:** `RegistroTests.test_the_same_person_found_by_both_is_classified_once_and_not_discovered_again` (1–2),
+  `RegistroMigracionTests` (3), `UnMiembroRegistroTests`, las suites `UnMiembro*` de red y del comprador y la comparación de
+  lecturas y colas contra `feda285` (4) · 2026-11-18 · pasa en local
+
+### ORG-29 · Quien toca primero a una persona se la queda <a id="org-29"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona; actúa con dos o más miembros activos
+- **Qué hace para Gustavo:** si él sigue, invita, acepta, comenta el post o le responde a alguien primero, esa persona es suya:
+  el CTO no la sigue, no la invita, no comenta sus posts, no le responde y no recibe borradores para ella; su ficha dice «La
+  atiende Gustavo». Clasificar no cuenta como tocar.
+- **Código:** `registro.claim` (en `operador.execute`, fila `FOR UPDATE`), `registro.issue`/`issue_for`/`execution_issue`,
+  `check_proposal` (en `operador.create_proposal`), `precheck` (antes de cada borrador pagado), `gate` (planificadores),
+  `foreign_uids`, `_leave_queues`, `unclaim`; `red.plan`, `red.check_stages`, `autopiloto._propose_groups`/`_lead_redraft`,
+  `mensajes_comprador.prepare`/`_notes`/`_messages`, `respuesta_comprador.prepare`, `respuestas.propose`; `Persona.tsx` y
+  `PersonaScreen.tsx` («La atiende <nombre>»).
+- **Criterios de aceptación:**
+  1. **Dado** que Gustavo sigue a una persona que el CTO también tiene, **cuando** se ejecuta, **entonces** Gustavo la atiende y la
+     propuesta abierta y el borrador del CTO para ella salen de sus colas.
+  2. **Dado** eso, **cuando** el CTO propone, aprueba o ejecuta algo para ella (también por la API, con sus propios ids) o pide su
+     borrador, **entonces** 409 o «La atiende Gustavo.» y no se escribe nada.
+  3. **Dado** dos ejecuciones a la vez sobre la misma persona, **cuando** corren, **entonces** una escribe y la otra no.
+  4. **Dado** una persona excluida para todos, **cuando** cualquiera la propone o ejecuta, **entonces** se rechaza.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `RegistroTests.test_the_first_follow_keeps_her_…` (1–2), `RegistroConcurrenciaTests` (3),
+  `RegistroTests.test_excluded_for_everyone_nobody_touches_her` (4); `Persona.test.tsx`, `PersonaScreen.test.tsx`,
+  `barrio.test.ts` · 2026-11-18 · pasa en local
+
+### ORG-30 · Dos o tres personas por empresa, nunca dos del mismo cargo <a id="org-30"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona; actúa con dos o más miembros activos
+- **Qué hace para Gustavo:** donde él ya atiende a alguien de una empresa, el CTO no abre a nadie nuevo de esa empresa sin un
+  motivo propio; entre los dos, como mucho tres personas por empresa y nunca dos del mismo cargo (LI-08-V006-K02).
+- **Código:** `registro.company_issue`, `PEOPLE_PER_COMPANY_MAX`; `sin_posts.company_of`, `same_company`, `cargo_of`.
+- **Criterios de aceptación:**
+  1. **Dado** que Gustavo atiende a dos personas de Acme, **cuando** el CTO va a seguir a una tercera sin motivo propio,
+     **entonces** se rechaza; con motivo (la invitó) y el mismo cargo, también; con otro cargo, sale.
+  2. **Dado** tres atendidas de Acme, **cuando** el CTO va por una cuarta, **entonces** se rechaza.
+  3. **Dado** un referido o un puente, **cuando** se propone, **entonces** siguen sus propias reglas.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `RegistroTests.test_one_company_two_or_three_people_…` (1–3) · 2026-11-18 · pasa en local
+
+### ORG-31 · Liberar, pasar y reasignar una persona <a id="org-31"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona; actúa con dos o más miembros activos
+- **Qué hace para Gustavo:** desde la ficha de una persona que atiende, «Liberar» o «Pasar a <nombre>», siempre con un motivo;
+  quien la recibe empieza con la ficha básica y sus notas y mensajes se quedan con él. Como administrador, reasigna a quien
+  nadie ha tocado. Una persona en descanso o descartada sin actividad por 180 días queda libre.
+- **Código:** `registro.release`, `pass_to`, `card_for`, `reassign`, `release_stale`; `red_views.ContactRelease`, `ContactPass`,
+  `ContactReassign`; `red.discard(…, for_everyone)`; `compartido` (`releaseContact`, `passContact`, `useReleaseContact`,
+  `usePassContact`, `attendedBy`, `passTargets`).
+- **Criterios de aceptación:**
+  1. **Dado** una persona suya, **cuando** la pasa al CTO con motivo, **entonces** el CTO la atiende con una ficha sin sus notas
+     y queda auditado con el motivo; sin motivo, 400.
+  2. **Dado** que ya no la atiende, **cuando** intenta liberarla, **entonces** 403; quien la atiende la libera con motivo.
+  3. **Dado** el administrador, **cuando** reasigna a alguien sin tocar, **entonces** queda asignada; si alguien la atiende, 400;
+     el CTO (no administrador) recibe 403.
+- **Brechas código/docs:** falta un flujo de Maestro con dos miembros (fase 7).
+- **Cobertura QA:** `RegistroTests.test_release_and_pass_…` (1–3); `Persona.test.tsx`, `PersonaScreen.test.tsx` · 2026-11-18 ·
+  pasa en local
+
+### ORG-32 · Referentes de la organización: una lectura y un comentario por post <a id="org-32"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona; actúa con dos o más miembros activos
+- **Qué hace para Gustavo:** sus referentes son los de ProjectApp: cada post se lee una vez (las lecturas se reparten entre
+  las cuentas) y lo comenta un solo miembro, el primero que lo propone. La espera de 48 h por autor cuenta los comentarios de
+  los dos. Los cambios de referentes los sigue decidiendo él (o el administrador).
+- **Código:** `referentes.to_read`, `share_posts`, `scanned_everywhere`; `PostClaim`, `registro.claim_post`, `post_issue`,
+  `claimed_by_others`, `peers`; `operador.observe`, `autopiloto._observe`/`_propose`/`_propose_groups`/`_lead_redraft`/
+  `recent_comment_authors`, `operador.propose_comment`, `analisis_referentes.report`.
+- **Criterios de aceptación:**
+  1. **Dado** cuatro referentes y dos cuentas lectoras, **cuando** observan, **entonces** cada referente lo lee una sola cuenta
+     (la del hash) y sus posts llegan a las dos.
+  2. **Dado** que Gustavo propone un comentario en un post, **cuando** el CTO lo propone (también por la API o el borrador
+     pagado), **entonces** «Este post ya lo comenta Gustavo.».
+  3. **Dado** un comentario de Gustavo a un referente, **cuando** el CTO va por otro post del mismo autor, **entonces** espera.
+  4. **Dado** que una cuenta leyó los comentaristas de un post, **cuando** la otra descubre, **entonces** no lo vuelve a leer; los
+     descubiertos entran sin dueño.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `ReferentesDeLaOrganizacionTests` (1–4) · 2026-11-18 · pasa en local
+
+### ORG-33 · El reparto de candidatos y los colegas <a id="org-33"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona; actúa con dos o más miembros activos
+- **Qué hace para Gustavo:** los candidatos que nadie ha tocado se reparten solos: primero por afinidad (quien comentó su post,
+  lo invitó, le escribió o se lo refirieron), luego por la preferencia de rol si la activa (`PEOPLE_ROLE_PREFERENCE`, por
+  ejemplo `lider_tecnologia=CTO`) y el resto por un hash estable y parejo. Los perfiles del CTO y de Gustavo nunca son
+  prospectos, y alguien que trabaja en ProjectApp nunca es comprador.
+- **Código:** `registro.taker`, `may_take`, `gate`, `share_assigned`, `colleague_ids`, `remember_own`, `employee`;
+  `ConnectorAccount.linkedin_ids`; `red.COLLEAGUE_RULE`, `red.EMPLOYEE_RULE`, `operador.check_account`.
+- **Criterios de aceptación:**
+  1. **Dado** 200 personas sin tocar, **cuando** se reparten, **entonces** quedan cerca de mitad y mitad y igual en cada corrida;
+     la que invitó al CTO es suya; con la preferencia, un líder de tecnología va al CTO.
+  2. **Dado** los planificadores de los dos, **cuando** corren, **entonces** cada uno va solo por las suyas y el CTO recibe la ficha
+     básica de las que Gustavo descubrió para ella.
+  3. **Dado** el perfil propio del CTO como contacto de Gustavo, **cuando** se clasifica o se propone, **entonces** no se paga ni
+     se propone; un empleado de ProjectApp sale como no comprador.
+- **Brechas código/docs:** la preferencia de rol está apagada hasta que Gustavo la confirme.
+- **Cobertura QA:** `RepartoTests` (1–2), `RegistroTests.test_a_colleague_is_never_a_prospect_…` (3) · 2026-11-18 · pasa en local
+

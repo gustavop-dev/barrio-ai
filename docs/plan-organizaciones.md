@@ -80,7 +80,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | 3 | Identidad fuera del código (**hecha**) | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
 | 4 | Contenido por miembro (**hecha**) | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro (**hecha**) | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
-| 6 | Registro compartido de personas | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
+| 6 | Registro compartido de personas (**hecha**) | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
 | 7 | Alta del CTO | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
 
 ## Fase 1: lo construido
@@ -459,13 +459,13 @@ y el sha del documento de una propuesta de perfil) y los ids aleatorios de la se
 - Un usuario que no es miembro (una credencial de servicio, el robot del autopiloto) actúa por el único miembro activo,
   como antes; con varios activos recibe 400 en las rutas del miembro. Un token de dispositivo actúa como su usuario.
 
-**Las rutas** (144 de la API y 3 del proyecto):
+**Las rutas** (144 de la API y 3 del proyecto; la fase 6 suma tres: 147, con 117 del miembro y 4 + 1 del administrador):
 
 | Clase | Rutas | Cuáles |
 | --- | ---: | --- |
-| Del miembro | 115 | Las suyas: piezas, calendario, plan, resumen, revisión, memoria y hechos, preguntas, orientación, capturas, galería (fase 4) y, en esta fase, Tu turno entero, Notificaciones, Actividad, Resultados (su audiencia, su contenido, sus acciones, su analítica y su embudo del comprador), Personas (sus contactos y sus notas), sus conversaciones, respuestas y mensajes sugeridos, sus propuestas de acción, sus cuentas y sesiones de LinkedIn, su estudio de comunidad, sus propuestas de perfil, sus leads, reservas y respuestas del comprador, sus trabajos, su sesión, sus dispositivos y sus suscripciones push, `GET /api/v1/memory` y «quién soy» |
+| Del miembro | 115 (117 desde la fase 6: liberar y pasar a una persona) | Las suyas: piezas, calendario, plan, resumen, revisión, memoria y hechos, preguntas, orientación, capturas, galería (fase 4) y, en esta fase, Tu turno entero, Notificaciones, Actividad, Resultados (su audiencia, su contenido, sus acciones, su analítica y su embudo del comprador), Personas (sus contactos y sus notas), sus conversaciones, respuestas y mensajes sugeridos, sus propuestas de acción, sus cuentas y sesiones de LinkedIn, su estudio de comunidad, sus propuestas de perfil, sus leads, reservas y respuestas del comprador, sus trabajos, su sesión, sus dispositivos y sus suscripciones push, `GET /api/v1/memory` y «quién soy» |
 | De la organización | 18 | El embudo de oportunidades (2), los referentes y sus revisiones, análisis, cambios y experimentos (7), la biblioteca (`status`, `search`, `units`, `units/<id>`, `sources/<key>`), la parada total (`operador/control`), la escena de la oficina (`oficina/eventos`), el mapa del equipo (`equipo/grafo`) y la clave pública VAPID |
-| Solo del administrador | 3 + 1 | `integrity`, `audit`, `equipo/ciclos/<id>/decision` y la lectura de `app/errores` (informar un error, `POST`, es de cada uno) |
+| Solo del administrador | 3 + 1 (4 + 1 desde la fase 6) | `integrity`, `audit`, `equipo/ciclos/<id>/decision`, la lectura de `app/errores` (informar un error, `POST`, es de cada uno) y, desde la fase 6, `red/contacts/<id>/reasignar` |
 | Servicio | 7 | `auth/login`, `auth/token`, `linkedin/oauth/callback`, el webhook de Cal.com, la descarga con ticket de un perfil y las dos de la vista remota (`linkedin/pantalla/entrar`, `…/permitir`) |
 | Proyecto (`RAIZ`) | 3 | `admin/` (administrador: el admin de Django es del superusuario del servidor y ve todo), `health` (servicio), la consola de la biblioteca (organización) |
 
@@ -573,6 +573,121 @@ marca la tarjeta de otra persona.
   - `OPERATOR_ALERT_WEBHOOK` debe ser un canal que solo lea Gustavo (un tema de ntfy suyo); si es un canal de Slack que
     lee el CTO, recibiría los avisos de Gustavo. Verificarlo en el `.env` del servidor antes de activar al CTO.
   - El admin de Django (`/admin/`) es del superusuario del servidor y ve todo: no se da a otro miembro.
+
+## Fase 6: lo construido
+
+Hecho el 18/11/2026 en `feat/organizaciones` (fichas [ORG-28 a ORG-33](funcionalidades/organizaciones.md#org-28)). Decisión
+de Gustavo del 17/11/2026: «un modelo basado en organizaciones donde se comparta la base de datos, porque tenemos un mismo
+objetivo», «cada una con su cuenta, y ya él maneje de su lado sus cosas»; un solo embudo; **quien toca primero a una persona
+se la queda** y **nunca dos comentarios en el mismo post**. Todo vive en un módulo, `team_backend/registro.py`.
+
+**Con un solo miembro activo nada cambia** (la instalación de hoy): el reparto, la regla por empresa, la lectura repartida de
+referentes, la reutilización de clasificaciones, la regla de empleados y la liberación por plazo solo actúan con dos o más
+miembros activos; una exclusión nunca frena al miembro cuya propia historia la causó (decide la regla de hoy), y Personas no
+trae la clave `registro`. Comprobado contra el código del merge anterior a la fase (`feda285`) con el reloj congelado y el
+mismo `seed_qa`: **todas las rutas de lectura** y las colas de los planificadores (ver «Pruebas»).
+
+**Qué se comparte y qué no.** `Person` (migración `0062_registro_de_personas`): una ficha por persona de LinkedIn en la
+organización, única por (`organization`, `provider_user_id`; el id del perfil de `directo`, igual para las cuentas de todos
+desde el 14/11/2026). Guarda lo de la organización: nombre, titular, empresa (`sin_posts.company_of`), la parte de la
+clasificación que es su criterio (encaje, papel, nivel y puntaje del comprador, confianza, motivo, `stage_check`), la etapa
+general (candidata, seguida, invitada, conectada, descanso, descartada), una **exclusión para todos** (`rechazo_linkedin`,
+`no_contactar`, `descarte`) con quién la causó, y **quién la atiende** desde cuándo y con qué toque. Cada `Contact` apunta a su
+ficha (`Contact.person`) y guarda lo privado de su miembro: notas, historial, conversación, borradores, la nota de invitación y
+la evidencia de la clasificación. Un receptor `post_save` de `Contact` mantiene la ficha (`registro.sync`, en un savepoint: un
+fallo del espejo se registra y no frena el guardado). `PostClaim`: el único miembro que comenta un post de referente (único
+por organización y post).
+
+**«Quien la toca primero se la queda».** Toques: seguir (RED-01), invitar (RED-02), aceptar su invitación (RED-04), comentar
+su post (INT-03 en un post que no es de referente) y responderle (INT-04). Clasificar no es tocar. `operador.execute`, dentro
+del candado del miembro y antes de escribir, llama a `registro.claim`: toma la fila de la ficha `FOR UPDATE`; si nadie la
+atiende, el miembro queda como dueño y las propuestas abiertas y borradores pendientes del otro para esa persona salen de sus
+colas (descartadas, «La atiende <nombre>»; una fila que otra ejecución tiene tomada en ese momento se salta, sin esperar, y
+esa ejecución ve al dueño en su propio `claim`). Si la atiende otro, la propuesta se descarta sin escribir nada
+(`OperatorBlocked «La atiende <nombre>.»`, auditado `people.touch_refused`). Una ejecución que no escribió devuelve la ficha
+(`registro.unclaim` en `_finish`). La misma comprobación (`registro.issue`) está en `operador.create_proposal` (409 por la
+API), en `final_write_gate` y `red.execution_issues`, en los planificadores (`red.plan`, la verificación web de etapa, los
+comentarios, los borradores del comprador) y antes de cada borrador pagado (`propose_comment`, la respuesta en su post, el
+primer mensaje, los seguimientos y la respuesta del comprador).
+
+**Por empresa** (`registro.company_issue`, LI-08-V006-K02 y LI-08-M004-K04), al abrir a alguien nuevo (seguir o invitar) entre
+dos o más miembros: como mucho `PEOPLE_PER_COMPANY_MAX` (3) personas atendidas de una empresa entre todos, nunca dos del mismo
+cargo (`sin_posts.cargo_of`), y donde otro miembro ya atiende a alguien de esa empresa no se abre a nadie nuevo sin un motivo
+propio (la persona comentó su post, la invitó, le escribió, se la refirieron o es su puente). Un referido y un puente siguen
+sus propias reglas (`sin_posts`, `COMPANY_MAX`).
+
+**Liberar, pasar y reasignar** (`POST /api/v1/red/contacts/<id>/liberar|pasar|reasignar`): quien la atiende la libera o la
+pasa a otro miembro activo, siempre con motivo y auditado (`people.released`, `people.passed`); el que la recibe empieza con la
+ficha básica (`registro.card_for`: nombre, titular, perfil y la clasificación de la organización); notas, mensajes y
+borradores se quedan con quien los tenía. El administrador reasigna solo a quien nadie ha tocado (`people.reassigned`). Una
+persona en descanso o descartada sin exclusión para todos y sin actividad de su dueño durante `PEOPLE_RELEASE_AFTER_DAYS`
+(180) queda libre (`registro.release_stale`, en `red.plan`). Descartar con `for_everyone: true` excluye para toda la
+organización.
+
+**Colegas.** `ConnectorAccount.linkedin_ids` guarda el perfil propio de cada cuenta (lo lee `check_account` de `/me`); esos
+perfiles nunca se clasifican (salen como no encaja sin llamada pagada, `red.COLLEAGUE_RULE`), nunca se proponen ni se
+descubren. Con dos o más miembros, alguien cuyo titular nombra a la organización (`Organization.name`) nunca es comprador
+(`red.EMPLOYEE_RULE`).
+
+**Referentes de la organización.** La lista sigue en las cuentas de los miembros (la de Gustavo); con dos o más miembros
+`referentes.to_read` reparte cada referente a **una** cuenta lectora de la organización (hash estable del referente) y
+`referentes.share_posts` copia lo leído a las cuentas lectoras de los demás: cada post se lee una vez y cada miembro tiene su
+fila para proponer. El primer miembro con una propuesta viva en un post de referente se lo queda (`registro.claim_post`); los
+demás no lo proponen, no pagan su borrador y la API responde 409 «Este post ya lo comenta <nombre>.». La espera por autor
+(`OPERATOR_AUTHOR_COOLDOWN_HOURS`) cuenta los comentarios de todos los miembros (`registro.peers`). Los comentaristas de un
+post se leen una vez (`referentes.scanned_everywhere`) y entran al registro sin dueño. El análisis de la organización
+(`analisis_referentes.report` sin cuenta) cuenta cada post una vez. Decide los cambios de referentes el dueño de la cuenta o
+el administrador (ORG-07, sin cambio); los protegidos son de Gustavo.
+
+**El reparto de candidatos sin dueño** (`registro.taker`, para que Gustavo lo confirme): (1) a quien el administrador se la
+asignó; (2) afinidad: el miembro cuyo contacto llegó de su propio post, de una invitación, de una referencia o de una
+conversación; (3) `PEOPLE_ROLE_PREFERENCE` (apagado; propuesta: `lider_tecnologia=CTO`, los líderes de tecnología de
+ProjectApp al CTO y el resto por hash); (4) un hash estable de la persona entre los miembros que tienen cuenta lectora:
+determinista y parejo (200 personas: cerca de mitad y mitad, igual en cada corrida). La clasificación se paga una vez: otro
+miembro reutiliza la de la organización hecha con el mismo criterio (`red.shared_criterion`: instrucciones, umbral, curso y
+ProjectApp, sin el nombre ni la orientación privada de nadie). Los cupos semanales por papel (`NETWORK_ROLE_SHARE`) y todos
+los topes siguen siendo de cada miembro (fase 2). `red.plan` da a cada miembro la ficha básica de los candidatos que el reparto
+le asigna (`registro.share_assigned`, hasta 20 por corrida).
+
+**Pantallas.** Personas sigue mostrando solo los contactos del miembro (fase 5). Con dos o más miembros, `ContactOutput` trae
+`registro` (`attended_by`, `mine`, `pass_to`, `excluded`) y, si la atiende otro, el siguiente paso dice «La atiende
+<nombre>», sin nada privado del otro. La PWA y la app muestran esa línea, ocultan «Descartar» para la persona de otro y dan
+«Liberar» y «Pasar a <nombre>» (con motivo obligatorio) a quien la atiende.
+
+**Migración `0063_registro_inicial`** (datos, reversible e idempotente): todo lo de hoy es de Gustavo (el primer miembro). Cada
+contacto recibe su ficha; Gustavo queda como dueño de quien ya tocó (el contacto pasó de «encaja»: seguido, invitado,
+conectado o cerrado; o una escritura le llegó: seguir, invitar, aceptar, comentar su post o responderle), con toque «antes»;
+los candidatos que nadie tocó quedan libres. Los rechazos `cannot_resend_yet` (`network.recipient_blocked`) y las salidas
+«pidió no contacto» y «no le interesa» quedan como exclusión para todos, causada por Gustavo (para él sigue la regla de
+hoy). Cada propuesta de comentario en un post de referente reclama su post. En producción son inserciones en tablas nuevas
+(cientos de filas) y un `UPDATE` de `Contact.person`, en la transacción de la migración; nada de antes cambia. Sin miembros
+no hace nada (`bootstrap_local` lo hace después con `registro.adopt`). La vuelta vacía `Contact.person` y borra fichas y
+reclamos.
+
+**Pruebas.** `test_organizaciones_e2e`: `RegistroTests` (clasificada una vez y no se descubre otra vez; el primer seguimiento
+se la queda, la otra pierde su cola y no la toca ni por la API ni con un borrador; la regla por empresa; liberar, pasar y
+reasignar sin mover nada privado; colegas y empleados; excluida para todos), `RegistroConcurrenciaTests` (dos ejecuciones a
+la vez: una escribe, la otra no), `ReferentesDeLaOrganizacionTests` (cada referente leído por una cuenta, un comentario por
+post, comentaristas una vez, la espera por autor de los dos), `RepartoTests` (estable, parejo, afinidad, preferencia de rol y
+los planificadores), `RegistroMigracionTests` (0063 ida, otra vez y vuelta), `UnMiembroRegistroTests` y las suites de red y del
+comprador corridas con un solo miembro (`UnMiembroDiscoveryAndFollowTests`, `UnMiembroInvitationTests`,
+`UnMiembroVetoAndSafetyTests`, `UnMiembroTodayBuyerPathTests`). Identidad con un miembro: las lecturas de todas las rutas GET
+y las colas de `red.plan`, `autopiloto._propose` y `autopiloto._observe` comparadas contra `feda285`.
+
+### Lo que queda para la fase 7
+
+- El alta real del CTO (activarlo, su OAuth y su sesión del navegador): hasta entonces nada de esta fase actúa.
+- Que Gustavo confirme el reparto (afinidad, luego hash) y si activa `PEOPLE_ROLE_PREFERENCE=lider_tecnologia=CTO`.
+- Un flujo de Maestro con dos miembros («La atiende <nombre>», «Liberar», «Pasar a…»): con un miembro el texto visible no
+  cambia y los flujos de hoy no lo ven.
+- Riesgos conocidos:
+  - La reutilización de una clasificación lleva la orientación privada de quien la pagó (el criterio compartido no la
+    incluye): si las orientaciones de los dos difieren mucho, conviene que cada uno vuelva a clasificar (borrar la clave
+    `criterion` de la ficha).
+  - El reasignar del administrador nombra a la persona por un contacto de la organización; la API no lista aún las fichas
+    sin contacto suyo.
+  - Una persona cuya ficha se creó sin contacto (un comentarista de un post propio a quien se respondió) no entra al reparto
+    hasta que alguien la descubre.
 
 ## Servidor
 

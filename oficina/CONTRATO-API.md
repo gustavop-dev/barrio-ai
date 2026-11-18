@@ -41,7 +41,7 @@ solo lo suyo. Con un solo miembro ninguna respuesta cambia (todas las rutas de l
 - **Cada ruta tiene una clase** (`team_backend/alcance.py`, tabla en el [plan](../docs/plan-organizaciones.md#fase-5-lo-construido)):
   *del miembro* (lo suyo), *de la organización* (lo mismo para todos: oportunidades, referentes, biblioteca, parada total,
   escena y mapa del equipo, clave VAPID), *del administrador* (`integrity`, `audit`, `equipo/ciclos/<id>/decision`, `GET
-  /app/errores`: 403 a quien no es el administrador activo) o *servicio* (login, token, OAuth, Cal.com, tickets). Una ruta sin
+  /app/errores` y, desde la fase 6, `red/contacts/<id>/reasignar`: 403 a quien no es el administrador activo) o *servicio* (login, token, OAuth, Cal.com, tickets). Una ruta sin
   clase responde 403 `{ detail: "Esta ruta no dice de quién son sus datos (team_backend/alcance.py): se rechaza." }`.
 - **El id de otro miembro responde 404** en toda ruta del miembro y en todo método (antes de validar el cuerpo); lo mismo
   un id mal formado. En las rutas del miembro ya no hay 403 de «es de otro miembro» (preguntas, sesiones del navegador, acciones).
@@ -341,7 +341,23 @@ Valores que muestra la PWA:
 - `network_distance`: «1.er grado», «2.º grado», «3.er grado», «Fuera de tu red»; vacío no se muestra.
 - `confidence` (0 a 1) se muestra como porcentaje entero.
 
-POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`.
+POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`. Organizaciones, fase 6: `{ note, for_everyone: true }` además la excluye para toda la organización (ningún miembro la toca); sin `for_everyone` (o `false`) es lo de siempre.
+
+**El registro de personas (organizaciones, fase 6).** Solo con dos o más miembros activos; con uno, `ContactOutput` no trae la clave y nada cambia.
+
+```text
+"registro": { "attended_by": { "id": "uuid", "display_name": "…", "since": "ISO|null" } | null,
+              "mine": true|false,
+              "pass_to": [ { "id": "uuid", "display_name": "…" } ],
+              "excluded": "Rechazada por LinkedIn|No contactar|Descartada para todos" | null }
+```
+
+- `attended_by`: el otro miembro que la atiende (nunca nada privado suyo). Entonces `next_step` es `{ "owner": null, "text": "La atiende <nombre>", "at": null }` y las apps no ofrecen «Descartar».
+- `mine`: el miembro que lee la atiende; `pass_to` son los otros miembros activos a quienes puede pasarla (vacío si no la atiende).
+- POST `/api/v1/red/contacts/<id>/liberar` con `{ reason }` (obligatorio): quien la atiende deja de atenderla; 403 si no la atiende, 400 sin motivo. Devuelve `ContactOutput`.
+- POST `/api/v1/red/contacts/<id>/pasar` con `{ member, reason }`: la pasa a otro miembro activo con cuenta lectora; él empieza con la ficha básica y nada privado se mueve. 403 si no la atiende; 400 sin motivo o con un miembro que no existe, no está activo o no tiene cuenta.
+- POST `/api/v1/red/contacts/<id>/reasignar` con `{ member, reason }`: solo el administrador; da a un miembro una persona que nadie ha tocado (el id es el de cualquier contacto de la organización; fuera de ella, 404). 400 si ya la atiende alguien.
+- Cualquier propuesta para una persona que atiende otro miembro, excluida para todos o colega (`POST /api/v1/operador/actions`, un comentario en su post) responde 409 con el motivo («La atiende <nombre>.», «Este post ya lo comenta <nombre>.», «Es un colega de la organización: no es un prospecto.»). Todas con sesión humana, CSRF y `approve_actions`; auditadas (`people.released`, `people.passed`, `people.reassigned`).
 
 ### Resumen
 
