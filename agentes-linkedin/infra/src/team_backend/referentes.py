@@ -2,12 +2,10 @@
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
-import os
 import re
 import uuid
 from urllib.parse import urlsplit
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
@@ -20,16 +18,23 @@ TZ = ZoneInfo('America/Bogota')
 TERMINAL = {'approved', 'aplicada_por_plazo', 'rejected'}
 
 
-def is_gustavo(user):
-    # An explicit stable installation identity, never superuser/staff/operate_linkedin as a proxy.
-    username = getattr(settings, 'REFERENTS_GUSTAVO_USERNAME', os.environ.get('REFERENTS_GUSTAVO_USERNAME', 'gustavo'))
-    return bool(user and user.is_authenticated and user.is_active and user.get_username() == username)
+def is_gustavo(user, account=None):
+    """Who decides on an account's referents and experiments (organizaciones, phase 1): the member who owns the account
+    or the admin of its organization (miembros.can_decide), never superuser/staff/operate_linkedin as a proxy. Without an
+    account, any active admin. Without members at all (an installation before organizations), the explicit installation
+    identity REFERENTS_GUSTAVO_USERNAME, as before."""
+    from . import miembros
+    if not (user and user.is_authenticated and user.is_active):
+        return False
+    if not miembros.exist():
+        return user.get_username() == miembros.legacy_owner_username()
+    return miembros.can_decide(user, account) if account is not None else miembros.is_admin(user)
 
 
-def require_gustavo(user):
+def require_gustavo(user, account=None):
     from .orquestacion import current
     require(user, 'operate_linkedin')
-    if not is_gustavo(user) or current() is not None:
+    if not is_gustavo(user, account) or current() is not None:
         raise PermissionDenied('Solo Gustavo puede decidir cambios de referentes y experimentos.')
 
 
@@ -84,7 +89,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
     control = lock(ref.account)
     ref = Referent.objects.select_for_update().get(pk=ref.pk)
     if ref.protected or 'protected' in changes or replacement:
-        require_gustavo(user)
+        require_gustavo(user, ref.account)
     if ref.revision != version:
         raise Conflict('La ficha cambió. Recarga antes de guardar.')
     before = snapshot(ref)
@@ -115,7 +120,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
 @transaction.atomic
 def initialize(user, account, ids):
     """Recovery only after an ambiguous migration; never pick five by order/popularity."""
-    require_gustavo(user)
+    require_gustavo(user, account)
     control = lock(account)
     if control.initialized:
         raise Conflict('Los main iniciales ya están registrados; usa la gestión de protegidos.')
@@ -279,9 +284,9 @@ def _apply(item, control, user, automatic, now):
 @transaction.atomic
 def decide(user, item_id, version, decision, proposal=None, now=None, note=''):
     """`note`: Gustavo's why, kept in the history; a rejected industry candidate's note is shown to the next search."""
-    require_gustavo(user)
-    now = now or timezone.now()
     item = ReferentChange.objects.select_related('review__account').get(pk=item_id)
+    require_gustavo(user, item.review.account)
+    now = now or timezone.now()
     control = lock(item.review.account)
     item = ReferentChange.objects.select_for_update().select_related('review').get(pk=item_id)
     if item.version != version or item.state in TERMINAL:

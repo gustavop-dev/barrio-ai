@@ -72,7 +72,13 @@ class Reviews(APIView):
 
 def cards(user, card, now):
     out = []
-    human = referentes.is_gustavo(user)
+    deciders = {}
+
+    def human(account):
+        # Who decides is per account (organizaciones, phase 1): its owner or the organization's admin.
+        if account.pk not in deciders:
+            deciders[account.pk] = referentes.is_gustavo(user, account)
+        return deciders[account.pk]
     for control in ReferentControl.objects.filter(initialized=False).exclude(account__provider__in=['linkedin','linkedin_fake']).select_related('account'):
         out.append(card(f'referents_setup:{control.account_id}', 'aviso', 'Identificar los cinco referentes main',
             control.issue, [{'label': 'Gestionar protegidos', 'href': '/personas?pestana=referentes'}], agent='investigador_lider'))
@@ -89,7 +95,7 @@ def cards(user, card, now):
         actions = [{'label': {'add': 'Aprobar alta', 'remove': 'Aprobar baja', 'swap': 'Aprobar sustitución'}[p['kind']],
                     'endpoint': endpoint, 'body': {'version': item.version, 'decision': 'approve'}, 'primary': True},
                    *[{'label': label, 'endpoint': endpoint, 'body': {'version': item.version, 'decision': decision}}
-                     for label, decision in [('Rechazar', 'reject'), ('Pedir ajuste', 'adjust'), ('Más tarde', 'later')]]] if human else []
+                     for label, decision in [('Rechazar', 'reject'), ('Pedir ajuste', 'adjust'), ('Más tarde', 'later')]]] if human(review.account) else []
         sources = review.dossier.get('sources', [])
         current = Referent.objects.filter(account=review.account, active=True, archived_at__isnull=True)
         total, main = current.count(), current.filter(protected=True).count()
@@ -104,17 +110,17 @@ def cards(user, card, now):
                 'proposal': p, 'outgoing': referentes.snapshot(outgoing) if outgoing else None, 'sources': sources,
                 'evidence': review.dossier.get('evidence', {}), 'limitations': review.dossier.get('limitations', []),
                 'occupancy': {'before': total, 'after': total + (1 if p['kind'] == 'add' else -1 if p['kind'] == 'remove' else 0), 'main': main, 'variables': total-main},
-                'can_decide': human, 'conflict': item.conflict, 'endpoint': endpoint}))
-    for exp in ReferentExperiment.objects.select_related('referent').filter(state__in=['proposed', 'postponed', 'adjustment', 'approved']):
+                'can_decide': human(review.account), 'conflict': item.conflict, 'endpoint': endpoint}))
+    for exp in ReferentExperiment.objects.select_related('referent', 'account').filter(state__in=['proposed', 'postponed', 'adjustment', 'approved']):
         endpoint = f'/api/v1/referentes/experimentos/{exp.pk}/decidir'
         choices = [('Detener', 'stop')] if exp.state == 'approved' else [('Aprobar experimento', 'approve'), ('Pedir ajuste', 'adjust'), ('Descartar', 'discard'), ('Más tarde', 'later')]
-        actions = [{'label': label, 'endpoint': endpoint, 'body': {'version': exp.version, 'decision': decision}, 'primary': n == 0} for n, (label, decision) in enumerate(choices)] if human else []
+        actions = [{'label': label, 'endpoint': endpoint, 'body': {'version': exp.version, 'decision': decision}, 'primary': n == 0} for n, (label, decision) in enumerate(choices)] if human(exp.account) else []
         out.append(card(f'referent_experiment:{exp.pk}', 'experimento', f'Experimento: {exp.referent.display_name}',
             exp.plan['hypothesis'], actions, agent='investigador_lider', created_at=exp.created_at,
             state_override='pospuesta' if exp.state == 'postponed' else None,
             referent_experiment={'id': str(exp.pk), 'version': exp.version, 'state': exp.state, 'plan': exp.plan,
                 'starts_at': exp.starts_at, 'focus_at': exp.focus_at, 'followup_at': exp.followup_at, 'ends_at': exp.ends_at,
-                'can_decide': human, 'endpoint': endpoint, 'results': exp.results}))
+                'can_decide': human(exp.account), 'endpoint': endpoint, 'results': exp.results}))
     return out
 
 

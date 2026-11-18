@@ -58,7 +58,7 @@ class Referents(ListAPIView):
     serializer_class=ReferentOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=Referent.objects.filter(archived_at__isnull=True).order_by('-protected','position','display_name')
+        qs=Referent.objects.select_related('account__member').filter(archived_at__isnull=True).order_by('-protected','position','display_name')
         account=self.request.query_params.get('account')
         return qs.filter(account_id=account) if account else qs
     def post(self,request):

@@ -102,7 +102,7 @@ class ReferentOutput(serializers.ModelSerializer):
     def get_can_manage_protected(self,obj):
         from .referentes import is_gustavo
         request=self.context.get('request')
-        return is_gustavo(request.user) if request else False
+        return is_gustavo(request.user,obj.account) if request else False
     def get_protection_history(self,obj):
         from .referentes import history
         return history(obj)

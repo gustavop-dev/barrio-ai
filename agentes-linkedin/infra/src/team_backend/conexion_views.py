@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 from . import conexion
 from .models import BrowserLogin, ConnectorAccount
 from .operador_views import get_or_404, human_session
-from .permissions import require
 
 GONE = ('<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
         '<title>Conectar LinkedIn</title><body style="font-family:sans-serif;padding:24px">'
@@ -40,8 +39,7 @@ class AccountLogin(APIView):
 
 class LoginDetail(APIView):
     def get(self, request, lid):
-        require(request.user, 'operate_linkedin')
-        return _answer(request, conexion.refresh(get_or_404(BrowserLogin, id=lid)))
+        return _answer(request, conexion.poll(request.user, get_or_404(BrowserLogin, id=lid)))
 
 
 class LoginLink(APIView):

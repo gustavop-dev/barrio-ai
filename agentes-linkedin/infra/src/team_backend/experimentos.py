@@ -68,8 +68,8 @@ def cancel_pending(experiment):
 
 @transaction.atomic
 def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
-    require_gustavo(user)
     experiment = ReferentExperiment.objects.select_related('account').get(pk=experiment_id)
+    require_gustavo(user, experiment.account)
     operador.policy_lock()
     lock(experiment.account)
     experiment = ReferentExperiment.objects.select_for_update().get(pk=experiment_id)

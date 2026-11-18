@@ -125,10 +125,19 @@ def connect_member(user,token,profile):
     granted=set(token['scope'].replace(',',' ').split())
     if 'w_member_social' not in granted:
         raise ConnectorError('LinkedIn no concedió w_member_social: revisa el producto Share on LinkedIn de la app.',kind='scope')
+    from . import miembros
     urn='urn:li:person:'+profile['sub'];now=timezone.now()
     with transaction.atomic():
-        account,_=ConnectorAccount.objects.get_or_create(provider='linkedin',external_account_id=urn,
-            defaults={'label':'LinkedIn · API oficial'+(f' ({profile["name"]})' if profile['name'] else '')})
+        # Only its owner connects (or reconnects) a member's LinkedIn; a new one belongs to whoever connects it
+        # (organizaciones, phase 1). Nothing is stored when either fails.
+        account=ConnectorAccount.objects.select_for_update().filter(provider='linkedin',external_account_id=urn).first()
+        if account is not None and not miembros.is_owner(user,account):
+            raise ConnectorError('Esta cuenta de LinkedIn es de otro miembro: solo su dueño la conecta.',kind='owner')
+        if account is None:
+            try:member=miembros.member_for(user)
+            except miembros.MiembroRequerido as exc:raise ConnectorError(str(exc),kind='owner') from None
+            account=ConnectorAccount.objects.create(provider='linkedin',external_account_id=urn,member=member,
+                label='LinkedIn · API oficial'+(f' ({profile["name"]})' if profile['name'] else ''))
         credential,created=LinkedInCredential.objects.update_or_create(account=account,defaults={
             'member_urn':urn,'member_name':profile['name'],'scopes':' '.join(sorted(granted)),'token_encrypted':encrypt(token['access_token']),
             'expires_at':now+timedelta(seconds=token['expires_in']),'connected_by':user,'connected_at':now,'expiry_alerted_at':None})
@@ -274,7 +283,10 @@ def connector_for(account):
 
 # --------------------------------------------------------------------------- supervision
 
-def status_payload(now=None):
+def status_payload(now=None,member=None):
+    """The official connection of `member` (miembros.default_member() without one): her latest credential only, never
+    another member's."""
+    from . import miembros
     from .models import LinkedInCredential
     now=now or timezone.now()
     try:version=api_version()
@@ -282,7 +294,8 @@ def status_payload(now=None):
     data={'configured':oauth_configured(),'live':live(),'api_version':version,'scopes_required':list(SCOPES),'connected':False,
           'member_urn':None,'member_name':None,'scopes':[],'expires_at':None,'days_left':None,'expired':False,
           'expiring_soon':False,'account':None}
-    credential=LinkedInCredential.objects.select_related('account').order_by('-connected_at').first()
+    credential=(LinkedInCredential.objects.select_related('account').filter(account__in=miembros.accounts(miembros.resolve(member)))
+                .order_by('-connected_at').first())
     if credential:
         left=credential.expires_at-now;account=credential.account
         data.update(connected=left>timedelta(0),member_urn=credential.member_urn,member_name=credential.member_name,
