@@ -666,6 +666,9 @@ def propose(user,comment_id,origin_job=''):
     if reason:
         _decide(row,PostComment.State.CLOSED,reason);return {'decision':'closed','reason':reason}
     if row.proposals.filter(state__in=OPEN).exists():raise Conflict('Ya hay una respuesta abierta para este comentario.')
+    from . import registro
+    taken=registro.precheck(row.account,REPLY,comment=row)  # phase 6: another member attends her: no paid draft
+    if taken:return {'decision':'skip','reason':taken}
     from knowledge import presupuesto
     if presupuesto.left(now)<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
     from . import catalogo

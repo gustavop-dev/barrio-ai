@@ -516,6 +516,9 @@ def prepare(user,params,origin_job=''):
     at=_when(params.get('at')) or timezone.now()
     journey=comprador.journey(contact)
     if journey is None:return {'decision':'skip','reason':'Sin recorrido de comprador.'}
+    from . import registro
+    taken=registro.draft_issue(contact)  # phase 6: another member attends her (or she is excluded for everyone)
+    if taken:return {'decision':'skip','reason':taken}
     from . import secuencia_comprador
     if number>1 and not secuencia_comprador.active():return {'decision':'skip','reason':'Fase 4, fase 3 o líder apagados.'}
     if number==1 and not active():return {'decision':'skip','reason':'Fase 3 o líder apagados.'}
@@ -558,7 +561,9 @@ def _notes(account,now):
     route=sin_posts.active()
     rows=(BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING,contact__stage='followed',
                                                                 contact__classification__fit=True))
-    candidates=[j for j in rows if decision(j.contact,NOTE,j.attempt) is None and _ready_to_invite(j,now)]
+    from . import registro
+    allowed=registro.gate(member,account)  # phase 6: only people hers to touch
+    candidates=[j for j in rows if decision(j.contact,NOTE,j.attempt) is None and _ready_to_invite(j,now) and not allowed(j.contact)]
     if not candidates:return 0,None
     heat=calentamiento.heats([j.contact for j in candidates],now)
     if route:  # phase 5: the buyers warmed with comments first, then the route's by signal
@@ -593,10 +598,12 @@ def _messages(account,now):
     from .respuestas import _dm_rows
     rsp={row.contact_id for row in _dm_rows(alcance.TODOS)}
     decided=0;item=None
+    from . import registro
+    allowed=registro.gate(operador.member_of(account=account),account)  # phase 6: only people hers to touch
     rows=BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.ACCEPTED).order_by('accepted_at')
     for journey in rows:
         contact=journey.contact
-        if contact.pk in rsp or decision(contact,MESSAGE,journey.attempt):continue
+        if contact.pk in rsp or decision(contact,MESSAGE,journey.attempt) or allowed(contact):continue
         touches=comprador._touches(journey)
         began=max((t.at for t in touches if t.kind==Kind.RETRY),default=None)
         mine=[t for t in touches if began is None or t.at>=began]

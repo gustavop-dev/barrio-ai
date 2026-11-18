@@ -490,7 +490,10 @@ def register_account(user,provider,external_account_id,label):
 
 def check_account(account,actor=None):
     """Refresh provider status. A non-running or locked account pauses writes."""
-    status=get_connector(account).account_status()
+    connector=get_connector(account)
+    status=connector.account_status()
+    from . import registro
+    registro.remember_own(account,connector)  # her own profile ids: a colleague is never a prospect (phase 6)
     account.status=status['status'];account.is_locked=status['is_locked'];account.last_checked_at=timezone.now()
     fields=['status','is_locked','last_checked_at']
     account.save(update_fields=fields)
@@ -580,7 +583,8 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
     require(user,'operate_linkedin')
     if not 1<=limit<=20:raise ValueError('Límite de lectura inválido')
     connector=get_connector(account)
-    referents=Referent.objects.filter(account=account,active=True)
+    from . import referentes
+    referents=referentes.to_read(account)  # phase 6: alone her own; among members, each referent read by one account
     if referent_ids:referents=referents.filter(id__in=referent_ids)
     if buyers_only:referents=referents.none()
     context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS},account=account)
@@ -616,6 +620,8 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
                                         'scope':'Observed public post; no inferred audience or causality'})
         referent.last_observed_at=timezone.now();referent.save(update_fields=['last_observed_at'])
         observed.append(referent.id)
+        shared=referentes.share_posts(account,[post['id'] for post in posts])  # phase 6: the other members' copies
+        if shared:summary['shared_posts']=summary.get('shared_posts',0)+shared
     # «What worked for them» (modelos_crecimiento): outliers of what was just read. Never fails the observation.
     if observed or not buyers_only:
         try:summary['models']=modelos_crecimiento.after_observe(account,connector,observed)
@@ -677,6 +683,11 @@ def create_proposal(user,post,capability,payload,rationale='',citations=(),risks
         payload=dict(payload,media=manifest(piece))
     payload=validate_payload(capability,payload,(post or piece or contact or comment).account) if state!=ActionProposal.State.DISCARDED else payload
     account_id=(post or piece or contact or comment).account_id
+    if state!=ActionProposal.State.DISCARDED:
+        # Organizaciones, phase 6 (registro.py): a person another member attends, excluded for everyone or a colleague,
+        # and a referent's post another member comments, are never proposed (registro.Atendida, a Conflict).
+        from . import registro
+        registro.check_proposal((post or piece or contact or comment).account,capability,post=post,contact=contact,comment=comment)
     digest=payload_hash(account_id,capability,target_of(post,piece,contact,comment),payload)
     try:
         with transaction.atomic():
@@ -772,7 +783,10 @@ def _finish(execution,state,actor,**fields):
     execution.state=state;execution.finished_at=execution.finished_at or timezone.now()
     for key,value in fields.items():setattr(execution,key,value)
     execution.save()
-    if state=='failed' and not execution.wrote:release_spacing(execution)
+    if state=='failed' and not execution.wrote:
+        release_spacing(execution)
+        from . import registro
+        registro.unclaim(execution.proposal)  # nothing reached her: not a real touch (phase 6)
     ActionProposal.objects.filter(pk=execution.proposal_id).update(state=state)
     proposal=execution.proposal
     if state=='confirmed' and proposal.contact_id:
@@ -844,7 +858,11 @@ def final_write_gate(execution,proposal,user):
     if capped(proposal) and capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
     if proposal.capability in NETWORK:
         from . import red
-        issues.extend(red.execution_issues(proposal))
+        issues.extend(red.execution_issues(proposal))  # with the register's check (registro.issue_for)
+    else:
+        from . import registro
+        reason=registro.execution_issue(proposal)  # phase 6: the person (or the post) is still hers to touch
+        if reason:issues.append(reason)
     if proposal.comment_id:
         from . import respuestas
         issues.extend(respuestas.execution_issues(proposal))
@@ -946,23 +964,35 @@ def execute(user,proposal_id):
         if due:raise OperatorBlocked(f'El post de las {due.piece.scheduled_for.astimezone(local_tz()):%H:%M} sale primero; esta acción queda aprobada para después.')
         if capped(proposal) and capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
-        if proposal.capability in NETWORK:
-            from . import red
-            issues=red.execution_issues(proposal)
-            if issues:raise OperatorBlocked('; '.join(issues))
-            # Reserve the preflight before creating an execution. Exhaustion leaves approval retryable.
-            try:reserve_profile_read(account,'preflight')
-            except ProfileReadCapReached as exc:raise OperatorBlocked(str(exc)) from exc
-        if proposal.comment_id:
-            from . import respuestas
-            issues=respuestas.execution_issues(proposal)
-            if issues:raise OperatorBlocked('; '.join(issues))
-        reserved=reserve_spacing(capability=proposal.capability,member=member)
-        execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
-            idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
-        execution._spacing=reserved  # given back by _finish if nothing gets written
-        proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])
-        _audit(user,'operator.execution_started',proposal.id,capability=proposal.capability)
+        # Organizaciones, phase 6: «quien la toca primero se la queda». The person's card is taken FOR UPDATE here, after
+        # her own gates and before anything is written: with two members at once one wins and the other writes nothing
+        # (registro.claim); a gate below that stops the execution rolls the claim back with it.
+        from . import registro
+        lost=registro.claim(proposal,member)
+        if not lost:
+            if proposal.capability in NETWORK:
+                from . import red
+                issues=red.execution_issues(proposal)
+                if issues:raise OperatorBlocked('; '.join(issues))
+                # Reserve the preflight before creating an execution. Exhaustion leaves approval retryable.
+                try:reserve_profile_read(account,'preflight')
+                except ProfileReadCapReached as exc:raise OperatorBlocked(str(exc)) from exc
+            if proposal.comment_id:
+                from . import respuestas
+                issues=respuestas.execution_issues(proposal)
+                if issues:raise OperatorBlocked('; '.join(issues))
+            reserved=reserve_spacing(capability=proposal.capability,member=member)
+            execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
+                idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
+            execution._spacing=reserved  # given back by _finish if nothing gets written
+            proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])
+            _audit(user,'operator.execution_started',proposal.id,capability=proposal.capability)
+    if lost:
+        # Another member attends her (or she is excluded, or the post is another's): never written, never retried.
+        ActionProposal.objects.filter(pk=proposal.pk,state=ActionProposal.State.APPROVED).update(
+            state=ActionProposal.State.DISCARDED,decided_at=timezone.now(),decision_note=f'{lost} (registro de personas)')
+        _audit(user,'people.touch_refused',proposal.id,reason=lost)
+        raise OperatorBlocked(lost)
     post_id=proposal.post.provider_post_id if proposal.post_id else None
     try:
         connector=get_connector(account)
@@ -1255,6 +1285,9 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
     from . import compuertas, experimentos, orquestacion
     if not post.text.strip():raise ValueError('Sin contenido base verificable; no redactar.')
     if not experimentos.eligible(post):raise ValueError('Cupo del foco experimental agotado.')
+    from . import registro
+    taken=registro.precheck(post.account,'INT-03',post=post)  # phase 6: before paying, another member's post or person
+    if taken:raise registro.Atendida(taken)
     if ActionProposal.objects.filter(post=post,capability='INT-03',state__in=OPEN_ACTION_STATES+['confirmed']).exists():
         raise Conflict('Ya hay un comentario abierto o publicado en esta publicación; no se genera otro.')
     previous=None

@@ -278,6 +278,8 @@ def provider_failure(account,proposal,exc,actor=None):
     if cannot:
         uid=proposal.payload['user_id']
         operador._audit(actor,'network.recipient_blocked',uid,kind=exc.kind,status=422)
+        from . import registro
+        registro.exclude(uid,account,'rechazo_linkedin','LinkedIn rechazó su invitación (cannot_resend_yet).',member)  # phase 6
         # Two distinct recipients refused to HER in 24 h (her network.provider_limit events) pause her invitations.
         count=len(set(AuditEvent.objects.filter(action='network.provider_limit',target=key,metadata__scope='recipient',
                                                 created_at__gte=now-timedelta(hours=24)).values_list('metadata__recipient',flat=True)))
@@ -422,6 +424,11 @@ def send_invitation(execution,proposal,connector,user):
 def execution_issues(proposal,now=None):
     now=now or timezone.now();issues=[]
     if setting('OPERATOR_EXTERNAL_OUTREACH_ACTIVE','false').lower()=='true':issues.append('Outreach externo concurrente')
+    # Organizaciones, phase 6: the person is hers to touch (another member attends her, she is excluded for everyone or a
+    # colleague: registro.py). operador.execute already took her (registro.claim) before this runs.
+    from . import registro
+    reason=registro.execution_issue(proposal)
+    if reason:issues.append(reason)
     if proposal.capability==RED.INVITE:
         member=operador.member_of(account=proposal.account)
         note_policy(member)  # Unknown tier is a configuration error, even for a no-note invitation.
@@ -512,6 +519,10 @@ def discover(user,account,now=None):
     connector=get_connector(account)
     known=set(Contact.objects.filter(account=account).values_list('provider_user_id',flat=True))
     known|=set(Referent.objects.filter(account=account).exclude(provider_user_id='').values_list('provider_user_id',flat=True))
+    # Organizaciones, phase 6: someone the organization already has (another member's contact, classified once) or a
+    # colleague's own profile is not discovered again; with one member these are hers (the same set as before).
+    from . import registro
+    known|=registro.known_uids(account)
     max_new=min(room,int(setting('NETWORK_MAX_NEW_PER_RUN','15')));min_chars=int(setting('NETWORK_MIN_COMMENT_CHARS','80'))
     # BAR-25: with the ProjectApp buyer on, the searches rotate by audience (projectapp.next_search): ProjectApp buyers,
     # startup buyers (NETWORK_SEARCH_QUERIES) and partners, in proportion to the week's invitations of each one.
@@ -550,6 +561,8 @@ def discover(user,account,now=None):
         referent_comments(post,comments,now)
         store_audience(post,comments,now)  # counts and themes only, for «what worked for them»
         post.commenters_scanned_at=now;post.save(update_fields=['commenters_scanned_at']);summary['posts']+=1
+        from . import referentes
+        referentes.scanned_everywhere(post,now)  # phase 6: a colleague's copy of the post is not read again
         for comment in comments:
             author=comment['author'];uid=author.get('id')
             if comment['is_sender'] or not uid or uid in known or uid==post.author_provider_id:continue
@@ -792,6 +805,17 @@ def criterion_version(system,minimum_confidence,course_version,orientation):
         'course_version':course_version,'orientation':orientation,
     },sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
 
+def shared_criterion(minimum_confidence,course_version):
+    """Organizaciones, phase 6: the organization's part of the classifier's criterion (its instructions before any
+    member's name, the threshold, the course and the buyer of ProjectApp on or off), with no member's name nor private
+    orientation: another member's classification of the same person made with it is reused (registro.reusable)."""
+    from .evidencia import CRITERION_VERSION
+    on=projectapp.enabled()
+    return CRITERION_VERSION+':org:'+hashlib.sha256(json.dumps({
+        'system':CLASSIFY_SYSTEM_PROJECTAPP if on else CLASSIFY_SYSTEM,'minimum_confidence':minimum_confidence,
+        'course_version':course_version,'projectapp':on,
+    },sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
+
 def no_fit_rule(member=None):
     """The reason a buyer with evidence against leaves the neighborhood, with who decided it."""
     return identidad.of(member).render(NO_FIT_RULE)
@@ -866,6 +890,7 @@ def classification_people(contacts):
              'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','post','conversed','query','invitation_message') and v}}
             for c in contacts]
 
+EMPLOYEE_RULE='Trabaja en la organización (su titular la nombra): no es comprador (organizaciones, fase 6).'
 UNCITED_ATTEMPTS=2  # verdicts without a retrieved course citation before the person leaves as not fit
 UNCITED_RULE='Sin criterio del curso recuperado para sustentar el veredicto.'
 
@@ -879,13 +904,52 @@ def classify(user,account,now=None,batch=10):
     if budget_left(now)<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
     return _classify_batch(user,account,now,batch)
 
+COLLEAGUE_RULE='Es un colega de la organización (su propio perfil de LinkedIn): nunca es un prospecto.'
+
+def _shared_classifications(account,pending,now,grounding):
+    """Organizaciones, phase 6 (two or more active members): a colleague's own profile leaves as not fit without a paid
+    call, and a person another member's contact already classified with the same organization criterion
+    (shared_criterion) takes that classification (without its private evidence or note): classified once. Classifying is
+    not touching. Returns the contacts still to classify and how many were settled here. Alone: nothing changes."""
+    from . import registro
+    org=registro.organization_id(account)
+    if not registro.shared(org) or not pending:return pending,0
+    colleagues=registro.colleague_ids(org);criterion=shared_criterion(min_confidence(),grounding.get('course_version'))
+    rest=[];settled=0;when=(now or timezone.now()).isoformat()
+    from .evidencia import record_classification
+    for contact in pending:
+        reused=None if contact.provider_user_id in colleagues else registro.reusable(contact,criterion)
+        if contact.provider_user_id in colleagues:
+            contact.classification={'fit':False,'role':'colega','reason':COLLEAGUE_RULE,'rule':COLLEAGUE_RULE,'classified_at':when,
+                                    'confidence':1.0,'evidence':contact.evidence}
+        elif reused is not None:
+            contact.classification=reused
+        else:
+            rest.append(contact);continue
+        fit=bool(contact.classification.get('fit'))
+        reason=contact.classification.get('rule') or contact.classification.get('reason') or ''
+        why=reason if reused is None else f'Clasificada una vez en la organización (ficha {reused["shared_from"]}): {reason}'
+        if contact.stage=='candidate':_stage(contact,'fit' if fit else 'discarded','classified',why[:500])
+        else:note(contact,'classified',why[:500])
+        with transaction.atomic():
+            contact.save()
+            if reused is not None:record_classification(contact,observed_at=now or timezone.now())
+        comprador.on_contact(contact,'clasificacion')
+        settled+=1
+    return rest,settled
+
 def _classify_batch(user,account,now,batch):
     pending=list(Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).order_by('discovered_at')[:batch])
     units,methodology=classify_units()
     context,grounding=operador.role_context('clasificador',units,metodologia=methodology,account=account)
     if grounding['course_missing']:return {'classified':0,'fit':0,'stopped':'Biblioteca no disponible',**grounding}
+    pending,shared=_shared_classifications(account,pending,now,grounding)
+    if shared and not pending:
+        operador._audit(user,'network.classified',account.id,classified=shared,fit=0,uncited=0,shared=shared,**grounding)
+        return {'classified':shared,'fit':0,'uncited':0,'shared':shared,**grounding}
     contacts=_enrich(account,pending)
-    if not contacts:return {'classified':0,'fit':0,'stopped':'Sin perfiles legibles hoy; se clasifican mañana.' if pending else '',**grounding}
+    if not contacts:return {'classified':shared,'fit':0,'stopped':'Sin perfiles legibles hoy; se clasifican mañana.' if pending else '',
+                            **({'shared':shared} if shared else {}),**grounding}
     ident=identidad.of_account(account)
     _,private=identidad.blocks(ident)
     orientation=identidad.orientation(ident)
@@ -902,6 +966,9 @@ def _classify_batch(user,account,now,batch):
     from .orquestacion import ensure_current
     ensure_current()
     version=criterion_version(system,min_confidence(),grounding.get('course_version'),orientation)
+    from . import registro
+    organization=registro.organization_id(account);organization_shared=registro.shared(organization)
+    org_criterion=shared_criterion(min_confidence(),grounding.get('course_version')) if organization_shared else ''
     classified_at=now or timezone.now();when=classified_at.isoformat();fits=0;classified=0;uncited=0
     for contact in contacts:
         result=results.get(str(contact.id))
@@ -930,6 +997,8 @@ def _classify_batch(user,account,now,batch):
         if buyer and on and projectapp.too_big(buyer):
             buyer['level']='no_encaja'
             if fit:fit,rule=False,projectapp.size_rule(ident)
+        if fit and buyer and organization_shared and registro.employee(organization,contact.headline):
+            fit,rule=False,EMPLOYEE_RULE  # phase 6, two or more members: whoever works at the organization is not a buyer
         contact.classification={'fit':fit,'role':result.get('role'),'modality':result.get('modality'),'affinity':result.get('affinity'),
                                 'reason':(result.get('reason') or '')[:500],'confidence':round(confidence,2),'region':region or '',
                                 'model':answer.get('model'),'classified_at':when,
@@ -947,9 +1016,11 @@ def _classify_batch(user,account,now,batch):
         with transaction.atomic():
             contact.save()
             record_classification(contact,observed_at=classified_at)
+        if org_criterion:registro.classified(contact,org_criterion)  # phase 6: another member reuses it
         comprador.on_contact(contact,'clasificacion')  # buyer's journey: passive record, never stops the classification
-    operador._audit(user,'network.classified',account.id,classified=classified,fit=fits,uncited=uncited,model=answer.get('model'),**grounding)
-    return {'classified':classified,'fit':fits,'uncited':uncited,**grounding}
+    extra={'shared':shared} if shared else {}
+    operador._audit(user,'network.classified',account.id,classified=classified+shared,fit=fits,uncited=uncited,model=answer.get('model'),**extra,**grounding)
+    return {'classified':classified+shared,'fit':fits,'uncited':uncited,**extra,**grounding}
 
 # --------------------------------------------------------------------------- buyer stage: web check
 
@@ -1131,7 +1202,9 @@ def check_stages(user,account,now=None,limit=3):
     if not operador.within_read_window(now):
         summary['stopped']=STAGE_OUTSIDE;return summary
     day,_=operador.period_starts(now)
-    due=[c for c in _stage_queue(account) if _stage_due(c,now)]
+    from . import registro
+    allowed=registro.gate(operador.member_of(account=account),account)  # phase 6: one paid check per person, by her taker
+    due=[c for c in _stage_queue(account) if _stage_due(c,now) and not allowed(c)]
     # Half-open: while the web research is silent, one buyer a day is checked as a probe. Without findings nobody
     # spends an attempt and the pause is recorded (no notification kind fits a failing web tool yet: audit log only);
     # with findings the research works again and the checks go on.
@@ -1389,6 +1462,13 @@ def plan(user,account,now=None):
         return (Contact.objects.filter(account=account,**filters).exclude(proposals__state__in=OPEN_ACTION_STATES)
                 .exclude(id__in=_resting(capability,now)).exclude(id__in=_lead_resting(capability,now)))
     summary['outbound_rules']=outbound_rules(account,now)
+    # Organizaciones, phase 6 (registro.py): the untouched candidates the share gives her get their basic card on her
+    # account, and she only goes after people she attends or the share gives her, outside another member's company.
+    from . import registro
+    org=registro.organization_id(account)
+    if registro.shared(org):
+        summary['registro']={'liberadas':registro.release_stale(org,now),'compartidas':registro.share_assigned(member,account)}
+    allowed=registro.gate(member,account)
     from . import calentamiento
     warmup=calentamiento.enabled()
     # Phase 2: rest, wake and retry the buyers before choosing whom to invite (each person on its own savepoint).
@@ -1401,7 +1481,7 @@ def plan(user,account,now=None):
         followed=(calentamiento.invitable(followed,now) if warmup else
                   followed.filter(Q(followed_at__lte=now-invite_after())|Q(source=Contact.Source.OWN_POST)))
         candidates=list(followed.order_by('-classification__confidence','followed_at','discovered_at','id'))  # equals never dance
-        candidates=diverse_candidates(candidates)
+        candidates=[c for c in diverse_candidates(candidates) if not allowed(c,RED.INVITE)]
         # Whoever answered a follow (desenlaces RED-01: accepted, commented, replied, invited us) goes first among the
         # eligible; the order inside each group stays. Context for the order, never a new proposal or more volume.
         from . import desenlaces
@@ -1452,11 +1532,13 @@ def plan(user,account,now=None):
         for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).exclude(bridge_for__step='salio')
                                    .order_by('discovered_at','id')):
             if room(RED.FOLLOW)<=0:break
+            if allowed(contact,RED.FOLLOW):continue
             summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id},grounding))
     if autonomy(RED.ACCEPT,member)!='off':
         # Incoming people are classified like candidates (classify takes stage incoming): only a fitting verdict is accepted.
         for contact in waiting(RED.ACCEPT,stage='incoming',classification__fit=True).exclude(invitation_id=''):
             if room(RED.ACCEPT)<=0:break
+            if allowed(contact,RED.ACCEPT):continue
             summary['accept']+=bool(_propose(user,contact,RED.ACCEPT,{'request_id':contact.invitation_id,'user_id':contact.provider_user_id},grounding))
     _,week=operador.period_starts(now)
     for row in summary['distribution']:
@@ -1685,7 +1767,9 @@ def on_rejected(proposal,note_text=''):
         _stage(contact,'discarded','rejected',note_text or f'Rechazaste {proposal.capability}.');contact.save()
         comprador.on_contact(contact,'veto')
 
-def discard(user,contact_id,note_text):
+def discard(user,contact_id,note_text,for_everyone=False):
+    """Gustavo (or the member whose contact it is) discards a person still in course. `for_everyone` (organizaciones,
+    phase 6): the reason applies to the whole organization, and no other member touches her either."""
     require(user,'approve_actions')
     if not (note_text or '').strip():raise ValueError('Indica por qué descartas a esta persona')
     with transaction.atomic():
@@ -1699,7 +1783,10 @@ def discard(user,contact_id,note_text):
             proposal.save(update_fields=['state','decided_by','decided_at','decision_note'])
             operador._audit(user,'operator.rejected',proposal.id)
         _stage(contact,'discarded','discarded',note_text.strip());contact.save()
-        operador._audit(user,'network.contact_discarded',contact.id)
+        operador._audit(user,'network.contact_discarded',contact.id,**({'for_everyone':True} if for_everyone else {}))
+        if for_everyone:
+            from . import registro
+            registro.exclude(contact.provider_user_id,contact.account,'descarte',note_text.strip())
         comprador.on_contact(contact,'descarte')
     return contact
 

@@ -550,6 +550,9 @@ def prepare(user,params,origin_job=''):
     if not active():return {'decision':'skip','reason':'Fase 6, fase 4, fase 3 o líder apagados.'}
     journey=comprador.journey(contact)
     if journey is None:return {'decision':'skip','reason':'Sin recorrido de comprador.'}
+    from . import registro
+    taken=registro.draft_issue(contact)  # phase 6: another member attends her: no paid classification nor draft
+    if taken:return {'decision':'skip','reason':taken}
     row=decision(contact,journey.attempt,number)
     if row is None or row.state!=State.REVIEWING:return {'decision':'skip','reason':'Ya hay una decisión.'}
     from . import mensajes_comprador, oficina_eventos

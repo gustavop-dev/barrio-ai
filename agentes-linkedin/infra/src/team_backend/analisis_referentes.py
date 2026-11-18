@@ -336,6 +336,12 @@ def report(account=None, *, now=None, kinds=('industria',), days=None, top=12):
     if account is not None:
         rows = rows.filter(account=account)
     posts = list(rows.order_by('posted_at'))
+    from .models import Member
+    if account is None and Member.objects.filter(active=True).count() > 1:
+        # Organizaciones, phase 6: a referent's post read by one member is copied to the others (referentes.share_posts);
+        # the organization's analysis counts it once.
+        seen = set()
+        posts = [p for p in posts if not (p.provider_post_id in seen or seen.add(p.provider_post_id))]
     analyses = cached(posts)
     settled = now - timedelta(hours=t['mature_hours'])
     by_author = defaultdict(list)

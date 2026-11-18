@@ -456,16 +456,19 @@ def author_cooldown():
 LIVE_COMMENT_STATES=['proposed','approved','executing','sent','confirmed','uncertain']
 
 def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
-    """Referents who already got (or are about to get) a comment within the cooldown: one person, one comment at a time."""
-    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+    """Referents who already got (or are about to get) a comment within the cooldown: one person, one comment at a time.
+    Among two or more members, any member's comment counts (registro.peers, phase 6)."""
+    from . import registro
+    qs=ActionProposal.objects.filter(account__in=registro.peers(account),capability=ActionProposal.Capability.COMMENT,state__in=states,
                                      created_at__gte=now-author_cooldown(),post__referent__isnull=False)
     if exclude:qs=qs.exclude(pk=exclude)
     return set(qs.values_list('post__referent_id',flat=True))
 
 def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=None):
     """Authors (author_provider_id) who already got (or are about to get) a comment within the cooldown: the wait of
-    phase 2 is per author of the post, referent or buyer."""
-    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+    phase 2 is per author of the post, referent or buyer. Among two or more members, any member's comment counts."""
+    from . import registro
+    qs=ActionProposal.objects.filter(account__in=registro.peers(account),capability=ActionProposal.Capability.COMMENT,state__in=states,
                                      created_at__gte=now-author_cooldown())
     if exclude:qs=qs.exclude(pk=exclude)
     return set(filter(None,qs.values_list('post__author_provider_id',flat=True)))
@@ -473,8 +476,10 @@ def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=Non
 def _observe(user,account,now):
     if not operador.within_read_window(now):return 0
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
-    last=account.referents.filter(active=True).order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
-    referents_due=account.referents.filter(active=True).exists() and not (last and last>now-every)
+    from . import referentes
+    mine=referentes.to_read(account)  # phase 6: alone her referents; among members, the ones this account reads
+    last=mine.order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
+    referents_due=mine.exists() and not (last and last>now-every)
     if _pending('observe',account=str(account.id)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     if not referents_due:
@@ -530,8 +535,10 @@ def _propose(user,account,now):
     if calentamiento.enabled():return _propose_groups(user,account,now,max_age,prefilter)
     # A verdict is never older than its post, so verdicts from before the oldest candidate are irrelevant.
     verdicts=prefilter_verdicts(now-max_age-timedelta(days=1)) if prefilter else {}
+    from . import registro
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
                 .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                .exclude(provider_post_id__in=registro.claimed_by_others(account))  # phase 6: another member comments it
                 .exclude(id__in=[pid for pid,decision in verdicts.items() if decision=='skip']).order_by('-posted_at'))
     from . import experimentos
     focus=experimentos.active_focus(account,now)
@@ -557,9 +564,13 @@ def _propose_groups(user,account,now,max_age,prefilter):
     verdicts=prefilter_verdicts(now-max(max_age,calentamiento.post_max_age())-timedelta(days=1)) if prefilter else {}
     skips=[pid for pid,decision in verdicts.items() if decision=='skip']
     authors=recent_comment_author_ids(account,now)
+    from . import registro
     referents=list(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
                    .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                   .exclude(provider_post_id__in=registro.claimed_by_others(account))  # phase 6: another member comments it
                    .exclude(author_provider_id__in=list(authors)).exclude(id__in=skips).order_by('-posted_at')[:30])
+    # Phase 6: a buyer or partner another member attends (or excluded for everyone, or a colleague) is not commented.
+    authors=set(authors)|registro.foreign_uids(operador.member_of(account=account),registro.organization_id(account))
     focus=experimentos.active_focus(account,now)
     if focus:referents.sort(key=lambda post:post.referent_id!=focus.referent_id)
     # BAR-25: «comunidad» is the partners' posts with NETWORK_PROJECTAPP_BUYER_ENABLED; off it has none, as before.
@@ -594,7 +605,7 @@ def _lead_redraft(user,account,now):
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     if daily_proposals()-drafted<=0:return 0
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
-    from . import calentamiento
+    from . import calentamiento, registro
     warm=calentamiento.enabled()
     target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
     if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
@@ -607,6 +618,9 @@ def _lead_redraft(user,account,now):
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
                                              decided_at__gte=now-timedelta(hours=24)).filter(target)
                .exclude(post__referent_id__in=recent_comment_authors(account,now))
+               .exclude(post__provider_post_id__in=registro.claimed_by_others(account))  # phase 6: only one member comments
+               .exclude(post__author_provider_id__in=list(registro.foreign_uids(operador.member_of(account=account),
+                                                                              registro.organization_id(account))))
                .annotate(drafts=Count('post__proposals',filter=Q(post__proposals__capability='INT-03'))).filter(drafts=1)
                .select_related('post').order_by('-decided_at'))
     if warm:discarded=discarded.exclude(post__author_provider_id__in=list(recent_comment_author_ids(account,now)))
