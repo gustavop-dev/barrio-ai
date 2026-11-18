@@ -6,6 +6,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
 
 - **Código:** backend `capturas_views.Gallery`, `PhotoDetail`, `PhotoImage`, `capturas.add_photos`, `delete_photo`, `photo_payload`, `photo_status`, `photo_used_in`, modelo `GalleryPhoto`; PWA `oficina/src/pages/Galeria.tsx`, `pages/galeria/PhotoSheet.tsx`; app `movil/src/ajustes/FotosPerfil.tsx` y `movil/src/fotos/*` (`PhotoSheet.tsx`, `PhotoViewer.tsx`, `upload.ts`, `UploadProgressCard.tsx`), `movil/src/components/ui/ApiImage.tsx`; común `compartido/src/api/capturas.ts`, `compartido/src/logic/galeria.ts`.
 - **Documentación:** sección «Galería» de [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md) y de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
+- **Por miembro (organizaciones, fase 4):** cada foto es de un miembro (el de su captura, o quien la subió); la Galería lista solo las del usuario y una pieza solo puede usar fotos de su dueño. Ver [ORG-20](organizaciones.md#org-20).
 
 ## Resumen
 

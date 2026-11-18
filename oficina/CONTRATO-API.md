@@ -18,6 +18,26 @@ referentes y experimentos dice «Solo el dueño de la cuenta o el administrador 
 experimentos.» y el 409 de la relectura del perfil «…; sigue «Aplicado por ti».». `next_step.owner: "gustavo"` (y `by:
 "gustavo"` donde aparece) se queda como sinónimo de «tú»: lo leen los clientes instalados; se renombra en la fase 5.
 
+**Organizaciones (fase 4, [ORG-18 a ORG-22](../docs/funcionalidades/organizaciones.md#org-18)):** el contenido es de cada
+miembro. Ninguna forma de respuesta cambia y, con un solo miembro, ninguna respuesta cambia (comparado byte a byte en 32
+rutas). Con varios miembros, estas rutas responden lo del miembro del usuario:
+
+- `GET /api/v1/editorial/calendar` y `GET /api/v1/calendario` (sus piezas y su plan); `POST /api/v1/editorial/plan` prepara su
+  siguiente pieza (ya no responde 400 con varios miembros activos);
+- `GET /api/v1/estrategia/semana` y `POST /api/v1/estrategia/planear` (su plan de la semana);
+- `GET /api/v1/resultados/resumen-semanal` y `GET /api/v1/resultados/revision-mensual` (los suyos, y `generate` dice si el
+  suyo ya está); `POST …/generar` genera el suyo;
+- `GET /api/v1/preguntas`, `GET /api/v1/memoria/hechos` y sus correcciones y retiros, `GET`/`PUT /api/v1/orientacion`;
+- `GET /api/v1/capturas` y `GET /api/v1/galeria` (lo que ella grabó o subió);
+- `GET /api/v1/tu-turno`: sus preguntas (`questions`, `later`), su memoria pendiente, su tarjeta de resumen, sus
+  `recent` de preguntas y el aviso `linkedin_expired`/`linkedin_expiring` de su propia conexión; el resto de las tarjetas aún es de todos (fase 5).
+
+Responder, posponer, deshacer o declinar la pregunta de otro miembro (`POST /api/v1/preguntas/<id>/responder|mas-tarde|
+deshacer|no-compartir`) responde 403 `{ detail: "Esta pregunta es de otro miembro de tu organización." }`. Siguen leyendo a
+todos los miembros: `GET /api/v1/resultados` (el tablero), los detalles por id (`/editorial/pieces/<id>`, `/capturas/<id>`,
+`/galeria/<id>`, `/resultados/resumen-semanal/<id>`) y `GET /api/v1/memory` (la memoria cruda, con las claves de otros
+miembros y de la empresa con su prefijo `m:<uuid>:` u `o:<uuid>:`); su permiso por objeto es de la fase 5.
+
 **Organizaciones (fase 2, [ORG-10 a ORG-12](../docs/funcionalidades/organizaciones.md#org-10)):** el ritmo de LinkedIn
 (topes, espaciado, rampa, notas, tier, lecturas de perfil y bloqueos de invitaciones) es de cada miembro. Ninguna forma de
 respuesta cambia; cambian de quién son los números:
@@ -174,7 +194,7 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 
 Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
 
-POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco. La pieza se prepara para la cuenta oficial del miembro de quien la pide, nunca la de otro. Con varios miembros activos responde 400 (el calendario y la cola de ideas aún son de toda la instalación: fase 4 del plan de organizaciones).
+POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco. La pieza se prepara para la cuenta oficial del miembro de quien la pide, nunca la de otro, en su calendario y a su hora (fase 4 del plan de organizaciones); un miembro inactivo recibe 400.
 
 **Vetar** una pieza es rechazar su acción antes de la hora: `POST /api/v1/operador/actions/<action.id>/reject` con `{ note }` (sesión humana y `approve_actions`). Solo vale con la acción en `proposed` o `approved`; si ya se está ejecutando, 409. El día queda sin publicación (`status: "vetoed"`).
 

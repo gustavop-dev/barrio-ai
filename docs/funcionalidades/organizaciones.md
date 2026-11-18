@@ -5,7 +5,9 @@ son las fases 1 y 2 del [plan de organizaciones](../plan-organizaciones.md): el 
 selectores por miembro, las pausas por miembro y la sesión del navegador solo para su dueño (fase 1); y un ritmo de
 LinkedIn propio para cada miembro (fase 2: candado, espaciado, topes, lecturas de perfil, rampa, notas, tier, bloqueos
 del proveedor y sus ajustes); y su identidad fuera del código (fase 3: perfiles de organización y de miembro en la
-base, prompts por miembro, su voz y los textos que la nombran). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
+base, prompts por miembro, su voz y los textos que la nombran); y su contenido (fase 4: calendario y piezas, plan,
+resumen, revisión, audiencia, memoria, orientación, preguntas, capturas y galería de cada miembro, con la hora de los posts
+escalonada y los temas coordinados). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
 hasta entonces, un miembro nuevo entra **inactivo**.
 
 - **Código:** backend `models.py` (`Organization`, `Member`, `ConnectorAccount.member`), migración `0055_organizaciones`,
@@ -38,6 +40,11 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 | [ORG-15](#org-15) | Cada texto del equipo se escribe como su miembro | backend | funciona |
 | [ORG-16](#org-16) | La voz de cada miembro: provisional y aprendida | backend (servidor) | funciona (apagada) |
 | [ORG-17](#org-17) | Los textos que ven las personas nombran al dueño | backend, PWA, app | funciona |
+| [ORG-18](#org-18) | Cada miembro tiene su calendario, su plan, su resumen y su revisión | backend | funciona |
+| [ORG-19](#org-19) | Su memoria y sus hechos; los de la empresa los comparte el administrador | backend (servidor) | funciona |
+| [ORG-20](#org-20) | Sus capturas, su galería, sus preguntas y su orientación | backend | funciona |
+| [ORG-21](#org-21) | Posts escalonados y temas coordinados entre miembros | backend | funciona |
+| [ORG-22](#org-22) | Un post en voz provisional nunca sale solo | backend | funciona |
 
 ---
 
@@ -362,8 +369,8 @@ hasta entonces, un miembro nuevo entra **inactivo**.
   3. **Dado** su cuenta, **cuando** se dibuja una infografía o se titula un carrusel, **entonces** dice su nombre; la regla
      de infografías que lee el diseñador firma sus ejemplos con su nombre (misma versión de regla que la de Gustavo).
   4. **Dado** cualquier miembro, **cuando** una pregunta web lleva su nombre, **entonces** no sale a la web.
-- **Brechas código/docs:** la memoria, los hechos y la orientación de un miembro que no es el primero llegan en la fase 4
-  (hoy, vacíos); el plan semanal, el resumen, la revisión mensual y el perfil siguen siendo de la instalación.
+- **Brechas código/docs:** — (desde la fase 4 cada miembro tiene su memoria, su orientación, su plan, su resumen y su
+  revisión: [ORG-18](#org-18) a [ORG-20](#org-20)).
 - **Cobertura QA:** `test_identidad_prompts.GustavoSinCambiosTests` (1), `test_organizaciones_e2e.IdentidadPorMiembroTests`
   (2–4) · 2026-11-17 · pasa en local
 
@@ -400,7 +407,114 @@ hasta entonces, un miembro nuevo entra **inactivo**.
   1. **Dado** una cuenta del CTO, **cuando** un texto del servidor nombra a quien decide, **entonces** dice su nombre.
   2. **Dado** una cuenta de nadie con varios miembros, **cuando** se nombra al dueño, **entonces** «el dueño de la cuenta».
 - **Brechas código/docs:** `next_step.owner = 'gustavo'` en la API se queda como sinónimo de «tú» hasta la fase 5; las
-  etiquetas de las opciones de los modelos (`models.py`) y las razones de `guardas.py` aún dicen «Gustavo».
+  etiquetas de las opciones de los modelos (`models.py`) aún dicen «Gustavo». Las razones de las guardas nombran a la
+  autora en la revisión final (`guardas.text_checks`, fase 4); las de los chequeos previos del editorial, el editor visual
+  y las imágenes, que reciben solo los hechos, todavía dicen «Gustavo» en la nota de la pieza.
 - **Cobertura QA:** `IdentidadPorMiembroTests.test_without_saying_whose_identity_several_active_members_raise` (1–2); los
   textos de Gustavo, sus pruebas de siempre · 2026-11-17 · pasa en local
 
+### ORG-18 · Cada miembro tiene su calendario, su plan, su resumen y su revisión <a id="org-18"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** él sigue viendo su calendario, su plan, su resumen y su revisión como siempre. Cuando el CTO
+  esté activo, cada uno tiene su post del día (y su segundo post), su plan de la semana con los pilares de ProjectApp, su
+  resumen del lunes y su revisión del mes, con sus posts y su audiencia; los cambios de estrategia que apruebe van a su
+  orientación.
+- **Código:** `member` en `EditorialPiece`, `WeeklyPlan`, `WeeklySummary`, `MonthlyReview` y `AudienceSnapshot` (migraciones
+  `0059_contenido_por_miembro` y `0060_contenido_del_primer_miembro`); `miembros.own`, `each_member`, `job_parts`,
+  `job_params`, `of_job`; `editorial`, `urgente`, `estrategia`, `resumen_semanal`, `revision_mensual`, `metricas`,
+  `autopiloto._editorial`, `bucle_resultados` (`--miembro`).
+- **Criterios de aceptación:**
+  1. **Dado** dos miembros activos, **cuando** pasa el autopiloto, **entonces** cada uno tiene su pieza del día en su cuenta,
+     a su hora y con su trabajo (el de Gustavo con el id y los parámetros de antes).
+  2. **Dado** el domingo por la tarde, el lunes por la mañana o el primer lunes del mes, **cuando** pasa el autopiloto,
+     **entonces** el plan, el resumen y la revisión se encolan para cada uno y ninguno se detiene con `MiembroRequerido`.
+  3. **Dado** que el trabajo de un miembro falla, **cuando** pasa el autopiloto, **entonces** el del otro sale igual y el
+     fallo queda registrado con de quién era; si fallan todos, llega al informe.
+  4. **Dado** los posts y la audiencia de cada uno, **cuando** se escribe el resumen o la revisión, **entonces** cada uno
+     lleva solo los suyos y su aviso es suyo; las rutas del resumen y de la revisión le muestran a cada uno los suyos.
+  5. **Dado** la base de hoy, **cuando** migra, **entonces** todo pasa a ser de Gustavo sin duplicados; corrida otra vez no
+     cambia nada; revertida queda como estaba; y con un solo miembro la API responde lo mismo que antes.
+- **Brechas código/docs:** el tablero de Resultados (`resultados.build`) y los detalles por id aún leen a todos los
+  miembros (fase 5).
+- **Cobertura QA:** `test_organizaciones_e2e.ContenidoTests` (1–4), `ContenidoMigracionTests` (5), clases `UnMiembro…` del
+  plan, el calendario, el resumen y la revisión (5) · 2026-11-18 · pasa en local
+
+### ORG-19 · Su memoria y sus hechos; los de la empresa los comparte el administrador <a id="org-19"></a>
+
+- **Dónde:** backend (servidor)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** su memoria queda como está. Lo que confirma un miembro (respuestas, datos de sus capturas,
+  notas, correcciones) es solo suyo: nunca llega a los textos, las imágenes ni las decisiones de otro. Un hecho de la empresa
+  (un caso, una cifra de ProjectApp) llega a todos cuando el administrador lo comparte.
+- **Código:** `hechos.py` (`scope`, `latest`, `set_fact`, `confirmed_blocks`, `with_company`, `share`, `unshare`),
+  `knowledge/memory.py` (`in_scope`, `latest`/`confirmed_blocks(scope)`), `guardas.blocks(member)`/`text_checks`,
+  `identidad.facts`/`blocks`, `projectapp.case_facts`; comando `operador hecho-empresa`.
+- **Criterios de aceptación:**
+  1. **Dado** un hecho confirmado del CTO, **cuando** el director escribe la pieza de Gustavo, **entonces** no lo lee; y al
+     revés.
+  2. **Dado** una afirmación de experiencia, **cuando** se revisa el texto de un miembro, **entonces** solo la respaldan
+     sus hechos y la razón dice su nombre.
+  3. **Dado** el administrador activo, **cuando** comparte un hecho de un miembro (`hecho-empresa --compartir CLAVE
+     --miembro U`), **entonces** llega a todos como `empresa.<clave>` y queda auditado; otro miembro no puede compartirlo;
+     `--retirar` lo quita a todos y la dueña lo conserva.
+- **Brechas código/docs:** compartir es por comando; en la app, fase 5 o 7.
+- **Cobertura QA:** `test_organizaciones_e2e.ContenidoTests.test_her_facts_never_reach_his_post_and_his_never_hers_but_the_companys_reach_both`
+  (1–3) · 2026-11-18 · pasa en local
+
+### ORG-20 · Sus capturas, su galería, sus preguntas y su orientación <a id="org-20"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** lo que graba, sube y responde sigue llegando a sus piezas. El audio o la foto de un miembro solo
+  alimentan las piezas de ese miembro; cada uno ve sus capturas y su galería; la pregunta del equipo va a quien es dueño de
+  la pieza y solo ella la responde; cada uno tiene su orientación.
+- **Código:** `member` en `Capture`, `GalleryPhoto`, `TeamQuestion` y `Orientation`; `capturas.ideas_for_director`/
+  `feedback_for_director`, `imagenes.candidates`, `editor_visual.gallery`, `preguntas.py` (`_hers`), `orientacion.row`;
+  vistas `capturas_views.Captures`/`Gallery`, `rediseno_views.Questions`/`Facts`/`OrientationView`/`TuTurno`.
+- **Criterios de aceptación:**
+  1. **Dado** un audio del CTO, **cuando** se procesa, **entonces** es una idea suya y solo su director la lee.
+  2. **Dado** una foto de cada uno, **cuando** se arma la galería de una pieza, **entonces** solo se ofrece la de su dueño,
+     aunque el brief nombre la del otro.
+  3. **Dado** una pregunta del director de la pieza del CTO, **cuando** Gustavo intenta responderla, **entonces** 403; su
+     respuesta es memoria del CTO y Tu turno le muestra a cada uno solo las suyas.
+- **Brechas código/docs:** los detalles por id (`/capturas/<id>`, `/galeria/<id>`) no comprueban dueño (fase 5).
+- **Cobertura QA:** `ContenidoTests.test_her_audio_and_her_photos_feed_only_her_pieces` (1–2),
+  `test_a_team_question_goes_to_the_member_who_owns_the_piece` (3) · 2026-11-18 · pasa en local
+
+### ORG-21 · Posts escalonados y temas coordinados entre miembros <a id="org-21"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** su hora no cambia. El post del CTO sale al menos `EDITORIAL_POST_STAGGER_MINUTES` (15) después;
+  su plan semanal sabe lo que Gustavo ya planeó esa semana y no repite sus temas, sin pagar una llamada más.
+- **Código:** `editorial.staggered_times`, `post_stagger`, `post_time(member)`; `estrategia.team_topics`, `same_topic`,
+  `_pick` (`team_planned` en el pedido del plan).
+- **Criterios de aceptación:**
+  1. **Dado** las dos horas a las 08:30, **cuando** se calcula la del CTO, **entonces** 08:45 (con 40 minutos, 09:10); la del
+     primer miembro nunca se mueve.
+  2. **Dado** el plan de Gustavo hecho, **cuando** se planea la semana del CTO, **entonces** el pedido lleva sus temas, una
+     opción que repite uno nunca se elige (el día queda sin idea y el plan lo advierte) y se pagan dos llamadas, no tres; el
+     pedido de Gustavo solo es el de antes.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `ContenidoTests.test_each_member_has_her_post_of_the_day_on_the_same_day_at_her_own_hour` (1),
+  `test_each_member_plans_her_week_and_the_second_plan_avoids_the_first_ones_topics` (2) · 2026-11-18 · pasa en local
+
+### ORG-22 · Un post en voz provisional nunca sale solo <a id="org-22"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** nada cambia para él. Mientras la voz de un miembro es provisional, su CONT-09 está en
+  «aprobación» aunque su ajuste diga «auto»; un post escrito con la voz provisional espera a una persona incluso después de
+  que ella confirme su voz.
+- **Código:** `autopiloto.autonomy`, `provisional_voice`, `provisional_draft`, `policy_review`; `operador.create_proposal`
+  (copia la marca `voice` de la pieza).
+- **Criterios de aceptación:**
+  1. **Dado** el CTO con `CONT-09=auto` y voz provisional, **cuando** llega su hora, **entonces** el post de Gustavo sale y
+     el suyo queda propuesto, con la marca `{"tipo": "provisional"}`.
+  2. **Dado** que confirma su voz, **cuando** pasa el autopiloto, **entonces** ese post sigue esperando; sale cuando una
+     persona lo aprueba.
+- **Brechas código/docs:** mostrar la marca en la app es de la fase 7.
+- **Cobertura QA:** `ContenidoTests.test_a_post_in_a_provisional_voice_never_goes_out_on_its_own` (1–2) · 2026-11-18 · pasa
+  en local

@@ -78,7 +78,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | 1 | Organización y miembro (**hecha**) | Modelos `Organizacion` y `Miembro`; migración que crea ProjectApp y a Gustavo y le asigna sus dos cuentas; `ConnectorAccount.miembro`; los selectores de «la» cuenta pasan a ser por miembro (`publishing_account`, `reader_account`, `_own_posts_reader`, `analitica.account_for`, `perfil.read_profile`, `publications`); `require_gustavo` → dueño de la cuenta; **la vista remota del navegador solo para el dueño** |
 | 2 | Un miembro de LinkedIn por persona (**hecha**) | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
 | 3 | Identidad fuera del código (**hecha**) | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
-| 4 | Contenido por miembro | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
+| 4 | Contenido por miembro (**hecha**) | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
 | 6 | Registro compartido de personas | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
 | 7 | Alta del CTO | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
@@ -317,6 +317,118 @@ confirmar; confirmada y versionada) y `PerfilComandoTests` (validación, auditor
   (`estrategia.run`), el resumen y la revisión mensual, el pipeline de perfil (`perfil_*`), el enrutado de una captura sin
   autor y `evaluaciones` (el arnés de evaluación es el de Gustavo).
 - Fase 7: el formulario del perfil en la app (hoy, por comando), exponer la marca «voz provisional» en la API y su CTO.
+
+## Fase 4: lo construido
+
+Hecho el 18/11/2026 en `feat/organizaciones` (fichas [ORG-18 a ORG-22](funcionalidades/organizaciones.md)). Cada miembro
+tiene su contenido: su calendario y sus piezas, su plan semanal, su resumen, su revisión mensual, su audiencia, su memoria,
+su orientación, sus preguntas, sus capturas y su galería. Con un solo miembro la API responde lo mismo que antes: 32 rutas
+(calendario, piezas, plan, resumen, revisión, memoria y hechos, preguntas, orientación, galería, capturas, Tu turno,
+Resultados, Actividad y Ajustes) comparadas byte a byte contra el código anterior, con el mismo reloj congelado y el mismo
+`seed_qa`; la única diferencia es el id aleatorio de una imagen de la semilla, que también cambia entre dos corridas del
+mismo código.
+
+**De quién es cada cosa.**
+
+| Qué | Dónde | Regla |
+| --- | --- | --- |
+| Piezas y calendario | `EditorialPiece.member`; restricciones `one_open_piece_per_member_day` y `one_second_piece_per_member_day` | una pieza del día y una segunda por miembro y día; `models._her_content` le pone el miembro de su cuenta |
+| Hora del post | `editorial.post_time(member)`, `staggered_times`, `post_stagger` | la suya, escalonada (ver «Coordinación») |
+| Huecos y pedidos de fecha | `urgente.assign_slots(now, member)`, `next_slot`, `next_extra`, `reserved_at`, `extra_at`, `free_slot`, `confirm_day`, `editorial.next_slot` | su calendario; el recálculo sin miembro recorre a cada uno (`each_member`) |
+| Plan semanal | `WeeklyPlan.member` (`one_plan_per_member_week`); `estrategia.run`, `queue`, `regenerate`, `week`, `payload`, `calendar_days`; `estrategia_views.Week` | su plan, con la plantilla y los pilares de la organización |
+| Resumen semanal | `WeeklySummary.member` (`one_summary_per_member_week`); `resumen_semanal.stats`, `queue`, `generate`, `for_director` | sus posts, su red, su audiencia y sus capturas |
+| Revisión mensual y cambios de estrategia | `MonthlyReview.member` (`one_review_per_member_month`); `revision_mensual.stats`, `queue`, `generate`, `approve`, `revert` | lo aprobado va a su orientación |
+| Audiencia | `AudienceSnapshot.member` (`one_audience_per_member_day`); `metricas.collect_audience`, `due` | la del lector de su cuenta, una por miembro y día |
+| Memoria y hechos | `hechos.py`; `knowledge.memory.latest`/`confirmed_blocks(scope)`; `guardas.blocks(member)`, `guardas.text_checks(text, member)`; `identidad.facts`/`blocks(member)`; `knowledge.agents.context(memory_scope)` | ver «Hechos personales y de la empresa» |
+| Orientación | `Orientation.member`; `orientacion.row`, `text`, `update(member)` | la fila 1 es la del primer miembro; otro miembro recibe la suya, vacía |
+| Preguntas del equipo | `TeamQuestion.member` (`one_open_question_per_member_key`); `preguntas.ask`, `answer`, `undo`, `postpone`, `decline`, `facts`, `add_fact`, `correct`, `retire`, `sync_memory_proposals`; `projectapp.ask_case_questions`/`case_facts` | se pregunta al dueño de la pieza; solo ella responde (403 a otro miembro) y su respuesta es su memoria |
+| Capturas e ideas | `Capture.member` (de quien la grabó); `capturas.ideas_for_director`, `feedback_for_director`, `answer_research_for_director`, `expire_ideas`; `capture_intent.jev` | su audio y sus notas alimentan solo sus piezas |
+| Galería | `GalleryPhoto.member` (el de su captura, o quien la subió); `imagenes.candidates(ideas, member)`, `editor_visual.gallery(piece)`, `imagenes.prepare` | una foto suya nunca va en la pieza de otro |
+| Perfil | `perfil.schedule` por miembro (`each_member`) | |
+| Vistas que ya filtran | `rediseno_views.Questions`, `Facts`, `FactCorrect`, `FactRetire`, `OrientationView`, `Settings`, `Calendar` y, en `TuTurno`, sus preguntas, su memoria pendiente y su resumen; `capturas_views.Captures`, `Gallery`; `estrategia_views.Week`; `resumen_semanal.overview`/`revision_mensual.overview(member)`; la orientación de un resumen o una revisión es la de `summary.member`/`review.member` | las demás, en la fase 5 |
+| Diagnóstico | `bucle_resultados.report(member)` y `manage.py bucle_resultados --miembro U` | sus resúmenes, audiencia, recomendaciones y plan |
+
+**Trabajos periódicos.** Cada uno corre para cada miembro activo con `miembros.each_member(work, label)`: el fallo de uno se
+registra (`<label>_failed member=<id>` en `team_backend.autopilot`) y no frena al siguiente; si fallan todos, el error llega
+al informe del autopiloto como antes. El trabajo de un miembro lleva su id en el id determinista (`miembros.job_parts`) y
+en sus parámetros (`job_params`); los del primer miembro conservan el id y los parámetros de antes, así que un trabajo
+encolado antes del despliegue sigue siendo suyo (`miembros.of_job`). Lo hacen `autopiloto._editorial`,
+`urgente.assign_slots`, `estrategia.queue`, `resumen_semanal.queue`, `revision_mensual.queue` y `perfil.schedule`.
+
+**Lo que sigue siendo de la organización**, y por qué:
+- la plantilla de la estrategia y sus pilares (`Organization.profile`): la empresa decide de qué habla; cada plan los usa;
+- la biblioteca y el catálogo del curso: es conocimiento, se ingiere una vez y sirve a todos;
+- el presupuesto de IA: un solo tope de la instalación (decisión del 13/11/2026: sin límite por usuario);
+- los referentes y lo que aprende su análisis: se observan una vez para la organización (la fase 6 reparte a las personas);
+- el embudo de oportunidades: uno solo, visible para los dos (decisión del 17/11/2026).
+
+**Hechos personales y de la empresa.** La tabla `memory` no cambia de esquema: de quién es un hecho va en su clave. Las
+claves de antes (sin prefijo) son del primer miembro, así que la memoria de Gustavo no se mueve; las de otro miembro
+empiezan por `m:<uuid del miembro>:` y las de la empresa por `o:<uuid de la organización>:` (`knowledge.memory.in_scope`).
+Todo lo que un miembro confirma (una respuesta, un dato de su captura, una nota, una corrección) es suyo. Que un hecho sea
+de la empresa es un acto explícito del administrador activo: `manage.py operador --usuario <admin> hecho-empresa
+--compartir CLAVE --miembro U` copia su valor vigente a la clave de la organización (auditado,
+`memory.shared_with_organization`; idempotente) y `--retirar CLAVE [--motivo …]` lo retira con una lápida confirmada
+(`memory.unshared_from_organization`); sin opciones lista los hechos de la empresa. Un hecho de la empresa llega a todos
+los miembros y en el prompt se lee `empresa.<clave>`; si ella tiene la misma clave, gana la suya. Las guardas de fuga y de
+experiencia inventada de un texto comparan con los hechos de su autora (`guardas.text_checks`) y sus razones dicen su
+nombre.
+
+**Migraciones.** `0059_contenido_por_miembro` (esquema): la columna `member` (nula) en piezas, planes, resúmenes,
+revisiones, audiencia, preguntas, capturas y fotos, y `Orientation.member`; las restricciones únicas por día, semana, mes o
+clave pasan a ser por miembro y día, semana, mes o clave, con `NULLS NOT DISTINCT` (sin miembros, una por día como antes).
+`0060_contenido_del_primer_miembro` (datos): todo lo que no tiene miembro pasa a ser del primer miembro (el más antiguo); una
+captura o una foto de alguien que es miembro pasa a ser suya, y una foto de una captura es del miembro de la captura; la
+orientación de antes (fila 1) se marca suya. Sin miembros no hace nada; `miembros.ensure_first_member` aplica la misma regla
+(`adopt_content`) cuando la base recibe su primer miembro después.
+- *Efecto en producción:* unos `UPDATE` sobre las filas sin miembro de ocho tablas pequeñas (decenas a cientos de filas) y
+  la fila 1 de la orientación, dentro de la transacción de la migración. La memoria, las cuentas y los trabajos no se tocan.
+  Idempotente: corrida otra vez no encuentra nada que mover.
+- *Revertir:* `manage.py migrate team_backend 0058`. El paso inverso de 0060 vacía `member` en las filas del primer miembro;
+  el de 0059 quita las columnas y devuelve las restricciones de una por día o por semana, que solo caben mientras un único
+  miembro tenga contenido: si el CTO ya tiene piezas, planes o resúmenes, hay que archivarlos antes de revertir.
+
+**Coordinación sin llamadas de pago.**
+- *Temas:* `estrategia.team_topics(monday, member)` lee lo que los otros miembros de su organización ya planearon esa semana
+  y el pedido del plan lo lleva en `team_planned` (`{rule, topics}`) solo cuando no está vacío: el de Gustavo solo es el de
+  antes. `estrategia._pick` descarta la opción que repite un tema de otro miembro (`same_topic`: la mitad o más de sus
+  palabras con sentido en común, por código); si un día no queda otra, queda sin idea y el plan lo advierte.
+- *Horas:* `editorial.staggered_times` recorre a los miembros activos de la organización del más antiguo al más nuevo; cada
+  uno conserva su `EDITORIAL_POST_TIME` salvo que caiga a menos de `EDITORIAL_POST_STAGGER_MINUTES` (15 por defecto) de la
+  de uno más antiguo, y entonces se corre en pasos de ese tamaño. El primer miembro nunca se mueve; una hora suya mal escrita
+  falla solo su pasada.
+
+**Voz provisional.** Mientras su voz es provisional (`voz.current(member).provisional`), `autopiloto.autonomy('CONT-09',
+member)` devuelve «approval» aunque su ajuste diga «auto». Un post escrito con la voz provisional (la marca `voice` de su
+propuesta o de su pieza; `operador.create_proposal` copia la de la pieza) nunca sale solo, ni siquiera después de que ella
+confirme su voz: `autopiloto.provisional_draft` hace que `policy_review` lo deje esperando a una persona.
+
+**`MiembroRequerido` que quedan.** Con dos miembros activos, el autopiloto (sus pasadas del domingo, del lunes y de la hora
+del post) y los trabajos de contenido nunca piden «el» miembro: lo prueba
+`ContenidoTests.test_the_autopilot_never_asks_whose_content_it_is_with_two_active_members`. Las vistas de contenido de esta
+fase piden el miembro del usuario (`miembros.member_for`): preguntas, hechos, orientación, ajustes, calendario, capturas,
+galería, semana del plan, resumen y revisión (con su «Generar ahora») y, en Tu turno, sus preguntas, su memoria pendiente,
+su tarjeta de resumen y el aviso «Reconecta LinkedIn» de su conexión. Lo que queda sin decir de quién es de la fase 5 y no se detiene: lo lee entero, como antes. Son el
+tablero de Resultados (`resultados.build`: posts, comentarios, red y audiencia de todos los miembros), las demás tarjetas
+de Tu turno (aprobaciones, mensajes, fechas, cambios de estrategia, cuentas pausadas), los detalles por id (pieza, captura, foto, resumen),
+que no comprueban dueño, y `GET /api/v1/memory` (la memoria cruda de la Oficina, con todas las claves tal como están
+guardadas).
+
+**Pruebas** (`test_organizaciones_e2e.py`): `ContenidoTests` con dos miembros activos (el post de cada uno el mismo día a su
+hora, la voz provisional que no sale sola, hechos que no se cruzan y el de la empresa que llega a los dos, audio y fotos
+solo para sus piezas, la pregunta a su dueña, planes con temas coordinados, resumen y revisión con su audiencia, el fallo
+aislado, el plan por la API, el autopiloto sin `MiembroRequerido` y el diagnóstico por miembro); `ContenidoMigracionTests`
+(datos como los de producción: sin duplicados, idempotente y reversible) y las clases `UnMiembro…` que vuelven a correr con
+Gustavo las pruebas de siempre del plan, las preguntas, el calendario, las capturas, la galería, las ideas del director, el
+resumen y la revisión.
+
+### Lo que queda para las fases 5 a 7
+
+- Fase 5: las vistas listadas arriba (Resultados por miembro, el resto de Tu turno), los detalles por id con permiso por
+  objeto, `GET /api/v1/memory` por miembro, los avisos y el push solo a su dueño (hoy, cada aviso lleva su `ref` por
+  miembro pero llega a todos).
+- Fase 6: el registro compartido de personas.
+- Fase 7: el alta del CTO (con su voz provisional y su CONT-09 en «aprobación»).
 
 ## Servidor
 

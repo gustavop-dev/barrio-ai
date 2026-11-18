@@ -5,6 +5,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Código:** `agentes-linkedin/infra/src/team_backend/editorial.py`, `autopiloto.py` (`_editorial`, `policy_review`, `post_issues`), `operador.py` (`execute`, `_publish`, `reconcile`, `resolve_uncertain`), `compuertas.py` (severidad, segunda revisión y segundo intento), `auditoria_compuertas.py`, `connectors_linkedin.py`, `guardas.py`, `voz.py`, `posicionamiento.py`.
 - **Documentación:** [`publicacion-diaria.md`](../../agentes-linkedin/infra/docs/publicacion-diaria.md), [`compuertas.md`](../../agentes-linkedin/infra/docs/compuertas.md), [`mapa-agentes-runtime.md`](../../agentes-linkedin/infra/docs/mapa-agentes-runtime.md).
 - **Entorno de prueba:** cuenta `linkedin_fake` con `OPERATOR_ALLOW_FAKE=true` y Claude parcheado, como en `tests/test_publicacion.py`. En producción la publicación real exige `LIVE_LINKEDIN_OFFICIAL=true` y el OAuth de Gustavo; hoy está en `false`.
+- **Por miembro (organizaciones, fase 4):** la pasada del autopiloto prepara la pieza de cada miembro activo con su trabajo propio (`miembros.each_member`: el fallo de uno no frena al otro), con sus hechos, sus ideas, sus fotos y su orientación; el plan semanal (`estrategia.py`) es uno por miembro y evita los temas que otro miembro ya planeó esa semana sin otra llamada de pago; un post en voz provisional nunca sale solo. Ver [ORG-18](organizaciones.md#org-18), [ORG-21](organizaciones.md#org-21) y [ORG-22](organizaciones.md#org-22).
 
 ## Resumen
 

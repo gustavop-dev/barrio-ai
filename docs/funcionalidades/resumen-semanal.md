@@ -5,6 +5,7 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
 - **Código:** `agentes-linkedin/infra/src/team_backend/resumen_semanal.py` (`stats`, `run`, `validate`, `generate`, `apply`, `discard`, `undo`, `mark_seen`, `overview`, `for_director`), `resultados_views.py`, `rediseno_views._summary_card`, `autopiloto._weekly_summary`. Interfaz: `oficina/src/pages/resultados/ResumenSemanal.tsx` y `movil/src/resultados/ResumenSemanal.tsx`.
 - **Documentación:** [`resumen-semanal.md`](../../agentes-linkedin/infra/docs/resumen-semanal.md), sección «Resumen semanal» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
 - **Entorno de prueba:** Claude parcheado, como en `tests/test_resumen_semanal.py`.
+- **Por miembro (organizaciones, fase 4):** un resumen por miembro y semana, con sus posts, su red, su audiencia y sus capturas; su trabajo y su aviso son suyos (`weekly_summary:<semana>:<miembro>` para quien no es el primero) y `GET /api/v1/resultados/resumen-semanal` le muestra el suyo. El gasto de IA, los embudos y las compuertas se leen enteros (son de la organización). Ver [ORG-18](organizaciones.md#org-18).
 
 ## Resumen
 
