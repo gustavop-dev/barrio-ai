@@ -464,6 +464,26 @@ class Contact(models.Model):
 OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']
 OPEN_PIECE_STATES=['preparing','ready']
 
+
+def _her_content(row,account=None):
+    """Phase 4 of organizations: a content row created without saying whose is the member of its account (a piece), else
+    the default member (miembros.content_member: MiembroRequerido among several active members, never a guess). Without
+    members it stays without one, as before organizations."""
+    if row.member_id is None and row._state.adding:
+        from .miembros import content_member
+        member=content_member(account=account)
+        if member is not None:row.member=member
+
+
+def _whose_upload(row):
+    """A capture or a photo is of the member who recorded or uploaded it (created_by); a robot, a service or nobody: the
+    default member (_her_content)."""
+    if row.member_id is None and row._state.adding and row.created_by_id:
+        from .miembros import member_of_user
+        own=member_of_user(row.created_by)
+        if own is not None:row.member=own
+    _her_content(row)
+
 class EditorialPiece(models.Model):
     """CONT-01..07: one own publication prepared by the editorial circuit for a local calendar day.
     Its CONT-09 ActionProposal carries the exact text through policy approval and execution."""
@@ -475,6 +495,8 @@ class EditorialPiece(models.Model):
         READY='ready','Lista; publicación propuesta'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='pieces')
+    # Whose piece (organizaciones, phase 4): her calendar, her day's post and her second one. Set from the account's member.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='pieces')
     slot_date=models.DateField(db_index=True)
     scheduled_for=models.DateTimeField()
     state=models.CharField(max_length=20,choices=State.choices,default=State.PREPARING,db_index=True)
@@ -510,11 +532,16 @@ class EditorialPiece(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
     class Meta:
         ordering=['-slot_date','-created_at']
-        constraints=[models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=False),
-                                             name='one_open_piece_per_day'),
-                     models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=True),
-                                             name='one_second_piece_per_day')]
+        # One open post of the day and one second post per member and day (phase 4); without members (member null) one per
+        # day for the whole installation, as before (NULLS NOT DISTINCT).
+        constraints=[models.UniqueConstraint(fields=['member','slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=False),
+                                             name='one_open_piece_per_member_day',nulls_distinct=False),
+                     models.UniqueConstraint(fields=['member','slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=True),
+                                             name='one_second_piece_per_member_day',nulls_distinct=False)]
     def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self,self.account if self.account_id else None)
+        super().save(*args,**kwargs)
 
 class PostMetric(models.Model):
     """APRE-01: cumulative counters of an own published post at a fixed age, read through the directo account (metricas.py).
@@ -588,15 +615,21 @@ class AudienceSnapshot(models.Model):
     """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through the directo account.
     Cumulative counters: net growth is the difference between two snapshots. Null means no data, never zero."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    day=models.DateField(unique=True)
+    # One per member and day (organizaciones, phase 4); without members, one per day.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='audience')
+    day=models.DateField()
     followers=models.IntegerField(null=True,blank=True)
     connections=models.IntegerField(null=True,blank=True)
     # LinkedIn reports profile views over a trailing window (List Profile Views, date_range in days).
     profile_views=models.IntegerField(null=True,blank=True)
     profile_views_days=models.PositiveSmallIntegerField(null=True,blank=True)
     captured_at=models.DateTimeField(default=timezone.now)
-    class Meta:ordering=['-day']
+    class Meta:
+        ordering=['-day']
+        constraints=[models.UniqueConstraint(fields=['member','day'],name='one_audience_per_member_day',nulls_distinct=False)]
     def __str__(self):return str(self.day)
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 # ---------------------------------------------------------------------------
 # Creator analytics of a `directo` account (analitica.py): LinkedIn's own export of the account, imported by day, per
@@ -927,9 +960,13 @@ class Orientation(models.Model):
     text=models.TextField(blank=True)
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
     updated_at=models.DateTimeField(null=True,blank=True)
+    # Whose orientation (organizaciones, phase 4): row 1 is the first member's (and an installation's without members),
+    # the one of before; any other member gets her own row (orientacion.row).
+    member=models.OneToOneField(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='orientation')
     @classmethod
-    def current(cls):
-        return cls.objects.get_or_create(pk=1)[0]
+    def current(cls,member=None):
+        from .orientacion import row
+        return row(member)
 
 class TeamQuestion(models.Model):
     """«Preguntas del equipo» (Tu turno): what an agent needs to know from Gustavo, delivered complete.
@@ -970,10 +1007,15 @@ class TeamQuestion(models.Model):
     answered_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     answered_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
+    # Whom the team asks (organizaciones, phase 4): her answer is her memory, never another member's.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='questions')
     class Meta:
         ordering=['-created_at']
-        constraints=[models.UniqueConstraint(fields=['memory_key'],condition=models.Q(state='open'),name='one_open_question_per_key')]
+        constraints=[models.UniqueConstraint(fields=['member','memory_key'],condition=models.Q(state='open'),
+                                             name='one_open_question_per_member_key',nulls_distinct=False)]
     def __str__(self):return self.question[:80]
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 class Opportunity(models.Model):
     """A business opportunity (Personas → Oportunidades; Resultados → «¿Genera negocio?»). Gustavo registers and
@@ -1073,6 +1115,9 @@ class Capture(models.Model):
         UNDONE='deshecha','Deshecha'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # Whose capture (organizaciones, phase 4): her ideas, facts and photos feed only her pieces. The member of whoever
+    # recorded it, else the default member.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='captures')
     created_at=models.DateTimeField(default=timezone.now,db_index=True)
     note=models.TextField(blank=True)
     purpose=models.CharField(max_length=12,choices=Purpose.choices,blank=True)
@@ -1109,6 +1154,8 @@ class Capture(models.Model):
     error=models.TextField(blank=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.created_at:%Y-%m-%d %H:%M} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _whose_upload(self);super().save(*args,**kwargs)
     @property
     def text(self):
         """The note plus the transcript: what the team routes."""
@@ -1155,9 +1202,14 @@ class GalleryPhoto(models.Model):
     published_at=models.DateTimeField(null=True,blank=True)
     capture=models.ForeignKey(Capture,on_delete=models.SET_NULL,null=True,blank=True,related_name='photos')
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # Whose photo (organizaciones, phase 4): only her pieces may use it. Her capture's member, else whoever uploaded it.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='photos')
     created_at=models.DateTimeField(default=timezone.now,db_index=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.id} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        if self.member_id is None and self._state.adding and self.capture_id and self.capture.member_id:self.member_id=self.capture.member_id
+        _whose_upload(self);super().save(*args,**kwargs)
 
     @property
     def allow_ai_edit(self):return self.ai_edit!=AIEdit.NO
@@ -1268,7 +1320,9 @@ class WeeklySummary(models.Model):
         APPLIED='aplicado','Usado como orientación'
         DISCARDED='descartado','Descartado'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    week_start=models.DateField(unique=True)
+    # Whose week (organizaciones, phase 4): one per member and week; without members, one per week.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='weekly_summaries')
+    week_start=models.DateField()
     # Deterministic figures of the week and the one before; null means no data, never zero.
     stats=models.JSONField(default=dict,blank=True)
     # {titular, lo_que_funciono, lo_que_no, recomendaciones, orientacion_propuesta, advertencias, validacion}.
@@ -1283,8 +1337,12 @@ class WeeklySummary(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-week_start']
+    class Meta:
+        ordering=['-week_start']
+        constraints=[models.UniqueConstraint(fields=['member','week_start'],name='one_summary_per_member_week',nulls_distinct=False)]
     def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class WeeklyPlan(models.Model):
@@ -1294,7 +1352,9 @@ class WeeklyPlan(models.Model):
         TEMPLATE='estructura','Solo la estructura'
         PLANNED='planeada','Planeada'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    week_start=models.DateField(unique=True)
+    # Whose week (organizaciones, phase 4): her own plan from the organization's template and pillars.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='weekly_plans')
+    week_start=models.DateField()
     state=models.CharField(max_length=12,choices=State.choices,default=State.TEMPLATE)
     # One per day, Monday first: {date, type, type_reason, idea, reason, pillar, modality, approach, format, reader,
     # reader_need, audience_evidence, evidence_ok, pain, state, owner_edited, piece_id}.
@@ -1311,8 +1371,12 @@ class WeeklyPlan(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-week_start']
+    class Meta:
+        ordering=['-week_start']
+        constraints=[models.UniqueConstraint(fields=['member','week_start'],name='one_plan_per_member_week',nulls_distinct=False)]
     def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class DeviceToken(models.Model):
@@ -1633,7 +1697,9 @@ class MonthlyReview(models.Model):
         NEW='nuevo','Nueva'
         SEEN='visto','Vista'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    month_start=models.DateField(unique=True)
+    # Whose month (organizaciones, phase 4): one per member and month; its changes go to her orientation.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='monthly_reviews')
+    month_start=models.DateField()
     # The inputs, as the analyst read them: proof of where each figure of the report came from.
     stats=models.JSONField(default=dict,blank=True)
     # {titular, metodo, lo_que_paso, lo_que_funciono, lo_que_no, no_concluyente, cambios_previos, cambios, validacion, …}.
@@ -1646,8 +1712,12 @@ class MonthlyReview(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-month_start']
+    class Meta:
+        ordering=['-month_start']
+        constraints=[models.UniqueConstraint(fields=['member','month_start'],name='one_review_per_member_month',nulls_distinct=False)]
     def __str__(self):return f'{self.month_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class StrategyChange(models.Model):

@@ -216,9 +216,10 @@ def ensure_first_member(actor=None):
     member = Member.objects.create(organization=organization, user=owner, is_admin=True, role=FIRST_MEMBER['role'],
                                    display_name=(owner.get_full_name() or FIRST_MEMBER['display_name'])[:120])
     adopted = ConnectorAccount.objects.filter(member__isnull=True).update(member=member)
+    content = adopt_content(member)
     from .jobs import audit
     audit(actor, 'organization.member_saved', member.pk, created=True, adopted=adopted, source='bootstrap',
-          username=owner.get_username())
+          username=owner.get_username(), **({'content': content} if content else {}))
     from . import identidad
     identidad.seed_first(member, actor)  # phase 3: the installation's identity and voice, as migration 0058 does
     return member, True
@@ -330,6 +331,95 @@ def mine(rows, member, field='account'):
     if member is None:
         return rows
     return rows.filter(**{f'{field}__in': accounts(member)})
+
+
+# --------------------------------------------------------------------------- her content (phase 4)
+# Pieces and their calendar, the weekly plan, the weekly summary, the monthly review, the audience, the team's questions,
+# captures and the gallery carry their member (`member`, migration 0059; the rows of before organizations are the first
+# member's, migration 0060). Her memory and orientation follow policy_key's rule instead (hechos.py, orientacion.py): the
+# first member keeps the rows of before, untouched. What stays the organization's: the strategy template and pillars
+# (Organization.profile), the course library and catalog, the AI budget, the referents and what their analysis learns,
+# and the opportunities funnel.
+
+def own(rows, member=None, field='member'):
+    """`rows` of one member's content (`field` names the member: 'member', 'piece__member'…). `member=None`: the default
+    member (MiembroRequerido among several active ones, never a guess); with no members at all, every row, as before
+    organizations. The first member also owns rows without a member (written before migration 0060, or by a worker of
+    the code before this phase during a deploy)."""
+    member = resolve(member)
+    if member is None:
+        return rows
+    mine = Q(**{field: member})
+    if is_first(member):
+        mine |= Q(**{f'{field}__isnull': True})
+    return rows.filter(mine)
+
+
+def content_member(member=None, account=None):
+    """The member a new content row belongs to: `member`, else the owner of `account`, else the default member (None
+    without members; MiembroRequerido among several active ones and nothing to say whose)."""
+    if member is not None:
+        return member
+    if account is not None:
+        return member_for_account(account)
+    return resolve()
+
+
+CONTENT_MODELS = ('EditorialPiece', 'WeeklyPlan', 'WeeklySummary', 'MonthlyReview', 'AudienceSnapshot', 'TeamQuestion',
+                  'Capture', 'GalleryPhoto')
+
+
+def adopt_content(member):
+    """The installation's first member takes the content written before she existed (migration 0060's rule for a database
+    that gets its first member later, through bootstrap_local). Returns how many rows moved."""
+    from django.apps import apps
+    moved = 0
+    for name in CONTENT_MODELS:
+        moved += apps.get_model('team_backend', name).objects.filter(member__isnull=True).update(member=member)
+    moved += apps.get_model('team_backend', 'Orientation').objects.filter(pk=1, member__isnull=True).update(member=member)
+    return moved
+
+
+def job_parts(member):
+    """What a periodic job's deterministic id adds for her: nothing for the first member (and an installation without
+    members), so a job queued before this phase keeps its id; ('member', id) for any other, so one member's job never
+    deduplicates another's."""
+    return () if is_first(member) else ('member', member.pk)
+
+
+def job_params(member, params):
+    """A content job's params for her: the first member's (and an installation without members) are the ones of before,
+    without `member`, so a job queued before this phase keeps its params and its fingerprint; any other carries hers."""
+    params = dict(params)
+    if not is_first(member):
+        params['member'] = str(member.pk)
+    return params
+
+
+def of_job(params):
+    """Whose content a job prepares: params['member'], else the first member, who owns every content job without one
+    (the encoding of job_params: what was queued before this phase was hers); None without members."""
+    _, Member, _ = _models()
+    if params.get('member'):
+        return Member.objects.select_related('organization', 'user').get(pk=params['member'])
+    first = first_member_id()
+    return Member.objects.select_related('organization', 'user').get(pk=first) if first else None
+
+
+def job_filter(member):
+    """The JSON filter of her content jobs: {'params__member': id} for any member but the first, whose jobs carry no
+    member (job_params); for the first, the jobs without one."""
+    if is_first(member):
+        return {'params__has_key': 'member'}, True  # (filter, exclude)
+    return {'params__member': str(member.pk)}, False
+
+
+def her_jobs(rows, member):
+    """`rows` (Job) narrowed to her content jobs (job_params' encoding)."""
+    if member is None:
+        return rows
+    condition, exclude = job_filter(member)
+    return rows.exclude(**condition) if exclude else rows.filter(**condition)
 
 
 # The variables of her rhythm a member may set apart from the .env, with the same names and formats (Member.settings).
@@ -483,3 +573,23 @@ def save_settings(admin, member, values=None, remove=()):
     from .jobs import audit
     audit(admin, 'organization.member_settings', member.pk, before=before, after=after)
     return member, True
+
+
+def each_member(work, label):
+    """Run a periodic content job for every active member (one [None] for an installation without members), each apart:
+    the failure of one member's never stops another's. Returns the sum of what each returned; when every member that ran
+    failed, the last error is raised (the autopilot reports it as before organizations); a failure next to a success is
+    logged with whose it was."""
+    import logging
+    total, failed, error = 0, 0, None
+    members = active_members()
+    for member in members:
+        try:
+            total += work(member) or 0
+        except Exception as exc:  # her job failing never stops the next member's
+            failed += 1
+            error = exc
+            logging.getLogger('team_backend.autopilot').exception('%s_failed member=%s', label, getattr(member, 'pk', None))
+    if error is not None and failed == len(members):
+        raise error
+    return total
