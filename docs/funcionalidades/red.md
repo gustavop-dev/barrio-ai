@@ -614,7 +614,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   - **a.** Invitado con menos de dos comentarios (o ninguno) y sin aceptar en `BUYER_REST_AFTER_DAYS` (21) días → descanso de `BUYER_REST_DAYS` (60), `invitacion_no_aceptada`. Los 21 días cuentan desde lo último entre la invitación, el último comentario del intento, la última señal del puente del intento y el inicio del intento (si la invitación es de uno anterior, sigue pendiente y nunca se reenvía).
   - **b.** En la ruta sin posts, antes del descanso se intenta el puente (`hold_rest`): se pide y el descanso espera mientras se busca o mientras el puente está en curso, hasta `BUYER_BRIDGE_WAIT_DAYS` (21) días. Sin empresa, sin nadie, o ya buscado en un intento anterior, descansa. El plan cuenta `puente_antes_del_descanso`.
   - **c.** Cada reintento cambia de ángulo y lo guarda (`comprador.retry(..., kind, detail)`, detalle `tipo`): `senal_en_descanso` (una señal suya lo despertó), `senal_nueva` (una señal de compra con fuente que ningún intento ni texto citó, la más nueva; guarda `senal`), `puente` (esta ruta, sin puente aún y con lugar en la empresa: pide el puente del intento) u `otro_tema` (numerado desde el segundo). Tres intentos y después un año, en todas las rutas.
-  - **d.** Al terminar un descanso, una reverificación web de sus señales de compra (si su etapa ya se verificó con `ok` y `NETWORK_STAGE_CHECK` está encendido): el reintento espera hasta 2 días a que `red.check_stages` la corra dentro del mismo cupo diario de verificaciones (`NETWORK_STAGE_CHECKS_PER_DAY`, 6; clave `etapa:<persona>:reverificacion:<intento>:<día>`). Suma solo señales con una fuente nueva; nunca cambia el veredicto ni el encaje. Una por descanso: si no corre a tiempo queda `vencida` y el reintento sigue sin ella (toque `reverificacion`, `buyer.signals_rechecked`).
+  - **d.** Al terminar un descanso, una reverificación web de sus señales de compra (si su etapa ya se verificó con `ok` y `NETWORK_STAGE_CHECK` está encendido): el reintento espera hasta 2 días a que el job `check_buyer_stages` (`red.check_stages`, desde el 18/11/2026 en su propia corrida) la corra dentro del mismo cupo diario de verificaciones (`NETWORK_STAGE_CHECKS_PER_DAY`, 6; clave `etapa:<persona>:reverificacion:<intento>:<día>`). Suma solo señales con una fuente nueva; nunca cambia el veredicto ni el encaje. Una por descanso: si no corre a tiempo queda `vencida` y el reintento sigue sin ella (toque `reverificacion`, `buyer.signals_rechecked`).
 - **7. Embudo:** `ruta_sin_posts` en `GET /api/v1/resultados/embudo-comprador`, solo con el interruptor: `comparacion` (con y sin puente, el bloque de etapas de siempre), `puentes` (pedidos, búsquedas, encontrados, `sin_puente` por motivo, seguidos, invitados, aceptaron, compradores con señal del puente y con interacción del puente), `donde_comenta` y `visitas` (`disponible: false` con el motivo), `reintentos.por_angulo` y `reverificaciones` (pedidas, hechas, con señal nueva, vencidas).
 - **8. Metodología:** no se activa ninguna nueva: ningún agente redacta algo distinto (el comentario al puente es `comentario_calentamiento`, la nota `nota_invitacion` y el mensaje `primer_mensaje`, ya activadas) y la búsqueda, los topes y los reintentos son reglas de código. El registro de lectura de `comentario_calentamiento` anota que también comenta al puente y que la ruta es diseño de Gustavo.
 - **Para la fase 6:** `sin_posts.status(journey)` y `bridge_of_journey(journey)` (su puente), `relayed(journey)` y `fact(touch)` (lo que hizo el puente, como señal y como ancla), `strong_signal(contact)`, `next_angle(journey)`, `counterpart(cuenta, id)` (la otra persona de la empresa), `funnel`; los toques `puente`, `senal_puente` y `reverificacion`; `comprador.retry(journey, angulo, kind=, detail=)`.
@@ -765,6 +765,33 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   - El resumen del plan guarda el reparto con lo planeado.
   - **Regla de `aliado`:** comparte el turno de los recomendadores. La tabla busca recomendadores entre «clientes, aliados y socios», y un aliado (alguien que vende servicios a founders) es quien recomienda a Gustavo.
 - **Verificación en la ventana:** `check_stages` corre solo dentro de `READ_WINDOW`. Un reintento queda para el inicio de la ventana siguiente, no 24 horas después.
+- **Verificación en su propia corrida (18/11/2026):**
+  - **Qué pasaba:** cada mañana llegaba «Ciclo detenido: red. Se alcanzó el presupuesto del ciclo» y ese día no se verificaba a nadie (el 18/11: 0 verificaciones y 6 compradores `pending`). `red.classify` llamaba a `check_stages` dentro de la misma corrida de `classify_contacts`. Esa corrida tiene un solo presupuesto (`cost_cap_usd: 1` del ciclo `red`). La clasificación gastaba ~0,22 USD (`network-classify`). Después, la investigación web reservaba su peor caso antes de buscar, ~0,85–0,89 USD (`web-research-tool`). 0,22 + 0,87 > 1: `orquestacion.provider_metadata` paraba la corrida con `cost_cap` antes de la primera búsqueda.
+  - **Cómo queda:**
+    - `classify_contacts` solo clasifica (`red.classify` → `_classify_batch`).
+    - La verificación y la reverificación al terminar un descanso (`_recheck_signals`) corren en su propio job, `check_buyer_stages` (`red.check_buyer_stages` → `check_stages`): su propia corrida del ciclo `red`, con su propio presupuesto.
+    - Una verificación por corrida (`red.STAGE_CHECKS_PER_RUN=1`). Peor caso de una corrida: ~0,89 (investigación) + ~0,04 (juez `network-stage`) ≈ 0,93 USD, dentro de 1 USD. Dos no caben.
+  - **Cuándo se encola:** el autopiloto (`autopiloto._network`) la encola cada `NETWORK_STAGE_CHECK_EVERY_MINUTES` (20 por defecto), con el mismo patrón de reloj que los demás jobs de la red. Solo se encola si se cumplen todas estas condiciones:
+    - estamos dentro de `READ_WINDOW`;
+    - hay presupuesto del equipo (`budget_left`);
+    - hay una verificación o reverificación vencida y cupo del día (`red.stage_pending`: `NETWORK_STAGE_CHECK`, `NETWORK_STAGE_CHECKS_PER_DAY=6`);
+    - no hay otro `check_buyer_stages` pendiente.
+  - **Ritmo:** las 6 del día caben en unas 2 horas de la ventana. Ningún comprador se queda sin verificar porque la clasificación se coma el presupuesto.
+  - **Grafo `6.17-verificacion-etapa-propia`:**
+    - El paso `verificar_etapa` (relaciones_comunidad → clasificador_red, propósitos `web-research-tool` y `network-stage`, una llamada por corrida, 300 s).
+    - `clasificar` solo con `network-classify`.
+    - El esquema `stage_result`.
+    - En `code_bindings`: `network_edges`, `job_roles` (investigador_referentes) y `autopilot_direct_kinds`.
+  - **Permisos:** `check_buyer_stages` está en `jobs.OPERATION_PERMISSIONS` y `PAID_OPERATIONS`.
+  - **La alerta no cambia:** una corrida que de verdad pasa su presupuesto se detiene con `cost_cap`, deja la tarjeta «Ciclo detenido: red» en Tu turno y avisa por push y Slack (`OPERATOR_ALERT_WEBHOOK`).
+  - **La reserva de la investigación web (`knowledge/providers.py`, `_claude` con `WebTools`):**
+    - Se reserva antes de llamar, por el peor caso, sin cambiarla en este arreglo.
+    - Entrada reservada = (I + 256 + búsquedas × `WEB_SEARCH_RESERVED_TOKENS` + lecturas × `WEB_FETCH_MAX_CONTENT_TOKENS`) × (1 + búsquedas + lecturas).
+    - Esa entrada se cobra a precio de escritura de caché (×1,25). A eso se suma `WEB_RESEARCH_MAX_TOKENS` de salida y `WEB_SEARCH_USD_PER_REQUEST` por búsqueda.
+    - Con los valores de hoy (2 búsquedas, 2 lecturas, 25 000, 4 000, 4 000 de salida, Sonnet a 2/10 USD por millón, 0,01 por búsqueda) queda ≈ (I + 58 256) × 1,25e-5 + 0,06 USD. Con I ≈ 5 000–8 000 tokens contados da 0,85–0,89 USD.
+    - Lo real observado es 0,03–0,07 USD por investigación.
+    - No hay error de cálculo. Es un peor caso deliberado: cada búsqueda o lectura puede volver a enviar todo lo anterior (×5) y una búsqueda puede traer hasta 25 000 tokens.
+    - **Propuesta, no aplicada:** si se quiere margen sin perder el peor caso, bajar `WEB_SEARCH_RESERVED_TOKENS` a ~12 000 según lo que midan las búsquedas reales (la reserva queda en ~0,53–0,56 USD) o `WEB_FETCH_MAX_USES` a 1 (~0,65–0,68 USD). Hoy no hace falta: la corrida propia tiene ~7 % de holgura.
 - **Entrada y embudo:**
   - El recorrido guarda el nivel, el puntaje y la versión con que el equipo fue por la persona (`comprador._project`). Mientras solo está elegida siguen a su nivel, porque la verificación web suele responder el mismo día. El primer follow o la primera invitación los fijan, y una subida de nivel posterior cambia el puntaje actual, no la entrada.
   - `GET /api/v1/resultados/embudo-comprador` trae `entrada_comprador`, de solo lectura:
@@ -794,6 +821,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   6. **Dado** cupos por papel y pocos compradores, **cuando** se planifica, **entonces** sus turnos pasan a otros papeles y nadie espera.
   7. **Dado** una corrida de `reevaluar-compradores` sin `--confirmar`, **cuando** termina, **entonces** nada cambió; con `--confirmar` cada uno queda una vez y una segunda corrida no encuentra a nadie.
   8. **Dado** todos los `BUYER_*_ENABLED` apagados, **cuando** corre el caso `BAR-24-compradores`, **entonces** el resultado es el mismo y no se escribe ningún recorrido.
+  9. **Dado** un lote de 10 por clasificar y compradores esperando su verificación, **cuando** corre `classify_contacts`, **entonces** solo clasifica y no se detiene por presupuesto. **Cuando** corre `check_buyer_stages`, verifica a uno, dentro de su propio presupuesto, y deja `ok` con nivel, fuentes y señales. La suma del peor caso de cada corrida del ciclo `red` no pasa su `cost_cap_usd` (18/11/2026).
 - **Brechas:**
   - Cómo responde el modelo real con el prompt nuevo solo se mide con una corrida pagada. Las pruebas miden qué hace el código con cada respuesta.
   - La reevaluación no se corrió contra ninguna base real: la aplica Gustavo en producción.
@@ -802,6 +830,13 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   - `tests/test_compradores_niveles.py`: el caso, niveles, puntaje, cupos y reevaluación.
   - `tests/test_red_eeuu.py`, `tests/test_red.py` y `tests/test_comprador.py`.
   - `tests/test_comprador_e2e.py`: el recorrido `por_confirmar`, el de Latinoamérica con y sin calentamiento, y la reverificación que sube el nivel.
+  - `tests/test_verificacion_etapa.py` (18/11/2026): con el cliente de Anthropic falso y los precios y reservas reales, cubre:
+    - la clasificación sola;
+    - la verificación en su corrida;
+    - una por corrida y seis al día;
+    - la cola del autopiloto (interruptor, ventana, cupo, presupuesto, sin duplicados);
+    - el peor caso de cada corrida contra su `cost_cap_usd`;
+    - la parada real que sigue avisando.
   - Se corrieron en local con proveedores falsos en una PostgreSQL desechable. La regresión completa corre en CI.
 
 ## El comprador de ProjectApp y el partner (17/11/2026)

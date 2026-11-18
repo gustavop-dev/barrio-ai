@@ -362,12 +362,13 @@ Con `BUYER_REPLY_ENABLED=true` (por defecto `false`), la fase 4, el líder y el 
 
 ### Trabajos y roles (escena de la oficina)
 
-Hay cuatro trabajos nuevos (`Job.kind`). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:
+Hay cuatro trabajos nuevos (`Job.kind`), más `check_buyer_stages` (18/11/2026: la verificación web de la etapa de un comprador, en su propia corrida). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:
 
 | Trabajo | Rol |
 | --- | --- |
 | `discover_network` | `investigador_referentes` |
 | `classify_contacts` | `investigador_referentes` |
+| `check_buyer_stages` | `investigador_referentes` |
 | `plan_network` | `relaciones_comunidad` |
 | `sync_network` | `relaciones_comunidad` |
 
