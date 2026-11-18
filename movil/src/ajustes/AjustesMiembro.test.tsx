@@ -4,7 +4,7 @@ import type { MiPerfil, MiVoz, Yo } from '@compartido/api/types';
 import { organizacionFixture, perfilFixture, vozConfirmadaFixture, vozConPropuestaFixture, vozFixture, yoAltaFixture, yoFixture } from '@compartido/fixtures/miembro';
 import { ALTA_NOTICE } from '@compartido/logic/miembro';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { ScrollView } from 'react-native';
+import { DeviceEventEmitter, ScrollView, View } from 'react-native';
 import '@/api/transport';
 import { saveToken } from '@/api/token';
 import { renderApp } from '@/test/render';
@@ -269,6 +269,45 @@ describe('Ajustes · Organización y alta', () => {
     expect(screen.queryByText(ALTA_NOTICE)).toBeNull();
     expect(screen.queryByTestId('ajustes-alta')).toBeNull();
     expect(screen.queryByText(/Mientras tu cuenta está en alta/)).toBeNull();
+  });
+
+  it('focusing a field lifts that field, not the section’s top, under the top bar: above the keyboard', async () => {
+    // Drawn edge to edge, the screen does not shrink for the keyboard: with the section's top under the top bar,
+    // «Cómo te presentas» stayed under the keyboard (QA 44402904432). Here the field's box is 520 below the section's top.
+    routerState.params = { ancla: 'perfil' };
+    const scrollTo = jest.spyOn(ScrollView.prototype as unknown as { scrollTo: () => void }, 'scrollTo').mockImplementation(() => undefined);
+    type Measured = (x: number, y: number, width: number, height: number) => void;
+    const measureLayout = jest
+      .spyOn(View.prototype as unknown as { measureLayout: (to: unknown, onSuccess: Measured) => void }, 'measureLayout')
+      .mockImplementation(function (this: { props: { testID?: string } }, _to: unknown, onSuccess: Measured) {
+        if (this.props.testID === 'perfil-campo-identity') onSuccess(0, 520, 326, 150);
+      });
+    server();
+    await render();
+    const anchor = await screen.findByTestId('ajustes-perfil');
+    const layout = (height: number) => fireEvent(anchor, 'layout', { nativeEvent: { layout: { x: 0, y: 2400, width: 390, height } } });
+    await act(async () => layout(1200));
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 2388, animated: true });
+
+    await act(async () => fireEvent(await screen.findByTestId('perfil-identity'), 'focus'));
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 2908, animated: true });
+    // Measured against the section itself, whose top is the anchor's.
+    expect((measureLayout.mock.calls.at(-1)?.[0] as { props: { testID?: string } }).props.testID).toBe('ajustes-mi-perfil');
+    // The link's section is no longer followed: the section growing as she types leaves the field where it is.
+    const calls = scrollTo.mock.calls.length;
+    await act(async () => layout(1260));
+    expect(scrollTo).toHaveBeenCalledTimes(calls);
+    // Android's back hid the keyboard and left the field focused; tapping it again only brings the keyboard back.
+    const keyboardUp = () => DeviceEventEmitter.emit('keyboardDidShow', { endCoordinates: { screenX: 0, screenY: 541, width: 390, height: 303 } });
+    await act(async () => keyboardUp());
+    expect(scrollTo).toHaveBeenCalledTimes(calls + 1);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 2908, animated: true });
+    // Once she leaves the field, the keyboard coming up (for another section's field) lifts nothing of Mi perfil.
+    await act(async () => fireEvent(screen.getByTestId('perfil-identity'), 'blur'));
+    await act(async () => keyboardUp());
+    expect(scrollTo).toHaveBeenCalledTimes(calls + 1);
+    measureLayout.mockRestore();
+    scrollTo.mockRestore();
   });
 
   it('scrolls to #voz when a link asks for it', async () => {

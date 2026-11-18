@@ -49,12 +49,23 @@ export function AjustesScreen() {
   const yo = useYo();
   const member = yo.data?.member ?? null;
 
-  const scrollTo = useCallback((id: AnchorId, animated = true) => {
+  /** Brings section `id` (or what is `offset` below its top) under the top bar. */
+  const scrollTo = useCallback((id: AnchorId, offset = 0) => {
     const y = positions.current[id];
     if (y === undefined) return false;
-    scroll.current?.scrollTo({ y: Math.max(0, y - ANCHOR_MARGIN), animated });
+    scroll.current?.scrollTo({ y: Math.max(0, y + offset - ANCHOR_MARGIN), animated: true });
     return true;
   }, []);
+
+  // A field of Mi perfil got the focus: that field, not the section's top, goes under the top bar (see MiPerfil). A link's
+  // section stops being followed, or the section growing while she types would pull the screen back to its top.
+  const revealProfileField = useCallback(
+    (offset: number) => {
+      pending.current = null;
+      scrollTo('perfil', offset);
+    },
+    [scrollTo],
+  );
 
   useEffect(() => {
     pending.current = anchor;
@@ -119,7 +130,7 @@ export function AjustesScreen() {
         </Anchor>
         {member ? (
           <Anchor {...anchorProps('perfil')}>
-            <MiPerfilSection onFieldFocus={() => scrollTo('perfil')} />
+            <MiPerfilSection onFieldFocus={revealProfileField} />
           </Anchor>
         ) : null}
         {member ? (
