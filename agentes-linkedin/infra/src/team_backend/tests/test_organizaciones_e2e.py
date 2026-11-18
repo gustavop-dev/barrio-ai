@@ -15,11 +15,18 @@ migration 0055, the `operador miembro` command and bootstrap_local (seed_qa: tes
 
 This is the harness phases 2–7 extend. DosMiembrosBase gives each member a Persona (her member, user, client, accounts
 and fakes) and the steps piece() / publish() / pause() / oauth(); a phase adds its steps here and its own test class.
-What is still one for the whole installation (phase 2: caps, spacing, day schedule, ramp, notes, profile reads) is set
-wide in setUp so that it does not hide a per-member rule; the phase that splits it removes the setting and tests it."""
+
+Phase 2 (RitmoPorMiembroTests, ConcurrenciaTests, AjustesTests, EstadoDeGustavoTests, VigilantesTests): each member is
+one LinkedIn member with her own rhythm (lock, spacing and day schedule, daily and weekly caps, profile reads, the
+invitation ramp and its health, notes and tier, provider blocks); the total stop, the AI budget and «one person, one
+invitation» stay the organization's; Gustavo's state of before organizations is his first member's, untouched."""
 import hashlib
 import io
+import json
 import os
+import threading
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import timedelta
 from unittest.mock import patch
@@ -29,7 +36,7 @@ import httpx
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db import connection
+from django.db import OperationalError, close_old_connections, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
@@ -37,10 +44,10 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
 from team_backend import (alertas_slack, analitica, autopiloto, conexion, connectors_linkedin as li, editorial, imagenes,
-                          metricas, miembros, operador, perfil, referentes, respuestas)
-from team_backend.connectors import FakeConnector
-from team_backend.models import (ActionExecution, AuditEvent, BrowserLogin, ConnectorAccount, EditorialPiece, Job,
-                                 LinkedInCredential, Member, OperatorControl, Organization, Referent)
+                          metricas, miembros, operador, perfil, red, referentes, respuestas)
+from team_backend.connectors import ConnectorError, FakeConnector
+from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BrowserLogin, ConnectorAccount, Contact,
+                                 EditorialPiece, Job, LinkedInCredential, Member, OperatorControl, Organization, Referent)
 from team_backend.tests import test_conexion as cx
 from team_backend.tests import test_metricas as met
 from team_backend.tests import test_operador as op
@@ -81,10 +88,6 @@ class DosMiembrosBase(EditorialBase):
 
     def setUp(self):
         super().setUp()
-        # Phase 2: CONT-09 caps are still counted for the whole installation; wide enough for both to publish today.
-        env = patch.dict(os.environ, {'OPERATOR_DAILY_LIMITS': 'CONT-09=5', 'OPERATOR_WEEKLY_LIMITS': 'CONT-09=10'})
-        env.start()
-        self.addCleanup(env.stop)
         self.organization = Organization.objects.create(name='ProjectApp', slug='projectapp')
         gustavo = Member.objects.create(organization=self.organization, user=self.gustavo, display_name='Gustavo',
                                         role='Fundador', is_admin=True, created_at=timezone.now() - timedelta(days=90))
@@ -653,3 +656,463 @@ class AltaDeMiembrosTests(OperatorBase):
         member = Member.objects.select_related('user').get()
         self.assertEqual((member.user.username, member.is_admin, member.role), ('gustavo', True, 'Fundador'))
         self.assertEqual(list(ConnectorAccount.objects.values_list('member', flat=True)), [member.pk])
+
+
+# ---------------------------------------------------------------------- phase 2: one LinkedIn rhythm per member
+
+class RitmoBase(DosMiembrosBase):
+    """Phase 2 steps: what each member wrote, invited and noted, through the production models."""
+
+    def contact(self, persona, uid=None, **fields):
+        uid = uid or f'{persona.user.username}-{uuid.uuid4().hex[:8]}'
+        return Contact.objects.create(account=persona.reader, provider_user_id=uid, display_name=uid, source='manual', **fields)
+
+    def proposal(self, persona, capability, account=None, contact=None, payload=None, state='approved'):
+        contact = contact or self.contact(persona)
+        return ActionProposal.objects.create(account=account or persona.reader, contact=contact, capability=capability,
+                                             payload=payload or {'user_id': contact.provider_user_id},
+                                             payload_hash=uuid.uuid4().hex * 2, state=state)
+
+    def wrote(self, persona, capability, account=None, at=None, contact=None):
+        """One write of hers that LinkedIn took (what her caps count)."""
+        proposal = self.proposal(persona, capability, account, contact, state='confirmed')
+        return ActionExecution.objects.create(proposal=proposal, idempotency_key=uuid.uuid4().hex, provider='fake',
+                                              state='confirmed', executed_by=persona.user, started_at=at or timezone.now(),
+                                              wrote=True)
+
+    def set(self, persona, **values):
+        """The admin (Gustavo) sets her rhythm; production reads her accounts fresh, the test refreshes them."""
+        miembros.save_settings(self.g.user, persona.member, values)
+        for row in (persona.member, persona.reader, persona.official):
+            row.refresh_from_db()
+
+    def key(self, persona):
+        return miembros.policy_key(persona.member)
+
+
+class RitmoPorMiembroTests(RitmoBase):
+    def test_each_member_publishes_her_post_of_the_day_under_her_own_cap(self):
+        """Catch caps counted for the whole installation: CONT-09 is the .env's 1 a day for EACH member, so both publish
+        today and neither gets a second one."""
+        mine, hers = self.piece(self.g, 0), self.piece(self.cto, 1)
+        self.assertEqual(self.publish(mine).state, 'sent')
+        self.assertEqual((operador.capacity_left(self.g.official, 'CONT-09'), operador.capacity_left(self.cto.official, 'CONT-09')),
+                         (0, 1))
+        self.assertEqual(self.publish(hers).state, 'sent')
+        self.assertEqual(self.writes(), {'gustavo': 1, 'cto': 1})
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'Tope diario o semanal de CONT-09 alcanzado'):
+            self.publish(self.piece(self.g, 2))
+        self.assertEqual(self.writes(), {'gustavo': 1, 'cto': 1})
+
+    def test_spacing_and_day_schedule_are_hers_and_shared_by_her_connectors(self):
+        """Catch one spacing for everybody: Gustavo's reserved gap and his last write hold both his connectors and never
+        the CTO's; each one draws her own day's opening, once."""
+        self.spacing_patch.stop()
+        self.day_schedule_patch.stop()
+        now = timezone.now()
+        accounts = (self.g.reader, self.g.official, self.cto.reader, self.cto.official)
+        with patch.dict(os.environ, {'OPERATOR_MIN_SPACING_SECONDS': '1200', 'OPERATOR_MAX_SPACING_SECONDS': '2400'}):
+            for persona in (self.g, self.cto, self.g):  # his again the same day: never redrawn
+                operador.prepare_day_schedule(now, persona.member)
+            days = AuditEvent.objects.filter(action='operator.day_schedule').values_list('target', flat=True)
+            self.assertEqual(sorted(days), sorted(['member', f'member:{self.cto.member.pk}']))  # the first keeps the old key
+            later = now + timedelta(hours=1)  # both openings (at most 20 minutes) are over
+            operador.reserve_spacing(later, member=self.g.member)
+            gap = operador.policy_event('operator.schedule', member=self.g.member).metadata['gap_seconds']
+            self.assertEqual([operador.spacing_ok(a, later + timedelta(seconds=60)) for a in accounts], [False, False, True, True])
+            # Each one's last write holds only her own connectors.
+            self.wrote(self.g, 'RED-01', at=later)
+            after = later + timedelta(seconds=gap + 1)
+            self.wrote(self.cto, 'RED-01', account=self.cto.official, at=after)
+            self.assertEqual([operador.spacing_ok(a, after + timedelta(seconds=1)) for a in accounts], [True, True, False, False])
+
+    def test_daily_caps_are_hers_and_her_settings_change_only_hers(self):
+        """Catch writes counted across members: Gustavo spends RED-01 on his two connectors, the CTO keeps hers, and
+        lowering hers never lowers his."""
+        with patch.dict(os.environ, {'OPERATOR_DAILY_LIMITS': 'RED-01=2'}):
+            self.wrote(self.g, 'RED-01')
+            self.wrote(self.g, 'RED-01', account=self.g.official)
+
+            def left():
+                return [operador.capacity_left(a, 'RED-01') for a in (self.g.reader, self.g.official, self.cto.reader)]
+            self.assertEqual(left(), [0, 0, 2])
+            self.set(self.cto, OPERATOR_DAILY_LIMITS='RED-01=1')
+            self.assertEqual(left(), [0, 0, 1])
+            self.assertEqual((operador.limits(member=self.g.member)['RED-01'], operador.limits(member=self.cto.member)['RED-01']),
+                             ((2, 100), (1, 100)))
+            self.wrote(self.cto, 'RED-01')
+            self.assertEqual(left(), [0, 0, 0])
+
+    def test_profile_reads_are_hers_and_shared_by_her_connectors(self):
+        """Catch one profile-read ceiling for everybody: each member's connectors share her own ceiling."""
+        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '2'}):
+            operador.reserve_profile_read(self.g.reader, 'prueba')
+            operador.reserve_profile_read(self.g.official, 'prueba')
+            with self.assertRaises(operador.ProfileReadCapReached):
+                operador.reserve_profile_read(self.g.reader, 'prueba')
+            operador.reserve_profile_read(self.cto.reader, 'prueba')
+            self.set(self.cto, OPERATOR_PROFILE_READ_DAILY_LIMIT='1')
+            with self.assertRaises(operador.ProfileReadCapReached):
+                operador.reserve_profile_read(self.cto.official, 'prueba')
+            self.assertEqual((operador.profile_reads_used(self.g.member), operador.profile_reads_used(self.cto.member)), (2, 1))
+            self.assertEqual(alertas_slack.read_caps(self.cto.reader, timezone.now())[-1], ('perfiles', 'profile', 1, 1))
+        self.assertEqual(sorted(AuditEvent.objects.filter(action='operator.profile_read').values_list('target', flat=True)),
+                         sorted(['member', 'member', self.key(self.cto)]))
+
+    def test_the_ramp_is_hers_the_cto_starts_low_and_gustavo_keeps_his(self):
+        """Phase 7's CTO: her ramp starts at 5 a day (5/25,8/40,10/50 from stage 0) while Gustavo's goes on at his stage;
+        each saved under her own key."""
+        now = timezone.now()
+        operador._audit(None, 'network.ramp', 'member', stage=2, stage_since=(now - timedelta(days=20)).isoformat(),
+                        freeze_until=(now - timedelta(days=13)).isoformat(), pause_until=None, last_sample='', last_rate=None)
+        self.set(self.cto, OPERATOR_INVITE_RAMP_STAGES='5/25,8/40,10/50', OPERATOR_INVITE_RAMP_START='0')
+        self.assertEqual((red.ramp_limits(self.g.reader, now), red.ramp_limits(self.cto.reader, now)), ((20, 100), (5, 25)))
+        self.assertEqual((red.ramp_state(now, self.g.member)['stage'], red.ramp_state(now, self.cto.member)['stage']), (2, 0))
+        self.assertEqual(sorted(set(AuditEvent.objects.filter(action='network.ramp').values_list('target', flat=True))),
+                         sorted(['member', self.key(self.cto)]))
+
+    def test_her_acceptance_pauses_only_her_invitations(self):
+        """Catch one invitation health for everybody: 20 mature invitations of the CTO that nobody accepted pause hers;
+        Gustavo's ramp, account and invitations go on."""
+        now = timezone.now()
+        for _ in range(20):
+            person = self.contact(self.cto, stage='invited', invited_at=now - timedelta(days=10),
+                                  profile_checked_at=now - timedelta(hours=1))
+            self.wrote(self.cto, 'RED-02', at=now - timedelta(days=10), contact=person)
+        health = red.review_health(self.cto.reader, now)['health']
+        self.assertEqual((health['mature'], health['accepted']), (20, 0))
+        self.assertTrue(red.invites_blocked(now, self.cto.member)[0])
+        self.assertEqual(red.ramp_limits(self.cto.reader, now), (0, 0))
+        self.assertEqual(red.review_health(self.g.reader, now)['health']['mature'], 0)
+        self.assertEqual(red.invites_blocked(now, self.g.member), (False, ''))
+        self.assertEqual(red.ramp_limits(self.g.reader, now), (16, 80))
+        self.assertEqual([ConnectorAccount.objects.get(pk=p.reader.pk).paused for p in (self.g, self.cto)], [False, True])
+
+    def test_notes_tier_and_month_are_hers(self):
+        """Catch one note quota for everybody: Gustavo's month (free, 3) and the CTO's (premium, 5) are counted, noted
+        and blocked apart."""
+        def noted(persona):
+            person = self.contact(persona)
+            proposal = self.proposal(persona, 'RED-02', contact=person, payload={
+                'user_id': person.provider_user_id, 'note': 'Your post on evals was useful.', 'note_reason': 'Shared work.'})
+            self.assertTrue(red.reserve_note(proposal))
+        with patch.dict(os.environ, {'LINKEDIN_ACCOUNT_TIER': 'free', 'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT': '3'}):
+            self.set(self.cto, LINKEDIN_ACCOUNT_TIER='premium', LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT='5')
+            for persona in (self.g, self.g, self.cto):
+                noted(persona)
+            rooms = lambda: (red.note_room(member=self.g.member), red.note_room(member=self.cto.member))  # noqa: E731
+            self.assertEqual(rooms(), (1, 4))
+            operador._audit(None, 'network.notes_blocked', self.key(self.cto), kind='note_quota', status=429)
+            self.assertEqual(rooms(), (1, 0))  # LinkedIn refused one of hers: hers stop, his go on
+        self.assertEqual(dict(AuditEvent.objects.filter(action='network.account_tier').values_list('target', 'metadata__tier')),
+                         {'member': 'free', self.key(self.cto): 'premium'})
+
+    def test_repeated_cannot_resend_pauses_only_her_invitations_and_the_person_stays_blocked_for_all(self):
+        """Catch provider blocks counted for everybody: one refusal each pauses nobody; a second recipient refused to the
+        CTO pauses hers. The refused person stays blocked for everyone."""
+        refuse = ConnectorError('cannot resend', status=422, kind='provider/cannot_resend_yet')
+        his = self.proposal(self.g, 'RED-02')
+        red.provider_failure(self.g.reader, his, refuse, self.g.user)
+        hers = [self.proposal(self.cto, 'RED-02') for _ in range(2)]
+        red.provider_failure(self.cto.reader, hers[0], refuse, self.cto.user)
+
+        def blocked():
+            return [red.invites_blocked(member=p.member)[0] for p in (self.g, self.cto)]
+        self.assertEqual(blocked(), [False, False])  # two refusals of the installation, one each
+        red.provider_failure(self.cto.reader, hers[1], refuse, self.cto.user)
+        self.assertEqual(blocked(), [False, True])
+        self.assertEqual([ConnectorAccount.objects.get(pk=p.reader.pk).paused for p in (self.g, self.cto)], [False, True])
+        self.assertTrue(red.recipient_blocked(his.payload['user_id']))
+        self.assertEqual(sorted(AuditEvent.objects.filter(action='network.provider_limit').values_list('target', flat=True)),
+                         sorted(['member', self.key(self.cto), self.key(self.cto)]))
+
+    def test_a_429_pauses_only_her_invitations(self):
+        """Catch a provider limit stopping the other member: LinkedIn's 429 to the CTO stops her invitations only."""
+        red.provider_failure(self.cto.reader, self.proposal(self.cto, 'RED-02'),
+                             ConnectorError('throttle', status=429, kind='rate_limit', pause=True))
+        self.assertEqual([red.invites_blocked(member=p.member)[0] for p in (self.g, self.cto)], [False, True])
+        self.assertEqual((red.ramp_limits(None, member=self.g.member), red.ramp_limits(None, member=self.cto.member)),
+                         ((16, 80), (0, 0)))
+        self.assertEqual([ConnectorAccount.objects.get(pk=p.reader.pk).paused for p in (self.g, self.cto)], [False, True])
+
+    def test_one_person_is_never_invited_by_both(self):
+        """«One person, one invitation» stays the organization's: once Gustavo invited someone, the CTO's invitation to
+        the same person waits; another person's does not."""
+        uid = self.wrote(self.g, 'RED-02').proposal.payload['user_id']
+        same = self.proposal(self.cto, 'RED-02', contact=self.contact(self.cto, uid=uid))
+        other = self.proposal(self.cto, 'RED-02')
+        reason = 'Ya existe otra intención o envío para el destinatario'
+        self.assertEqual((reason in red.execution_issues(same), reason in red.execution_issues(other)), (True, False))
+
+    def test_the_tick_goes_on_with_two_members_and_skips_an_account_of_nobody(self):
+        """Catch the autopilot stopping on an account of nobody among several members: it is skipped and counted."""
+        orphan = ConnectorAccount.objects.create(provider='fake', external_account_id='acc_huerfana', label='Sin miembro')
+        self.proposal(self.g, 'RED-01', account=orphan, state='proposed')
+        report = autopiloto.tick(self.autobot)
+        self.assertEqual(report['unowned'], 2, report)  # the account and its proposal
+        self.assertFalse(ActionExecution.objects.filter(proposal__account=orphan).exists())
+
+
+class ConcurrenciaTests(RitmoBase):
+    def test_her_connectors_wait_for_each_other_and_two_members_never_do(self):
+        """Two reservations at once on Gustavo's two connectors with one read left: exactly one gets it. While his lock is
+        held, the CTO reserves hers at once and his other connector waits (lock_timeout: it never got the lock)."""
+        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1'}):
+            start = threading.Barrier(2)
+
+            def race(account):
+                close_old_connections()
+                try:
+                    start.wait(5)
+                    operador.reserve_profile_read(account, 'carrera')
+                    return True
+                except operador.ProfileReadCapReached:
+                    return False
+                finally:
+                    close_old_connections()
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                self.assertEqual(sorted(pool.map(race, [self.g.reader, self.g.official])), [False, True])
+            held, done = threading.Event(), threading.Event()
+
+            def hold():
+                close_old_connections()
+                try:
+                    with transaction.atomic():
+                        operador.policy_lock(self.g.member)
+                        held.set()
+                        done.wait(20)
+                finally:
+                    close_old_connections()
+
+            def reserve(account):
+                held.wait(5)
+                close_old_connections()
+                try:
+                    with transaction.atomic():
+                        with connection.cursor() as cursor:
+                            cursor.execute("SET LOCAL lock_timeout = '3s'")
+                        operador.reserve_profile_read(account, 'mientras')
+                    return 'reservó'
+                except OperationalError:
+                    return 'esperó'
+                except operador.ProfileReadCapReached:
+                    return 'tope'
+                finally:
+                    close_old_connections()
+            with ThreadPoolExecutor(max_workers=3) as pool:
+                holder = pool.submit(hold)
+                attempts = [pool.submit(reserve, account) for account in (self.cto.reader, self.g.official)]
+                outcome = [attempt.result(30) for attempt in attempts]
+                done.set()
+                holder.result(30)
+        self.assertEqual(outcome, ['reservó', 'esperó'])
+        self.assertEqual((operador.profile_reads_used(self.g.member), operador.profile_reads_used(self.cto.member)), (1, 1))
+
+
+class AjustesTests(RitmoBase):
+    def run_command(self, *args, user='gustavo-test', member='cto-test'):
+        out = io.StringIO()
+        call_command('operador', '--usuario', user, 'ajustes', '--miembro', member, *args, stdout=out)
+        return out.getvalue()
+
+    def test_the_admin_sets_her_rhythm_validated_audited_and_only_hers(self):
+        """`operador ajustes`: the admin sets the CTO's rhythm (phase 7: low ramp, «approval»); it is validated as a
+        whole, audited with before and after, idempotent, and never touches Gustavo's."""
+        out = self.run_command('--fijar', 'OPERATOR_INVITE_RAMP_STAGES=5/25, 8/40, 10/50', '--fijar', 'OPERATOR_INVITE_RAMP_START=0',
+                               '--fijar', 'OPERATOR_AUTONOMY=INT-03=approval,RED-02=approval')
+        wanted = {'OPERATOR_INVITE_RAMP_STAGES': '5/25,8/40,10/50', 'OPERATOR_INVITE_RAMP_START': '0',
+                  'OPERATOR_AUTONOMY': 'INT-03=approval,RED-02=approval'}
+        self.assertEqual(Member.objects.get(pk=self.cto.member.pk).settings, wanted)
+        for line in ('Ritmo actualizado (auditado).', 'OPERATOR_INVITE_RAMP_START=0  [miembro]', 'OPERATOR_DAILY_LIMITS=  [entorno]'):
+            self.assertIn(line, out)
+        event = AuditEvent.objects.get(action='organization.member_settings')
+        self.assertEqual((event.actor, event.target, event.metadata), (self.g.user, str(self.cto.member.pk), {'before': {}, 'after': wanted}))
+        self.assertIn('Sin cambios', self.run_command('--fijar', 'OPERATOR_INVITE_RAMP_START=0'))
+        cto = Member.objects.get(pk=self.cto.member.pk)
+        self.assertEqual((autopiloto.autonomy('INT-03', cto), autopiloto.autonomy('INT-03', self.g.member)), ('approval', 'auto'))
+        self.assertEqual((red.ramp_limits(None, member=cto), red.ramp_limits(None, member=self.g.member)), ((5, 25), (16, 80)))
+        # Wrong input, or someone who is not the admin: nothing changes.
+        with patch.dict(os.environ, {'OPERATOR_WINDOW': '07:00-21:00'}):
+            for args, reason in ((('--fijar', 'OPERATOR_INVITE_RAMP_STAGES=30/150,16/80,20/100'), 'solo puede bajar'),
+                                 (('--fijar', 'NO_EXISTE=1'), 'Ajuste desconocido'),
+                                 (('--fijar', 'EDITORIAL_POST_TIME=23:30'), 'fuera de OPERATOR_WINDOW'),
+                                 (('--fijar', 'OPERATOR_DAILY_LIMITS=RED-09=3'), 'capacidad desconocida'),
+                                 (('--fijar', 'LINKEDIN_ACCOUNT_TIER=gold'), 'free, premium o sales_navigator'),
+                                 (('--fijar', 'OPERATOR_INVITE_RAMP_START=0', '--quitar', 'OPERATOR_INVITE_RAMP_START'), 'a la vez')):
+                with self.subTest(args=args), self.assertRaisesMessage(CommandError, reason):
+                    self.run_command(*args)
+        with self.assertRaisesMessage(CommandError, 'Solo el administrador'):
+            self.run_command('--fijar', 'OPERATOR_INVITE_RAMP_START=2', user='cto-test', member='gustavo-test')
+        self.assertEqual((Member.objects.get(pk=self.cto.member.pk).settings, Member.objects.get(pk=self.g.member.pk).settings),
+                         (wanted, {}))
+        self.assertEqual(AuditEvent.objects.filter(action='organization.member_settings').count(), 1)
+        self.run_command('--quitar', 'OPERATOR_AUTONOMY')  # back to the .env's
+        self.assertEqual(autopiloto.autonomy('INT-03', Member.objects.get(pk=self.cto.member.pk)), 'auto')
+
+
+class EstadoDeGustavoTests(OperatorBase):
+    """Production before phase 2: Gustavo's rhythm lives on audit events with target 'member'. Migration 0056 moves
+    nothing: his first member reads the very same rows (no reset), and a second member starts her own."""
+
+    def note(self, uid):
+        contact = Contact.objects.create(account=self.account, provider_user_id=uid, display_name=uid, source='manual')
+        proposal = ActionProposal.objects.create(
+            account=self.account, contact=contact, capability='RED-02', state='approved', payload_hash=uuid.uuid4().hex * 2,
+            payload={'user_id': uid, 'note': 'Your post on evals was useful.', 'note_reason': 'Shared work.'})
+        self.assertTrue(red.reserve_note(proposal))
+        ActionExecution.objects.create(proposal=ActionProposal.objects.create(
+            account=self.account, contact=contact, capability='RED-01', state='confirmed', payload={'user_id': uid},
+            payload_hash=uuid.uuid4().hex * 2), idempotency_key=uuid.uuid4().hex, provider='fake', state='confirmed',
+            executed_by=self.gustavo, started_at=timezone.now(), wrote=True)
+
+    def state(self, now, member=None):
+        """What his rhythm says now: ramp, notes left, profile reads, the schedule he waits for, spacing and caps."""
+        schedule = operador.policy_event('operator.schedule', member=member)
+        return {'ramp': red.ramp_state(now, member)['stage'], 'invitations': red.ramp_limits(None, now, member),
+                'notes_left': red.note_room(now, member), 'profile_reads': operador.profile_reads_used(member, now),
+                'schedule': schedule.pk if schedule else None, 'spacing_ok': operador.spacing_ok(self.account, now),
+                'follows_left': operador.capacity_left(self.account, 'RED-01', now)}
+
+    def events(self):
+        return sorted(AuditEvent.objects.exclude(action='organization.member_saved').values_list('action', 'target', 'id'))
+
+    def test_his_state_of_before_is_his_first_members_and_a_second_starts_her_own(self):
+        """Catch a reset on deploy: the ramp at stage 1, this month's notes, today's schedule and today's profile reads
+        written before organizations read exactly the same for his first member, with or without naming him, and with a
+        second active member; she starts fresh under her own key."""
+        self.spacing_patch.stop()
+        self.day_schedule_patch.stop()
+        now = timezone.now()
+        env = {'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT': '3', 'OPERATOR_MIN_SPACING_SECONDS': '1200', 'LINKEDIN_ACCOUNT_TIER': 'free'}
+        with patch.dict(os.environ, env):
+            operador._audit(None, 'network.ramp', 'member', stage=1, stage_since=(now - timedelta(days=3)).isoformat(),
+                            freeze_until=(now + timedelta(days=4)).isoformat(), pause_until=None, last_sample='', last_rate=0.5)
+            operador.prepare_day_schedule(now)
+            for _ in range(5):
+                operador.reserve_profile_read(self.account, 'antes', now)
+            self.note('antes-1')
+            self.note('antes-2')
+            before, rows = self.state(now), self.events()
+        self.assertEqual((before['ramp'], before['notes_left'], before['profile_reads'], before['follows_left']), (1, 1, 5, 18))
+        with override_settings(REFERENTS_GUSTAVO_USERNAME=self.gustavo.get_username()):
+            gustavo, _ = miembros.ensure_first_member()
+        self.account.refresh_from_db()
+        with patch.dict(os.environ, env):
+            self.assertEqual((self.state(now, gustavo), self.state(now)), (before, before))
+            operador.prepare_day_schedule(now, gustavo)  # today's opening is drawn already: not again
+            self.assertEqual(self.events(), rows)  # nothing moved, rewritten or added
+            user = User.objects.create_user('cto-test', password='local-only-password')
+            self.grant(user, *ALL)
+            cto = Member.objects.create(organization=gustavo.organization, user=user, display_name='CTO de prueba', role='CTO')
+            operador.register_account(user, 'fake', 'acc_fake_cto', 'Cuenta simulada del CTO')
+            self.assertEqual(self.state(now, gustavo), before)
+            self.assertEqual((red.ramp_state(now, cto)['stage'], red.note_room(now, cto), operador.profile_reads_used(cto, now),
+                              operador.policy_event('operator.schedule', member=cto)), (1, 3, 0, None))
+            self.assertEqual(miembros.policy_key(cto), f'member:{cto.pk}')
+
+
+class VigilantesTests(OperatorBase):
+    """Every Slack watcher without members, with one member and with two active members (the CI of phase 1: a watcher
+    that cannot name a member must neither fail nor silence the others). Slack is an httpx.MockTransport."""
+
+    def setUp(self):
+        super().setUp()
+        env = patch.dict(os.environ, {
+            'SLACK_WEBHOOK_URL': 'https://hooks.slack.test/services/ALERTAS', 'SLACK_WEBHOOK_RESUMEN': '',
+            'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1', 'OPERATOR_DAILY_LIMITS': 'RED-01=1', 'OPERATOR_AUTONOMY': 'RED-01=approval',
+            'OPERATOR_PROPOSAL_TTL_HOURS': '48', 'AI_MONTHLY_LIMIT_USD': '1', 'AI_DAILY_FUSE_USD': '1000',
+            'BUYER_REPLY_ENABLED': 'true', 'BUYER_SEQUENCE_ENABLED': 'true', 'CALCOM_BOOKING_URL': ''})
+        env.start()
+        self.addCleanup(env.stop)
+        self.sent = []
+
+        def slack(request):
+            self.sent.append(json.loads(request.content)['text'])
+            return httpx.Response(200)
+        transport = patch.object(alertas_slack, 'TRANSPORT', httpx.MockTransport(slack))
+        transport.start()
+        self.addCleanup(transport.stop)
+        alertas_slack._watched_at = None
+        self.now = timezone.now()
+
+    def troubles(self, user, account):
+        """What a member's own watchers report: her profile reads and a write cap spent today, her ramp paused and her
+        account paused by LinkedIn's 429, a proposal of hers in «approval» about to expire."""
+        operador.reserve_profile_read(account, 'vigilantes', self.now)
+        contact = Contact.objects.create(account=account, provider_user_id=f'v-{uuid.uuid4().hex[:8]}', display_name='P', source='manual')
+
+        def proposal(capability, state, **fields):
+            return ActionProposal.objects.create(account=account, contact=contact, capability=capability, state=state,
+                                                 payload={'user_id': contact.provider_user_id}, payload_hash=uuid.uuid4().hex * 2, **fields)
+        ActionExecution.objects.create(proposal=proposal('RED-01', 'confirmed'), idempotency_key=uuid.uuid4().hex, provider='fake',
+                                       state='confirmed', executed_by=user, started_at=self.now, wrote=True)
+        red.provider_failure(account, proposal('RED-02', 'approved'), ConnectorError('throttle', status=429, kind='rate_limit', pause=True))
+        proposal('RED-01', 'proposed', created_at=self.now - timedelta(hours=40))
+
+    def watchers(self):
+        """Every watcher called by itself: none may raise. [(watcher, key, text)]; a lazy text stays unbuilt."""
+        alerts = []
+        for watcher in alertas_slack.WATCHERS:
+            for alert in watcher(self.now) or ():
+                alerts.append((watcher.__name__, alert.key, '<lazy>' if callable(alert.text) else alert.text))
+        return alerts
+
+    def test_every_watcher_with_no_member_one_member_and_two(self):
+        from knowledge import db
+        self.troubles(self.gustavo, self.account)
+        with db.connect() as c:  # the month's AI spend over AI_MONTHLY_LIMIT_USD: the organization's, one alert
+            c.execute("INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,actual_usd,status,usage,created_at) "
+                      "VALUES(%s,'anthropic','prueba',2,2,'complete','{}',%s)", (str(uuid.uuid4()), self.now))
+        AuditEvent.objects.create(action='buyer.reply_no_link', target=str(uuid.uuid4()), created_at=self.now - timedelta(minutes=1),
+                                  metadata={'tipo': 'interesado'})
+        nobody = self.watchers()
+        his = {'cupos_de_lectura': 'cupo:perfiles.profile:agotado', 'cupos_de_escritura': 'cupo:escritura.RED-01:agotado',
+               'propuestas_por_caducar': 'tuturno:caducan'}
+        keys = {(name, key) for name, key, _ in nobody}
+        self.assertTrue(set(his.items()) <= keys, keys)
+        self.assertTrue({'rampa_en_pausa', 'cuenta_en_pausa', 'gasto_ia', 'falta_enlace_agenda'} <= {name for name, _ in keys}, keys)
+        # One member (ensure_first_member, the rule of migration 0055): exactly the same keys and texts.
+        with override_settings(REFERENTS_GUSTAVO_USERNAME=self.gustavo.get_username()):
+            gustavo, _ = miembros.ensure_first_member()
+        self.account.refresh_from_db()
+        self.assertEqual(self.watchers(), nobody)
+        # Two active members, the CTO with the same troubles: nothing fails, his alerts keep their keys and say his
+        # name, hers carry her id and her name, and what is the organization's goes once.
+        user = User.objects.create_user('cto-test', password='local-only-password')
+        self.grant(user, *ALL)
+        cto = Member.objects.create(organization=gustavo.organization, user=user, display_name='CTO de prueba', role='CTO')
+        hers = operador.register_account(user, 'fake', 'acc_fake_cto', 'Cuenta simulada del CTO')
+        self.troubles(user, hers)
+        both = self.watchers()
+        by_key = {key: (name, text) for name, key, text in both}
+        for name, key, text in nobody:
+            with self.subTest(watcher=name):
+                self.assertIn(key, by_key)
+                if name in ('gasto_ia', 'falta_enlace_agenda'):
+                    self.assertEqual(by_key[key][1], text)  # the organization's: once, nobody's name
+                    self.assertEqual([k for n, k, _ in both if n == name], [key])
+                elif text != '<lazy>':
+                    self.assertTrue(by_key[key][1].startswith('Barrio · Gustavo · '), by_key[key][1])
+        for name, key in his.items():
+            with self.subTest(watcher=name):
+                self.assertTrue(by_key[f'{key}:{cto.pk}'][1].startswith('Barrio · CTO de prueba · '))
+        self.assertTrue(any(n == 'rampa_en_pausa' and k.endswith(f':{cto.pk}') and t.startswith('Barrio · CTO de prueba · ')
+                            for n, k, t in both))
+        self.assertTrue(any(n == 'cuenta_en_pausa' and k.startswith(f'pausa:cuenta:{hers.id}:') and 'CTO de prueba' in t
+                            for n, k, t in both))
+        # One member's failing reader never silences the other's alerts.
+        ramp_state = red.ramp_state
+
+        def broken(now=None, member=None):
+            if member is not None and member.pk == cto.pk:
+                raise RuntimeError('rota')
+            return ramp_state(now, member)
+        with patch('team_backend.red.ramp_state', side_effect=broken), self.assertLogs('team_backend.alertas_slack', 'WARNING'):
+            self.assertEqual([k for k in (a.key for a in alertas_slack.rampa_en_pausa(self.now))],
+                             [k for n, k, _ in nobody if n == 'rampa_en_pausa'])
+        # vigilar sends every one of them, each once.
+        alertas_slack.vigilar(self.now, force=True)
+        alertas_slack.vigilar(self.now, force=True)
+        sent = set(AuditEvent.objects.filter(action='slack.alert').values_list('target', flat=True))
+        self.assertTrue({key for _, key, text in both if text != '<lazy>'} <= sent)
+        self.assertEqual(len(self.sent), len(sent))

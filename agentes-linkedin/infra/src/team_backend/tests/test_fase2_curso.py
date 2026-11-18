@@ -5,13 +5,15 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone as utc
 from unittest.mock import patch
 
+from django.contrib.auth.models import User
 from django.db import close_old_connections
 from django.apps import apps
+from django.test import override_settings
 from django.utils import timezone
 
-from team_backend import conversaciones, evaluaciones, lider, metricas, operador, red, resumen_semanal
+from team_backend import conversaciones, evaluaciones, lider, metricas, miembros, operador, red, resumen_semanal
 from team_backend.connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota
-from team_backend.models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, Conversation
+from team_backend.models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, Conversation, Member
 from team_backend.tests.test_red import NetworkBase
 
 
@@ -36,6 +38,21 @@ class ParticipationTests(NetworkBase):
         env.start();self.addCleanup(env.stop)
         notice=patch('team_backend.notificaciones.avisar')
         self.notice=notice.start();self.addCleanup(notice.stop)
+
+    def first_member(self):
+        """Organizaciones, phase 2: what is shared is one MEMBER's (every connector of hers), not the installation's.
+        Gustavo becomes the first member (the rule of migration 0055) and owns this account."""
+        with override_settings(REFERENTS_GUSTAVO_USERNAME=self.gustavo.get_username()):
+            member,_=miembros.ensure_first_member()
+        self.account.refresh_from_db()
+        return member
+
+    def another_members_account(self):
+        """A second active member (created after him: the clock is frozen) with her own connector."""
+        first=Member.objects.get()
+        user=User.objects.create_user('cto-fase2',password='local-only-password')
+        cto=Member.objects.create(organization=first.organization,user=user,display_name='CTO',role='CTO',created_at=self.now+timedelta(seconds=1))
+        return ConnectorAccount.objects.create(provider='fake',external_account_id='acc_cto',label='Otra persona',member=cto)
 
     def approved(self,person=None,note=False,cap='RED-02'):
         person=person or self.contact('person-'+str(Contact.objects.count()),'Person',stage='followed',followed_hours=72)
@@ -101,8 +118,9 @@ class ParticipationTests(NetworkBase):
             self.assertTrue(operador.within_window(self.now.replace(hour=12,minute=0)))
             self.assertFalse(operador.within_window(self.now.replace(hour=2,minute=0)))
 
-    def test_gap_is_persistent_shared_and_not_redrawn_by_retry(self):
+    def test_gap_is_persistent_shared_by_her_connectors_and_not_redrawn_by_retry(self):
         self.spacing_patch.stop()
+        member=self.first_member()
         with patch('team_backend.operador.random.SystemRandom') as rng:
             rng.return_value.randint.return_value=1801
             first=self.approved();operador.execute(self.gustavo,first.id)
@@ -111,9 +129,11 @@ class ParticipationTests(NetworkBase):
             with self.assertRaises(operador.OperatorBlocked):operador.execute(self.gustavo,second.id)
             self.assertEqual(operador.policy_event('operator.schedule').metadata['next_action_at'],next_at)
             self.assertEqual(rng.return_value.randint.call_count,1)
-            other=ConnectorAccount.objects.create(provider='linkedin_fake',external_account_id='other',label='Same member')
+            other=ConnectorAccount.objects.create(provider='linkedin_fake',external_account_id='other',label='Same member',member=member)
             self.assertFalse(operador.spacing_ok(other,self.now+timedelta(seconds=1800)))
             self.assertTrue(operador.spacing_ok(other,self.now+timedelta(seconds=1801)))
+            # Another member's connector never waits for his gap (organizaciones, phase 2).
+            self.assertTrue(operador.spacing_ok(self.another_members_account(),self.now+timedelta(seconds=60)))
 
     def test_opening_time_varies_even_if_rng_repeats_and_preserves_pending_wait(self):
         self.day_schedule_patch.stop()
@@ -221,8 +241,9 @@ class ParticipationTests(NetworkBase):
         self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
         self.assertEqual(self.fake.state['writes'],0)
 
-    def test_profile_reads_share_atomic_ceiling_across_accounts_and_paths(self):
-        other=ConnectorAccount.objects.create(provider='fake',external_account_id='acc_other',label='Other connector')
+    def test_profile_reads_share_atomic_ceiling_across_her_connectors_and_paths(self):
+        other=ConnectorAccount.objects.create(provider='fake',external_account_id='acc_other',label='Other connector',
+                                              member=self.first_member())
         AuditEvent.objects.bulk_create([AuditEvent(action='operator.profile_read',target='member',metadata={}) for _ in range(79)])
         def attempt(account):
             close_old_connections()
@@ -240,6 +261,7 @@ class ParticipationTests(NetworkBase):
         with patch.dict(os.environ,{'OPERATOR_PROFILE_READ_DAILY_LIMIT':'1000'}):
             for _ in range(20):operador.reserve_profile_read(self.account,'test')
             with self.assertRaises(operador.ProfileReadCapReached):operador.reserve_profile_read(self.account,'test')
+        operador.reserve_profile_read(self.another_members_account(),'test')  # another member reads under her own ceiling
 
     def test_deployment_preserves_legacy_profile_usage_without_double_charging_new_reads(self):
         AuditEvent.objects.bulk_create([AuditEvent(action='network.read',target=str(self.account.id),metadata={'kind':'profile'}) for _ in range(79)])
