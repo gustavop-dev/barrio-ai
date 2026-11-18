@@ -573,7 +573,7 @@ def run(user,month_start,origin_job='',member=None):
     waiting=(f'{count} cambio de estrategia espera tu decisión en Tu turno.' if count==1 else
              f'{count} cambios de estrategia esperan tu decisión en Tu turno.' if count else 'Este mes no propone cambios de estrategia.')
     avisar('monthly_review',f'Revisión de {label(month_start)}',f'{analysis["titular"]} · {waiting}',link=LINK,
-           ref=f'monthly_review:{month_start.isoformat()}'+resumen_semanal._ref_part(member))
+           ref=f'monthly_review:{month_start.isoformat()}'+resumen_semanal._ref_part(member),member=member)
     audit(user,'monthly_review.created',review.id,month=month_start.isoformat(),changes=count,partial=review.partial,
           dropped=len(analysis['validacion']['descartado']),previous=len(data['cambios_previos']))
     return review
@@ -701,13 +701,15 @@ def payload(review,with_stats=False):
     if with_stats:out['stats']=data
     return out
 
-def latest():
-    return MonthlyReview.objects.first()
+def latest(member=None):
+    """Her latest review (`member=None`: anyone's, an installation without members)."""
+    return _reviews(member).first()
 
-def cards(card):
-    """Tu turno: one card per change of the latest review that waits for Gustavo («cuando puedas»). Deciding it closes the
+def cards(card,member=None):
+    """Tu turno: one card per change of her latest review that waits for her («cuando puedas»). Deciding it closes the
     card. A change left undecided when the next review arrives leaves Tu turno and stays decidable from Resultados."""
-    review=latest()
+    from . import alcance
+    review=latest(alcance._require(member))
     if review is None:return []
     out=[]
     for change in review.changes.filter(state=StrategyChange.State.PROPOSED).select_related('decided_by').order_by('position'):

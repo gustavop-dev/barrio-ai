@@ -12,7 +12,7 @@ Only Gustavo creates the opportunity (PRS-09): the handoff's Tu turno card «Cre
 that person. An opportunity he creates by hand from Personas links the handoff too (on_opportunity)."""
 from django.db import transaction
 from django.utils import timezone
-from . import comprador, identidad, operador
+from . import alcance, comprador, identidad, operador
 from .exceptions import Conflict
 from .models import BuyerDraft, BuyerTouch, Contact, LeadHandoff, Opportunity
 from .permissions import require
@@ -209,8 +209,9 @@ def payload(handoff):
             'conversacion_id':str(handoff.conversation_id) if handoff.conversation_id else None,
             'creada':_iso(handoff.created_at),'actualizada':_iso(handoff.updated_at),'confirmada':_iso(handoff.confirmed_at)}
 
-def listing(state=None,source=None,limit=100):
-    rows=LeadHandoff.objects.select_related('opportunity').order_by('-created_at')
+def listing(state=None,source=None,limit=100,member=None):
+    """Her handoffs (alcance.de: those of her buyers; a handoff without a person is the first member's)."""
+    rows=alcance.de(LeadHandoff.objects.all(),member).select_related('opportunity').order_by('-created_at')
     if state:
         if state not in State.values:raise ValueError('estado debe ser lista, confirmada o cancelada')
         rows=rows.filter(state=state)
@@ -219,12 +220,12 @@ def listing(state=None,source=None,limit=100):
         rows=rows.filter(source=source)
     return [payload(h) for h in rows[:limit]]
 
-def cards(card,now=None):
-    """Tu turno: each lead ready to hand over, with «Crear la oportunidad» (or «Vincular la oportunidad») first."""
+def cards(card,now=None,member=None):
+    """Tu turno: each lead of hers ready to hand over, with «Crear la oportunidad» (or «Vincular la oportunidad») first."""
     from . import respuesta_comprador
     if not respuesta_comprador.enabled():return []
     out=[]
-    for handoff in LeadHandoff.objects.select_related('contact').filter(state=State.READY).order_by('created_at'):
+    for handoff in alcance.de(LeadHandoff.objects.all(),member).select_related('contact').filter(state=State.READY).order_by('created_at'):
         contact=handoff.contact
         if contact is None:continue
         name=contact.display_name or 'Alguien';existing=_open(contact)

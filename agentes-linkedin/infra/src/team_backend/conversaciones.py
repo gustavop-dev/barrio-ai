@@ -18,7 +18,7 @@ from urllib.parse import quote
 from django.db import transaction
 from django.utils import timezone
 from knowledge import providers
-from . import identidad, operador
+from . import alcance, identidad, operador
 from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit
@@ -174,10 +174,11 @@ def payload(conversation,now=None,messages=3):
 def for_contact(contact):
     return contact.conversations.order_by('-last_message_at').first()
 
-def needing_gustavo(now=None):
+def needing_gustavo(now=None,member=None):
+    """Her conversations that wait for her (alcance.de: `member=None` only without members)."""
     if not enabled():return []
     now=now or timezone.now()
-    rows=(Conversation.objects.select_related('contact').filter(last_from_me=False,last_message_at__gte=now-max_age())
+    rows=(alcance.de(Conversation.objects.all(),member).select_related('contact').filter(last_from_me=False,last_message_at__gte=now-max_age())
           .exclude(assessment={}).order_by('-last_message_at'))
     return [c for c in rows if needs_gustavo(c,now)]
 
@@ -345,9 +346,9 @@ def assess(conversation,now=None):
 
 def _push(conversation):
     """One push per new inbound message (its assessment runs once). No message text: it may reach a webhook."""
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     name=conversation.attendee_name or (conversation.contact.display_name if conversation.contact else 'Alguien')
-    avisar('conversation',f'{name} te escribió',why(conversation),link='/tu-turno')
+    avisar('conversation',f'{name} te escribió',why(conversation),link='/tu-turno',member=de_cuenta(conversation.account))  # hers only
 
 # --------------------------------------------------------------------------- Gustavo closes the card
 
@@ -363,10 +364,12 @@ def close(user,conversation_id,how,note=''):
     audit(user,'conversation.closed',conversation.id,how=how,note=(note or '')[:300],message_id=inbound['id'])
     return conversation
 
-def recently_resolved(days=7):
-    """Tu turno → Hecho recientemente: cards Gustavo closed, and conversations he answered on LinkedIn."""
+def recently_resolved(days=7,member=None):
+    """Tu turno → Hecho recientemente: cards Gustavo closed, and conversations he answered on LinkedIn (hers only)."""
     since=timezone.now()-timedelta(days=days);out=[]
-    events=AuditEvent.objects.filter(created_at__gte=since,action__in=['conversation.closed','conversation.replied']).order_by('-created_at')[:30]
+    events=list(AuditEvent.objects.filter(created_at__gte=since,action__in=['conversation.closed','conversation.replied']).order_by('-created_at'))
+    hers=alcance.suyos(Conversation,member,[e.target for e in events])
+    events=[e for e in events if e.target in hers][:30]
     names={str(k):v for k,v in Conversation.objects.filter(id__in=[e.target for e in events]).values_list('id','attendee_name')}
     for event in events:
         name=names.get(event.target) or 'Alguien'

@@ -690,7 +690,7 @@ def run(user,week_start,origin_job='',member=None):
     oficina_eventos.emit('entrega',ROLE,'director_editorial',f'Resumen de la semana {_week_label(week_start)}')
     from .notificaciones import avisar
     avisar('weekly_summary',f'Resumen de la semana {_week_label(week_start)}',analysis['titular'],link='/resultados#resumen',
-           ref=f'weekly_summary:{week_start.isoformat()}'+_ref_part(member))
+           ref=f'weekly_summary:{week_start.isoformat()}'+_ref_part(member),member=member)
     audit(user,'weekly_summary.created',summary.id,week=week_start.isoformat(),dropped=len(analysis['validacion']['descartado']))
     return summary
 

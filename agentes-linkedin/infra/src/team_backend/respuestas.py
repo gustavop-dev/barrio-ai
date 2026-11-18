@@ -35,7 +35,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import providers
-from . import identidad, idioma, miembros, operador, voz
+from . import alcance, identidad, idioma, miembros, operador, voz
 from .connectors import ConnectorError, deferred, get_connector, same_text
 from .exceptions import Conflict
 from .models import ActionExecution, ActionProposal, AuditEvent, Contact, PostComment, TeamQuestion
@@ -861,11 +861,12 @@ def on_confirmed(proposal,execution):
 
 # --------------------------------------------------------------------------- the drafted first message (Tu turno)
 
-def _dm_rows():
+def _dm_rows(member):
     """Comments where the team closed a second reply with someone who is now a connection, and Gustavo has not decided
     about the drafted message yet: one per person, the latest. Only a message the lead approved in the review of that same
-    confirmed reply (review.dm_approved, BIB-09-primer-mensaje): with no lead review there is no card."""
-    rows=(PostComment.objects.select_related('contact','piece').filter(own=False,state=PostComment.State.REPLY,decision__turn=2,
+    confirmed reply (review.dm_approved, BIB-09-primer-mensaje): with no lead review there is no card. `member`: hers only
+    (alcance.de); alcance.TODOS for the machine's own readings."""
+    rows=(alcance.de(PostComment.objects.all(),member).select_related('contact','piece').filter(own=False,state=PostComment.State.REPLY,decision__turn=2,
           decision__has_key='dm_opener',proposals__capability=REPLY,proposals__state='confirmed',
           proposals__review__dm_approved=True)
           .filter(Q(contact__stage='connected')|Q(contact__network_distance='FIRST_DEGREE'))
@@ -879,13 +880,13 @@ def card_id(row):
 
 def on_connected(contact):
     """Someone who conversed on his post is now a connection: Tu turno has a drafted first message (push once)."""
-    for row in _dm_rows():
+    for row in _dm_rows(alcance.TODOS):
         if row.contact_id!=contact.pk:continue
         if AuditEvent.objects.filter(action='replies.dm_ready',target=str(row.id)).exists():continue  # pushed once
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_cuenta
         topic=_topic(row.piece)
         avisar('dm_ready',f'{contact.display_name or row.author_name} y tú ya están conectados',
-               f'Venían hablando de «{topic}» en tu post. Tienes un primer mensaje redactado en la Bandeja.')
+               f'Venían hablando de «{topic}» en tu post. Tienes un primer mensaje redactado en la Bandeja.',member=de_cuenta(row.account))
         _audit(None,'replies.dm_ready',row.id,contact=str(contact.pk))
 
 def _topic(piece):
@@ -895,10 +896,11 @@ def _team_reply(row):
     proposal=row.proposals.filter(capability=REPLY,state='confirmed').order_by('-created_at').first()
     return proposal.payload.get('text','') if proposal else ''
 
-def cards(card,now=None):
-    """Tu turno «Mensaje sugerido»: the team never sends it; Gustavo opens the profile, sends it himself and says so."""
+def cards(card,now=None,member=None):
+    """Tu turno «Mensaje sugerido»: the team never sends it; Gustavo opens the profile, sends it himself and says so.
+    Hers only (alcance.de: `member=None` only without members)."""
     out=[]
-    for row in _dm_rows():
+    for row in _dm_rows(member):
         contact=row.contact;name=contact.display_name or row.author_name;decision=row.decision or {}
         replied=decision.get('replied_at')
         accepted=bool(contact.connected_at and replied and contact.connected_at.isoformat()>=replied)
@@ -937,10 +939,12 @@ def close_dm(user,comment_id,how,note_text=''):
         _audit(user,'replies.dm_closed',row.id,how=how)
     return row
 
-def recently_resolved(days=7):
-    """Tu turno → Hecho recientemente: the suggested messages Gustavo closed."""
+def recently_resolved(days=7,member=None):
+    """Tu turno → Hecho recientemente: the suggested messages Gustavo closed (hers only)."""
     since=timezone.now()-timedelta(days=days)
-    events=list(AuditEvent.objects.filter(action='replies.dm_closed',created_at__gte=since).order_by('-created_at')[:20])
+    events=list(AuditEvent.objects.filter(action='replies.dm_closed',created_at__gte=since).order_by('-created_at'))
+    hers=alcance.suyos(PostComment,member,[e.target for e in events])
+    events=[e for e in events if e.target in hers][:20]
     names={str(k):v for k,v in PostComment.objects.filter(id__in=[e.target for e in events]).values_list('id','author_name')}
     return [{'kind':'mensaje','id':f'dm:{e.target}','title':f'Mensaje sugerido para {names.get(e.target) or "alguien"}','at':e.created_at,
              'how':'Le escribiste' if (e.metadata or {}).get('how')=='enviado' else 'No le escribiste'} for e in events]

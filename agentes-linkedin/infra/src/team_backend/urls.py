@@ -38,7 +38,7 @@ urlpatterns=[
  path('integrity',views.Integrity.as_view()),path('audit',views.Audit.as_view()),
  # Account operator (DESC-04, INT-02, INT-03, ADM-04/05).
  # Self-hosted office PWA (oficina/CONTRATO-API.md).
- path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
+ path('yo',of.Yo.as_view()),path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
  path('operador/overview',of.Overview.as_view()),path('operador/control',of.Control.as_view()),
  path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),path('oficina/eventos',of.Eventos.as_view()),
  path('push/key',of.PushKey.as_view()),path('push/subscriptions',of.PushSubscriptions.as_view()),

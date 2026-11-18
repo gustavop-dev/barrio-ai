@@ -38,7 +38,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from knowledge import providers
-from . import calentamiento, comprador, identidad, idioma, operador, projectapp, voz
+from . import alcance, calentamiento, comprador, identidad, idioma, operador, projectapp, voz
 from .exceptions import Conflict
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Job
 from .permissions import require
@@ -591,7 +591,7 @@ def _messages(account,now):
     waits, and once Gustavo closed it either way. Per attempt: a buyer woken from a rest (a new attempt) gets a new first
     message; what was written in an earlier attempt does not count."""
     from .respuestas import _dm_rows
-    rsp={row.contact_id for row in _dm_rows()}
+    rsp={row.contact_id for row in _dm_rows(alcance.TODOS)}
     decided=0;item=None
     rows=BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.ACCEPTED).order_by('accepted_at')
     for journey in rows:
@@ -649,12 +649,13 @@ def _retire(account,now):
 
 def _announce(account,now):
     """Push once when a first message's card shows in Tu turno (dm_ready, like RSP-07's)."""
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_cuenta
     for row in BuyerDraft.objects.select_related('contact').filter(contact__account=account,kind=MESSAGE,number=1,state=State.READY,
                                                                    show_at__lte=now):
         if AuditEvent.objects.filter(action='buyer.dm_ready',target=str(row.pk)).exists():continue
         name=row.contact.display_name or 'Alguien'
-        avisar('dm_ready',f'{name} aceptó tu invitación','El equipo te dejó un primer mensaje en la Bandeja; lo envías tú desde LinkedIn.')
+        avisar('dm_ready',f'{name} aceptó tu invitación','El equipo te dejó un primer mensaje en la Bandeja; lo envías tú desde LinkedIn.',
+               member=de_cuenta(account))
         _audit(None,'buyer.dm_ready',row.pk,contact=str(row.contact_id))
 
 def step(account,now=None):
@@ -732,15 +733,15 @@ def _card_body(anchor):
           'puente':'Un colega suyo de su empresa (el puente) conectó con el equipo y ella aceptó tu invitación.'}.get(kind,'Aceptó tu invitación.')
     return lead+' El equipo te dejó un primer mensaje; lo envías tú desde LinkedIn. «No escribirle» la saca del recorrido.'
 
-def cards(card,now=None):
+def cards(card,now=None,member=None):
     """Tu turno «Mensaje sugerido» for the journey's first message: one card per person, from show_at on, never while a
-    conversation on his post has its own card (RSP-07 wins). Same actions and endpoint as RSP-07's."""
+    conversation on his post has its own card (RSP-07 wins). Same actions and endpoint as RSP-07's. Hers only."""
     if not enabled():return []
     now=now or timezone.now()
     from .respuestas import _dm_rows
-    rsp={row.contact_id for row in _dm_rows()}
+    rsp={row.contact_id for row in _dm_rows(member)}
     out=[]
-    rows=(BuyerDraft.objects.select_related('contact__buyer_journey').filter(kind=MESSAGE,number=1,state=State.READY)
+    rows=(alcance.de(BuyerDraft.objects.all(),member).select_related('contact__buyer_journey').filter(kind=MESSAGE,number=1,state=State.READY)
           .filter(Q(show_at__isnull=True)|Q(show_at__lte=now)).order_by('show_at','created_at'))
     for row in rows:
         contact=row.contact;journey=getattr(contact,'buyer_journey',None)
@@ -753,7 +754,7 @@ def cards(card,now=None):
                  {'label':'No escribirle','endpoint':close,'body':{'how':'no'},'note_optional':True}]
         out.append(card(f'dm:{row.id}','mensaje',f'{name} aceptó tu invitación',_card_body(anchor),actions,agent=AGENT,
                         priority='importante',created_at=row.show_at or row.decided_at,
-                        message={'text':row.text,'comment':(anchor.get('texto') or '')[:600],'reply':(anchor.get('comentario_del_equipo') or '')[:900],
+                        message={**voz.marca(row),'text':row.text,'comment':(anchor.get('texto') or '')[:600],'reply':(anchor.get('comentario_del_equipo') or '')[:900],
                                  'comment_label':labels[0],'reply_label':labels[1],'piece_id':'','topic':'','origin':'recorrido',
                                  'person':{'id':str(contact.id),'display_name':name,'headline':contact.headline,
                                            'profile_url':contact.profile_url,'role':(contact.classification or {}).get('role')}}))
@@ -784,10 +785,12 @@ def close(user,draft_id,how,note_text=''):
         _audit(user,'buyer.dm_closed',row.pk,how=how,contact=str(contact.pk))
     return row
 
-def recently_resolved(days=7):
-    """Tu turno → Hecho recientemente: the journey's messages Gustavo closed (the first one and the follow-ups)."""
+def recently_resolved(days=7,member=None):
+    """Tu turno → Hecho recientemente: the journey's messages Gustavo closed (the first one and the follow-ups); hers."""
     since=timezone.now()-timedelta(days=days)
-    events=list(AuditEvent.objects.filter(action='buyer.dm_closed',created_at__gte=since).order_by('-created_at')[:20])
+    events=list(AuditEvent.objects.filter(action='buyer.dm_closed',created_at__gte=since).order_by('-created_at'))
+    hers=alcance.suyos(BuyerDraft,member,[e.target for e in events])
+    events=[e for e in events if e.target in hers][:20]
     rows={str(k):(name,number) for k,name,number in BuyerDraft.objects.filter(id__in=[e.target for e in events])
           .values_list('id','contact__display_name','number')}
     def title(target):

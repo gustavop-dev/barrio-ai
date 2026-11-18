@@ -115,6 +115,13 @@ def meta(member=None):
     return current(member).meta
 
 
+def marca(row):
+    """{'provisional_voice': True} for a draft written in a member's provisional voice (its `voice`, meta above), so the
+    apps show «Voz provisional» (organizaciones, phase 5); nothing otherwise: a draft of a confirmed or the initial voice
+    reads exactly as before."""
+    return {'provisional_voice': True} if (getattr(row, 'voice', None) or {}).get('tipo') == PROVISIONAL_KIND else {}
+
+
 # --------------------------------------------------------------------------- the voice documents
 
 def documents(member):

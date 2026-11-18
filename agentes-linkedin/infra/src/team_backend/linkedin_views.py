@@ -12,7 +12,7 @@ from django.views.decorators.http import require_GET
 from urllib.parse import urlencode
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import connectors_linkedin as li, miembros
+from . import alcance, connectors_linkedin as li
 from .connectors import ConnectorError
 from .jobs import audit
 from .operador_views import human_session
@@ -73,4 +73,4 @@ def oauth_callback(request):
 class Status(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(li.status_payload(member=miembros.member_for(request.user)))
+        return Response(li.status_payload(member=alcance.miembro(request)))  # her LinkedIn

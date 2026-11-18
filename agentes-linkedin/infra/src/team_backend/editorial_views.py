@@ -14,10 +14,7 @@ from .permissions import require
 from .serializers import ActionOutput, JobOutput, OptionalRequestInput, OverrideInput
 from .exceptions import Conflict
 
-def provisional(row):
-    """{'provisional_voice': True} for a draft written in a member's provisional voice (phase 3 stores it in `voice`), so the
-    apps show «Voz provisional»; nothing otherwise (Gustavo's answers stay as they were)."""
-    return {'provisional_voice':True} if (getattr(row,'voice',None) or {}).get('tipo')=='provisional' else {}
+from .voz import marca as provisional  # «Voz provisional» on her drafts (organizaciones, phase 5)
 
 def summary(piece,action):
     brief=piece.brief or {};execution=getattr(action,'execution',None) if action is not None else None

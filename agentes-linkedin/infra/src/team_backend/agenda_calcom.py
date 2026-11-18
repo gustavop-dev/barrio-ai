@@ -32,7 +32,7 @@ from datetime import datetime, time
 from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from . import comprador, operador
+from . import alcance, comprador, operador
 from .exceptions import Conflict
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Conversation, MeetingBooking
 from .permissions import require
@@ -287,20 +287,23 @@ def associate(user,booking_id,journey_id=None,discard=False):
 
 # --------------------------------------------------------------------------- Tu turno and Slack
 
-def unmatched():
-    return MeetingBooking.objects.filter(state=State.BOOKED,journey__isnull=True).order_by('created_at')
+def unmatched(member=None):
+    """Bookings nobody matched. One Cal.com link, the first member's: a booking without a person is hers
+    (alcance.DUENO); alcance.TODOS for the machine's own readers."""
+    return alcance.de(MeetingBooking.objects.all(),member).filter(state=State.BOOKED,journey__isnull=True).order_by('created_at')
 
-def candidates(limit=5):
-    """The buyers a booking may be from: who got the link and has not booked, latest reply first."""
-    return list(_with_link().filter(step__in=[Step.REPLIED,Step.INTERESTED,Step.RESTING]).order_by('-last_inbound_at')[:limit])
+def candidates(limit=5,member=None):
+    """The buyers a booking may be from: who got the link and has not booked, latest reply first (hers)."""
+    return list(alcance.de(_with_link(),member).filter(step__in=[Step.REPLIED,Step.INTERESTED,Step.RESTING]).order_by('-last_inbound_at')[:limit])
 
-def cards(card,now=None):
-    """Tu turno: each booking nobody matched, with the buyers who got the link as buttons and «No es de un comprador»."""
+def cards(card,now=None,member=None):
+    """Tu turno: each booking nobody matched, with the buyers who got the link as buttons and «No es de un comprador».
+    Hers only: the bookings without a person go to the first member, whose Cal.com link it is."""
     from . import respuesta_comprador
     if not respuesta_comprador.enabled():return []
     out=[];people=None
-    for booking in unmatched():
-        people=candidates() if people is None else people
+    for booking in unmatched(member):
+        people=candidates(member=member) if people is None else people
         when=booking.start_at.astimezone(operador.local_tz()).strftime('%d/%m %H:%M') if booking.start_at else 'sin fecha'
         who=' · '.join(x for x in (booking.attendee_name,booking.attendee_email) if x) or 'sin nombre'
         endpoint=f'/api/v1/comprador/reservas/{booking.pk}/emparejar'

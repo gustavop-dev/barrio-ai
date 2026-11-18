@@ -38,7 +38,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import comprador, identidad, operador
+from . import alcance, comprador, identidad, operador, voz
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation
 
 log=logging.getLogger(__name__)
@@ -409,13 +409,13 @@ BODIES={2:'No ha respondido a tu primer mensaje. El equipo te dejó el mensaje 2
 def label(number):
     return f'Seguimiento {number} de {LAST}'
 
-def cards(card,now=None):
-    """Tu turno: the follow-ups ready for Gustavo, the same card as the first message's («Hecho, le escribí», «No
+def cards(card,now=None,member=None):
+    """Tu turno (hers only, alcance.de): the follow-ups ready for Gustavo, the same card as the first message's («Hecho, le escribí», «No
     escribirle», same endpoint) with its label «Seguimiento n de 4» and what he sent last. Never when she replied, when
     her journey moved on, or without an inbox read in the last CARD_INBOX_MAX_AGE (her reply could be there)."""
     if not enabled():return []
     now=now or timezone.now()
-    rows=(BuyerDraft.objects.select_related('contact__buyer_journey','contact__account')
+    rows=(alcance.de(BuyerDraft.objects.all(),member).select_related('contact__buyer_journey','contact__account')
           .filter(kind=MESSAGE,number__gt=1,state=State.READY).filter(Q(show_at__isnull=True)|Q(show_at__lte=now))
           .order_by('show_at','created_at'))
     out=[];inbox={}
@@ -437,7 +437,7 @@ def cards(card,now=None):
         sent_label=f'Tu mensaje {last.get("numero",row.number-1)}'+(f' (hace {ago} días)' if ago is not None else '')
         out.append(card(f'dm:{row.id}','mensaje',f'{label(row.number)} para {name}',body,actions,agent='relaciones_comunidad',
                         priority='importante',created_at=row.show_at or row.decided_at,
-                        message={'text':row.text,'text_label':label(row.number),'comment':(last.get('texto') or '')[:600],
+                        message={**voz.marca(row),'text':row.text,'text_label':label(row.number),'comment':(last.get('texto') or '')[:600],
                                  'comment_label':sent_label,'reply':'','reply_label':'','piece_id':'','topic':'','origin':'recorrido',
                                  'person':{'id':str(contact.id),'display_name':name,'headline':contact.headline,
                                            'profile_url':contact.profile_url,'role':(contact.classification or {}).get('role')}}))

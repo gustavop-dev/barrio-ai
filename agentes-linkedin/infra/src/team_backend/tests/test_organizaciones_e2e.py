@@ -366,17 +366,18 @@ class SesionesTests(DosMiembrosBase):
         return persona.client().post(f'/api/v1/operador/accounts/{self.directo[owner.member.pk].id}/conexion')
 
     def test_only_the_owner_opens_polls_reopens_or_cancels_her_session(self):
-        """Catch someone else, even the admin, reaching another member's live LinkedIn session through any login route."""
-        self.assertEqual(self.start(self.cto, self.g).status_code, 403)
-        self.assertEqual(self.start(self.g, self.cto).status_code, 403)  # the admin neither
+        """Catch someone else, even the admin, reaching another member's live LinkedIn session through any login route.
+        Phase 5: another member's account or login does not exist for her (404), as every object of another member."""
+        self.assertEqual(self.start(self.cto, self.g).status_code, 404)
+        self.assertEqual(self.start(self.g, self.cto).status_code, 404)  # the admin neither
         self.assertEqual(self.service.calls, [])
         started = self.start(self.g, self.g)
         self.assertEqual(started.status_code, 201, started.content)
         lid = started.json()['login']['id']
         hers = self.cto.client()
-        self.assertEqual(hers.get(f'/api/v1/operador/conexiones/{lid}').status_code, 403)
-        self.assertEqual(hers.post(f'/api/v1/operador/conexiones/{lid}/enlace').status_code, 403)
-        self.assertEqual(hers.post(f'/api/v1/operador/conexiones/{lid}/cancelar').status_code, 403)
+        self.assertEqual(hers.get(f'/api/v1/operador/conexiones/{lid}').status_code, 404)
+        self.assertEqual(hers.post(f'/api/v1/operador/conexiones/{lid}/enlace').status_code, 404)
+        self.assertEqual(hers.post(f'/api/v1/operador/conexiones/{lid}/cancelar').status_code, 404)
         self.assertEqual(BrowserLogin.objects.get(pk=lid).state, 'esperando')
         self.assertEqual(self.g.client().get(f'/api/v1/operador/conexiones/{lid}').status_code, 200)
         self.assertEqual(self.start(self.cto, self.cto).status_code, 201)
@@ -1649,7 +1650,7 @@ class ContenidoTests(ContenidoBase):
             self.assertEqual(turn.status_code, 200, turn.content)
             self.assertEqual([c['id'] for c in turn.json()['questions']], [f'question:{questions[persona.member.pk].id}'])
         hers_q = questions[self.cto.member.pk]
-        self.assertEqual(self.g.client().post(f'/api/v1/preguntas/{hers_q.id}/responder', {'text': 'MySQL'}, format='json').status_code, 403)
+        self.assertEqual(self.g.client().post(f'/api/v1/preguntas/{hers_q.id}/responder', {'text': 'MySQL'}, format='json').status_code, 404)
         response = self.cto.client().post(f'/api/v1/preguntas/{hers_q.id}/responder', {'text': 'Postgres 17', 'public_use': True}, format='json')
         self.assertEqual(response.status_code, 200, response.content)
         self.assertIn('stack.base_de_datos', {r['key'] for r in hechos.latest(self.cto.member)})

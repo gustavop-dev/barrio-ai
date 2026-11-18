@@ -192,14 +192,14 @@ def problems(now=None,member=None):
 def tick_day_requests(now=None):
     """Autopilot: each new question about a date pushes once; questions of the old flow are settled by the new rule.
     Every member's captures, each one on her own calendar (its member)."""
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_contenido
     now=now or timezone.now();count=0
     for capture in Capture.objects.filter(publish_at__isnull=False,day_request__state='pending'):_honor_legacy(capture,now)
     for capture in problems(now):
         if capture.day_request.get('notified'):continue
         capture.day_request=dict(capture.day_request,notified=now.isoformat());capture.save(update_fields=['day_request'])
         avisar('day_request','No puedo publicarlo cuando pediste',PROBLEMS.get(capture.day_request.get('problem'),'')+' ¿Qué hacemos?',
-               link='/tu-turno',ref=f'day_request:{capture.id}')
+               link='/tu-turno',ref=f'day_request:{capture.id}',member=de_contenido(capture))
         count+=1
     return count
 
@@ -283,7 +283,7 @@ def assign_slots(now=None,member=None):
 
 def _assign_slots(now,member):
     from . import editorial, estrategia, operador, autopiloto, oficina_eventos
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_contenido
     now=now or timezone.now();account=editorial.publishing_account(member)
     from .capturas import expire_ideas
     expire_ideas(now,member)
@@ -294,7 +294,8 @@ def _assign_slots(now,member):
             if not _eligible(capture) or _waiting(capture):continue
             capture.publish_asap_expected_slot=None;capture.publish_asap_reason=reason
             capture.save(update_fields=['publish_asap_expected_slot','publish_asap_reason'])
-            avisar('capture_scheduled','Tu idea espera fecha',reason,link='/?enviado=1',ref=f'capture_slot:{capture.id}:no_account')
+            avisar('capture_scheduled','Tu idea espera fecha',reason,link='/?enviado=1',ref=f'capture_slot:{capture.id}:no_account',
+                   member=de_contenido(capture))
             oficina_eventos.emit('entrega','director_editorial','operador_cuenta',reason)
         return 0
     with transaction.atomic():
@@ -346,7 +347,7 @@ def _assign_slots(now,member):
         detail=(f'Previsto para {_local(when):%d/%m %H:%M}. ' if when else '')+capture.publish_asap_reason
         title='Tu idea tiene prioridad' if capture.publish_asap else ('Tu idea ya tiene fecha' if when else 'Tu idea espera fecha')
         avisar('capture_scheduled',title,detail,link='/?enviado=1',
-               ref=f'capture_slot:{capture.id}:{when.isoformat() if when else "pending"}')
+               ref=f'capture_slot:{capture.id}:{when.isoformat() if when else "pending"}',member=de_contenido(capture))
         oficina_eventos.emit('entrega','director_editorial','operador_cuenta',detail)
         operador._audit(None,'capture.priority_slot',capture.id,expected_slot=when.isoformat() if when else None,decision=capture.publish_asap_reason)
     return 0
@@ -412,9 +413,9 @@ def ensure_veto(piece):
         piece.save(update_fields=['scheduled_for','slot_date','second_of_day'])
         ideas.update(publish_asap_expected_slot=when,publish_asap_reason='Se movió para conservar el plazo de veto tras la preparación')
         piece.gallery_photos.update(chosen_for=piece.slot_date)
-    from .notificaciones import avisar
+    from .notificaciones import avisar, de_contenido
     avisar('capture_scheduled','Tu idea cambió de hora',f'Previsto para {_local(when):%d/%m %H:%M}; conserva tu plazo de veto.',
-           link=f'/calendario/pieza/{piece.id}',ref=f'priority_moved:{piece.id}:{when.isoformat()}')
+           link=f'/calendario/pieza/{piece.id}',ref=f'priority_moved:{piece.id}:{when.isoformat()}',member=de_contenido(piece))
 
 
 WEEKDAYS=['lunes','martes','miércoles','jueves','viernes','sábado','domingo']
@@ -424,10 +425,11 @@ def _when(value):
     local=_local(value);return f'{WEEKDAYS[local.weekday()]} {local:%d/%m} a las {local:%H:%M}'
 
 
-def cards(card,now=None):
-    """Bandeja: «No puedo publicarlo cuando pediste» for each idea of his whose date cannot be kept, at once."""
+def cards(card,now=None,member=None):
+    """Bandeja: «No puedo publicarlo cuando pediste» for each idea of hers whose date cannot be kept, at once."""
+    from . import alcance
     now=now or timezone.now();out=[]
-    for capture in problems(now):
+    for capture in alcance.de(Capture.objects.filter(pk__in=[c.pk for c in problems(now)]),member).order_by('created_at'):
         request=capture.day_request;code=request.get('problem');endpoint=f'/api/v1/capturas/{capture.id}/fecha'
         asked=datetime.fromisoformat(request['asked']) if request.get('asked') else None
         quote=request.get('evidence') or capture.publish_at_evidence
@@ -443,12 +445,13 @@ def cards(card,now=None):
     return out
 
 
-def recently_resolved(days=7):
-    """Tu turno «Hecho»: what happened with a date he asked for that needed his answer."""
+def recently_resolved(days=7,member=None):
+    """Tu turno «Hecho»: what happened with a date she asked for that needed her answer (hers)."""
+    from . import alcance
     since=timezone.now()-timedelta(days=days);out=[]
     how={'next_free':'Va al primer día libre','discarded':'La descartaste','same_day':'Sale el día que pediste',
          'expired':'Se quedó en el siguiente día libre'}
-    for capture in Capture.objects.filter(day_request__state__in=list(how)).order_by('-created_at')[:20]:
+    for capture in alcance.de(Capture.objects.filter(day_request__state__in=list(how)),member).order_by('-created_at')[:20]:
         at=capture.day_request.get('answered_at')
         if not at or datetime.fromisoformat(at)<since:continue
         asked=capture.day_request.get('asked')

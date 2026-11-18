@@ -747,7 +747,8 @@ def drafts(journeys=None):
     first=messages.filter(number=1)
     ready=first.filter(state=State.READY).count();follow_ups=messages.filter(number__gt=1,state=State.READY).count()
     # A journey draft is pending only while its card can show (its switch on); RSP-07's as before.
-    pending=(sum(1 for row in _dm_rows() if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
+    from . import alcance
+    pending=(sum(1 for row in _dm_rows(alcance.TODOS) if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
              +(follow_ups if secuencia_comprador.enabled() else 0))
     sent=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.MESSAGE).count()
     declined=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.NO_MESSAGE).count()

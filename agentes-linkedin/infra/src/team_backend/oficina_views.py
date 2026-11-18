@@ -16,7 +16,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import autopiloto, editorial, expo, miembros, operador, push
+from . import alcance, autopiloto, editorial, expo, miembros, operador, push
 from .authentication import device_bearer, device_for
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, EditorialPiece, Job, ObservedPost, OperatorControl,
                      PushSubscription, Referent)
@@ -73,6 +73,27 @@ def logout_view(request):
     logout(request)
     return HttpResponse(status=204)
 
+class Yo(APIView):
+    """GET /api/v1/yo, «quién soy» (organizaciones, phase 5): the user's member, role and organization, whether she is its
+    admin and whether the team writes with her provisional voice. The apps name people with it, never with a fixed name.
+    A user who is not a member (a service, the robot) gets member null; so does every user without members."""
+    def get(self,request):
+        user=request.user
+        member=miembros.member_of_user(user)
+        organization=member.organization if member is not None else None
+        voice=None
+        if member is not None and member.active:
+            from . import voz
+            voice=voz.current(member)
+        return Response({
+            'username':user.get_username(),
+            'member':{'id':str(member.pk),'display_name':member.display_name,'role':member.role,'active':member.active,
+                      'is_admin':member.is_admin,'first':miembros.is_first(member)} if member is not None else None,
+            'organization':{'id':str(organization.pk),'name':organization.name,'slug':organization.slug} if organization else None,
+            'is_admin':miembros.is_admin(user),
+            'provisional_voice':bool(voice is not None and voice.provisional),
+            'members':miembros._models()[1].objects.filter(active=True).count() if member is not None else 0})
+
 # --------------------------------------------------------------------------- machine
 
 def _control_payload():
@@ -101,8 +122,11 @@ class Overview(APIView):
         require(request.user,'operate_linkedin')
         now=timezone.now();day,_=operador.period_starts(now)
         start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
-        proposals={state:ActionProposal.objects.filter(created_at__gte=day,state=state).count() for state in ActionProposal.State.values}
-        accounts=[dict(AccountOutput(a).data,capacity=_capacity(a,now)) for a in ConnectorAccount.objects.order_by('created_at')]
+        # Hers (organizaciones, phase 5): her accounts, her proposals, posts and uncertain actions; the total stop, the
+        # AI budget and the referents are the organization's.
+        member=alcance.miembro(request);mine=alcance.de(ActionProposal.objects.all(),member)
+        proposals={state:mine.filter(created_at__gte=day,state=state).count() for state in ActionProposal.State.values}
+        accounts=[dict(AccountOutput(a).data,capacity=_capacity(a,now)) for a in alcance.accounts(member).order_by('created_at')]
         return Response({
             'autopilot':{'enabled':autopiloto.enabled(),'policy_version':autopiloto.POLICY_VERSION},
             'control':_control_payload(),
@@ -111,11 +135,11 @@ class Overview(APIView):
             'accounts':accounts,
             'today':{'proposals':proposals,'llm_spent_usd':str(autopiloto.llm_spent_today(now)),
                      'llm_daily_cap_usd':str(presupuesto.daily_fuse()),  # the team's daily safety fuse; no per-area caps
-                     'drafts':ActionProposal.objects.filter(source='agent',created_at__gte=day).count(),
+                     'drafts':mine.filter(source='agent',created_at__gte=day).count(),
                      'drafts_daily_cap':autopiloto.daily_proposals(),
                      'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(presupuesto.daily_fuse())},
-            'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':ObservedPost.objects.count(),
-                      'uncertain':ActionExecution.objects.filter(state='uncertain').count()}})
+            'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':alcance.de(ObservedPost.objects.all(),member).count(),
+                      'uncertain':alcance.de(ActionExecution.objects.all(),member).filter(state='uncertain').count()}})
 
 class ControlInput(serializers.Serializer):
     paused=serializers.BooleanField()
@@ -127,12 +151,24 @@ class Control(APIView):
         operador.set_global_pause(request.user,data['paused'],data['reason'])
         return Response(_control_payload())
 
+def _her_events(request):
+    """The operator feed's events that are hers: what she did, what happened to her proposals, accounts and jobs, and the
+    organization's total stop. Another member's events are not in her feed (organizaciones, phase 5)."""
+    from django.db.models import CharField
+    from django.db.models.functions import Cast
+    member=alcance.miembro(request)
+    if member is None:return Q()
+    def ids(rows):return rows.annotate(target_text=Cast('pk',CharField())).values('target_text')
+    return (Q(actor=request.user)|Q(target='machine')|Q(target__in=ids(alcance.de(ActionProposal.objects.all(),member)))
+            |Q(target__in=ids(alcance.accounts(member)))|Q(target__in=ids(alcance.trabajos(request))))
+
 class Feed(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
         try:limit=max(1,min(200,int(request.query_params.get('limit','50'))))
         except ValueError:limit=50
-        events=(AuditEvent.objects.select_related('actor').filter(action__regex=r'^(operator|job)\.').order_by('-created_at')[:limit])
+        events=(AuditEvent.objects.select_related('actor').filter(action__regex=r'^(operator|job)\.')
+                .filter(_her_events(request)).order_by('-created_at')[:limit])
         return Response([{'id':e.id,'action':e.action,'target':e.target,'created_at':e.created_at,
                           'actor':e.actor.get_username() if e.actor else None,'metadata':e.metadata} for e in events])
 
@@ -197,7 +233,10 @@ def _describe(job):
     return DESCRIPTIONS.get(job.kind,'')
 
 class Actividad(APIView):
+    """The office scene: the team's roles at work (the organization's team). A piece is named only to its member."""
     def get(self,request):
+        member=alcance.miembro(request)
+        hers=lambda piece:piece is not None and alcance.is_hers(piece,member)
         implemented={'posicionamiento','perfil',*JOB_ROLES.values(),*editorial.EDITORIAL_ROLES}
         roles={r:{'status':'en_espera' if r in implemented else 'diseno','detail':'' if r in implemented else 'Contrato diseñado; aún sin implementar','since':None}
                for r in ROLES}
@@ -208,7 +247,7 @@ class Actividad(APIView):
                     roles[role]={'status':'trabajando','detail':_describe(job),'since':job.started_at}
                     if role=='editor_visual':
                         piece=EditorialPiece.objects.filter(origin_job=str(job.id)).first()
-                        if piece:roles[role].update(piece_id=str(piece.id),detail=f'{STAGE_DESCRIPTIONS["visual"]} del {piece.slot_date:%d/%m}')
+                        if hers(piece):roles[role].update(piece_id=str(piece.id),detail=f'{STAGE_DESCRIPTIONS["visual"]} del {piece.slot_date:%d/%m}')
                 elif roles[role]['status']!='trabajando':
                     roles[role]['detail']='Trabajo en cola'
         finished=list(Job.objects.filter(state__in=[Job.State.COMPLETE,Job.State.FAILED]).order_by('-finished_at')[:200])
@@ -218,7 +257,7 @@ class Actividad(APIView):
             if roles[role]['status']=='en_espera' and not roles[role]['detail']:
                 last=next((j for j in finished if role in _roles(j,visual_pieces)),None)
                 if last:roles[role].update(detail=f'Último: {DESCRIPTIONS.get(last.kind,last.kind).lower()} ({last.result_status or last.state})',since=last.finished_at)
-                if last and role=='editor_visual' and last.kind=='prepare_piece':
+                if last and role=='editor_visual' and last.kind=='prepare_piece' and hers(visual_pieces[str(last.id)]):
                     piece=visual_pieces[str(last.id)]
                     roles[role].update(piece_id=str(piece.id),detail=f'Último: medios de la pieza del {piece.slot_date:%d/%m} ({piece.get_state_display()})')
         if operador.globally_paused():

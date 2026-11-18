@@ -33,7 +33,7 @@ from datetime import date, datetime, time, timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import comprador, identidad, miembros, operador, secuencia_comprador
+from . import alcance, comprador, identidad, miembros, operador, secuencia_comprador, voz
 from .exceptions import Conflict
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation
 from .permissions import require
@@ -764,25 +764,26 @@ def _body_of(row,journey,kind):
     parts.append('Lo envías tú desde LinkedIn.')
     return ' '.join(parts)
 
-def card_rows(now=None):
-    """The replies waiting for Gustavo (ready, of the journey's current attempt), oldest first."""
+def card_rows(now=None,member=None):
+    """The replies waiting for Gustavo (ready, of the journey's current attempt), oldest first: hers (alcance.de;
+    alcance.TODOS for the machine's own counts)."""
     if not enabled():return []
     now=now or timezone.now()
     out=[]
-    for row in (BuyerDraft.objects.select_related('contact__buyer_journey','contact__account').filter(kind=REPLY,state=State.READY)
+    for row in (alcance.de(BuyerDraft.objects.all(),member).select_related('contact__buyer_journey','contact__account').filter(kind=REPLY,state=State.READY)
                 .filter(Q(show_at__isnull=True)|Q(show_at__lte=now)).order_by('decided_at','created_at')):
         journey=getattr(row.contact,'buyer_journey',None)
         if journey is None or journey.attempt!=row.attempt or journey.step==Step.MEETING:continue
         out.append((row,journey))
     return out
 
-def cards(card,now=None):
-    """Tu turno: one card per reply of hers. With a draft, the «Mensaje sugerido» card (her message, what is missing and
+def cards(card,now=None,member=None):
+    """Tu turno: one card per reply of hers (the member's: alcance.de). With a draft, the «Mensaje sugerido» card (her message, what is missing and
     the reply); without one («otro», no booking link, nothing classified), the conversation card «necesita tu respuesta».
     Both close with «Hecho, le escribí» / «No escribirle» (respuestas/<id>/mensaje); the link types also have «Agendó»."""
     from . import conversaciones
     now=now or timezone.now();out=[]
-    for row,journey in card_rows(now):
+    for row,journey in card_rows(now,member):
         contact=row.contact;name=contact.display_name or 'Alguien';kind=_kind(row) or OTHER
         message=(row.inputs or {}).get('mensaje') or {}
         chat=Conversation.objects.filter(pk=message.get('conversacion')).first() if message.get('conversacion') else None
@@ -803,7 +804,7 @@ def cards(card,now=None):
             missing=(row.inputs or {}).get('faltan') or []
             out.append(card(f'respuesta:{row.id}','mensaje',TITLES[kind].format(name=name),body,actions,agent=AGENT,priority='importante',
                             created_at=row.decided_at,
-                            message={'text':row.text,'text_label':LABELS[kind],'comment':(message.get('texto') or '')[:600],
+                            message={**voz.marca(row),'text':row.text,'text_label':LABELS[kind],'comment':(message.get('texto') or '')[:600],
                                      'comment_label':'Lo que te respondió','reply':'; '.join(missing)[:900],
                                      'reply_label':'Falta confirmar' if missing else '','piece_id':'','topic':'','origin':'respuesta',
                                      'person':person}))
@@ -850,10 +851,12 @@ def close(user,draft_id,how,note_text=''):
         operador._audit(user,'buyer.reply_closed',row.pk,how=how,contact=str(contact.pk),tipo=_kind(row))
     return row
 
-def recently_resolved(days=7):
-    """Tu turno → Hecho recientemente: the replies Gustavo closed."""
+def recently_resolved(days=7,member=None):
+    """Tu turno → Hecho recientemente: the replies Gustavo closed (hers)."""
     since=timezone.now()-timedelta(days=days)
-    events=list(AuditEvent.objects.filter(action='buyer.reply_closed',created_at__gte=since).order_by('-created_at')[:20])
+    events=list(AuditEvent.objects.filter(action='buyer.reply_closed',created_at__gte=since).order_by('-created_at'))
+    hers=alcance.suyos(BuyerDraft,member,[e.target for e in events])
+    events=[e for e in events if e.target in hers][:20]
     names={str(k):v for k,v in BuyerDraft.objects.filter(id__in=[e.target for e in events]).values_list('id','contact__display_name')}
     return [{'kind':'mensaje','id':f'respuesta:{e.target}','title':f'Respuesta para {names.get(e.target) or "alguien"}','at':e.created_at,
              'how':'Le escribiste' if (e.metadata or {}).get('how')=='enviado' else 'No le escribiste'} for e in events]
@@ -862,7 +865,7 @@ def recently_resolved(days=7):
 
 def pending_counts(now=None):
     """(with a draft, without one) waiting in Tu turno."""
-    rows=[row for row,_ in card_rows(now)]
+    rows=[row for row,_ in card_rows(now,alcance.TODOS)]  # the machine's counts: every member's
     return sum(1 for r in rows if r.text),sum(1 for r in rows if not r.text)
 
 def _median(values):

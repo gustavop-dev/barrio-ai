@@ -18,7 +18,9 @@ module is the one place that says it, in three parts:
    several active members she gets MiembroRequerido (400), never another member's data. With no members at all
    (an installation before organizations, the CI's base) it is None and everything reads as before.
 
-`de(rows, None)` with members in the installation raises MiembroRequerido: no helper may fall back to «the» member."""
+`de(rows, None)` with members in the installation raises MiembroRequerido: no helper may fall back to «the» member.
+`de(rows, TODOS)` reads every member's rows on purpose: the autopilot, the Slack summary and other machine readers that
+work for the whole installation, never a screen."""
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.permissions import BasePermission
@@ -281,6 +283,15 @@ DUENO = {
 }
 
 
+class _Todos:
+    """Every member's rows, said explicitly (machine readers only, never a view)."""
+    def __repr__(self):
+        return 'alcance.TODOS'
+
+
+TODOS = _Todos()
+
+
 def _require(member):
     """`member` itself; None only for an installation without members, where everything counts as before."""
     if member is None and miembros.exist():
@@ -290,6 +301,8 @@ def _require(member):
 
 def mine(member, path, kind):
     """The Q of the rows of `member` along `path` (DUENO's kinds). Q() (every row) without members."""
+    if member is TODOS:
+        return Q()
     member = _require(member)
     if member is None:
         return Q()
@@ -325,6 +338,50 @@ def accounts(member):
 def is_hers(obj, member):
     """Whether one row is hers (the object form of `de`)."""
     return de(type(obj).objects.filter(pk=obj.pk), member).exists()
+
+
+def suyos(model, member, ids):
+    """Which of `ids` (an audit trail's targets, as strings) are rows of `model` that are hers: what «Hecho
+    recientemente» and the feed may name. Ids that are not keys of `model` are nobody's."""
+    from django.core.exceptions import ValidationError
+    keys = []
+    for value in set(ids):
+        try:
+            keys.append(model._meta.pk.to_python(value))
+        except (ValidationError, TypeError, ValueError):
+            continue
+    return {str(pk) for pk in de(model.objects.filter(pk__in=keys), member).values_list('pk', flat=True)}
+
+
+def vista(user, item_id):
+    """InboxSeen's key of a card she opened: the card id itself for the first member's user (the «Vista» of before
+    organizations are hers) and for everyone in an installation without members; «u:<user id>:<card id>» for anyone
+    else, so one person's «Vista» never marks another's card."""
+    first = miembros.first_member_id()
+    if first is None:
+        return item_id
+    _, Member, _ = miembros._models()
+    if Member.objects.filter(pk=first, user_id=user.pk).exists():
+        return item_id
+    return f'u:{user.pk}:{item_id}'
+
+
+def trabajos(request):
+    """The jobs this request may see (jobs.visible_jobs: her own; every one with manage_jobs), never another member's:
+    neither a job of another member's user, nor a content job queued for another member (miembros.job_params), nor a job
+    on another member's account. The machine's own jobs (the autopilot's, without a member) stay for manage_jobs."""
+    from . import jobs
+    from .models import ConnectorAccount
+    rows = jobs.visible_jobs(request.user)
+    member = miembro(request)
+    if member is None:
+        return rows
+    _, Member, _ = miembros._models()
+    others = Member.objects.exclude(pk=member.pk)
+    rows = rows.exclude(owner_id__in=others.values('user_id'))
+    rows = rows.exclude(params__member__in=[str(pk) for pk in others.values_list('pk', flat=True)])
+    foreign = ConnectorAccount.objects.exclude(pk__in=accounts(member).values('pk')).values_list('pk', flat=True)
+    return rows.exclude(params__account__in=[str(pk) for pk in foreign])
 
 
 def miembro(request):
