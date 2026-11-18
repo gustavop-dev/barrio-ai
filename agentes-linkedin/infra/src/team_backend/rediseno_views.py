@@ -11,7 +11,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from knowledge import db
-from . import autopiloto, editorial, imagenes, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
+from . import autopiloto, editorial, imagenes, lider, miembros, notificaciones, operador, oportunidades, orientacion, preguntas, red
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Opportunity,
                      OPEN_ACTION_STATES, OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
@@ -215,10 +215,17 @@ def approval_key(p):
     return f'{p.capability}:comment' if p.comment_id and p.capability=='INT-02' else p.capability
 
 def awaiting_approval():
-    """Proposals that wait for Gustavo: still `proposed`, never executed, of a capability in `approval` mode (the policy
-    leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the calendar's «En cola»."""
-    rows=ActionProposal.objects.select_related('post','piece','contact','comment__piece').filter(state='proposed',execution__isnull=True).order_by('created_at')
-    return [p for p in rows if autopiloto.autonomy(p.capability)=='approval']
+    """Proposals that wait for Gustavo: still `proposed`, never executed, of a capability in `approval` mode for the member
+    who owns its account (the policy leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the
+    calendar's «En cola». A proposal of an account of nobody among several members waits for nobody here."""
+    rows=(ActionProposal.objects.select_related('post','piece','contact','comment__piece','account__member')
+          .filter(state='proposed',execution__isnull=True).order_by('created_at'))
+    out=[]
+    for p in rows:
+        try:
+            if autopiloto.autonomy_of(p)=='approval':out.append(p)
+        except miembros.MiembroRequerido:continue
+    return out
 
 def approval_expiry(p):
     """When it stops waiting: an own piece at its hour; anything else when the autopilot lets it expire (TTL)."""
@@ -407,7 +414,7 @@ class Notifications(APIView):
         if request.query_params.get('filtro')=='sin_leer':qs=qs.filter(read_at__isnull=True)
         items=[{'id':str(n.id),'kind':n.kind,'layer':n.layer,'title':n.title,'detail':n.detail,'link':n.link,'at':n.created_at,
                 'read':n.read_at is not None} for n in qs.order_by('-created_at')[:200]]
-        return Response({'upcoming':notificaciones.upcoming(),'items':items,'unread':notificaciones.unread()})
+        return Response({'upcoming':notificaciones.upcoming(member=miembros.member_for(request.user)),'items':items,'unread':notificaciones.unread()})
 
 class NotificationsRead(APIView):
     """POST /api/v1/notificaciones/leer {ids} or {todas: true}."""
@@ -730,9 +737,11 @@ class Settings(APIView):
         now=timezone.now();day,_=operador.period_starts(now);budget=presupuesto.status(now)
         month=now.astimezone(operador.local_tz()).replace(day=1,hour=0,minute=0,second=0,microsecond=0)
         start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
-        return Response({'autonomy':{c:autopiloto.autonomy(c) for c in sorted(operador.limits())},
+        member=miembros.member_for(request.user)  # her autonomy and caps (organizaciones, phase 2)
+        caps=operador.limits(member=member)
+        return Response({'autonomy':{c:autopiloto.autonomy(c,member) for c in sorted(caps)},
                          'lead':{'enabled':lider.enabled(),'capabilities':lider.capabilities(),'model':os.environ.get('TYPESAFE_MODEL','jev-1.14.0')},
-                         'limits':{c:{'daily':d,'weekly':w} for c,(d,w) in operador.limits().items()},
+                         'limits':{c:{'daily':d,'weekly':w} for c,(d,w) in caps.items()},
                          'window':{'start':start,'end':end,'timezone':str(operador.local_tz()),'open_now':operador.within_window(now),
                                    'min_spacing_seconds':int(operador.min_spacing().total_seconds())},
                          # One budget for the whole team (knowledge.presupuesto): the month line carries the limit, the

@@ -16,7 +16,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import autopiloto, editorial, expo, operador, push
+from . import autopiloto, editorial, expo, miembros, operador, push
 from .authentication import device_bearer, device_for
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, EditorialPiece, Job, ObservedPost, OperatorControl,
                      PushSubscription, Referent)
@@ -83,9 +83,13 @@ def _control_payload():
             'updated_at':control.updated_at,'updated_by':control.updated_by.get_username() if control.updated_by else None}
 
 def _capacity(account,now):
+    """The caps of the account's member and what every connector of hers wrote today and this week (organizaciones,
+    phase 2). None for an account of nobody among several members: no rhythm applies to it."""
+    try:member=operador.member_of(account=account)
+    except miembros.MiembroRequerido:return None
     day,week=operador.period_starts(now);result={}
-    for capability,(daily,weekly) in operador.limits().items():
-        done=operador.writes(account,capability)
+    for capability,(daily,weekly) in operador.limits(member=member).items():
+        done=operador.writes(account,capability,member)
         daily_used=done.filter(started_at__gte=day).count();weekly_used=done.filter(started_at__gte=week).count()
         result[capability]={'daily':daily,'weekly':weekly,'daily_used':daily_used,'weekly_used':weekly_used,
                             'left':max(0,min(daily-daily_used,weekly-weekly_used))}

@@ -58,11 +58,12 @@ def free_slot(account,now,reserved=(),not_before=None,exclude_piece=None,at=None
     preparation, no other idea reserved, CONT-09 capacity left, and the day's GASP type when one is asked. `at` is an
     hour he asked for; otherwise the daily post hour."""
     from . import editorial, estrategia, operador
-    today=_local(now).date();daily,weekly=operador.limits()['CONT-09']
+    member=operador.member_of(account=account)  # her caps and her post time (organizaciones, phase 2)
+    today=_local(now).date();daily,weekly=operador.limits(member=member)['CONT-09']
     taken={_local(r).date() for r in reserved}
     for offset in range(15):
         day=today+timedelta(days=offset)
-        when=datetime.combine(day,at,tzinfo=operador.local_tz()) if at else editorial.scheduled_for(day)
+        when=datetime.combine(day,at,tzinfo=operador.local_tz()) if at else editorial.scheduled_for(day,member)
         if at and not operador.within_window(when):return None
         if when<now+veto_window() or (not_before and day<not_before) or day in taken:continue
         if gasp_type and estrategia.day_type(day)!=gasp_type:continue
@@ -78,7 +79,7 @@ def free_slot(account,now,reserved=(),not_before=None,exclude_piece=None,at=None
             proposals__execution__isnull=True,second_of_day=False).exclude(pk=exclude_piece).distinct().count()
         pending+=sum(start<=_local(r).date()<end for r in reserved)
         _,week_start=operador.period_starts(when)
-        executed=operador.writes(account,'CONT-09').exclude(proposal__piece__second_of_day=True).filter(
+        executed=operador.writes(account,'CONT-09',member).exclude(proposal__piece__second_of_day=True).filter(
             started_at__gte=week_start,started_at__lt=week_start+timedelta(days=7)).count()
         if executed+pending>=weekly:continue
         return when
@@ -284,7 +285,7 @@ def assign_slots(now=None):
                 continue
             if _waiting(capture):continue  # his answer in the Bandeja decides
             old=capture.publish_asap_expected_slot;extra=is_extra(capture)
-            if operador.globally_paused() or not editorial.can_publish(account) or autopiloto.autonomy('CONT-09')=='off':
+            if operador.globally_paused() or not editorial.can_publish(account) or autopiloto.autonomy('CONT-09',operador.member_of(account=account) if account else None)=='off':
                 when=None;reason='Publicación en pausa; se asignará el hueco al reanudar'
             else:
                 # A queued or running preparation already owns this capture's reservation.

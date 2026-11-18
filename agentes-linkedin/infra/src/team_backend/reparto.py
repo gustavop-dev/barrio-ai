@@ -103,7 +103,7 @@ def week_counts(account,now=None):
 def weekly_invitations(account,now=None):
     """What the invitations may reach this week: the weekly cap within the ramp."""
     from . import operador, red
-    _,weekly=operador.limits(now)['RED-02']
+    _,weekly=operador.limits(now,operador.member_of(account=account))['RED-02']
     _,ramp=red.ramp_limits(account,now)
     return min(weekly,ramp)
 

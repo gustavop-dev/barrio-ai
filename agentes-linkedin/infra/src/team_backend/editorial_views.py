@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, editorial, operador, rescate, respuestas, resultados, imagenes
+from . import capturas, editorial, miembros, operador, rescate, respuestas, resultados, imagenes
 from .jobs import enqueue_operation
 from .models import EditorialPiece, PieceImage
 from .capturas_views import FileView, serve
@@ -37,7 +37,7 @@ class Calendar(APIView):
             action=max(piece.proposals.all(),key=lambda a:a.created_at,default=None)
             item=summary(piece,action);rows.setdefault(piece.slot_date,[]).append((piece,item['status'],item))
         pieces={day:editorial.calendar_rows(day_rows,today) for day,day_rows in rows.items()}
-        try:post_time=editorial.post_time().strftime('%H:%M');config_error=None
+        try:post_time=editorial.post_time(miembros.member_for(request.user)).strftime('%H:%M');config_error=None
         except ValueError as exc:post_time=None;config_error=str(exc)
         return Response({'timezone':str(operador.local_tz()),'post_time':post_time,'lead_hours':editorial.lead_time().total_seconds()/3600,
             'config_error':config_error,'today':today,'days':[{'date':start+timedelta(days=i),'pieces':pieces.get(start+timedelta(days=i),[])}

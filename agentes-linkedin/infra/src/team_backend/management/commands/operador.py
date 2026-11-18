@@ -57,6 +57,12 @@ class Command(BaseCommand):
         mie.add_argument('--admin',action=argparse.BooleanOptionalAction,default=None,help='Administrador de la organización o no')
         mie.add_argument('--grupo',action='append',default=[],help='Grupo de permisos que se le añade (lectura, operacion, revision); repetible')
         sub.add_parser('miembros',help='Lista las organizaciones, sus miembros y las cuentas de LinkedIn de cada uno (solo lectura)')
+        aju=sub.add_parser('ajustes',help='El ritmo de LinkedIn de un miembro (tier, topes, rampa, lecturas de perfil, autonomía, hora del '
+                           'post): sin --fijar ni --quitar solo lo muestra con su origen; fijar o quitar es del administrador (auditado)')
+        aju.add_argument('--miembro',required=True,help='Usuario de Django del miembro')
+        aju.add_argument('--fijar',action='append',default=[],metavar='VARIABLE=VALOR',
+                         help='Fija una variable de su ritmo con el formato del .env (p. ej. OPERATOR_INVITE_RAMP_STAGES=5/25,8/40,10/50); repetible')
+        aju.add_argument('--quitar',action='append',default=[],metavar='VARIABLE',help='Vuelve a la del .env; repetible')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -88,6 +94,23 @@ class Command(BaseCommand):
                 return
             if o['accion']=='miembros':
                 for line in miembros_lines():self.stdout.write(line)
+                return
+            if o['accion']=='ajustes':
+                from team_backend import miembros
+                from team_backend.models import Member
+                member=Member.objects.select_related('organization').filter(user__username=o['miembro']).first()
+                if member is None:raise CommandError(f'«{o["miembro"]}» no es miembro de ninguna organización.')
+                values={}
+                for item in o['fijar']:
+                    name,sep,value=item.partition('=')
+                    if not sep:raise CommandError(f'--fijar «{item}»: usa VARIABLE=VALOR.')
+                    values[name.strip()]=value
+                if values or o['quitar']:
+                    member,changed=miembros.save_settings(user,member,values,o['quitar'])
+                    self.stdout.write('Ritmo actualizado (auditado).' if changed else 'Sin cambios: ya tenía esos valores.')
+                self.stdout.write(f'Ritmo de {member.display_name} ({o["miembro"]}) · {member.organization.name}:')
+                for name,value,source in miembros.effective_settings(member):
+                    self.stdout.write(f'  {name}={value}  [{source}]')
                 return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp

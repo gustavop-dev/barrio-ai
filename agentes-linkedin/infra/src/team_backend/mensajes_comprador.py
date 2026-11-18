@@ -538,9 +538,11 @@ def _ready_to_invite(journey,now):
 
 def _notes(account,now):
     """Buyers about to be invited without a note decision, warmest first: not warmed or nothing real → «hecho»; no note
-    left this month (red.note_room, minus the notes ready or in review) → «cupo»; else the next one to draft."""
+    left this month (red.note_room of the account's member, minus her notes ready or in review) → «cupo»; else the next
+    one to draft."""
     from .red import note_room
-    from . import sin_posts
+    from . import miembros, operador, sin_posts
+    member=operador.member_of(account=account)
     route=sin_posts.active()
     rows=(BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING,contact__stage='followed',
                                                                 contact__classification__fit=True))
@@ -551,7 +553,8 @@ def _notes(account,now):
         hot={j.pk for j in candidates if warmed(j,now)}
         candidates.sort(key=lambda j:(j.pk not in hot,-heat.get(j.contact_id,0),j.warming_at or j.chosen_at))
     else:candidates.sort(key=lambda j:(-heat.get(j.contact_id,0),j.warming_at or j.chosen_at))
-    room=note_room(now)-BuyerDraft.objects.filter(kind=NOTE,state__in=[State.READY,State.REVIEWING]).count()
+    room=note_room(now,member)-miembros.mine(BuyerDraft.objects.filter(kind=NOTE,state__in=[State.READY,State.REVIEWING]),
+                                             member,'contact__account').count()
     reserved=sin_posts.warmed_waiting(account,now) if route else 0
     decided=0;item=None
     for journey in candidates:
@@ -660,14 +663,15 @@ def step(account,now=None):
 
 # --------------------------------------------------------------------------- the note in red.plan and the send
 
-def note_hold(contacts,now=None):
+def note_hold(contacts,now=None,member=None):
     """red.plan: warmed buyers ready to invite whose note is not decided yet wait for it (the autopilot drafts it), at most
-    NOTE_HOLD after they became ready (next_at). Nobody waits with the switch or the lead off, or without notes left."""
+    NOTE_HOLD after they became ready (next_at). Nobody waits with the switch or the lead off, or without notes left to
+    the member who invites (`member`: red.plan's; None, the only one)."""
     if not active():return set()
     from .red import note_room
     from . import sin_posts
     now=now or timezone.now()
-    if note_room(now)<=0:return set()
+    if note_room(now,member)<=0:return set()
     held=set()
     journeys={j.contact_id:j for j in BuyerJourney.objects.select_related('contact').filter(contact__in=[c.pk for c in contacts],step=Step.WARMING)}
     for contact in contacts:

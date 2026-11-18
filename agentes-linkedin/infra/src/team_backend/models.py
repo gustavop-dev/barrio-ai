@@ -149,6 +149,10 @@ class Member(models.Model):
     active=models.BooleanField(default=True)
     is_admin=models.BooleanField(default=False)
     created_at=models.DateTimeField(default=timezone.now)
+    # Her LinkedIn rhythm when it differs from the .env (phase 2): {VARIABLE: value} with the same names and formats as
+    # the environment (LINKEDIN_ACCOUNT_TIER, OPERATOR_DAILY_LIMITS…). Only miembros.MEMBER_SETTINGS, validated by
+    # miembros.save_settings; a variable she does not set takes the .env's value (miembros.setting).
+    settings=models.JSONField(default=dict,blank=True)
     class Meta:ordering=['created_at']
     def __str__(self):return f'{self.display_name} ({self.organization.slug})'
 

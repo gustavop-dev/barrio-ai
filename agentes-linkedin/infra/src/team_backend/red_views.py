@@ -73,7 +73,10 @@ class Summary(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
         account=request.query_params.get('account')
-        data=red.summary(get_or_404(ConnectorAccount,id=account) if account else None)
+        if account:data=red.summary(get_or_404(ConnectorAccount,id=account))  # the rhythm of the account's member
+        else:
+            from . import miembros
+            data=red.summary(member=miembros.member_for(request.user))  # hers (organizaciones, phase 2)
         from .models import Opportunity
         data['stages']['opportunity']=Contact.objects.filter(opportunities__isnull=False).exclude(
             opportunities__stage__in=['acuerdo','sin_acuerdo']).distinct().count()

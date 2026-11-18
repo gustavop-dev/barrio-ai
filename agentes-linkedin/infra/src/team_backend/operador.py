@@ -95,19 +95,34 @@ def _audit(actor,action,target,**metadata):
 # 15/75 on 17/11/2026 (Gustavo: keep commenting on referents and also on possible buyers; docs/plan-outbound.md).
 DEFAULT_LIMITS={'INT-03':(15,75),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)}
 
-def _parse_caps(variable):
+def _parse_caps(variable,member=None):
+    """{capability: cap} of the .env's variable, with the member's own values on top (miembros.setting): she may set
+    only some capabilities; the rest keep the .env's."""
     caps={}
-    for item in filter(None,os.environ.get(variable,'').split(',')):
-        key,_,value=item.partition('=')
-        if value.strip().isdigit():caps[key.strip()]=int(value)
+    sources=[os.environ.get(variable,'')]
+    if member is not None and variable in (member.settings or {}):sources.append(member.settings[variable])
+    for source in sources:
+        for item in filter(None,source.split(',')):
+            key,_,value=item.partition('=')
+            if value.strip().isdigit():caps[key.strip()]=int(value)
     return caps
 
 def is_weekend(now=None):
     return (now or timezone.now()).astimezone(local_tz()).weekday()>=5
 
-def limits(now=None):
-    """{capability: (daily, weekly)}; OPERATOR_DAILY_LIMITS / OPERATOR_WEEKLY_LIMITS override."""
-    daily,weekly=_parse_caps('OPERATOR_DAILY_LIMITS'),_parse_caps('OPERATOR_WEEKLY_LIMITS')
+def member_of(account=None,member=None):
+    """Whose LinkedIn rhythm applies (organizaciones, phase 2): `member` when given, else the owner of `account`, else
+    the only active member. None without members (everything as before organizations); MiembroRequerido when it cannot
+    be named among several active members (an account of nobody, or no account and no member)."""
+    if member is not None:return member
+    if account is not None:return miembros.member_for_account(account)
+    return miembros.resolve()
+
+def limits(now=None,member=None):
+    """{capability: (daily, weekly)} of a member; OPERATOR_DAILY_LIMITS / OPERATOR_WEEKLY_LIMITS override, from the
+    member's own settings first and then the .env's. Without a member, the only active one (miembros.resolve)."""
+    member=member_of(member=member)
+    daily,weekly=_parse_caps('OPERATOR_DAILY_LIMITS',member),_parse_caps('OPERATOR_WEEKLY_LIMITS',member)
     caps={cap:(daily.get(cap,d),weekly.get(cap,w)) for cap,(d,w) in DEFAULT_LIMITS.items()}
     caps['RED-02']=(min(20,caps['RED-02'][0]),min(100,caps['RED-02'][1]))
     if is_weekend(now):
@@ -194,14 +209,27 @@ def batch_spacing():
 def min_spacing():
     return timedelta(seconds=int(os.environ.get('OPERATOR_MIN_SPACING_SECONDS','1200')))
 
-def policy_lock():
-    """One member across all connectors. Call inside atomic(), before account/proposal locks."""
-    from .models import OperatorControl
-    OperatorControl.current()
-    return OperatorControl.objects.select_for_update().get(pk=1)
+def policy_lock(member=None):
+    """One LinkedIn member across her connectors (organizaciones, phase 2): the lock that serializes her rhythm (spacing,
+    caps, reads, ramp, notes) between workers. Call inside atomic(), before account/proposal locks. The first member (and
+    an installation without members) keeps the row it always had, OperatorControl pk=1, so a worker still running the
+    code before this phase and a new one never race over Gustavo's rhythm while a deploy rolls; any later member locks
+    her own Member row (FOR NO KEY UPDATE: it never blocks the accounts that point to her). Two members never wait for
+    each other; two accounts of the same member always do. Without `member`, the only active member
+    (MiembroRequerido among several)."""
+    member=member_of(member=member)
+    if miembros.is_first(member):
+        from .models import OperatorControl
+        OperatorControl.current()
+        return OperatorControl.objects.select_for_update().get(pk=1)
+    from .models import Member
+    return Member.objects.select_for_update(no_key=True).get(pk=member.pk)
 
-def policy_event(action,target='member'):
+def policy_event(action,target=None,member=None):
+    """The latest audit event of `action` for `target`; without a target, for the member's rhythm key
+    (miembros.policy_key: 'member' for the first member, 'member:<id>' for the others)."""
     from .models import AuditEvent
+    if target is None:target=miembros.policy_key(member_of(member=member))
     return AuditEvent.objects.filter(action=action,target=str(target)).order_by('-created_at','-id').first()
 
 def spacing_range(capability=None,now=None):
@@ -209,59 +237,66 @@ def spacing_range(capability=None,now=None):
     low=max(1200,int(min_spacing().total_seconds()))
     return low,max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
 
-def reserve_spacing(now=None,capability=None):
-    """Caller holds policy_lock; a restart cannot shorten a reserved random gap. Returns the reserved next_action_at."""
-    now=now or timezone.now()
+def reserve_spacing(now=None,capability=None,member=None):
+    """Caller holds the member's policy_lock; a restart cannot shorten a reserved random gap. Returns the reserved
+    next_action_at."""
+    now=now or timezone.now();member=member_of(member=member)
     low,high=spacing_range(capability,now)
     seconds=random.SystemRandom().randint(low,high)
     at=(now+timedelta(seconds=seconds)).isoformat()
-    _audit(None,'operator.schedule','member',next_action_at=at,gap_seconds=seconds)
+    _audit(None,'operator.schedule',miembros.policy_key(member),next_action_at=at,gap_seconds=seconds)
     return at
 
 def release_spacing(execution):
     """An execution that ended without writing gives its reserved gap back (spacing_ok: it does not count). Only while
-    its reservation is still the latest schedule: a later day's opening or another gap is never undone."""
+    its reservation is still its member's latest schedule: a later day's opening or another gap is never undone."""
     reserved=getattr(execution,'_spacing',None)
     if not isinstance(reserved,str):return
     execution._spacing=None
+    member=member_of(account=execution.proposal.account)
     with transaction.atomic():
-        policy_lock();event=policy_event('operator.schedule')
+        policy_lock(member);event=policy_event('operator.schedule',member=member)
         if event is None or event.metadata.get('next_action_at')!=reserved or event.metadata.get('released_for'):return
-        _audit(None,'operator.schedule','member',next_action_at=timezone.now().isoformat(),gap_seconds=0,released_for=str(execution.id))
+        _audit(None,'operator.schedule',miembros.policy_key(member),next_action_at=timezone.now().isoformat(),gap_seconds=0,
+               released_for=str(execution.id))
 
-def post_due(now=None):
-    """The own post that any other write started now could push past its hour, or None. Every write reserves a
-    random gap of up to OPERATOR_MAX_SPACING_SECONDS, so inside that gap before a post's hour (and while it is due)
-    only the post writes. Spacing is per member, so this looks at every connector."""
+def post_due(now=None,member=None):
+    """The member's own post that any other write of hers started now could push past its hour, or None. Every write
+    reserves a random gap of up to OPERATOR_MAX_SPACING_SECONDS, so inside that gap before a post's hour (and while it
+    is due) only the post writes. Spacing is per member, so this looks at every connector of hers and at no one else's."""
     from .models import ActionProposal
     from .orquestacion import cycle_issues
-    now=now or timezone.now();_,high=spacing_range()
-    rows=ActionProposal.objects.select_related('piece').filter(piece__isnull=False,piece__state='ready',execution__isnull=True,
+    now=now or timezone.now();_,high=spacing_range();member=member_of(member=member)
+    rows=miembros.mine(ActionProposal.objects.select_related('piece').filter(piece__isnull=False,piece__state='ready',execution__isnull=True,
         state__in=[ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED],
-        piece__scheduled_for__gt=now-timedelta(hours=2),piece__scheduled_for__lte=now+timedelta(seconds=high)).order_by('piece__scheduled_for')
+        piece__scheduled_for__gt=now-timedelta(hours=2),piece__scheduled_for__lte=now+timedelta(seconds=high)),member).order_by('piece__scheduled_for')
     for proposal in rows:
         if not cycle_issues(proposal) and (not capped(proposal) or capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0):return proposal
     return None
 
 def spacing_ok(account,now=None,capability=None):
-    # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
-    # pre-check found nothing to write does not count (an execution in flight does: it may be writing). Inside a
-    # network round a network write only waits the round's short gap.
+    # Every connector of a member acts as the same LinkedIn member, so her public writes share one spacing; another
+    # member's writes never delay hers (organizaciones, phase 2). An execution whose pre-check found nothing to write
+    # does not count (an execution in flight does: it may be writing). Inside a network round a network write only
+    # waits the round's short gap.
     # The day's opening wait is drawn at the first attempt of the day; when that attempt is his own post at its
     # hour, the post does not wait for it (14/11/2026: it left 15 minutes late). The gap after a real write still holds.
-    event=policy_event('operator.schedule')
+    member=member_of(account=account)
+    event=policy_event('operator.schedule',member=member)
     own_post=capability==ActionProposal.Capability.PUBLISH and event is not None and event.metadata.get('opening')
     if event and not own_post and datetime.fromisoformat(event.metadata['next_action_at'])>(now or timezone.now()):return False
-    last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
+    last=(miembros.mine(ActionExecution.objects.filter(wrote=True),member,'proposal__account')
+          .order_by('-started_at').values_list('started_at',flat=True).first())
     gap=timedelta(seconds=batch_spacing()[0]) if capability in NETWORK and network_batch(now) is not None else min_spacing()
     return last is None or last<=(now or timezone.now())-gap
 
 @transaction.atomic
-def prepare_day_schedule(now=None):
-    """A persisted, varied opening slot; missed activity never earns a burst of catch-up writes."""
-    now=now or timezone.now();policy_lock()
+def prepare_day_schedule(now=None,member=None):
+    """A persisted, varied opening slot of the member's day; missed activity never earns a burst of catch-up writes. Each
+    member draws her own (a second member's day never reuses or moves the first one's)."""
+    now=now or timezone.now();member=member_of(member=member);policy_lock(member);key=miembros.policy_key(member)
     local=now.astimezone(local_tz());day=local.date().isoformat()
-    event=policy_event('operator.day_schedule')
+    event=policy_event('operator.day_schedule',key)
     if event and event.metadata['day']==day:return
     start=os.environ.get('OPERATOR_WINDOW','07:00-21:00').split('-')[0]
     hour,minute=map(int,start.split(':'))
@@ -269,20 +304,25 @@ def prepare_day_schedule(now=None):
     delay=random.SystemRandom().randint(0,1200)
     if event and delay==event.metadata.get('delay'):delay=(delay+1)%1201
     next_at=max(opened,now)+timedelta(seconds=delay)
-    previous=policy_event('operator.schedule')
+    previous=policy_event('operator.schedule',key)
     pending=datetime.fromisoformat(previous.metadata['next_action_at']) if previous else None
     # `opening`: the wait is only the day's varied start, not the gap a write reserved. His own post keeps its hour.
     opening=pending is None or pending<=next_at
     if not opening:next_at=pending
-    _audit(None,'operator.day_schedule','member',day=day,delay=delay)
-    _audit(None,'operator.schedule','member',next_action_at=next_at.isoformat(),gap_seconds=delay,opening=opening)
+    _audit(None,'operator.day_schedule',key,day=day,delay=delay)
+    _audit(None,'operator.schedule',key,next_action_at=next_at.isoformat(),gap_seconds=delay,opening=opening)
 
-def writes(account,capability):
-    """Executions of a capability that wrote (or may have written) on LinkedIn: what the caps count."""
-    return ActionExecution.objects.filter(proposal__capability=capability,wrote=True)
+def writes(account,capability,member=None):
+    """Executions of a capability that wrote (or may have written) on LinkedIn: what the caps count. Those of the member
+    who owns `account` (every connector of hers); without an account, the given or the only active member's."""
+    return miembros.mine(ActionExecution.objects.filter(proposal__capability=capability,wrote=True),
+                         member_of(account,member),'proposal__account')
 
 def capacity_left(account,capability,now=None):
-    daily,weekly=limits(now).get(capability,(0,0))
+    """What a member may still write today and this week of a capability: her caps (limits) minus what every connector
+    of hers wrote. Another member's writes never count."""
+    member=member_of(account=account)
+    daily,weekly=limits(now,member).get(capability,(0,0))
     if capability=='RED-02':
         from .red import ramp_limits
         rd,rw=ramp_limits(account,now)
@@ -291,7 +331,7 @@ def capacity_left(account,capability,now=None):
         rounds=network_batches()
         if len(rounds)>1 and network_batch(now)==0:daily=(daily+1)//2
     day,week=period_starts(now)
-    done=writes(account,capability)
+    done=writes(account,capability,member)
     if capability=='CONT-09':done=done.exclude(proposal__piece__second_of_day=True)  # outside the caps: see capped()
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
 
@@ -303,28 +343,43 @@ def capped(proposal):
 class ProfileReadCapReached(ValueError):
     """A required profile read waits; it never disappears from a write's preflight."""
 
-def reserve_profile_read(account,purpose,now=None):
+def profile_read_cap(member=None):
+    """OPERATOR_PROFILE_READ_DAILY_LIMIT of the member (hers, else the .env's), within 0–100."""
+    return max(0,min(100,int(miembros.setting(member,'OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
+
+def profile_reads_used(member,now=None,create_baseline=False):
+    """The member's profile reads of the local day: the day's baseline (reads the pre-BAR-15 counters charged before the
+    first reservation) plus her operator.profile_read events. Every connector of hers shares it; another member's never
+    count. `create_baseline` (the caller holds her policy_lock): the day's first reservation saves the baseline."""
     from .models import AuditEvent
-    now=now or timezone.now();day,_=period_starts(now)
-    cap=max(0,min(100,int(os.environ.get('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
+    now=now or timezone.now();day,_=period_starts(now);key=miembros.policy_key(member)
+    period={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
+    # Reuse the original baseline for this day, even if a later day's reservation exists.
+    baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target=key,
+        metadata__day=day.date().isoformat()).order_by('created_at','id').first()
+    if baseline is not None:legacy=baseline.metadata['used']
+    elif create_baseline:
+        # Preserve reads already charged by the pre-BAR-15 counters on deployment day (those of her accounts).
+        counted=AuditEvent.objects.filter(
+            Q(action='network.read',metadata__kind='profile')|
+            Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
+            Q(action='metrics.read',metadata__kind='profile'),**period)
+        if member is not None:counted=counted.filter(target__in=[str(pk) for pk in miembros.accounts(member).values_list('pk',flat=True)])
+        legacy=counted.count()
+        AuditEvent.objects.create(action='operator.profile_baseline',target=key,created_at=now,
+                                  metadata={'day':day.date().isoformat(),'used':legacy})
+    else:legacy=0
+    return legacy+AuditEvent.objects.filter(action='operator.profile_read',target=key,**period).count()
+
+def reserve_profile_read(account,purpose,now=None):
+    """One profile read of the member who owns `account`, within her daily cap; atomic under her policy_lock."""
+    from .models import AuditEvent
+    now=now or timezone.now();member=member_of(account=account);cap=profile_read_cap(member)
     with transaction.atomic():
-        policy_lock()
-        period={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
-        # Reuse the original baseline for this day, even if a later day's reservation exists.
-        baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target='member',
-            metadata__day=day.date().isoformat()).order_by('created_at','id').first()
-        if baseline is None:
-            # Preserve reads already charged by the pre-BAR-15 counters on deployment day.
-            legacy=AuditEvent.objects.filter(
-                Q(action='network.read',metadata__kind='profile')|
-                Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
-                Q(action='metrics.read',metadata__kind='profile'),**period).count()
-            AuditEvent.objects.create(action='operator.profile_baseline',target='member',created_at=now,
-                                      metadata={'day':day.date().isoformat(),'used':legacy})
-        else:legacy=baseline.metadata['used']
-        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',**period).count()
+        policy_lock(member)
+        used=profile_reads_used(member,now,create_baseline=True)
         if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
-        AuditEvent.objects.create(action='operator.profile_read',target='member',created_at=now,
+        AuditEvent.objects.create(action='operator.profile_read',target=miembros.policy_key(member),created_at=now,
                                   metadata={'account':str(account.id),'purpose':purpose})
 
 def env_paused():
@@ -367,7 +422,8 @@ def set_global_pause(user,paused,reason=''):
         avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde la Bandeja.')
     return control
 
-def validate_payload(capability,payload):
+def validate_payload(capability,payload,account=None):
+    """`account`: the one that would write it; an invitation's note is checked against its member's tier."""
     if not isinstance(payload,dict):raise ValueError('La acción requiere un objeto')
     if capability in (ActionProposal.Capability.COMMENT,ActionProposal.Capability.REPLY):
         text=payload.get('text')
@@ -390,7 +446,7 @@ def validate_payload(capability,payload):
             if set(payload)!={'user_id'}:raise ValueError('Metadatos de nota sin nota')
             return {'user_id':payload['user_id']}
         from .red import note_policy
-        policy=note_policy()
+        policy=note_policy(member_of(account=account))
         note=payload.get('note');reason=payload.get('note_reason')
         if not isinstance(note,str) or not note.strip() or len(note)>policy['max_chars'] or '\x00' in note:
             raise ValueError('Nota de invitación inválida para el tier efectivo')
@@ -615,7 +671,7 @@ def create_proposal(user,post,capability,payload,rationale='',citations=(),risks
     if piece and 'media' not in payload:
         from .imagenes import manifest
         payload=dict(payload,media=manifest(piece))
-    payload=validate_payload(capability,payload) if state!=ActionProposal.State.DISCARDED else payload
+    payload=validate_payload(capability,payload,(post or piece or contact or comment).account) if state!=ActionProposal.State.DISCARDED else payload
     account_id=(post or piece or contact or comment).account_id
     digest=payload_hash(account_id,capability,target_of(post,piece,contact,comment),payload)
     try:
@@ -773,7 +829,7 @@ def _record_metrics(proposal,post):
 @transaction.atomic
 def final_write_gate(execution,proposal,user):
     """Recheck after slow preflight/upload. The current execution already owns its capacity slot."""
-    policy_lock()
+    policy_lock(member_of(account=proposal.account))
     from .orquestacion import cycle_issues
     issues=cycle_issues(proposal)
     from . import experimentos
@@ -850,12 +906,14 @@ def execute(user,proposal_id):
     # Persist health/pause changes before any gate can roll back the execution reservation.
     from . import red
     candidate=ActionProposal.objects.select_related('account').get(id=proposal_id)
+    # Her rhythm (organizaciones, phase 2): the member who owns the account; MiembroRequerido for an account of nobody.
+    member=member_of(account=candidate.account)
     if candidate.capability=='RED-02':red.review_health(candidate.account)
     if candidate.capability in NETWORK and not candidate.account.paused and os.environ.get('OPERATOR_EXTERNAL_OUTREACH_ACTIVE','false').lower()=='true':
         set_account_pause(candidate.account,'Outreach externo concurrente; desactivarlo antes de reanudar.')
-    prepare_day_schedule()
+    prepare_day_schedule(member=member)
     with transaction.atomic():
-        policy_lock()
+        policy_lock(member)
         proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact','comment').get(id=proposal_id)
         existing=ActionExecution.objects.filter(proposal=proposal).first()
         if existing:return existing
@@ -880,7 +938,7 @@ def execute(user,proposal_id):
         waits=batch_issue(proposal.capability) if not proposal.piece_id else ''
         if waits:raise OperatorBlocked(waits)
         if not spacing_ok(account,capability=proposal.capability):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
-        due=None if proposal.piece_id else post_due()
+        due=None if proposal.piece_id else post_due(member=member)
         if due:raise OperatorBlocked(f'El post de las {due.piece.scheduled_for.astimezone(local_tz()):%H:%M} sale primero; esta acción queda aprobada para después.')
         if capped(proposal) and capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
@@ -895,7 +953,7 @@ def execute(user,proposal_id):
             from . import respuestas
             issues=respuestas.execution_issues(proposal)
             if issues:raise OperatorBlocked('; '.join(issues))
-        reserved=reserve_spacing(capability=proposal.capability)
+        reserved=reserve_spacing(capability=proposal.capability,member=member)
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
         execution._spacing=reserved  # given back by _finish if nothing gets written
@@ -1166,7 +1224,7 @@ def _draft_comment(message,units,warm=False):
 def _fixable_issues(post,data,citations,risks):
     """Deterministic issues (autopiloto) that only a different text can fix; none when the target itself is blocked."""
     from . import autopiloto
-    if autopiloto.autonomy('INT-03')!='auto':return []  # only the auto policy applies these rules
+    if autopiloto.autonomy('INT-03',member_of(account=post.account))!='auto':return []  # only the auto policy applies these rules
     draft=ActionProposal(account=post.account,post=post,capability='INT-03',payload={'text':data['comment']},
                          citations=citations,risks=risks,source='agent')
     issues=autopiloto.comment_text_issues(draft)

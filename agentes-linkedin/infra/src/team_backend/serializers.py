@@ -264,7 +264,9 @@ class ContactOutput(serializers.ModelSerializer):
         if stage=='followed' and not (obj.classification or {}).get('fit'):
             return {'owner':None,'text':'La sigues; no se invitará: '+((obj.classification or {}).get('rule') or 'ya no encaja'),'at':None}
         if stage=='followed' and obj.followed_at:
-            blocked,reason=red.invites_blocked()
+            from . import miembros, operador
+            try:blocked,reason=red.invites_blocked(member=operador.member_of(account=obj.account))  # her invitations (phase 2)
+            except miembros.MiembroRequerido:blocked,reason=True,'Su cuenta no es de ningún miembro: nadie la invitará.'
             when=obj.followed_at+red.invite_after()
             return {'owner':'equipo','text':reason if blocked else 'El equipo la invitará cuando termine la espera','at':when}
         if stage=='invited':

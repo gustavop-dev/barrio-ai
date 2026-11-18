@@ -70,7 +70,7 @@ def cancel_pending(experiment):
 def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
     experiment = ReferentExperiment.objects.select_related('account').get(pk=experiment_id)
     require_gustavo(user, experiment.account)
-    operador.policy_lock()
+    operador.policy_lock(operador.member_of(account=experiment.account))
     lock(experiment.account)
     experiment = ReferentExperiment.objects.select_for_update().get(pk=experiment_id)
     now = timezone.now()
@@ -262,7 +262,7 @@ def tick(now=None):
     now = now or timezone.now()
     for experiment in ReferentExperiment.objects.filter(state='approved').select_related('account', 'referent', 'approved_by'):
         with transaction.atomic():
-            operador.policy_lock()
+            operador.policy_lock(operador.member_of(account=experiment.account))
             lock(experiment.account)
             experiment.refresh_from_db()
             if experiment.state != 'approved':

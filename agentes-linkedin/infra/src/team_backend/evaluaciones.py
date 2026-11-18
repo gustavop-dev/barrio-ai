@@ -226,7 +226,8 @@ def comment_request(run,post,revision=None):
 def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
     people=red.classification_people(contacts)
-    message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
+    policy=red.note_policy(operador.member_of(account=contacts[0].account) if contacts else None)  # the tier of whoever invites them
+    message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':policy},ensure_ascii=False,default=str)
     unit_ids,methodology=red.classify_units()  # BAR-25: the same prompt, schema and units as red.classify today
     units,missing,_=run.context(unit_ids,metodologia=methodology)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')

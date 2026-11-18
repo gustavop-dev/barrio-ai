@@ -23,7 +23,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
-from . import comprador, guardas, operador, ubicacion
+from . import comprador, guardas, miembros, operador, ubicacion
 from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .models import OPEN_ACTION_STATES, ActionExecution, ActionProposal, AuditEvent, Contact, ObservedPost, Referent
@@ -127,16 +127,25 @@ BARRIO_TABLE=(
 # 80 a week, never more than 30 (LI-03-V021-K02, LI-03-V014-K03).
 RAMP_STAGES=((8,40),(16,80),(20,100))
 RAMP_START=1
+# Organizaciones, phase 2: each member has her own ramp, its health and its pauses, her own notes and tier; the stages and
+# the start can be set per member (miembros.MEMBER_SETTINGS: OPERATOR_INVITE_RAMP_STAGES, OPERATOR_INVITE_RAMP_START).
 
 
-def invitation_health(now=None):
-    """Unique outbound recipients, rolling send cohort, mature and observed outcomes only."""
-    now=now or timezone.now()
+def ramp_start(member=None):
+    """The stage a member's new ramp starts at: OPERATOR_INVITE_RAMP_START (hers, else the .env's), else RAMP_START."""
+    try:return max(0,min(len(RAMP_STAGES)-1,int(miembros.setting(member,'OPERATOR_INVITE_RAMP_START',str(RAMP_START)))))
+    except ValueError:raise ValueError('OPERATOR_INVITE_RAMP_START inválida: 0, 1 o 2.') from None
+
+
+def invitation_health(now=None,member=None):
+    """Unique outbound recipients, rolling send cohort, mature and observed outcomes only: the invitations of the member's
+    accounts (each member's acceptance is measured apart)."""
+    now=now or timezone.now();member=operador.member_of(member=member)
     maturity=max(7,int(setting('OPERATOR_INVITE_MATURITY_DAYS','7')))
     cohort=max(maturity,int(setting('OPERATOR_INVITE_COHORT_DAYS','28')))
-    rows=(ActionExecution.objects.filter(proposal__capability=RED.INVITE,wrote=True,
-          state__in=['confirmed','sent','uncertain','executing'],started_at__gte=now-timedelta(days=cohort),started_at__lte=now)
-          .select_related('proposal__contact').order_by('started_at'))
+    rows=(miembros.mine(ActionExecution.objects.filter(proposal__capability=RED.INVITE,wrote=True,
+          state__in=['confirmed','sent','uncertain','executing'],started_at__gte=now-timedelta(days=cohort),started_at__lte=now),
+          member,'proposal__account').select_related('proposal__contact').order_by('started_at'))
     people={}
     for row in rows:
         if row.proposal.contact_id:people.setdefault(row.proposal.contact.provider_user_id,row)
@@ -158,30 +167,35 @@ def invitation_health(now=None):
             'rate':accepted/known if known else None,'maturity_days':maturity,'cohort_days':cohort,'sample_key':fingerprint}
 
 
-def ramp_state(now=None):
-    now=now or timezone.now();event=operador.policy_event('network.ramp')
+def ramp_state(now=None,member=None):
+    """The member's invitation ramp (her latest network.ramp event); a new one starts at her ramp_start."""
+    now=now or timezone.now();member=operador.member_of(member=member)
+    event=operador.policy_event('network.ramp',member=member)
     # A new ramp has no pause; only a health or provider event sets a deadline.
-    return dict(event.metadata) if event else {'stage':RAMP_START,'stage_since':now.isoformat(),'freeze_until':now.isoformat(),
+    return dict(event.metadata) if event else {'stage':ramp_start(member),'stage_since':now.isoformat(),'freeze_until':now.isoformat(),
                                               'pause_until':None,'last_sample':'','last_rate':None}
 
-def health_snapshot(at):
+def health_snapshot(at,member=None):
     """Historical reporting uses the saved cut, never today's profile state as yesterday's evidence."""
-    event=AuditEvent.objects.filter(action='network.ramp',target='member',created_at__lte=at,
+    key=miembros.policy_key(operador.member_of(member=member))
+    event=AuditEvent.objects.filter(action='network.ramp',target=key,created_at__lte=at,
                                    metadata__has_key='health').order_by('-created_at','-id').first()
     if event:return dict(event.metadata['health'],observed_at=event.metadata.get('reviewed_at'),source='saved_health_cut')
     return {'rate':None,'mature':0,'accepted':0,'unknown':None,'reason':'Sin corte de salud guardado para esta ventana'}
 
 
-def _save_ramp(state,reason,now):
-    operador._audit(None,'network.ramp','member',**dict(state,reason=reason,reviewed_at=now.isoformat()))
+def _save_ramp(state,reason,now,member=None):
+    operador._audit(None,'network.ramp',miembros.policy_key(operador.member_of(member=member)),
+                    **dict(state,reason=reason,reviewed_at=now.isoformat()))
 
 
 @transaction.atomic
 def review_health(account,now=None):
-    now=now or timezone.now();operador.policy_lock()
-    existed=operador.policy_event('network.ramp');state=ramp_state(now)
+    """Once a day, the ramp of the member who owns `account` follows her own acceptance (invitation_health)."""
+    now=now or timezone.now();member=operador.member_of(account=account);operador.policy_lock(member)
+    existed=operador.policy_event('network.ramp',member=member);state=ramp_state(now,member)
     if existed and state.get('reviewed_day')==now.astimezone(operador.local_tz()).date().isoformat():return state
-    health=invitation_health(now)
+    health=invitation_health(now,member)
     previous_health=state.get('health',{})
     state['reviewed_day']=now.astimezone(operador.local_tz()).date().isoformat();state['health']=health
     days=max(7,int(setting('OPERATOR_INVITE_RAMP_MIN_DAYS','7')))
@@ -209,12 +223,15 @@ def review_health(account,now=None):
               now>=datetime.fromisoformat(state['freeze_until']) and now>=datetime.fromisoformat(state['stage_since'])+timedelta(days=days)):
             state['stage']=min(2,state['stage']+1);state['stage_since']=now.isoformat();reason='Etapa saludable tras al menos siete días'
         state['last_rate']=rate;state['last_sample']=health['sample_key']
-    _save_ramp(state,reason,now)
+    _save_ramp(state,reason,now,member)
     return state
 
 
-def ramp_limits(account,now=None):
-    state=review_health(account,now) if account is not None else ramp_state(now)
+def ramp_limits(account,now=None,member=None):
+    """(daily, weekly) invitations the member's ramp allows now: of the owner of `account` (reviewing her health), else
+    of `member` (else the only active one)."""
+    member=operador.member_of(account,member)
+    state=review_health(account,now) if account is not None else ramp_state(now,member)
     if state.get('pause_until') and (now or timezone.now())<datetime.fromisoformat(state['pause_until']):return 0,0
     health=state.get('health',{})
     if (health.get('mature',0)>=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20'))) and
@@ -222,11 +239,11 @@ def ramp_limits(account,now=None):
         return 0,0
     # Overrides may only lower each stage; disabling growth retains the initial ceiling.
     stages=list(RAMP_STAGES)
-    raw=setting('OPERATOR_INVITE_RAMP_STAGES','8/40,16/80,20/100').split(',')
+    raw=str(miembros.setting(member,'OPERATOR_INVITE_RAMP_STAGES','8/40,16/80,20/100')).split(',')
     if len(raw)!=3:raise ValueError('OPERATOR_INVITE_RAMP_STAGES requiere tres etapas')
     for i,value in enumerate(raw):
         d,w=map(int,value.split('/'));stages[i]=(max(0,min(stages[i][0],d)),max(0,min(stages[i][1],w)))
-    stage=state['stage'] if setting('OPERATOR_INVITE_RAMP_ENABLED','true').lower()=='true' else min(state['stage'],RAMP_START)
+    stage=state['stage'] if setting('OPERATOR_INVITE_RAMP_ENABLED','true').lower()=='true' else min(state['stage'],ramp_start(member))
     return stages[stage]
 
 
@@ -244,23 +261,28 @@ def invitation_reserved(uid,proposal=None):
 
 @transaction.atomic
 def provider_failure(account,proposal,exc,actor=None):
-    operador.policy_lock();now=timezone.now()
+    """LinkedIn pushed back on a write of `account`: a limit, a restriction or cannot_resend_yet lowers and freezes (or
+    pauses) the ramp of the member who owns it, and pauses her account; another member's ramp and accounts go on. The
+    recipient stays blocked for everyone (recipient_blocked: a person is never invited again by anyone)."""
+    member=operador.member_of(account=account);operador.policy_lock(member);now=timezone.now();key=miembros.policy_key(member)
     cannot=exc.status==422 and exc.kind.split('/')[-1]=='cannot_resend_yet'
     limit=exc.status==429 or bool(LIMIT_ERROR.search(exc.kind))
     restricted=exc.pause or exc.kind.split('/')[-1] in ('account_restricted','account_locked')
     if cannot or limit or restricted:
-        state=ramp_state(now);state['stage']=max(0,state['stage']-1);state['stage_since']=now.isoformat()
+        state=ramp_state(now,member);state['stage']=max(0,state['stage']-1);state['stage_since']=now.isoformat()
         state['freeze_until']=(now+timedelta(days=7)).isoformat()
         if limit or restricted:state['pause_until']=(now+timedelta(days=7)).isoformat()
-        _save_ramp(state,exc.kind,now)
-        operador._audit(actor,'network.provider_limit','member',kind=exc.kind,status=exc.status,
+        _save_ramp(state,exc.kind,now,member)
+        operador._audit(actor,'network.provider_limit',key,kind=exc.kind,status=exc.status,
                         recipient=proposal.payload.get('user_id'),scope='recipient' if cannot else 'account')
     if cannot:
         uid=proposal.payload['user_id']
         operador._audit(actor,'network.recipient_blocked',uid,kind=exc.kind,status=422)
-        count=AuditEvent.objects.filter(action='network.recipient_blocked',created_at__gte=now-timedelta(hours=24)).values('target').distinct().count()
+        # Two distinct recipients refused to HER in 24 h (her network.provider_limit events) pause her invitations.
+        count=len(set(AuditEvent.objects.filter(action='network.provider_limit',target=key,metadata__scope='recipient',
+                                                created_at__gte=now-timedelta(hours=24)).values_list('metadata__recipient',flat=True)))
         if count>=2:
-            state['pause_until']=(now+timedelta(days=7)).isoformat();_save_ramp(state,'cannot_resend_yet repetido',now)
+            state['pause_until']=(now+timedelta(days=7)).isoformat();_save_ramp(state,'cannot_resend_yet repetido',now,member)
             operador.set_account_pause(account,'cannot_resend_yet en dos destinatarios: mínimo siete días de pausa.',actor)
         else:
             from .notificaciones import avisar
@@ -269,12 +291,15 @@ def provider_failure(account,proposal,exc,actor=None):
         operador.set_account_pause(account,f'Restricción o límite del proveedor: {exc}. Mínimo siete días; requiere revisión.',actor)
 
 
-def note_policy():
-    tier=setting('LINKEDIN_ACCOUNT_TIER','free')
+def note_policy(member=None):
+    """The member's notes: her account's tier and monthly cap (hers, else the .env's) and what the provider verified for
+    her (network.note_capability under her key)."""
+    member=operador.member_of(member=member)
+    tier=miembros.setting(member,'LINKEDIN_ACCOUNT_TIER','free')
     if tier not in ('free','premium','sales_navigator'):raise ValueError('LINKEDIN_ACCOUNT_TIER inválido')
     # Paid tiers do not imply an unlimited quota or a verified increase in text length.
-    cap=max(0,int(setting('LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT','3')))
-    verified=operador.policy_event('network.note_capability')
+    cap=max(0,int(miembros.setting(member,'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT','3')))
+    verified=operador.policy_event('network.note_capability',member=member)
     data=verified.metadata if verified and verified.metadata.get('tier')==tier else {}
     chars=200 if tier=='free' else min(300,int(data.get('max_chars',200)))
     if 'remaining' in data:cap=min(cap,max(0,int(data['remaining'])))
@@ -282,36 +307,59 @@ def note_policy():
             'source':'verified_provider' if data else 'local_product_cap','default':'without_note'}
 
 
-def note_blocked():
-    event=operador.policy_event('network.notes_blocked')
-    reset=operador.policy_event('network.notes_reset_verified')
+def note_blocked(member=None):
+    """LinkedIn refused a note of the member's (network.notes_blocked under her key) and no reset was verified since."""
+    member=operador.member_of(member=member)
+    event=operador.policy_event('network.notes_blocked',member=member)
+    reset=operador.policy_event('network.notes_reset_verified',member=member)
     return bool(event and (reset is None or reset.created_at<=event.created_at))
 
 
-def note_room(now=None):
-    day,_=operador.period_starts(now);start=day.replace(day=1)
-    if note_blocked():return 0
-    # Reserved, in-flight, uncertain and confirmed notes remain charged across restarts/tier changes.
+def _her_proposals(targets,member):
+    """The proposal ids among `targets` (note events name their invitation) that are of the member's accounts; all of
+    them without a member to name (as before organizations)."""
+    if member is None:return set(targets)
+    import uuid
+    ids=[]
+    for target in targets:
+        try:ids.append(uuid.UUID(str(target)))
+        except ValueError:continue
+    return {str(pk) for pk in miembros.mine(ActionProposal.objects.filter(pk__in=ids),member).values_list('pk',flat=True)}
+
+
+def _notes_used(member,start):
+    """(reserved, rejected) proposal ids of the member's notes since `start`."""
     attempts=set(AuditEvent.objects.filter(action='network.note_reserved',created_at__gte=start).values_list('target',flat=True))
     rejected=set(AuditEvent.objects.filter(action='network.note_rejected',created_at__gte=start).values_list('target',flat=True))
-    pending=set(str(pk) for pk in ActionProposal.objects.filter(payload__has_key='note',
-                state__in=['proposed','approved','executing','sent','uncertain']).values_list('pk',flat=True))
-    return max(0,note_policy()['monthly_limit']-len((attempts|pending)-rejected))
+    return _her_proposals(attempts,member),_her_proposals(rejected,member)
+
+
+def note_room(now=None,member=None):
+    """Notes the member may still reserve this month: her cap minus her reserved, in-flight, uncertain and confirmed
+    notes (another member's never count)."""
+    member=operador.member_of(member=member)
+    day,_=operador.period_starts(now);start=day.replace(day=1)
+    if note_blocked(member):return 0
+    # Reserved, in-flight, uncertain and confirmed notes remain charged across restarts/tier changes.
+    attempts,rejected=_notes_used(member,start)
+    pending=set(str(pk) for pk in miembros.mine(ActionProposal.objects.filter(payload__has_key='note',
+                state__in=['proposed','approved','executing','sent','uncertain']),member).values_list('pk',flat=True))
+    return max(0,note_policy(member)['monthly_limit']-len((attempts|pending)-rejected))
 
 
 @transaction.atomic
 def reserve_note(proposal):
-    operador.policy_lock();policy=note_policy();now=timezone.now()
-    last=operador.policy_event('network.account_tier')
+    member=operador.member_of(account=proposal.account);key=miembros.policy_key(member)
+    operador.policy_lock(member);policy=note_policy(member);now=timezone.now()
+    last=operador.policy_event('network.account_tier',member=member)
     if last is None or last.metadata['tier']!=policy['tier']:
-        operador._audit(None,'network.account_tier','member',tier=policy['tier'],previous=last.metadata['tier'] if last else None,
+        operador._audit(None,'network.account_tier',key,tier=policy['tier'],previous=last.metadata['tier'] if last else None,
                         change_source='server_configuration',capability_source=policy['source'])
     existing=operador.policy_event('network.note_reserved',proposal.id)
     if existing:return True
-    if note_blocked():return False
+    if note_blocked(member):return False
     day,_=operador.period_starts(now);start=day.replace(day=1)
-    attempts=set(AuditEvent.objects.filter(action='network.note_reserved',created_at__gte=start).values_list('target',flat=True))
-    rejected=set(AuditEvent.objects.filter(action='network.note_rejected',created_at__gte=start).values_list('target',flat=True))
+    attempts,rejected=_notes_used(member,start)
     if len(attempts-rejected)>=policy['monthly_limit']:return False
     operador._audit(None,'network.note_reserved',proposal.id,**policy,period=start.date().isoformat(),
                     recipient=proposal.payload['user_id'],reason=proposal.payload['note_reason'],provider_consumption='unknown')
@@ -344,7 +392,8 @@ def send_invitation(execution,proposal,connector,user):
         # Never reserve a monthly note for a text nobody reviewed; the approved alternative is the same invitation without it.
         operador._audit(user,'network.note_omitted',proposal.id,reason=NOTE_UNREVIEWED)
         text=None
-    use_note=bool(text and len(text)<=note_policy()['max_chars'] and reserve_note(proposal))
+    member=operador.member_of(account=proposal.account)
+    use_note=bool(text and len(text)<=note_policy(member)['max_chars'] and reserve_note(proposal))
     if text and not use_note:
         operador._audit(user,'network.note_omitted',proposal.id,reason='Local cap or provider note block; approved alternative')
     try:
@@ -352,8 +401,8 @@ def send_invitation(execution,proposal,connector,user):
     except InvitationNoteQuota as exc:
         if not use_note:raise  # A note-only rejection without a note is inconsistent; never retry it.
         with transaction.atomic():
-            operador.policy_lock()
-            operador._audit(user,'network.notes_blocked','member',kind=exc.kind,status=exc.status)
+            operador.policy_lock(member)
+            operador._audit(user,'network.notes_blocked',miembros.policy_key(member),kind=exc.kind,status=exc.status)
             operador._audit(user,'network.note_rejected',proposal.id,provider_consumption='not_consumed')
             finished=operador._finish(execution,'failed',user,error_kind='note_quota',http_status=exc.status,note=str(exc),wrote=False)
             fallback=operador.create_proposal(user,None,RED.INVITE,{'user_id':uid},rationale='Alternativa sin nota aprobada: '+proposal.rationale,
@@ -373,19 +422,21 @@ def execution_issues(proposal,now=None):
     now=now or timezone.now();issues=[]
     if setting('OPERATOR_EXTERNAL_OUTREACH_ACTIVE','false').lower()=='true':issues.append('Outreach externo concurrente')
     if proposal.capability==RED.INVITE:
-        note_policy()  # Unknown tier is a configuration error, even for a no-note invitation.
+        member=operador.member_of(account=proposal.account)
+        note_policy(member)  # Unknown tier is a configuration error, even for a no-note invitation.
         if operador.is_weekend(now):issues.append('Invitaciones solo lunes–viernes')
+        # One person, one invitation, whoever's: the recipient's block and the reservation stay the organization's.
         if recipient_blocked(proposal.payload['user_id']):issues.append('Destinatario bloqueado por cannot_resend_yet')
         if invitation_reserved(proposal.payload['user_id'],proposal):issues.append('Ya existe otra intención o envío para el destinatario')
-        blocked,reason=invites_blocked(now)
+        blocked,reason=invites_blocked(now,member)
         if blocked:issues.append(reason)
         if proposal.contact.classification.get('role')=='lider':issues.append('La tabla del curso prescribe comentar con criterio a líderes')
         if proposal.payload.get('note'):
-            try:operador.validate_payload(RED.INVITE,proposal.payload)
+            try:operador.validate_payload(RED.INVITE,proposal.payload,proposal.account)
             except ValueError as exc:
                 # An approved fallback survives a tier downgrade; no text is silently truncated.
                 text=proposal.payload.get('note')
-                if not (isinstance(text,str) and len(text)>note_policy()['max_chars'] and proposal.payload.get('without_note_fallback') is True):
+                if not (isinstance(text,str) and len(text)>note_policy(member)['max_chars'] and proposal.payload.get('without_note_fallback') is True):
                     issues.append(str(exc))
             # A note without the lead's approval only blocks an invitation that has no approved alternative without it;
             # red.plan always gives one (without_note_fallback) and send_invitation then leaves the note out.
@@ -404,7 +455,7 @@ def _read(account,kind,purpose='research'):
     """Count a read before making it; a spent cap stops the read."""
     cap=read_caps()[kind]
     with transaction.atomic():
-        operador.policy_lock()
+        operador.policy_lock(operador.member_of(account=account))
         if reads_today(account,kind)>=cap:raise ReadCapReached(f'Tope diario de lecturas «{kind}» alcanzado ({cap}).')
         if kind=='profile':
             try:operador.reserve_profile_read(account,purpose)
@@ -755,7 +806,7 @@ def _signals_read(account,allowance):
     profile caps still stop it (ReadCapReached)."""
     day,_=operador.period_starts()
     with transaction.atomic():
-        operador.policy_lock()
+        operador.policy_lock(operador.member_of(account=account))
         if AuditEvent.objects.filter(action='network.signals_read',target=str(account.id),created_at__gte=day).count()>=allowance:return False
         _read(account,'profile')
         AuditEvent.objects.create(action='network.signals_read',target=str(account.id))
@@ -823,7 +874,8 @@ def _classify_batch(user,account,now,batch):
     from .evidencia import record_classification, CRITERION_VERSION
     people=classification_people(contacts)
     from . import orientacion
-    message=json.dumps({'private_guidance':private,'orientation':orientacion.text(),'people':people,'note_policy':note_policy()},ensure_ascii=False,default=str)
+    message=json.dumps({'private_guidance':private,'orientation':orientacion.text(),'people':people,
+                        'note_policy':note_policy(operador.member_of(account=account))},ensure_ascii=False,default=str)
     # Sonnet 5.5 thinks at effort high by default; medium keeps the judgment and the cap leaves room for thinking.
     system=classify_system();on=projectapp.enabled()
     answer=providers.claude(system,message,max_tokens=16000,output_schema=classify_schema(),effort='medium',
@@ -1163,17 +1215,19 @@ def _raise_level(contact,verdict,now):
 def _open(capability,account):
     return ActionProposal.objects.filter(account=account,capability=capability,state__in=['proposed','approved']).count()
 
-def invites_blocked(now=None):
-    """LinkedIn refused invitations for a limit in the last 7 days: invitations wait."""
-    since=(now or timezone.now())-timedelta(days=7)
-    state=ramp_state(now)
+def invites_blocked(now=None,member=None):
+    """The member's invitations wait: her ramp is paused, her mature acceptance is under the pause threshold, or LinkedIn
+    refused one of hers for a limit in the last 7 days. Another member's never stop hers."""
+    since=(now or timezone.now())-timedelta(days=7);member=operador.member_of(member=member)
+    state=ramp_state(now,member)
     if state.get('pause_until') and (now or timezone.now())<datetime.fromisoformat(state['pause_until']):
         return True,'Pausa de invitaciones por salud o proveedor; mínimo siete días.'
     health=state.get('health',{})
     if (health.get('mature',0)>=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20'))) and
             health.get('rate') is not None and health['rate']<max(0.25,float(setting('OPERATOR_INVITE_ACCEPTANCE_PAUSE','0.25')))):
         return True,'Aceptación madura bajo el umbral de pausa; esperar conciliación y recuperación.'
-    for execution in ActionExecution.objects.filter(proposal__capability=RED.INVITE,state='failed',started_at__gte=since):
+    for execution in miembros.mine(ActionExecution.objects.filter(proposal__capability=RED.INVITE,state='failed',started_at__gte=since),
+                                   member,'proposal__account'):
         if execution.error_kind=='note_quota':continue
         if execution.http_status==429 or LIMIT_ERROR.search(f'{execution.error_kind} {execution.note}'):
             return True,f'LinkedIn rechazó una invitación por límite el {execution.started_at:%d/%m}; se reanuda sola en 7 días.'
@@ -1273,13 +1327,14 @@ def plan(user,account,now=None):
     from .autopiloto import autonomy
     from .orquestacion import current, load_graph
     require(user,'operate_linkedin')
-    operador.policy_lock()
+    member=operador.member_of(account=account)  # her caps, ramp, notes and autonomy (organizaciones, phase 2)
+    operador.policy_lock(member)
     now=now or timezone.now()
     review_health(account,now)
     account.refresh_from_db()
     _,grounding=operador.role_context('relaciones',NETWORK_UNITS)
     summary={'follow':0,'invite':0,'accept':0,**grounding,'distribution':[]}
-    summary['rhythm']=weekly_rhythm(now)
+    summary['rhythm']=weekly_rhythm(now,member=member)
     for row in BARRIO_TABLE:
         count=Contact.objects.filter(account=account,classification__fit=True,classification__role=row['role']).count()
         summary['distribution'].append(dict(row,available=count,gap=max(0,row['profiles']-count),
@@ -1293,7 +1348,7 @@ def plan(user,account,now=None):
     if runtime and runtime.job_id:
         review_limit-=ActionProposal.objects.filter(origin_job=runtime.job_id,capability__in=[RED.FOLLOW,RED.INVITE,RED.ACCEPT]).count()
     def room(capability):
-        reserved=ActionProposal.objects.filter(capability=capability,state__in=['proposed','approved']).count()
+        reserved=miembros.mine(ActionProposal.objects.filter(capability=capability,state__in=['proposed','approved']),member).count()
         return min(operador.capacity_left(account,capability,now)-reserved,
                    review_limit-sum(summary[kind] for kind in ('follow','invite','accept')))
     def waiting(capability,**filters):
@@ -1305,7 +1360,7 @@ def plan(user,account,now=None):
     # Phase 2: rest, wake and retry the buyers before choosing whom to invite (each person on its own savepoint).
     if warmup:summary['calentamiento']=calentamiento.sweep(account,now)
     # Invitations first: they are the scarce action that builds the network; follows take the reviews that are left.
-    if autonomy(RED.INVITE)!='off' and not invites_blocked(now)[0]:
+    if autonomy(RED.INVITE,member)!='off' and not invites_blocked(now,member)[0]:
         # Whoever commented on his own post already showed interest: invited without the warm-up (INT-04, 12/11/2026).
         followed=waiting(RED.INVITE,stage='followed',classification__fit=True).exclude(id__in=stage_waiting())
         # Phase 2: a buyer with a journey waits for the warm-up (calentamiento.invite_ready); everyone else as before.
@@ -1328,7 +1383,7 @@ def plan(user,account,now=None):
         # decided yet waits for it (NOTE_HOLD at most); a stopped note never stops the invitation.
         from . import mensajes_comprador
         buyer_notes=mensajes_comprador.enabled()
-        held=mensajes_comprador.note_hold(candidates,now) if buyer_notes else set()
+        held=mensajes_comprador.note_hold(candidates,now,member) if buyer_notes else set()
         ready=mensajes_comprador.ready_notes(candidates) if buyer_notes else {}
         if held:summary['nota_en_espera']=len(held)
         # A scarce note goes first to someone who conversed with him on his post, with a slightly lower bar.
@@ -1336,35 +1391,35 @@ def plan(user,account,now=None):
             c.classification.get('invitation_note') and c.classification.get('note_reason') and
             'LI-03-M006-K01' in c.classification.get('course_citations',[])),
             key=lambda c:(bool((c.evidence or {}).get('conversed')),c.classification['confidence']),reverse=True)
-        note_ids={c.pk for c in exceptions[:note_room(now)]}
+        note_ids={c.pk for c in exceptions[:note_room(now,member)]}
         for contact in candidates:
             if room(RED.INVITE)<=0:break
             if contact.pk in held:continue
             if recipient_blocked(contact.provider_user_id) or invitation_reserved(contact.provider_user_id):continue
             payload={'user_id':contact.provider_user_id};c=contact.classification
             draft=ready.get(contact.pk)
-            if draft is not None and note_room(now)>0:
+            if draft is not None and note_room(now,member)>0:
                 payload.update(note=draft.text,note_reason=('Nota del comprador calentado: '+(draft.reason or ''))[:500],
                                without_note_fallback=True)
-                try:operador.validate_payload(RED.INVITE,payload)
+                try:operador.validate_payload(RED.INVITE,payload,account)
                 except ValueError:payload={'user_id':contact.provider_user_id}
-            elif contact.pk in note_ids and note_room(now)>0:
+            elif contact.pk in note_ids and note_room(now,member)>0:
                 payload.update(note=c['invitation_note'],note_reason=c['note_reason'],without_note_fallback=True)
-                try:operador.validate_payload(RED.INVITE,payload)
+                try:operador.validate_payload(RED.INVITE,payload,account)
                 except ValueError:payload={'user_id':contact.provider_user_id}
             proposal=_propose(user,contact,RED.INVITE,payload,grounding)
             if proposal is not None and draft is not None and payload.get('note')==draft.text:mensajes_comprador.use_note(draft,proposal)
             summary['invite']+=bool(proposal)
             if proposal:invited.append(contact)
         reparto.planned(summary['role_quota'],invited)
-    if autonomy(RED.FOLLOW)!='off':
+    if autonomy(RED.FOLLOW,member)!='off':
         # Leaders are followed too (their posts are where the team comments); only invitations leave them out.
         # Phase 5: a bridge whose buyer left the journey is not followed (no bridge exists with the switch off).
         for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).exclude(bridge_for__step='salio')
                                    .order_by('discovered_at')):
             if room(RED.FOLLOW)<=0:break
             summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id},grounding))
-    if autonomy(RED.ACCEPT)!='off':
+    if autonomy(RED.ACCEPT,member)!='off':
         # Incoming people are classified like candidates (classify takes stage incoming): only a fitting verdict is accepted.
         for contact in waiting(RED.ACCEPT,stage='incoming',classification__fit=True).exclude(invitation_id=''):
             if room(RED.ACCEPT)<=0:break
@@ -1697,14 +1752,14 @@ def network_issues(proposal):
     if proposal.capability in (RED.FOLLOW,RED.INVITE) and not outbound_target(contact):
         issues.append('La verificación encontró evidencia en contra: no es comprador')
     if proposal.capability==RED.INVITE:
-        try:operador.validate_payload(RED.INVITE,proposal.payload)
+        try:operador.validate_payload(RED.INVITE,proposal.payload,proposal.account)
         except ValueError as exc:issues.append(str(exc))
         if recipient_blocked(contact.provider_user_id):issues.append('Destinatario bloqueado')
         if proposal.payload.get('note'):
             from .autopiloto import PITCH, URL, EMAIL, PHONE
             if any(pattern.search(proposal.payload['note']) for pattern in (PITCH,URL,EMAIL,PHONE)):
                 issues.append('Nota con pitch o datos de contacto')
-        blocked,reason=invites_blocked()
+        blocked,reason=invites_blocked(member=operador.member_of(account=proposal.account))
         if blocked:issues.append(reason)
     if proposal.capability==RED.ACCEPT and proposal.payload.get('request_id')!=contact.invitation_id:
         issues.append('La invitación no coincide con la registrada')
@@ -1731,45 +1786,51 @@ def connection_roles(contacts):
         roles[role]=roles.get(role,0)+1
     return {'total':sum(roles.values()),'roles':roles}
 
-def summary(account=None,now=None):
+def summary(account=None,now=None,member=None):
+    """The network's state for the member who owns `account` (else `member`, else the only active one): her caps, ramp,
+    health, notes and blocks; the stages and reads of `account` (of every account without one)."""
     from .autopiloto import autonomy
-    now=now or timezone.now();contacts=Contact.objects.all()
+    now=now or timezone.now();contacts=Contact.objects.all();member=operador.member_of(account,member)
     if account:contacts=contacts.filter(account=account)
     stages={s:contacts.filter(stage=s).count() for s in Contact.Stage.values}
     day,week=operador.period_starts(now);capacity={}
     for capability in NETWORK_CAPABILITIES:
-        daily,weekly=operador.limits(now)[capability]
+        daily,weekly=operador.limits(now,member)[capability]
         if capability==RED.INVITE:
-            rd,rw=ramp_limits(account,now);daily,weekly=min(daily,rd),min(weekly,rw)
-        done=ActionExecution.objects.filter(proposal__capability=capability,wrote=True)  # what the caps count
+            rd,rw=ramp_limits(account,now,member);daily,weekly=min(daily,rd),min(weekly,rw)
+        done=operador.writes(account,capability,member)  # what the caps count: every connector of hers
         du,wu=done.filter(started_at__gte=day).count(),done.filter(started_at__gte=week).count()
         capacity[capability]={'daily':daily,'daily_used':du,'weekly':weekly,'weekly_used':wu,
-                              'left':max(0,min(daily-du,weekly-wu)),'mode':autonomy(capability)}
+                              'left':max(0,min(daily-du,weekly-wu)),'mode':autonomy(capability,member)}
     reads=AuditEvent.objects.filter(action='network.read',created_at__gte=day)
     if account:reads=reads.filter(target=str(account.id))
-    blocked,reason=invites_blocked(now)
+    blocked,reason=invites_blocked(now,member)
     def last(action):
         return AuditEvent.objects.filter(action=action).order_by('-created_at').values_list('created_at',flat=True).first()
-    return {'enabled':enabled(),'stages':stages,'connections':connection_roles(contacts),'capacity':capacity,'ramp':ramp_state(now),
-            'invitation_health':invitation_health(now),'note_policy':dict(note_policy(),local_remaining=note_room(now),blocked=note_blocked()),
+    return {'enabled':enabled(),'stages':stages,'connections':connection_roles(contacts),'capacity':capacity,'ramp':ramp_state(now,member),
+            'invitation_health':invitation_health(now,member),
+            'note_policy':dict(note_policy(member),local_remaining=note_room(now,member),blocked=note_blocked(member)),
             'reads_today':{k:reads.filter(metadata__kind=k).count() for k in READ_KINDS},'read_caps':read_caps(),
             'llm':{'spent_today':float(spent_today(now)),'daily':float(_fuse()),'model':classifier_model()},
             'invites_blocked':{'blocked':blocked,'reason':reason},
             'last_discovery_at':last('network.discovered'),'last_sync_at':last('network.synced')}
 
 
-def weekly_rhythm(now=None,start=None,end=None):
-    """Count confirmed actions and useful research separately, never uncertain writes or technical reads."""
-    now=now or timezone.now();_,week=operador.period_starts(now)
+def weekly_rhythm(now=None,start=None,end=None,member=None):
+    """Count confirmed actions and useful research separately, never uncertain writes or technical reads: the member's
+    (her accounts, her ramp's weekly target, her caps)."""
+    now=now or timezone.now();_,week=operador.period_starts(now);member=operador.member_of(member=member)
     start=start or week;end=end or now
-    executions=ActionExecution.objects.filter(state='confirmed',wrote=True,started_at__gte=start,started_at__lt=end)
+    executions=miembros.mine(ActionExecution.objects.filter(state='confirmed',wrote=True,started_at__gte=start,started_at__lt=end),
+                             member,'proposal__account')
     social={cap:executions.filter(proposal__capability=cap).count() for cap in operador.DEFAULT_LIMITS if cap!='CONT-09'}
     research=AuditEvent.objects.filter(action='network.research_result',created_at__gte=start,created_at__lt=end)
+    if member is not None:research=research.filter(target__in=[str(pk) for pk in miembros.accounts(member).values_list('pk',flat=True)])
     unique={(e.metadata['kind'],e.metadata['key']) for e in research}
-    stage=ramp_state(now)['stage'];target=(50,100,125)[stage]
+    stage=ramp_state(now,member)['stage'];target=(50,100,125)[stage]
     total=sum(social.values())+len(unique)
     return {'weekly_target':target,'confirmed_social':social,'own_pieces':executions.filter(proposal__capability='CONT-09').count(),
             'research_results':len(unique),'unique_people':executions.exclude(proposal__contact=None).values('proposal__contact__provider_user_id').distinct().count(),
-            'useful_total':total,'deficit':max(0,target-total),'limits':operador.limits(now),
+            'useful_total':total,'deficit':max(0,target-total),'limits':operador.limits(now,member),
             'reason':'Objetivo gradual, no cuota. Faltantes dependen de encaje, material, presupuesto, salud y ventana; no se rellena.',
-            'invitation_health':health_snapshot(end),'source':'confirmed_executions_and_research_results'}
+            'invitation_health':health_snapshot(end,member),'source':'confirmed_executions_and_research_results'}

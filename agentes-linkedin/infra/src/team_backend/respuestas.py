@@ -133,10 +133,11 @@ def read_caps():
         if key.strip() in caps and value.strip().isdigit():caps[key.strip()]=int(value)
     return caps
 
-def enabled():
-    """On by default (Gustavo, 12/11/2026); REPLIES_ENABLED=false or OPERATOR_AUTONOMY INT-04=off stops it."""
+def enabled(member=None):
+    """On by default (Gustavo, 12/11/2026); REPLIES_ENABLED=false or OPERATOR_AUTONOMY INT-04=off (the member's, else the
+    .env's) stops it. Without a member, the only active one."""
     from .autopiloto import autonomy
-    return setting('REPLIES_ENABLED','true').lower()=='true' and autonomy(REPLY)!='off'
+    return setting('REPLIES_ENABLED','true').lower()=='true' and autonomy(REPLY,member)!='off'
 
 def _audit(actor,action,target,**metadata):
     operador._audit(actor,action,target,**metadata)

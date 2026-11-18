@@ -101,11 +101,12 @@ def purge(now=None):
 def unread():
     return Notification.objects.filter(read_at__isnull=True,created_at__gte=timezone.now()-RETENTION).count()
 
-def upcoming(now=None):
-    """Computed «PRÓXIMO»: the next piece within 48 h, invitations expected in the next day, a server-side stop."""
+def upcoming(now=None,member=None):
+    """Computed «PRÓXIMO»: the next piece within 48 h, invitations expected in the next day (the member's people, unless
+    her invitations are blocked), a server-side stop. Without a member, the only active one."""
     from . import editorial, operador, red
     from .models import Contact, EditorialPiece
-    now=now or timezone.now();tz=operador.local_tz();out=[]
+    now=now or timezone.now();tz=operador.local_tz();out=[];member=operador.member_of(member=member)
     for piece in EditorialPiece.objects.filter(state='ready',scheduled_for__gt=now,scheduled_for__lte=now+timedelta(hours=48)).order_by('scheduled_for')[:2]:
         action=editorial.latest_action(piece)
         if action and action.state in ('proposed','approved'):
@@ -113,8 +114,10 @@ def upcoming(now=None):
             out.append({'id':f'piece_scheduled:{piece.id}','kind':'piece_scheduled','layer':'publicaciones',
                         'title':f'Sale la pieza «{(piece.brief or {}).get("thesis") or piece.final_text[:80]}»',
                         'detail':f'Puedes vetarla en el detalle hasta las {when:%H:%M}.','link':f'/calendario/pieza/{piece.id}','at':piece.scheduled_for})
-    due=[c for c in Contact.objects.filter(stage='followed',followed_at__isnull=False) if c.followed_at+red.invite_after()<=now+timedelta(hours=24)]
-    if due and not red.invites_blocked(now)[0]:
+    from . import miembros
+    due=[c for c in miembros.mine(Contact.objects.filter(stage='followed',followed_at__isnull=False),member)
+         if c.followed_at+red.invite_after()<=now+timedelta(hours=24)]
+    if due and not red.invites_blocked(now,member)[0]:
         out.append({'id':'invites_expected','kind':'invites_expected','layer':'red',
                     'title':f'El equipo invitará a {len(due)} {"persona" if len(due)==1 else "personas"} que encajan',
                     'detail':'Si los topes del día lo permiten.','link':None,'at':now+timedelta(hours=24)})  # Personas lists only connections

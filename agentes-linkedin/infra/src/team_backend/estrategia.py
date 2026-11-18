@@ -628,7 +628,7 @@ def queue(user,now=None):
     job_id=_job_id('plan_week',monday)
     if Job.objects.filter(id=job_id).exists():return 0
     account=editorial.publishing_account()
-    if not editorial.can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':return 0
+    if not editorial.can_publish(account) or operador.globally_paused() or autonomy('CONT-09',operador.member_of(account=account))=='off':return 0
     if not editorial.can_afford_preparation(now) or spent_this_week(now)>=plan_budget():return 0
     from .jobs import enqueue_operation
     _,created=enqueue_operation(user,'plan_week',{'week':monday.isoformat()},request_id=job_id)

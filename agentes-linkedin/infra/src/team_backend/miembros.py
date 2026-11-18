@@ -22,7 +22,13 @@ there are several active members it belongs to nobody: no selector picks it and 
 
 The first member: migration 0055 (and ensure_first_member, for bootstrap_local) makes the organization ProjectApp and its
 first member, admin, with first_owner()'s user, and gives it every account without a member. Later members come from
-`manage.py operador --usuario <admin> miembro` (save_member), never with LinkedIn accounts."""
+`manage.py operador --usuario <admin> miembro` (save_member), never with LinkedIn accounts.
+
+Phase 2, her LinkedIn rhythm (see the section below): policy_key(member) names the audit rows of a member's rhythm
+('member' for the first member, so the state written before organizations is hers with no move; 'member:<id>' for the
+others), active_members() the members a watcher or the autopilot goes through, mine(rows, member) narrows what her
+accounts did, and setting(member, name, default) reads a variable of her rhythm: hers (Member.settings, set with
+`manage.py operador ajustes` → save_settings, audited) else the .env's."""
 import os
 
 from django.conf import settings
@@ -278,3 +284,200 @@ def save_member(admin, username, display_name, role='', *, make_admin=None, acti
 
 def is_admin_member(member):
     return member is not None and member.active and member.is_admin
+
+
+# --------------------------------------------------------------------------- her LinkedIn rhythm (phase 2)
+# Each member is one LinkedIn member: her lock, spacing, day schedule, write caps, profile reads, invitation ramp and its
+# health, notes, tier and provider blocks are hers (operador.py, red.py). What stays the whole machine's: the total stop
+# (OPERATOR_PAUSED, OperatorControl), the AI budget, the navegador service's own caps (per account) and «one person, one
+# invitation» (red.invitation_reserved, recipient_blocked).
+
+LEGACY_KEY='member'  # the audit target of the rhythm before organizations
+
+
+def first_member_id():
+    """The oldest member of the installation (created_at, then id): she carries the rhythm the installation had before
+    organizations. None without members."""
+    _, Member, _ = _models()
+    return Member.objects.order_by('created_at', 'pk').values_list('pk', flat=True).first()
+
+
+def is_first(member):
+    """Whether `member` is the first member, or there is none to name (an installation without members): her rhythm is
+    the one of before organizations, under the same key and the same lock (operador.policy_lock)."""
+    return member is None or member.pk == first_member_id()
+
+
+def policy_key(member):
+    """The audit target of a member's rhythm events (operator.schedule, network.ramp, network.notes_blocked…): 'member'
+    for the first member and for an installation without members, so the state written before organizations (and a
+    rollback to the code before this phase) keeps reading the same rows; 'member:<id>' for any later member."""
+    return LEGACY_KEY if is_first(member) else f'member:{member.pk}'
+
+
+def active_members():
+    """Every active member, oldest first; [None] for an installation without members (one rhythm, as before)."""
+    _, Member, _ = _models()
+    members = list(Member.objects.filter(active=True).order_by('created_at', 'pk'))
+    return members if members or Member.objects.exists() else [None]
+
+
+def mine(rows, member, field='account'):
+    """`rows` narrowed to what the member's accounts did (`field` names the account: 'account', 'proposal__account'…).
+    `member=None` (an installation without members) leaves every row, as before organizations."""
+    if member is None:
+        return rows
+    return rows.filter(**{f'{field}__in': accounts(member)})
+
+
+# The variables of her rhythm a member may set apart from the .env, with the same names and formats (Member.settings).
+# Phase 7 starts the CTO's free, long unused account low: OPERATOR_INVITE_RAMP_STAGES=5/25,8/40,10/50 with
+# OPERATOR_INVITE_RAMP_START=0 (5 a day, up to 10; LI-09-V006-K01) and OPERATOR_AUTONOMY in «approval», without touching
+# anyone else's.
+MEMBER_SETTINGS = {
+    'LINKEDIN_ACCOUNT_TIER': 'free, premium o sales_navigator',
+    'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT': 'notas de invitación al mes (entero de 0 a 100)',
+    'OPERATOR_DAILY_LIMITS': 'topes diarios por capacidad: CAP=n,CAP=n (las demás, las del .env)',
+    'OPERATOR_WEEKLY_LIMITS': 'topes semanales por capacidad: CAP=n,CAP=n (las demás, las del .env)',
+    'OPERATOR_INVITE_RAMP_STAGES': 'tres etapas día/semana, como mucho 8/40,16/80,20/100',
+    'OPERATOR_INVITE_RAMP_START': 'etapa con la que empieza su rampa: 0, 1 o 2',
+    'OPERATOR_PROFILE_READ_DAILY_LIMIT': 'lecturas de perfil al día (0 a 100)',
+    'OPERATOR_AUTONOMY': 'CAP=auto|approval|off,… (las demás, las del .env)',
+    'EDITORIAL_POST_TIME': 'hora del post del día, HH:MM dentro de OPERATOR_WINDOW',
+}
+# The .env's value when neither she nor the environment sets one (the defaults the modules already use).
+SETTING_DEFAULTS = {'LINKEDIN_ACCOUNT_TIER': 'free', 'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT': '3', 'OPERATOR_DAILY_LIMITS': '',
+                    'OPERATOR_WEEKLY_LIMITS': '', 'OPERATOR_INVITE_RAMP_STAGES': '8/40,16/80,20/100',
+                    'OPERATOR_INVITE_RAMP_START': '1', 'OPERATOR_PROFILE_READ_DAILY_LIMIT': '80', 'OPERATOR_AUTONOMY': '',
+                    'EDITORIAL_POST_TIME': '08:30'}
+
+
+def setting(member, name, default):
+    """One variable of her rhythm: hers when she set it (Member.settings), else the .env's, else `default`."""
+    own = (member.settings or {}) if member is not None else {}
+    if name in own:
+        return own[name]
+    return os.environ.get(name, default)
+
+
+def setting_source(member, name):
+    own = (member.settings or {}) if member is not None else {}
+    return 'miembro' if name in own else 'entorno' if name in os.environ else 'por defecto'
+
+
+def _pairs(value, name):
+    items = []
+    for item in filter(None, (x.strip() for x in value.split(','))):
+        key, sep, rest = item.partition('=')
+        if not sep or not key.strip() or not rest.strip():
+            raise ValueError(f'{name}: «{item}» no tiene la forma CAP=valor.')
+        items.append((key.strip(), rest.strip()))
+    if not items:
+        raise ValueError(f'{name}: vacío; usa --quitar para volver al valor del .env.')
+    if len({k for k, _ in items}) != len(items):
+        raise ValueError(f'{name}: una capacidad aparece dos veces.')
+    return items
+
+
+def validate_setting(name, value):
+    """The value normalized as the .env would hold it, or ValueError with the reason (never a silent default)."""
+    from datetime import time
+    from . import operador, red
+    from .models import ActionProposal
+    if name not in MEMBER_SETTINGS:
+        raise ValueError(f'Ajuste desconocido: {name}. Se pueden fijar: {", ".join(MEMBER_SETTINGS)}.')
+    value = str(value).strip()
+    if name == 'LINKEDIN_ACCOUNT_TIER':
+        if value not in ('free', 'premium', 'sales_navigator'):
+            raise ValueError('LINKEDIN_ACCOUNT_TIER: free, premium o sales_navigator.')
+        return value
+    if name in ('LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT', 'OPERATOR_PROFILE_READ_DAILY_LIMIT'):
+        if not value.isdigit() or int(value) > 100:
+            raise ValueError(f'{name}: un entero de 0 a 100.')
+        return str(int(value))
+    if name in ('OPERATOR_DAILY_LIMITS', 'OPERATOR_WEEKLY_LIMITS'):
+        pairs = _pairs(value, name)
+        for cap, n in pairs:
+            if cap not in operador.DEFAULT_LIMITS:
+                raise ValueError(f'{name}: capacidad desconocida «{cap}» ({", ".join(operador.DEFAULT_LIMITS)}).')
+            if not n.isdigit():
+                raise ValueError(f'{name}: «{cap}={n}» necesita un entero.')
+        return ','.join(f'{cap}={int(n)}' for cap, n in pairs)
+    if name == 'OPERATOR_INVITE_RAMP_STAGES':
+        stages = [x.strip() for x in value.split(',')]
+        if len(stages) != len(red.RAMP_STAGES):
+            raise ValueError('OPERATOR_INVITE_RAMP_STAGES: tres etapas día/semana, p. ej. 5/25,8/40,10/50.')
+        out = []
+        for (top_day, top_week), stage in zip(red.RAMP_STAGES, stages):
+            day, sep, week = stage.partition('/')
+            if not sep or not day.strip().isdigit() or not week.strip().isdigit():
+                raise ValueError(f'OPERATOR_INVITE_RAMP_STAGES: «{stage}» no es día/semana.')
+            if int(day) > top_day or int(week) > top_week:
+                raise ValueError('OPERATOR_INVITE_RAMP_STAGES: solo puede bajar cada etapa (como mucho 8/40,16/80,20/100).')
+            out.append(f'{int(day)}/{int(week)}')
+        return ','.join(out)
+    if name == 'OPERATOR_INVITE_RAMP_START':
+        if value not in ('0', '1', '2'):
+            raise ValueError('OPERATOR_INVITE_RAMP_START: 0, 1 o 2.')
+        return value
+    if name == 'OPERATOR_AUTONOMY':
+        pairs = _pairs(value, name)
+        for cap, mode in pairs:
+            if cap not in ActionProposal.Capability.values:
+                raise ValueError(f'OPERATOR_AUTONOMY: capacidad desconocida «{cap}».')
+            if mode not in ('auto', 'approval', 'off'):
+                raise ValueError(f'OPERATOR_AUTONOMY: «{cap}={mode}»; los modos son auto, approval y off.')
+        return ','.join(f'{cap}={mode}' for cap, mode in pairs)
+    hours, sep, minutes = value.partition(':')  # EDITORIAL_POST_TIME
+    try:
+        if not sep:
+            raise ValueError
+        at = time(int(hours), int(minutes))
+    except ValueError:
+        raise ValueError('EDITORIAL_POST_TIME: HH:MM.') from None
+    if not operador.within_window(timezone_now_at(at)):
+        raise ValueError('EDITORIAL_POST_TIME: queda fuera de OPERATOR_WINDOW.')
+    return f'{at:%H:%M}'
+
+
+def timezone_now_at(at):
+    """Today at `at` in OPERATOR_TIMEZONE (to check an hour against the operator's window)."""
+    from datetime import datetime
+    from django.utils import timezone
+    from . import operador
+    return datetime.combine(timezone.now().astimezone(operador.local_tz()).date(), at, tzinfo=operador.local_tz())
+
+
+def effective_settings(member):
+    """[(name, value, source)] of every variable of her rhythm: hers, the .env's or the default."""
+    return [(name, str(setting(member, name, SETTING_DEFAULTS[name])), setting_source(member, name)) for name in MEMBER_SETTINGS]
+
+
+@transaction.atomic
+def save_settings(admin, member, values=None, remove=()):
+    """Set (or remove, back to the .env's) variables of a member's rhythm; only the active admin of her organization.
+    Validated as a whole before anything changes; idempotent; audited with before and after. Returns (member, changed)."""
+    _, Member, _ = _models()
+    acting = member_of_user(admin)
+    if not is_admin_member(acting) or acting.organization_id != member.organization_id:
+        raise PermissionError('Solo el administrador activo de su organización cambia el ritmo de un miembro.')
+    values = dict(values or {})
+    remove = list(dict.fromkeys(remove))
+    unknown = sorted((set(values) | set(remove)) - set(MEMBER_SETTINGS))
+    if unknown:
+        raise ValueError(f'Ajuste desconocido: {", ".join(unknown)}. Se pueden fijar: {", ".join(MEMBER_SETTINGS)}.')
+    if set(values) & set(remove):
+        raise ValueError('Un mismo ajuste no se fija y se quita a la vez.')
+    clean = {name: validate_setting(name, value) for name, value in values.items()}
+    member = Member.objects.select_for_update().get(pk=member.pk)
+    before = dict(member.settings or {})
+    after = {**before, **clean}
+    for name in remove:
+        after.pop(name, None)
+    if after == before:
+        return member, False
+    member.settings = after
+    member.save(update_fields=['settings'])
+    from .jobs import audit
+    audit(admin, 'organization.member_settings', member.pk, before=before, after=after)
+    return member, True

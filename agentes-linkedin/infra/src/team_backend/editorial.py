@@ -428,13 +428,16 @@ def spent_today(now=None):
 def lead_time():
     return timedelta(hours=float(os.environ.get('EDITORIAL_LEAD_HOURS','12')))
 
-def post_time():
-    raw=os.environ.get('EDITORIAL_POST_TIME','08:30').strip();hours,_,minutes=raw.partition(':')
+def post_time(member=None):
+    """EDITORIAL_POST_TIME of the member (hers, else the .env's; organizaciones, phase 2). Without a member, the only
+    active one (MiembroRequerido among several)."""
+    member=operador.member_of(member=member)
+    raw=str(miembros.setting(member,'EDITORIAL_POST_TIME','08:30')).strip();hours,_,minutes=raw.partition(':')
     try:return time(int(hours),int(minutes or 0))
     except ValueError:raise ValueError('EDITORIAL_POST_TIME inválida: usa HH:MM.') from None
 
-def scheduled_for(day):
-    when=datetime.combine(day,post_time(),tzinfo=operador.local_tz())
+def scheduled_for(day,member=None):
+    when=datetime.combine(day,post_time(member),tzinfo=operador.local_tz())
     if not operador.within_window(when):raise ValueError('EDITORIAL_POST_TIME queda fuera de OPERATOR_WINDOW.')
     return when
 
@@ -526,11 +529,11 @@ def plan(user,request_id=None,audit_request_id=''):
         # A retry of the same request returns its job; never recompute the slot (that would be a 409).
         previous=Job.objects.filter(id=request_id,owner=user,kind='prepare_piece').first()
         if previous:return previous,False,date.fromisoformat(previous.params['slot'])
-    account=publishing_account(miembros.member_for(user))
+    member=miembros.member_for(user);account=publishing_account(member)
     if account is None:raise Conflict('Conecta LinkedIn (API oficial) antes de planificar piezas.')
     if not can_publish(account):raise Conflict('La publicación está en pausa o desactivada (LIVE_LINKEDIN_OFFICIAL); no se prepara una pieza que no saldría.')
     from .autopiloto import autonomy
-    if operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('La publicación está detenida; no se prepara una pieza.')
+    if operador.globally_paused() or autonomy('CONT-09',operador.member_of(account=account,member=member))=='off':raise Conflict('La publicación está detenida; no se prepara una pieza.')
     extra=urgente.next_extra()  # a post he asked for at a day and hour goes first: it is an order
     slot=extra or urgente.next_slot(manual=True) or next_slot(manual=True)
     if slot is None:raise Conflict('No hay un hueco libre en los próximos siete días.')
@@ -688,11 +691,12 @@ def prepare(user,slot,origin_job='',extra=False):
     """Run the whole circuit for one slot. Each stage is saved as it completes and never repeated. `extra`: the post
     Gustavo asked for at a day and hour, next to the day's own (urgente.py)."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
-    account=publishing_account(miembros.member_for(user))
+    member=miembros.member_for(user);account=publishing_account(member)
     if account is None:raise ValueError('LinkedIn (API oficial) no está conectado; no se prepara la pieza.')
     from .autopiloto import autonomy
-    if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('Publicación detenida antes de preparar.')
-    when=urgente.extra_at(slot) if extra else urgente.reserved_at(slot) or scheduled_for(slot);now=timezone.now()
+    member=operador.member_of(account=account,member=member)
+    if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09',member)=='off':raise Conflict('Publicación detenida antes de preparar.')
+    when=urgente.extra_at(slot) if extra else urgente.reserved_at(slot) or scheduled_for(slot,member);now=timezone.now()
     if when is None:raise Conflict('Ya no hay un post pedido para ese día.')
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
     piece=EditorialPiece.objects.filter(origin_job=origin_job).first() if origin_job else None

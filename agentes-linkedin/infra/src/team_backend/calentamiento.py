@@ -202,7 +202,7 @@ def _reserve(account,contact,now):
     """Count a read before making it, under the operator's policy lock; a person known only by a public id also takes a
     read from the shared profile allowance (OPERATOR_PROFILE_READ_DAILY_LIMIT)."""
     with transaction.atomic():
-        operador.policy_lock()
+        operador.policy_lock(operador.member_of(account=account))
         if _reads_today(account,now)>=read_cap():raise ReadCapReached(f'Tope diario de lecturas de compradores alcanzado ({read_cap()}).')
         if not MEMBER_ID.fullmatch(contact.provider_user_id or ''):
             try:operador.reserve_profile_read(account,'buyer_posts',now)
@@ -333,7 +333,7 @@ def used(account,now):
 def rooms(account,now,available):
     """Slots left today per group. A group with nothing to comment now (not in `available`) passes its slots to the
     next group that has something, in order and wrapping around. The overall cap still rules (operador.capacity_left)."""
-    quota=quotas(operador.limits(now).get('INT-03',(0,0))[0]);spent=used(account,now)
+    quota=quotas(operador.limits(now,operador.member_of(account=account)).get('INT-03',(0,0))[0]);spent=used(account,now)
     room={g:max(0,quota[g]-spent[g]) for g in GROUPS}
     if not any(g in available for g in GROUPS):return room
     for i,group in enumerate(GROUPS):

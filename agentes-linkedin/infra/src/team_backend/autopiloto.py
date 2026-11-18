@@ -68,12 +68,21 @@ def daily_proposals():
 # is autonomous from the start by his decision (12/11/2026), with the lead as its gate.
 AUTO_BY_DEFAULT=('INT-03','INT-04','INT-02','CONT-09')
 
-def autonomy(capability):
-    """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off."""
-    for item in filter(None,setting('OPERATOR_AUTONOMY','').split(',')):
-        key,_,mode=item.partition('=')
-        if key.strip()==capability and mode.strip() in ('auto','approval','off'):return mode.strip()
+def autonomy(capability,member=None):
+    """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off. The member's own value for a
+    capability (miembros.setting) wins over the .env's (organizaciones, phase 2: the CTO starts in «approval» without
+    touching Gustavo's). Without a member, the only active one (MiembroRequerido among several)."""
+    member=operador.member_of(member=member)
+    own=(member.settings or {}).get('OPERATOR_AUTONOMY','') if member is not None else ''
+    for source in (own,setting('OPERATOR_AUTONOMY','')):
+        for item in filter(None,source.split(',')):
+            key,_,mode=item.partition('=')
+            if key.strip()==capability and mode.strip() in ('auto','approval','off'):return mode.strip()
     return 'auto' if capability in AUTO_BY_DEFAULT else 'approval'
+
+def autonomy_of(proposal):
+    """The autonomy of a proposal's capability for the member who owns its account."""
+    return autonomy(proposal.capability,operador.member_of(account=proposal.account))
 
 def enabled():
     return setting('OPERATOR_AUTOPILOT','false').lower()=='true'
@@ -157,7 +166,7 @@ def policy_review(proposal,lead_budget=None):
     from tick) caps the lead's reviews: once spent, a proposal that needs the lead stays pending for a later tick."""
     from .orquestacion import cycle_issues
     if cycle_issues(proposal):return proposal
-    mode=autonomy(proposal.capability)
+    mode=autonomy_of(proposal)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
     if proposal.capability==ActionProposal.Capability.PUBLISH and issues and set(issues)<={'Imagen no disponible','Documento no disponible'}:
@@ -251,10 +260,14 @@ def lead_silence(now=None):
     now=now or timezone.now();minimum=int(setting('LEAD_SILENCE_MIN_REVIEWS','5'));sent=0
     year,week,_=now.astimezone(operador.local_tz()).isocalendar()
     from .notificaciones import avisar
+    members=miembros.active_members()
     for capability in lider.capabilities():
-        if autonomy(capability)!='auto':continue
+        # The lead is the organization's; what it reviews in `auto` is the proposals of the members who have it in `auto`.
+        auto=[m for m in members if autonomy(capability,m)=='auto']
+        if not auto:continue
         reviewed=ActionProposal.objects.filter(capability=capability,decided_at__gte=now-timedelta(days=7),
                                                review__decision__in=['approve','discard'])
+        if None not in auto:reviewed=reviewed.filter(account__member__in=auto) if len(auto)<len(members) else reviewed
         total=reviewed.count()
         if total<max(minimum,1) or reviewed.filter(review__decision='approve').exists():continue
         top=', '.join(f'{qid} ({n})' for qid,n in _failing_checks(reviewed.values_list('review',flat=True)).most_common(3))
@@ -314,7 +327,10 @@ def tick(user,now=None):
     # a plan_network the rest wait for the next ticks instead of blocking this one for minutes.
     lead_budget={'left':lead_reviews_per_tick(),'deferred':0}
     for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
-        policy_review(proposal,lead_budget);report['reviewed']+=1
+        try:policy_review(proposal,lead_budget)
+        except miembros.MiembroRequerido:  # an account of nobody among several members: no rhythm decides for it
+            report['unowned']=report.get('unowned',0)+1;continue
+        report['reviewed']+=1
     if lead_budget['deferred']:report['lead_deferred']=lead_budget['deferred']
     if _lead_silence_due(now):
         report['lead_silent']=lead_silence(now)
@@ -324,7 +340,10 @@ def tick(user,now=None):
         except Exception as exc:report['gate_alerts_error']=type(exc).__name__  # the audit never stops the tick
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
+    members=miembros.exist()
     for account in ConnectorAccount.objects.filter(paused=False):
+        if members and miembros.member_of_account(account) is None:  # organizaciones, phase 2: an account of nobody among
+            report['unowned']=report.get('unowned',0)+1;continue  # several members has no rhythm: it neither reads nor writes
         try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
         except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
@@ -387,7 +406,7 @@ def _editorial(user,now):
                                     request_id=_job_id('extra',extra) if not attempt else _job_id('extra',extra,attempt))
         return int(created)
     slot=urgente.next_slot(now) or editorial.next_slot(now)
-    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot))<=0:return 0
+    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot,operador.member_of(account=account)))<=0:return 0
     attempt=EditorialPiece.objects.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
     _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
                                 request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))
@@ -459,7 +478,7 @@ def _prefilter(post):
 
 def _propose(user,account,now):
     # A paid draft only when a write slot is left after the comments already waiting for one.
-    if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
+    if autonomy('INT-03',operador.member_of(account=account))=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
     from knowledge import presupuesto
     if presupuesto.left(now)<=0:return 0
     day,_=operador.period_starts(now)
@@ -528,7 +547,7 @@ def _lead_redraft(user,account,now):
     write slot, budget, daily room and one-draft-at-a-time as _propose. The redraft goes through the rules and the lead
     again; a post that already has two comment drafts is never redrafted."""
     from . import compuertas
-    if not compuertas.lead_redraft() or not lider.enabled() or autonomy('INT-03')!='auto':return 0
+    if not compuertas.lead_redraft() or not lider.enabled() or autonomy('INT-03',operador.member_of(account=account))!='auto':return 0
     if 'INT-03' not in lider.capabilities() or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
     from knowledge import presupuesto
     if presupuesto.left(now)<=0 or Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).exists():
@@ -688,7 +707,7 @@ def _replies(user,account,now):
     leave a slot after the replies already waiting. Only inside READ_WINDOW: a draft reads the commenter's profile too."""
     from . import respuestas
     from knowledge import presupuesto
-    if not respuestas.enabled() or account.provider not in respuestas.PROVIDERS or not operador.within_read_window(now):return 0
+    if not respuestas.enabled(operador.member_of(account=account)) or account.provider not in respuestas.PROVIDERS or not operador.within_read_window(now):return 0
     queued=0
     due=respuestas.reading_due(account,now)
     if due and not _pending('read_own_comments',account=str(account.id)):
@@ -730,14 +749,24 @@ def _stopped_recently(proposal,now):
     last=stops.aggregate(at=Max(Coalesce('finished_at','created_at')))['at']
     return bool(last) and now-last<min(RETRY_BASE*2**min(count-1,10),RETRY_CAP)
 
+def _executing(member):
+    """Whether an execution of the member's is queued or running: one at a time per member (another member's never
+    holds hers back; organizaciones, phase 2). Without members, any execution, as before."""
+    pending=[pk for pk in Job.objects.filter(kind='execute_action',state__in=[Job.State.QUEUED,Job.State.RUNNING])
+             .values_list('params__proposal',flat=True)]
+    if not pending:return False
+    if member is None:return True
+    return miembros.mine(ActionProposal.objects.filter(pk__in=pending),member).exists()
+
 def _execute(user,account,now):
     from .orquestacion import cycle_issues
     if not operador.within_window(now):return 0
-    if _pending('execute_action'):return 0
+    member=operador.member_of(account=account)
+    if _executing(member):return 0
     rounds=bool(operador.network_batches())
-    # Without network rounds every write shares one spacing; with them a network write inside its round waits less.
-    # His own post does not wait for the day's opening (operador.spacing_ok).
-    due=operador.post_due(now)  # a network action or comment now could push his post past its hour
+    # Without network rounds every write of a member shares one spacing; with them a network write inside its round
+    # waits less. Her own post does not wait for the day's opening (operador.spacing_ok).
+    due=operador.post_due(now,member)  # a network action or comment of hers now could push her post past its hour
     # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
     first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
     for proposal in ActionProposal.objects.select_related('post','piece','contact','comment').filter(account=account,state='approved',execution__isnull=True).order_by(first,'created_at'):
