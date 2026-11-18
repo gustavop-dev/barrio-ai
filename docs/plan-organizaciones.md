@@ -2,8 +2,8 @@
 
 Abierto el 17/11/2026 a pedido de Gustavo: que su CTO use Barrio AI con su propia cuenta de LinkedIn, «pero bien».
 Mismos objetivos, criterios, servicios, biblioteca y estrategia; cambian su nombre, su identidad y su cuenta.
-**Fase 1 construida** (17/11/2026, rama `feat/organizaciones`, sin desplegar): ver «Fase 1: lo construido». Las fases
-2 a 7 no están construidas. Las fichas del catálogo siguen siendo la fuente de verdad de cada función
+**Fases 1 a 5 construidas** (17 y 18/11/2026, rama `feat/organizaciones`, sin desplegar): ver «Fase N: lo construido».
+Las fases 6 y 7 no están construidas. Las fichas del catálogo siguen siendo la fuente de verdad de cada función
 ([ORG](funcionalidades/organizaciones.md) para esta).
 
 ## Decisiones de Gustavo
@@ -79,7 +79,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | 2 | Un miembro de LinkedIn por persona (**hecha**) | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
 | 3 | Identidad fuera del código (**hecha**) | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
 | 4 | Contenido por miembro (**hecha**) | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
-| 5 | Vistas y avisos por miembro | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
+| 5 | Vistas y avisos por miembro (**hecha**) | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
 | 6 | Registro compartido de personas | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
 | 7 | Alta del CTO | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
 
@@ -424,11 +424,155 @@ resumen y la revisión.
 
 ### Lo que queda para las fases 5 a 7
 
-- Fase 5: las vistas listadas arriba (Resultados por miembro, el resto de Tu turno), los detalles por id con permiso por
-  objeto, `GET /api/v1/memory` por miembro, los avisos y el push solo a su dueño (hoy, cada aviso lleva su `ref` por
-  miembro pero llega a todos).
+- Fase 5 (**hecha**, ver «Fase 5: lo construido»): las vistas listadas arriba, los detalles por id con permiso por objeto,
+  `GET /api/v1/memory` por miembro, los avisos y el push solo a su dueño.
 - Fase 6: el registro compartido de personas.
 - Fase 7: el alta del CTO (con su voz provisional y su CONT-09 en «aprobación»).
+
+## Fase 5: lo construido
+
+Hecho el 18/11/2026 en `feat/organizaciones` (fichas [ORG-23 a ORG-27](funcionalidades/organizaciones.md#org-23)).
+Decisión de Gustavo del 17/11/2026: **cada miembro ve y maneja solo lo suyo**; ni el administrador ve las conversaciones,
+los borradores ni las notas privadas de otro miembro. Con un solo miembro la API responde lo mismo que antes: **todas las
+rutas de lectura** (249 lecturas: cada ruta GET sin id y cada ruta con id una vez por fila de la semilla) comparadas byte a
+byte contra el código de la fase 4 (`350e01b`), con el reloj congelado y el mismo `seed_qa`. Las únicas diferencias son
+cinco valores que también cambian entre dos corridas del mismo código (los `payload_hash`/`approved_hash` de las propuestas
+y el sha del documento de una propuesta de perfil) y los ids aleatorios de la semilla.
+
+**El mecanismo, en un solo lugar: `team_backend/alcance.py`.**
+- `RUTAS` clasifica **cada** ruta de `team_backend.urls` y `RAIZ` las del proyecto: *del miembro*, *de la organización*,
+  *solo del administrador* o *servicio* (con su porqué al lado). `RutaClasificada` (en `DEFAULT_PERMISSION_CLASSES`, después
+  de `KnowledgeAccess`) rechaza con 403 una ruta que no esté en la tabla, pide el administrador activo en las de
+  administrador y, en una ruta *del miembro* con id, comprueba **antes de la vista** que la fila que nombra el id sea suya
+  (`OBJETOS`, armado de la tabla de prefijos `_IDS`): la de otro miembro responde **404, nunca 403**, diga lo que diga el
+  cuerpo, y no cambia nada. `tests/test_alcance.py` falla si una ruta nueva no está clasificada, si una clasificada ya no
+  existe o si una ruta del miembro con id no dice qué fila nombra.
+- `DUENO` dice, para cada modelo de un miembro, el camino de una fila a su dueño: un miembro (`member`, `piece__member`…),
+  una cuenta de LinkedIn (`account`, `contact__account`…) o un usuario (`owner`, `user`). Una fila sin dueño en ese camino
+  (escrita antes de las organizaciones) es del primer miembro.
+- Las vistas usan solo `alcance.de(filas, miembro)` (las suyas), `alcance.obtener(request, Modelo, **lookup)` (una suya o 404,
+  también para un id mal formado) y `alcance.miembro(request)` (el miembro del usuario autenticado, explícito). Ningún
+  ayudante convierte «sin miembro» en «el» miembro: `de(filas, None)` con miembros en la instalación es `MiembroRequerido`
+  (400). `alcance.TODOS` lee a todos a propósito y solo lo usan lectores de la máquina (el autopiloto, Slack), nunca una
+  pantalla. `alcance.trabajos(request)` son los trabajos que puede ver (los de su usuario, los de contenido de su miembro y los
+  de sus cuentas; los de la máquina, sin miembro, siguen para quien tiene `manage_jobs`).
+- Un usuario que no es miembro (una credencial de servicio, el robot del autopiloto) actúa por el único miembro activo,
+  como antes; con varios activos recibe 400 en las rutas del miembro. Un token de dispositivo actúa como su usuario.
+
+**Las rutas** (144 de la API y 3 del proyecto):
+
+| Clase | Rutas | Cuáles |
+| --- | ---: | --- |
+| Del miembro | 115 | Las suyas: piezas, calendario, plan, resumen, revisión, memoria y hechos, preguntas, orientación, capturas, galería (fase 4) y, en esta fase, Tu turno entero, Notificaciones, Actividad, Resultados (su audiencia, su contenido, sus acciones, su analítica y su embudo del comprador), Personas (sus contactos y sus notas), sus conversaciones, respuestas y mensajes sugeridos, sus propuestas de acción, sus cuentas y sesiones de LinkedIn, su estudio de comunidad, sus propuestas de perfil, sus leads, reservas y respuestas del comprador, sus trabajos, su sesión, sus dispositivos y sus suscripciones push, `GET /api/v1/memory` y «quién soy» |
+| De la organización | 18 | El embudo de oportunidades (2), los referentes y sus revisiones, análisis, cambios y experimentos (7), la biblioteca (`status`, `search`, `units`, `units/<id>`, `sources/<key>`), la parada total (`operador/control`), la escena de la oficina (`oficina/eventos`), el mapa del equipo (`equipo/grafo`) y la clave pública VAPID |
+| Solo del administrador | 3 + 1 | `integrity`, `audit`, `equipo/ciclos/<id>/decision` y la lectura de `app/errores` (informar un error, `POST`, es de cada uno) |
+| Servicio | 7 | `auth/login`, `auth/token`, `linkedin/oauth/callback`, el webhook de Cal.com, la descarga con ticket de un perfil y las dos de la vista remota (`linkedin/pantalla/entrar`, `…/permitir`) |
+| Proyecto (`RAIZ`) | 3 | `admin/` (administrador: el admin de Django es del superusuario del servidor y ve todo), `health` (servicio), la consola de la biblioteca (organización) |
+
+**Lo que es de la organización, y por qué:** el embudo de oportunidades (decisión del 17/11/2026: uno solo, visible para
+los dos; cada oportunidad dice quién la registró y de qué miembro vino), los referentes (se observan una vez para todos;
+decide el dueño de la cuenta o el administrador, ORG-07), la biblioteca y el catálogo (conocimiento que se ingiere una vez),
+el gasto de IA (un solo tope, sin límite por miembro, decisión del 13/11/2026) y la parada total (es de toda la máquina). La
+escena de la oficina y el mapa del equipo son de todos porque solo llevan rol, destino y conteos, sin contenido ni ids.
+
+**Oportunidades.** `Opportunity.member` (quien la registró) y `Opportunity.origin_member` (el dueño de la cuenta de su
+persona; sin persona, quien la registró). Todos ven y mueven todas. Con varios miembros cada una trae `registered_by` y
+`brought_by` (`{id, display_name}`); con uno, nada cambia. El nombre de la persona se ve en el embudo de todos (es de la
+organización); su ficha (`contact`) solo la ve su dueña: para otro miembro llega `contact: null` hasta que la fase 6
+comparta el registro. Un miembro solo puede vincular una persona suya («Persona inexistente» para la de otro) y, al editar
+una oportunidad cuya persona es de otro miembro, lo que mande para la persona se ignora: mueve la etapa y el siguiente paso,
+nunca la persona. El aviso de una oportunidad que avanza va a quien la trajo.
+
+**Avisos por dueño.**
+- `Notification.member`; `notificaciones.avisar(…, member=)` es obligatorio (sin valor por defecto). `member=ORGANIZACION`
+  es el aviso de toda la organización (la parada total, el silencio del líder, las compuertas, un ciclo de la máquina): una
+  fila por miembro activo, cada una con su estado de leído y sus preferencias. Con miembros, un aviso que no nombra a nadie se
+  descarta con un `warning` (`notice_without_member`), nunca se adivina. Lo usan todos los avisos del backend, con
+  `de_cuenta(account)`, `de_contenido(fila)`, `de_usuario(user)` o el miembro que ya tienen.
+- El push web y el de Expo van solo a los dispositivos del usuario de su miembro (`alerts.notify(users=[…])`); un miembro
+  inactivo guarda la fila y no recibe push. `OPERATOR_ALERT_WEBHOOK` es el canal del primer miembro (el de Gustavo): recibe
+  los avisos suyos y los de la organización, nunca los de otro miembro.
+- Preferencias por usuario (`OfficePreference.user`, `OfficePreference.of(user)`): la fila 1 (lo que Gustavo apagó o prendió y
+  el retoque de su galería) es de su usuario, intacta; cualquier otra persona recibe la suya con los valores por defecto. El
+  «Vista» de Tu turno (`InboxSeen`) es de cada uno: las del primer miembro conservan su id; las de otro llevan
+  `u:<id de usuario>:` delante (`alcance.vista`).
+- El `ref` de deduplicación del primer miembro es el de antes; el de otro lleva `@<id del miembro>` (salvo que ya lo nombre).
+- **Slack: un solo canal.** Con más de un miembro activo, los avisos que nombran lo privado de un miembro (comentario sin
+  responder, mensaje sugerido, conversación que espera, seguimiento que vence, comprador que respondió o se interesó, reunión
+  agendada) llegan genéricos: «Barrio · {tipo}. El detalle está en Tu turno de quien corresponde; Slack no lo nombra.»
+  (`alertas_slack.privado`). Con uno, el texto de siempre.
+- **Con un solo miembro, Gustavo recibe exactamente lo que recibe hoy:** los mismos avisos, el mismo push (su usuario es el
+  dueño de todos los dispositivos de hoy), sus preferencias (fila 1), sus «Vista», el mismo canal de Slack con el mismo texto.
+
+**Las apps.** Ajustes › Sesión dice «Has entrado como Gustavo (Fundador) · ProjectApp.» con `GET /api/v1/yo` (sin miembro,
+el usuario como antes); Ajustes › LinkedIn ya muestra solo sus cuentas (`operador/overview` es del miembro); Tu turno marca
+«Voz provisional» en un borrador escrito con su voz provisional (`approval.provisional_voice`, `message.provisional_voice`);
+el tablero de oportunidades dice «Trajo: …» con varios miembros y el formulario deja fija la persona de otro miembro. Las apps
+no tenían textos con un nombre fijo (los que nombraban a Gustavo venían del backend: fase 3 y `comprador.signal_name`).
+
+**`'gustavo'` en el cable: se queda.** `next_step.owner: "gustavo"`, `decided_by: "gustavo"` y los valores internos
+(`confirmed_by_gustavo`, las opciones de `models.py`) siguen igual: los leen las apps instaladas (APK y PWA en caché) y cambiar el valor rompe a quien
+no se actualizó. Como cada miembro solo ve sus contactos, sus propuestas y su Tu turno, `'gustavo'` significa siempre «tú»
+y las apps nunca lo muestran como nombre (lo dicen los tipos de `compartido/src/api/types.ts`). Las etiquetas internas de
+`models.py` no llegan a la pantalla de otro miembro; las que sí (las señales de un comprador) se dicen con su nombre
+(`comprador.signal_name`). Renombrarlo, si se quiere, va con una versión nueva del contrato y de las apps.
+
+**El inicio de sesión de otro miembro.** El administrador lo da de alta (`manage.py operador --usuario <admin> miembro
+--nombre «Ana Pérez» --usuario-nuevo ana --rol CTO --grupo operacion --grupo revision`, inactivo hasta la fase 7) y le fija
+la contraseña en el servidor (`manage.py changepassword ana`), que le entrega en persona o por un canal privado, nunca por
+Slack ni en un archivo del repositorio. Los grupos `operacion` y `revision` bastan para trabajar su cuenta (operar LinkedIn,
+aprobar y ejecutar sus acciones, confirmar su memoria, planear con proveedores de pago); no le dan `manage_jobs` ni la
+administración. En la PWA entra con `POST /api/v1/auth/login` (sesión) y en la app con `POST /api/v1/auth/token` (un
+`DeviceToken` de su usuario); los dos leen solo lo suyo. Activarla es de la fase 7 (`--activo`): mientras está inactiva, las
+rutas del miembro le responden 400 «Tu miembro está inactivo en la organización.».
+
+**Migración `0061_avisos_y_preferencias_por_miembro`.** `Notification.member`, `OfficePreference.user`, `InboxSeen.item_id`
+hasta 200 caracteres, `Opportunity.member` y `Opportunity.origin_member`; los avisos de antes (7 días) pasan al primer
+miembro, la fila 1 de preferencias a su usuario y cada oportunidad recibe el miembro de quien la creó (si no, el primero) y su
+origen (el dueño de la cuenta de su persona). Sin miembros no hace nada.
+- *Efecto en producción:* unas columnas en tablas pequeñas y unos `UPDATE` de decenas de filas, en la transacción de la
+  migración. Idempotente.
+- *Revertir:* `manage.py migrate team_backend 0060`: el paso inverso vacía lo que llenó, borra las preferencias que no son la
+  fila 1 y quita las columnas.
+
+**Pruebas.** `tests/test_alcance.py`: `RutasTests` (toda ruta clasificada, ninguna sobrante, los totales de esta tabla, toda
+ruta del miembro con id dice qué fila nombra); con dos miembros activos y una fila de cada cosa por miembro (contacto,
+conversación, pieza, imagen, comentario, post observado, propuesta, pregunta, captura, foto, resumen, revisión y su cambio,
+recorrido y borrador del comprador, reserva, lead, propuesta de perfil y su archivo, sesión del navegador, fuente de
+comunidad, trabajo, dispositivo, aviso y memoria), `DelMiembroTests` recorre **todas** las rutas del miembro: ninguna lista
+trae el texto ni los ids del otro, el id del otro responde 404 en cada ruta y método sin cambiar nada, los suyos responden y
+un id inexistente se ve igual; `FactsKeysTests`, `OrganizacionYAdministradorTests` (las de la organización responden igual a
+los dos, el embudo y quién trajo cada oportunidad, editar la de otro sin tocar su persona, el 403 de administrador, la ruta
+sin clasificar), `QuienSoyTests` y `AvisosTests` (su aviso solo a sus dispositivos y nunca al canal de Gustavo, el de la
+organización a los dos con su estado de leído, preferencias y «Vista» de cada uno, el aviso sin dueño descartado, Slack
+genérico con dos y el de siempre con uno). `test_organizaciones_e2e.RecorridoDelCtoTests`: el CTO entra con contraseña a la
+PWA y con token a la app, ve quién es, conecta su LinkedIn, aprueba y publica su post con la marca de voz provisional, recibe
+solo su aviso, no abre nada de Gustavo (404 en la oficina y en el teléfono) y el embudo dice quién trajo cada oportunidad.
+
+**Revisión de seguridad de la fase** (lectura del código con un revisor independiente; arreglado con su prueba en
+`CruzadosTests`): un id que llega en el cuerpo y no en la ruta no pasa por `OBJETOS`, así que cada uno se comprueba donde se
+usa: la captura ligada a una persona, una pieza o una pregunta (`capturas.context_object(…, member)`: la de otro miembro
+es «no existe», ni su nombre ni su nota llegan a él); el «Mensaje sugerido» de un comprador (`respuestas/<id>/mensaje`
+acepta un comentario o un borrador del comprador: `OBJETOS` admite varios modelos por id); las notas de la oportunidad que
+crea un lead con varios miembros dicen dónde está la conversación, no lo que dice (`entrega_lead.confirm`); `GET
+/api/v1/audit` no muestra al administrador las acciones propias de otro miembro, y un id «u:…» en `tu-turno/vistos` nunca
+marca la tarjeta de otra persona.
+
+### Lo que queda para las fases 6 y 7
+
+- Fase 6: el registro compartido de personas (hasta entonces, cada miembro ve solo sus contactos, y en el embudo solo el
+  nombre de la persona de otro).
+- Fase 7: el alta real del CTO (activarlo, su OAuth y su sesión del navegador).
+- Riesgos conocidos:
+  - El administrador (`manage_jobs`) ve metadatos de los trabajos y ciclos de la máquina de todos en el mapa del equipo y
+    en las tarjetas de ciclo de Tu turno (ids, tipo, estado, motivo de parada; no el contenido); un administrador que no
+    sea el primer miembro vería además los trabajos de contenido sin miembro en sus parámetros. Hoy el administrador es
+    Gustavo, el primer miembro.
+  - Los avisos de experimentos de referentes se guardan sin miembro: con varios, solo los ve el primero (son datos de la
+    organización; decide el dueño de la cuenta o el administrador, ORG-07).
+  - `OPERATOR_ALERT_WEBHOOK` debe ser un canal que solo lea Gustavo (un tema de ntfy suyo); si es un canal de Slack que
+    lee el CTO, recibiría los avisos de Gustavo. Verificarlo en el `.env` del servidor antes de activar al CTO.
+  - El admin de Django (`/admin/`) es del superusuario del servidor y ve todo: no se da a otro miembro.
 
 ## Servidor
 

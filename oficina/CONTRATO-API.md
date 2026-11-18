@@ -16,7 +16,8 @@ hay que indicarlo." }` en lugar de adivinar. Un miembro inactivo recibe 400 «Tu
 respuesta cambia. Los textos que nombraban a Gustavo nombran al dueño de la cuenta (para él dicen lo mismo); el 403 de
 referentes y experimentos dice «Solo el dueño de la cuenta o el administrador decide cambios de referentes y
 experimentos.» y el 409 de la relectura del perfil «…; sigue «Aplicado por ti».». `next_step.owner: "gustavo"` (y `by:
-"gustavo"` donde aparece) se queda como sinónimo de «tú»: lo leen los clientes instalados; se renombra en la fase 5.
+"gustavo"` donde aparece) se queda como sinónimo de «tú»: lo leen los clientes instalados. La fase 5 decidió no
+renombrarlo: cada miembro solo ve lo suyo, así que siempre significa «tú», y cambiar el valor rompería las apps instaladas.
 
 **Organizaciones (fase 4, [ORG-18 a ORG-22](../docs/funcionalidades/organizaciones.md#org-18)):** el contenido es de cada
 miembro. Ninguna forma de respuesta cambia y, con un solo miembro, ninguna respuesta cambia (comparado byte a byte en 32
@@ -32,11 +33,40 @@ rutas). Con varios miembros, estas rutas responden lo del miembro del usuario:
 - `GET /api/v1/tu-turno`: sus preguntas (`questions`, `later`), su memoria pendiente, su tarjeta de resumen, sus
   `recent` de preguntas y el aviso `linkedin_expired`/`linkedin_expiring` de su propia conexión; el resto de las tarjetas aún es de todos (fase 5).
 
-Responder, posponer, deshacer o declinar la pregunta de otro miembro (`POST /api/v1/preguntas/<id>/responder|mas-tarde|
-deshacer|no-compartir`) responde 403 `{ detail: "Esta pregunta es de otro miembro de tu organización." }`. Siguen leyendo a
-todos los miembros: `GET /api/v1/resultados` (el tablero), los detalles por id (`/editorial/pieces/<id>`, `/capturas/<id>`,
-`/galeria/<id>`, `/resultados/resumen-semanal/<id>`) y `GET /api/v1/memory` (la memoria cruda, con las claves de otros
-miembros y de la empresa con su prefijo `m:<uuid>:` u `o:<uuid>:`); su permiso por objeto es de la fase 5.
+Responder, posponer, deshacer o declinar la pregunta de otro miembro responde 404 desde la fase 5 (antes, 403).
+
+**Organizaciones (fase 5, [ORG-23 a ORG-27](../docs/funcionalidades/organizaciones.md#org-23)):** cada miembro ve y maneja
+solo lo suyo. Con un solo miembro ninguna respuesta cambia (todas las rutas de lectura, comparadas byte a byte). Con varios:
+
+- **Cada ruta tiene una clase** (`team_backend/alcance.py`, tabla en el [plan](../docs/plan-organizaciones.md#fase-5-lo-construido)):
+  *del miembro* (lo suyo), *de la organización* (lo mismo para todos: oportunidades, referentes, biblioteca, parada total,
+  escena y mapa del equipo, clave VAPID), *del administrador* (`integrity`, `audit`, `equipo/ciclos/<id>/decision`, `GET
+  /app/errores`: 403 a quien no es el administrador activo) o *servicio* (login, token, OAuth, Cal.com, tickets). Una ruta sin
+  clase responde 403 `{ detail: "Esta ruta no dice de quién son sus datos (team_backend/alcance.py): se rechaza." }`.
+- **El id de otro miembro responde 404** en toda ruta del miembro y en todo método (antes de validar el cuerpo); lo mismo
+  un id mal formado. En las rutas del miembro ya no hay 403 de «es de otro miembro» (preguntas, sesiones del navegador, acciones).
+- Las listas y tableros del miembro traen solo lo suyo: Tu turno (todas sus tarjetas y `recent`), `notificaciones` (sus
+  avisos y los de la organización), `actividad`, `operador/feed`, `operador/overview` (sus cuentas; la parada y el gasto de IA
+  son de todos), `operador/actions`, `operador/posts`, `red/contacts`, `red/summary`, `red/invitaciones-pendientes`,
+  `resultados` (su audiencia, contenido y acciones; el embudo de oportunidades y el gasto, de la organización),
+  `resultados/analitica`, `resultados/embudo-comprador`, `comprador/entregas`, `comprador/lectura-semanal`, `comunidad`,
+  `runs`, `calendario`, `oficina/actividad` (el detalle de una pieza solo para su dueña) y `GET /api/v1/memory` (sus hechos y
+  los de la empresa).
+- `PUT /api/v1/ajustes/preferencias` y `POST /api/v1/tu-turno/vistos` son de cada usuario: lo que uno apaga o marca como visto
+  no cambia lo del otro. Las preferencias de antes son las de Gustavo.
+- Una credencial sin miembro (un servicio) recibe 400 en las rutas del miembro; un token de la app actúa como su usuario.
+- Los ids que llegan en el cuerpo también son suyos: `POST /api/v1/capturas` con `contexto_id` de una persona, una pieza o
+  una pregunta de otro miembro responde 400 «El elemento ligado a la captura no existe.», como un id inexistente.
+  `POST /api/v1/respuestas/<id>/mensaje` acepta el id de un comentario o de un borrador del comprador suyos (404 si es de
+  otro). `GET /api/v1/audit` (administrador) no trae las acciones propias de otro miembro.
+- **Oportunidades** (de la organización): todas para todos. Con varios miembros cada una trae `registered_by` y `brought_by`
+  (`{ id, display_name }`); con uno, no llegan. `contact` solo llega a la dueña de la persona (para otro miembro, `null`;
+  `person` sigue diciendo su nombre). `contact` en `POST`/`PATCH` solo acepta una persona suya (400 «Persona inexistente»);
+  en el `PATCH` de una oportunidad cuya persona es de otro miembro, `contact` y `person_name` se ignoran.
+- **Tu turno:** `approval.provisional_voice` y `message.provisional_voice` (`true` cuando el borrador se escribió con su voz
+  provisional); las apps lo marcan «Voz provisional».
+- **Avisos:** cada aviso es de un miembro o de la organización; el push va solo a los dispositivos de su dueño y Slack no
+  nombra lo privado de nadie (texto genérico con varios miembros).
 
 **Organizaciones (fase 2, [ORG-10 a ORG-12](../docs/funcionalidades/organizaciones.md#org-10)):** el ritmo de LinkedIn
 (topes, espaciado, rampa, notas, tier, lecturas de perfil y bloqueos de invitaciones) es de cada miembro. Ninguna forma de
@@ -63,6 +93,7 @@ respuesta cambia; cambian de quién son los números:
 | GET `/api/v1/auth/session` | — | `{ authenticated, user: { username, is_superuser, permissions: [codename…] } \| null }`. Además fija la cookie CSRF. |
 | POST `/api/v1/auth/login` | `{ username, password }` | 200 `{ user }`; 400 si las credenciales son inválidas; 429 si hay demasiados intentos. |
 | POST `/api/v1/auth/logout` | — | 204 |
+| GET `/api/v1/yo` | — | «Quién soy» (fase 5 de organizaciones): `{ username, member: { id, display_name, role, active, is_admin, first } \| null, organization: { id, name, slug } \| null, is_admin, provisional_voice, members }`. `member` es null para un usuario que no es miembro y en una instalación sin miembros; `members` cuenta los activos de su organización. Las apps nombran a la persona con esto, nunca con un nombre fijo. |
 
 ## Máquina autónoma
 

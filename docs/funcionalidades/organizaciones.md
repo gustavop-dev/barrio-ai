@@ -7,7 +7,8 @@ LinkedIn propio para cada miembro (fase 2: candado, espaciado, topes, lecturas d
 del proveedor y sus ajustes); y su identidad fuera del código (fase 3: perfiles de organización y de miembro en la
 base, prompts por miembro, su voz y los textos que la nombran); y su contenido (fase 4: calendario y piezas, plan,
 resumen, revisión, audiencia, memoria, orientación, preguntas, capturas y galería de cada miembro, con la hora de los posts
-escalonada y los temas coordinados). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
+escalonada y los temas coordinados); y sus vistas y sus avisos (fase 5: cada ruta dice de quién son sus datos, el id de otro
+miembro es un 404, el embudo de oportunidades es de la empresa y dice quién trajo cada una, cada aviso tiene dueño). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
 hasta entonces, un miembro nuevo entra **inactivo**.
 
 - **Código:** backend `models.py` (`Organization`, `Member`, `ConnectorAccount.member`), migración `0055_organizaciones`,
@@ -44,7 +45,12 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 | [ORG-19](#org-19) | Su memoria y sus hechos; los de la empresa los comparte el administrador | backend (servidor) | funciona |
 | [ORG-20](#org-20) | Sus capturas, su galería, sus preguntas y su orientación | backend | funciona |
 | [ORG-21](#org-21) | Posts escalonados y temas coordinados entre miembros | backend | funciona |
-| [ORG-22](#org-22) | Un post en voz provisional nunca sale solo | backend | funciona |
+| [ORG-22](#org-22) | Un post en voz provisional nunca sale solo | backend, PWA, app | funciona |
+| [ORG-23](#org-23) | Cada ruta dice de quién son sus datos; lo de otro miembro no existe | backend | funciona |
+| [ORG-24](#org-24) | Un solo embudo de oportunidades que dice quién trajo cada una | backend, PWA, app | funciona |
+| [ORG-25](#org-25) | Cada aviso tiene dueño: push, preferencias y «Vista» por persona | backend | funciona |
+| [ORG-26](#org-26) | «Quién soy» y la marca de voz provisional en las apps | backend, PWA, app | funciona |
+| [ORG-27](#org-27) | Cada miembro entra con su usuario y solo lee lo suyo | backend (servidor), PWA, app | funciona |
 
 ---
 
@@ -479,7 +485,7 @@ hasta entonces, un miembro nuevo entra **inactivo**.
      aunque el brief nombre la del otro.
   3. **Dado** una pregunta del director de la pieza del CTO, **cuando** Gustavo intenta responderla, **entonces** 403; su
      respuesta es memoria del CTO y Tu turno le muestra a cada uno solo las suyas.
-- **Brechas código/docs:** los detalles por id (`/capturas/<id>`, `/galeria/<id>`) no comprueban dueño (fase 5).
+- **Brechas código/docs:** — (los detalles por id comprueban dueño desde la fase 5, [ORG-23](#org-23)).
 - **Cobertura QA:** `ContenidoTests.test_her_audio_and_her_photos_feed_only_her_pieces` (1–2),
   `test_a_team_question_goes_to_the_member_who_owns_the_piece` (3) · 2026-11-18 · pasa en local
 
@@ -515,6 +521,117 @@ hasta entonces, un miembro nuevo entra **inactivo**.
      el suyo queda propuesto, con la marca `{"tipo": "provisional"}`.
   2. **Dado** que confirma su voz, **cuando** pasa el autopiloto, **entonces** ese post sigue esperando; sale cuando una
      persona lo aprueba.
-- **Brechas código/docs:** mostrar la marca en la app es de la fase 7.
+- **Brechas código/docs:** — (la marca «Voz provisional» se ve en Tu turno desde la fase 5, [ORG-26](#org-26)).
 - **Cobertura QA:** `ContenidoTests.test_a_post_in_a_provisional_voice_never_goes_out_on_its_own` (1–2) · 2026-11-18 · pasa
   en local
+
+### ORG-23 · Cada ruta dice de quién son sus datos; lo de otro miembro no existe <a id="org-23"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** nada cambia para él. Con el CTO activo, cada uno ve y maneja solo lo suyo: sus contactos, sus
+  conversaciones, sus borradores, sus notas, su Tu turno, sus Resultados, sus cuentas y sus sesiones. Ni el administrador ve
+  lo privado de otro miembro (decisión del 17/11/2026). Pedir algo del otro por su id responde 404, como si no existiera.
+- **Código:** `alcance.py` (`RUTAS`, `RAIZ`, `RutaClasificada` en `DEFAULT_PERMISSION_CLASSES`, `OBJETOS`, `DUENO`, `de`,
+  `obtener`, `miembro`, `trabajos`, `TODOS`); las vistas de `rediseno_views.py`, `operador_views.py`, `red_views.py`,
+  `comprador_views.py`, `editorial_views.py`, `capturas_views.py`, `resultados_views.py`, `revision_views.py`,
+  `comunidad_views.py`, `conexion_views.py`, `linkedin_views.py`, `oficina_views.py` y `views.py`.
+- **Criterios de aceptación:**
+  1. **Dado** una ruta nueva en `team_backend/urls.py` que no está en `alcance.RUTAS`, **cuando** corre la prueba, **entonces**
+     falla; y en ejecución la ruta responde 403 («Esta ruta no dice de quién son sus datos…»).
+  2. **Dado** dos miembros activos con una fila de cada cosa, **cuando** cada uno pide cualquier ruta del miembro, **entonces**
+     ninguna lista trae el texto ni los ids del otro.
+  3. **Dado** el id de una fila del otro, **cuando** lo pide por cualquier ruta y método, **entonces** 404 (aunque el cuerpo
+     sea inválido) y nada cambia; con un id suyo responde.
+  4. **Dado** el CTO sin ser administrador, **cuando** pide `integrity`, `audit`, la lectura de `app/errores` o decide un
+     ciclo, **entonces** 403.
+  5. **Dado** un solo miembro, **cuando** se leen todas las rutas GET con la semilla de QA y el reloj congelado, **entonces**
+     la respuesta es byte a byte la de antes.
+  6. **Dado** un id del otro en el cuerpo (la persona, la pieza o la pregunta de una captura; el borrador de un comprador en
+     «Mensaje sugerido»), **cuando** lo usa, **entonces** responde como un id inexistente y nada suyo cambia; el
+     administrador no ve en la auditoría las acciones propias del otro.
+- **Brechas código/docs:** el registro compartido de personas es de la fase 6; el admin de Django ve todo (es del
+  superusuario del servidor); el administrador ve metadatos (no contenido) de los trabajos y ciclos de todos.
+- **Cobertura QA:** `test_alcance.RutasTests` (1), `DelMiembroTests` (2–3), `OrganizacionYAdministradorTests.
+  test_administrator_routes_refuse_the_cto`/`test_an_unclassified_route_is_refused` (4, 1), comparación de 249 lecturas
+  contra `350e01b` (5), `CruzadosTests` (6) · 2026-11-18 · pasa en local
+
+### ORG-24 · Un solo embudo de oportunidades que dice quién trajo cada una <a id="org-24"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona
+- **Qué hace para Gustavo:** ve todas las oportunidades de la empresa, también las que trae el CTO, con «Trajo: …» en cada
+  tarjeta cuando hay más de un miembro. La ficha de la persona solo la abre su dueño.
+- **Código:** `Opportunity.member`/`origin_member` (migración `0061`), `oportunidades.py` (`create`, `update`, `_origin`, `hers`,
+  `_notify`), `rediseno_views.OpportunityOutput` (`registered_by`, `brought_by`, `contact` solo para su dueña);
+  `compartido/src/logic/barrio.ts` (`broughtByText`, `personModeOf`, `othersPersonText`), `Oportunidades.tsx` y
+  `OportunidadForm.tsx` de las dos apps.
+- **Criterios de aceptación:**
+  1. **Dado** una oportunidad de un contacto de Gustavo, **cuando** el CTO abre el embudo, **entonces** la ve con el nombre de
+     la persona, `brought_by` Gustavo y `contact: null`.
+  2. **Dado** que el CTO la edita, **cuando** guarda, **entonces** cambian la etapa y el siguiente paso, y la persona sigue
+     siendo la de Gustavo (lo que mande para la persona se ignora); Gustavo sí puede cambiarla.
+  3. **Dado** que el CTO intenta vincular un contacto de Gustavo, **cuando** guarda, **entonces** 400 «Persona inexistente».
+  4. **Dado** un solo miembro, **cuando** lee el embudo, **entonces** no llegan `registered_by` ni `brought_by`.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `OrganizacionYAdministradorTests.test_organization_routes_answer_the_same_to_both` (1),
+  `test_she_moves_his_opportunity_but_never_its_person` (2), `RecorridoDelCtoTests` (1), comparación de un miembro (4);
+  `barrio.test.ts` «Who brought the opportunity» · 2026-11-18 · backend pasa en local; front sin correr en local (CI)
+
+### ORG-25 · Cada aviso tiene dueño: push, preferencias y «Vista» por persona <a id="org-25"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** recibe exactamente lo de hoy: los mismos avisos, el mismo push, sus preferencias y el mismo
+  Slack. Con el CTO activo, el aviso de uno no llega al teléfono del otro, y Slack no nombra lo privado de nadie.
+- **Código:** `Notification.member`, `OfficePreference.user`, `InboxSeen` (migración `0061`); `notificaciones.avisar(…,
+  member=)` (obligatorio), `ORGANIZACION`, `empujar`, `de_cuenta`, `de_contenido`, `de_usuario`, `push_enabled(kind, user)`;
+  `alerts.notify(users=, webhook=)`; `alcance.vista`; `alertas_slack.privado`.
+- **Criterios de aceptación:**
+  1. **Dado** un aviso del CTO, **cuando** se envía, **entonces** se guarda para él y el push va solo a sus dispositivos, nunca
+     al canal de Gustavo (`OPERATOR_ALERT_WEBHOOK`).
+  2. **Dado** la parada total (aviso de la organización), **cuando** se envía, **entonces** llega a los dos, cada uno con su
+     estado de leído y sus preferencias.
+  3. **Dado** que el CTO apaga un tipo de push, **cuando** llega un aviso de ese tipo, **entonces** no le llega a él y a
+     Gustavo sí; las preferencias de antes son las de Gustavo.
+  4. **Dado** un aviso que no dice de quién es con miembros, **cuando** se envía, **entonces** se descarta con un warning.
+  5. **Dado** dos miembros activos, **cuando** sale un aviso de Slack de un comentario o una conversación, **entonces** el
+     texto es genérico; con uno, el de siempre.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `test_alcance.AvisosTests` (1–5) · 2026-11-18 · pasa en local
+
+### ORG-26 · «Quién soy» y la marca de voz provisional en las apps <a id="org-26"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona
+- **Qué hace para Gustavo:** Ajustes › Sesión dice «Has entrado como Gustavo (Fundador) · ProjectApp.». Los borradores del
+  CTO escritos con su voz provisional llevan la marca «Voz provisional» en Tu turno.
+- **Código:** `oficina_views.Yo` (`GET /api/v1/yo`), `provisional_voice` en las tarjetas de aprobación y de mensaje de Tu
+  turno; `compartido` (`getYo`, `useYo`, `sessionLabel`, `provisionalVoice`), `Sesion.tsx`, `TurnoCardView.tsx` y
+  `TurnoCard.tsx`; Maestro `15-ajustes-sesion.yaml`.
+- **Criterios de aceptación:**
+  1. **Dado** un miembro, **cuando** abre Ajustes › Sesión, **entonces** lee su nombre, su rol y su organización; sin miembro,
+     su usuario como antes.
+  2. **Dado** un borrador con `provisional_voice`, **cuando** se ve en Tu turno, **entonces** lleva la marca; sin ella, no.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `QuienSoyTests.test_yo_says_who_she_is`, `RecorridoDelCtoTests` (backend); `ajustes.test.ts`,
+  `Ajustes.test.tsx`, `AjustesScreen.test.tsx`, `TuTurno.test.tsx`, `TuTurnoScreen.test.tsx` · 2026-11-18 · backend pasa en
+  local; front y Maestro sin correr en local (CI)
+
+### ORG-27 · Cada miembro entra con su usuario y solo lee lo suyo <a id="org-27"></a>
+
+- **Dónde:** backend (servidor), PWA, app
+- **Estado:** funciona
+- **Qué hace para Gustavo:** nada cambia para él. Al CTO se le da un usuario con los grupos `operacion` y `revision` y una
+  contraseña que se le entrega en privado; entra a la PWA con su sesión y a la app con su token, y los dos leen solo lo suyo.
+- **Código:** `manage.py operador --usuario <admin> miembro … --grupo operacion --grupo revision`, `manage.py changepassword`;
+  `auth/login` (sesión), `auth/token` (`DeviceToken`); `alcance.miembro`.
+- **Criterios de aceptación:**
+  1. **Dado** el CTO con los dos grupos y sin otros permisos, **cuando** entra con contraseña, **entonces** trabaja su cuenta
+     (conectar, aprobar, publicar) y una contraseña mala responde 400.
+  2. **Dado** su token de la app, **cuando** pide una pieza o una acción de Gustavo, **entonces** 404.
+  3. **Dado** una credencial de servicio (sin miembro) con dos miembros activos, **cuando** pide Tu turno o Notificaciones,
+     **entonces** 400, nunca los datos de uno.
+- **Brechas código/docs:** activarlo es de la fase 7.
+- **Cobertura QA:** `RecorridoDelCtoTests.test_the_cto_logs_in_works_her_account_and_never_sees_gustavos` (1–3) · 2026-11-18 ·
+  pasa en local
