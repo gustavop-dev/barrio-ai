@@ -2061,11 +2061,31 @@ class RecorridoDelCtoTests(DosMiembrosBase):
 SUBSTANTIVE = 'The hard part is not the model, it is deciding which step of the sales workflow you automate first.'
 
 
+REGISTRO_NOW = datetime(2026, 11, 18, 10, 0)  # Wednesday, inside the operator's window
+
+
+def freeze_clock(test, moment):
+    """Phase 6 steps never read the real hour: timezone.now (and the model field defaults Django bound to it when the
+    models loaded) answer `moment` until the test ends (the clock of ContenidoBase)."""
+    test.now = moment
+    clock = patch('django.utils.timezone.now', side_effect=lambda: test.now)
+    clock.start()
+    test.addCleanup(clock.stop)
+    for model in apps.get_app_config('team_backend').get_models():
+        for field in model._meta.fields:
+            if getattr(field.default, '__module__', '') == 'django.utils.timezone':
+                frozen = patch.object(field, '_get_default', new=lambda: timezone.now())
+                frozen.start()
+                test.addCleanup(frozen.stop)
+    return moment
+
+
 class RegistroBase(RitmoBase):
     """Phase 6 steps: the same LinkedIn person on both members' fakes (the same id for both, as directo's since
-    14/11/2026), each member's contact of her, and her touches through operador.execute."""
+    14/11/2026), each member's contact of her, and her touches through operador.execute. A frozen clock."""
 
     def setUp(self):
+        freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
         super().setUp()
         env = patch.dict(os.environ, {'NETWORK_ENABLED': 'true', 'NETWORK_SCAN_DAYS': '3650', 'NETWORK_SEARCH_QUERIES': '',
                                       'NETWORK_INVITE_AFTER_HOURS': '48', 'NETWORK_DAILY_LLM_USD': '1', 'NETWORK_READ_CAPS': '',
@@ -2074,7 +2094,6 @@ class RegistroBase(RitmoBase):
         env.start()
         self.addCleanup(env.stop)
         self.autobot = self.bot()
-        self.now = timezone.now()
         self.paid = []
 
     def person(self, slug, headline='Founder at Seedco', **seed):
@@ -2395,7 +2414,7 @@ class ReferentesDeLaOrganizacionTests(RegistroBase):
         self.assertNotIn(ref.pk, autopiloto.recent_comment_authors(self.cto.reader, self.now))
         operador.create_proposal(self.g.user, first, 'INT-03', {'text': 'Una opinión con fundamento.'}, source='agent',
                                  state='approved')
-        self.assertIn(ref.pk, autopiloto.recent_comment_authors(self.cto.reader, timezone.now()))
+        self.assertIn(ref.pk, autopiloto.recent_comment_authors(self.cto.reader, self.now))
         draft = ActionProposal(account=self.cto.reader, post=second, capability='INT-03', payload={'text': 'x'})
         self.assertTrue(autopiloto.comment_author_issues(draft))
 
@@ -2447,6 +2466,8 @@ class RegistroMigracionTests(Migraciones, TransactionTestCase):
     again it changes nothing; back, the register is empty."""
 
     def test_todays_people_become_gustavos_cards_idempotently_and_reversibly(self):
+        """Catch a migration that gives away untouched people, keeps an exclusion with one member or runs twice."""
+        now = freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
         apps = self.at(('team_backend', '0062_registro_de_personas'))
         User = apps.get_model('auth', 'User')
         Organization, Member = apps.get_model('team_backend', 'Organization'), apps.get_model('team_backend', 'Member')
@@ -2458,7 +2479,6 @@ class RegistroMigracionTests(Migraciones, TransactionTestCase):
         org = Organization.objects.create(name='ProjectApp', slug='projectapp')
         member = Member.objects.create(organization=org, user=user, display_name='Gustavo', is_admin=True)
         account = Account.objects.create(provider='directo', external_account_id='cuenta-gustavo', label='Navegador', member=member)
-        now = timezone.now()
 
         def contact(uid, stage='fit', **fields):
             return Contact_.objects.create(account=account, provider_user_id=uid, display_name=uid, stage=stage,
@@ -2522,10 +2542,14 @@ class UnMiembroTodayBuyerPathTests(UnMiembro, buyer_e2e.TodayBuyerPathTests):
 class UnMiembroRegistroTests(UnMiembro, EditorialBase):
     """Alone (the only member, made by production): the register records, and every answer is the one of before."""
 
+    def setUp(self):
+        freeze_clock(self, REGISTRO_NOW.replace(tzinfo=operador.local_tz()))
+        super().setUp()
+
     def test_alone_the_register_changes_no_answer(self):
         """Catch phase 6 changing Gustavo's day before a second member exists: no «registro» in Personas, no share, no
         company rule, no referent split or copies, her own exclusions do not stop her, nothing more is «known»."""
-        now = timezone.now()
+        now = self.now
         self.assertFalse(registro.shared(self.member.organization_id))
         person = Contact.objects.create(account=self.account, provider_user_id='ACoana', display_name='Ana', stage='fit',
                                         headline='CTO at Acme', classification={'fit': True, 'role': 'comprador'})
