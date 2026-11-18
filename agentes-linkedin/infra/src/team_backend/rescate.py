@@ -13,7 +13,7 @@ Una pieza detenida por presupuesto o por un ciclo detenido no ofrece nada: la re
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from . import editorial, guardas, identidad, imagenes, operador, retoque
+from . import editorial, guardas, identidad, imagenes, miembros, operador, retoque
 from .models import ActionProposal, CycleLedger, EditorialPiece, OPEN_PIECE_STATES
 
 KIND_LABEL = {'verificador': 'el verificador', 'imagen': 'la imagen', 'lider': 'el líder'}
@@ -82,7 +82,7 @@ def _image(piece):
         # His order repeats the image step that the block left half done (imagenes.prepare refuses a silent repeat).
         piece.image_review = {}
         piece.save(update_fields=['image_review', 'updated_at'])
-    public, private = guardas.blocks()
+    public, private = guardas.blocks(miembros.member_for_account(piece.account))  # hers (organizaciones, phase 4)
     editorial._visual(piece, public, private)
     if not piece.images.exists():
         raise ValueError('El equipo no pudo preparar la imagen')

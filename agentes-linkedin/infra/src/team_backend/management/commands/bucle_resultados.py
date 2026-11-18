@@ -109,6 +109,17 @@ def render(report):
     return '\n'.join(out)
 
 
+def _member(username):
+    """The member of `username` (--miembro), or None: the only active member (organizaciones, phase 4)."""
+    if not username:return None
+    from django.contrib.auth import get_user_model
+    from team_backend import miembros
+    user=get_user_model().objects.filter(username=username).first()
+    member=miembros.member_of_user(user) if user is not None else None
+    if member is None:raise CommandError(f'«{username}» no es miembro de una organización.')
+    return member
+
+
 class Command(BaseCommand):
     help=('Bucle de resultados (team_backend/bucle_resultados.py): por flujo —posts, comentarios, red, investigación, resumen '
           'semanal y cuenta— ¿llega la información?, ¿la usan los agentes? y ¿vuelve al ciclo?, con recuentos y los ids de lo '
@@ -119,6 +130,8 @@ class Command(BaseCommand):
         parser.add_argument('--dias',type=int,default=bucle_resultados.DIAS,help='Ventana en días hasta ahora (14 por defecto)')
         parser.add_argument('--json',action='store_true',help='Imprime el informe en JSON')
         parser.add_argument('--pieza',help='Traza una pieza (uuid): ejecución, cortes, analítica, director y resumen de su semana')
+        parser.add_argument('--miembro',help='Usuario del miembro cuyo contenido se revisa (resúmenes, audiencia, recomendaciones '
+                            'y plan semanal); obligatorio con varios miembros activos')
         parser.add_argument('--accion',help='Traza una propuesta (uuid): ejecución, desenlaces, su uso posterior y resumen de su semana')
 
     def handle(self,**o):
@@ -127,5 +140,5 @@ class Command(BaseCommand):
             report={}
             if o['pieza']:report['pieza']=bucle_resultados.trace_piece(o['pieza'])
             if o['accion']:report['accion']=bucle_resultados.trace_action(o['accion'])
-        else:report=bucle_resultados.report(o['dias'])
+        else:report=bucle_resultados.report(o['dias'],member=_member(o['miembro']))
         self.stdout.write(json.dumps(report,ensure_ascii=False,indent=2,default=str) if o['json'] else render(report))

@@ -23,7 +23,7 @@ import uuid
 from datetime import datetime, time, timedelta
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
-from . import analitica, desenlaces, editorial, estrategia, metricas, operador, resumen_semanal
+from . import analitica, desenlaces, editorial, estrategia, metricas, miembros, operador, resumen_semanal
 from .models import (ActionExecution, ActionOutcome, ActionProposal, AudienceSnapshot, AuditEvent, CanaryRun, Contact, CycleLedger,
                      EditorialPiece, ObservedPost, PostMetric, WebResearchRun, WeeklyPlan, WeeklySummary)
 
@@ -195,9 +195,9 @@ def _research(since,now):
     return {'estado':_state(len(rows),len(rows)-len(empty)),'corridas':len(rows),'con_hallazgos':len(rows)-len(empty),'por_tipo':kinds,
             'sin_hallazgos':empty[:MAX_IDS],'n_sin_hallazgos':len(empty)}
 
-def _summaries(weeks,now):
-    """One WeeklySummary per finished week, and how many entries its validator dropped."""
-    stored={s.week_start:s for s in WeeklySummary.objects.filter(week_start__in=weeks,created_at__lte=now)}
+def _summaries(weeks,now,member=None):
+    """One WeeklySummary of hers per finished week, and how many entries its validator dropped."""
+    stored={s.week_start:s for s in miembros.own(WeeklySummary.objects.filter(week_start__in=weeks,created_at__lte=now),member)}
     rows=[]
     for week in weeks:
         s=stored.get(week)
@@ -218,10 +218,10 @@ def _canary(now):
            else 'parcial' if run.state==CanaryRun.State.RUNNING or hours>CANARY_HOURS else 'ok')
     return {'estado':state,'ultimo':{'id':run.pk,'estado':run.state,'edad_horas':hours,'error':run.error_kind or None}}
 
-def _profile_views(since,now):
-    today=_local(now).date()
-    rows=list(AudienceSnapshot.objects.filter(day__gte=_local(since).date(),day__lte=today).order_by('-day').values_list('day','profile_views'))
-    latest=AudienceSnapshot.objects.filter(day__lte=today).order_by('-day').values_list('day','profile_views','profile_views_days').first()
+def _profile_views(since,now,member=None):
+    today=_local(now).date();audience=miembros.own(AudienceSnapshot.objects.all(),member)  # her audience
+    rows=list(audience.filter(day__gte=_local(since).date(),day__lte=today).order_by('-day').values_list('day','profile_views'))
+    latest=audience.filter(day__lte=today).order_by('-day').values_list('day','profile_views','profile_views_days').first()
     if latest is None:return {'estado':'roto','ultima':None,'motivo':'Ninguna captura de audiencia.'}
     views=sum(1 for _,v in rows if v is not None)
     return {'estado':'ok' if latest[1] is not None else 'parcial' if views else 'roto',
@@ -258,10 +258,10 @@ def _usage(name,since,now):
     good={i for i,v in carried if filled(v)}
     return dict(out,estado=_state(len(carried),len(good)),con_dato=len(good),vacios=_ids(i for i,_ in carried if i not in good))
 
-def _summary_stats(weeks,now):
-    """Which sections of each summary's stats had data; complete when the core ones did and its posts had 72 h cuts."""
+def _summary_stats(weeks,now,member=None):
+    """Which sections of each summary of hers had data; complete when the core ones did and its posts had 72 h cuts."""
     rows=[]
-    for s in WeeklySummary.objects.filter(week_start__in=weeks,created_at__lte=now).order_by('week_start'):
+    for s in miembros.own(WeeklySummary.objects.filter(week_start__in=weeks,created_at__lte=now),member).order_by('week_start'):
         week=(s.stats or {}).get('semana') or {}
         sections={k:v for k,v in week.items() if isinstance(v,dict) and 'disponible' in v}
         posts=sections.get('publicaciones') or {};measured=((posts.get('cortes') or {}).get('72h') or {}).get('medidos')
@@ -273,11 +273,11 @@ def _summary_stats(weeks,now):
 
 # --------------------------------------------------------------------------- ¿vuelve al ciclo?
 
-def _recommendations(since,now):
-    """resumen_semanal.for_director now, why it gives nothing, and whether the director's later snapshots carried it."""
-    given=resumen_semanal.for_director(now)
+def _recommendations(since,now,member=None):
+    """resumen_semanal.for_director now (hers), why it gives nothing, and whether the director's later snapshots carried it."""
+    given=resumen_semanal.for_director(now,member)
     floor=_local(now).date()-timedelta(days=7*(resumen_semanal.DIRECTOR_WEEKS+1))
-    recent=WeeklySummary.objects.filter(week_start__gte=floor);source=recent.exclude(state=WeeklySummary.State.DISCARDED).first()
+    summaries=miembros.own(WeeklySummary.objects.all(),member);recent=summaries.filter(week_start__gte=floor);source=recent.exclude(state=WeeklySummary.State.DISCARDED).first()
     out={'para_el_director':{'semana':given['semana']['desde'],'recomendaciones':len(given['recomendaciones'])} if given else None,
          'resumen':str(source.id) if source else None}
     if given is None:
@@ -285,24 +285,25 @@ def _recommendations(since,now):
         else:
             out['motivo']='sin_recomendaciones'
             out['descartadas_por_el_validador']=len(((source.analysis or {}).get('validacion') or {}).get('descartado') or [])
-        return dict(out,estado='roto' if WeeklySummary.objects.exists() else 'sin_datos')
+        return dict(out,estado='roto' if summaries.exists() else 'sin_datos')
     after=[(i,v) for i,_,v in _values(_cycles('editorial_context',max(since,source.created_at),now),'editorial_context') if v is not MISSING]
     carried={i for i,v in after if _recommended(v)}
     return dict(out,estado='ok' if not after else _state(len(after),len(carried)),ciclos_despues=len(after),
                 ciclos_con_recomendaciones=len(carried),ciclos_sin_recomendaciones=_ids(i for i,_ in after if i not in carried))
 
-def _plan(now):
-    """This week's WeeklyPlan: its slots carry a GASP type, and each piece of the week was prepared after the plan with
-    the slot's type."""
+def _plan(now,member=None):
+    """Her WeeklyPlan of this week: its slots carry a GASP type, and each piece of hers of the week was prepared after the
+    plan with the slot's type. Never another member's plan or pieces (organizaciones, phase 4)."""
     today=_local(now).date();monday=today-timedelta(days=today.weekday())
-    following=WeeklyPlan.objects.filter(week_start=monday+timedelta(days=7)).values_list('id','state').first()
+    plans=miembros.own(WeeklyPlan.objects.all(),member)
+    following=plans.filter(week_start=monday+timedelta(days=7)).values_list('id','state').first()
     out={'semana':monday.isoformat(),'semana_siguiente':{'plan':str(following[0]),'estado_plan':following[1]} if following else None}
     if not estrategia.enabled():return dict(out,estado='sin_datos',motivo='La estrategia semanal está apagada (STRATEGY_ENABLED=false).')
-    plan=WeeklyPlan.objects.filter(week_start=monday,created_at__lte=now).first()
+    plan=plans.filter(week_start=monday,created_at__lte=now).first()
     if plan is None:return dict(out,estado='roto',plan=None,motivo='Esta semana no tiene plan.')
     slots=[s for s in plan.slots or [] if isinstance(s,dict)];typed=[s for s in slots if s.get('type') in estrategia.TYPES]
     pieces={}
-    for p in EditorialPiece.objects.filter(slot_date__gte=monday,slot_date__lte=monday+timedelta(days=6),second_of_day=False,created_at__lte=now).order_by('created_at'):
+    for p in miembros.own(EditorialPiece.objects.all(),member).filter(slot_date__gte=monday,slot_date__lte=monday+timedelta(days=6),second_of_day=False,created_at__lte=now).order_by('created_at'):
         pieces[p.slot_date.isoformat()]=p  # the day's latest attempt
     days=[]
     for s in typed:
@@ -338,8 +339,10 @@ def _check(build):
     try:return build()
     except Exception as exc:return {'estado':'error','motivo':f'{type(exc).__name__}: {str(exc)[:160]}'}
 
-def report(dias=DIAS,now=None):
-    """The whole diagnosis of the last `dias` days up to `now`."""
+def report(dias=DIAS,now=None,member=None):
+    """The whole diagnosis of the last `dias` days up to `now`. Summaries, audience, recommendations and the weekly plan
+    are one member's (`member`; organizaciones, phase 4): without one, the only active member; among several active ones
+    those checks say MiembroRequerido (estado error) instead of picking one."""
     now=now or timezone.now();since=now-timedelta(days=dias);weeks=_weeks(since,now)
     try:posts,pieces=_posts(since,now)
     except Exception as exc:posts,pieces={'estado':'error','motivo':f'{type(exc).__name__}: {str(exc)[:160]}'},[]
@@ -347,12 +350,12 @@ def report(dias=DIAS,now=None):
          'llega':{'posts':posts,'analitica':_check(lambda:_analytics(pieces,now)),
                   'comentarios':_check(lambda:dict(_measured((desenlaces.COMMENT,),'72h',since,now,wrote=True),tasas=desenlaces.comment_rates(dias,now))),
                   'red':_check(lambda:dict(_measured(desenlaces.NETWORK,'7d',since,now),interactuaron=len(desenlaces.network_engaged(days=dias,now=now)))),
-                  'investigacion':_check(lambda:_research(since,now)),'resumen_semanal':_check(lambda:_summaries(weeks,now)),
-                  'canario':_check(lambda:_canary(now)),'visitas_perfil':_check(lambda:_profile_views(since,now)),
+                  'investigacion':_check(lambda:_research(since,now)),'resumen_semanal':_check(lambda:_summaries(weeks,now,member)),
+                  'canario':_check(lambda:_canary(now)),'visitas_perfil':_check(lambda:_profile_views(since,now,member)),
                   'contactos':_check(lambda:_contacts(since,now))},
          'usan':{**{name:_check(lambda name=name:_usage(name,since,now)) for name in SNAPSHOTS},
-                 'resumen_stats':_check(lambda:_summary_stats(weeks,now))},
-         'vuelve':{'recomendaciones':_check(lambda:_recommendations(since,now)),'plan_semanal':_check(lambda:_plan(now))}}
+                 'resumen_stats':_check(lambda:_summary_stats(weeks,now,member))},
+         'vuelve':{'recomendaciones':_check(lambda:_recommendations(since,now,member)),'plan_semanal':_check(lambda:_plan(now,member))}}
     out['veredictos']=verdicts(out)
     return out
 
@@ -361,10 +364,10 @@ def report(dias=DIAS,now=None):
 def _link(name,state,why=None,**data):
     return {'eslabon':name,'estado':state,'motivo':why,**data}
 
-def _week_link(day,now,section,included=None):
-    """The WeeklySummary of the week of local `day`: ok when its `section` had data and, given `included`, it holds the
-    item; aun_no_toca before the summary of that week is due."""
-    week=day-timedelta(days=day.weekday());summary=WeeklySummary.objects.filter(week_start=week,created_at__lte=now).first()
+def _week_link(day,now,section,included=None,member=None):
+    """Her WeeklySummary of the week of local `day` (the item's member): ok when its `section` had data and, given
+    `included`, it holds the item; aun_no_toca before the summary of that week is due."""
+    week=day-timedelta(days=day.weekday());summary=miembros.own(WeeklySummary.objects.all(),member).filter(week_start=week,created_at__lte=now).first()
     if summary is None:
         late=now>=_summary_due(week)
         return _link('resumen','falta' if late else 'aun_no_toca','Su semana no tiene resumen.' if late
@@ -419,7 +422,8 @@ def trace_piece(piece_id,now=None):
         else:links.append(_link('director','aun_no_toca','Aún no hubo un ciclo del director después de su primer corte.'))
     day=piece.slot_date.isoformat()
     links.append(_week_link(_local(started).date(),now,'publicaciones',
-                            lambda data:any(isinstance(r,dict) and r.get('fecha')==day for r in data.get('posts') or [])))
+                            lambda data:any(isinstance(r,dict) and r.get('fecha')==day for r in data.get('posts') or []),
+                            piece.member or miembros.member_for_account(piece.account)))
     return {'pieza':str(piece.id),'eslabones':links}
 
 def _use_link(proposal,execution,outcomes,now):
@@ -479,5 +483,5 @@ def trace_action(proposal_id,now=None):
         elif elapsed<age:links.append(_link('desenlace','aun_no_toca',f'Se mide al cumplir {kind}.'))
         else:links.append(_link('desenlace','falta','Plazo vencido sin desenlace.' if elapsed>late else 'En plazo y aún sin desenlace: collect_outcomes no lo midió.'))
         links.append(_use_link(proposal,execution,outcomes,now))
-    links.append(_week_link(_local(execution.started_at).date(),now,SECTION.get(cap)))
+    links.append(_week_link(_local(execution.started_at).date(),now,SECTION.get(cap),member=miembros.member_for_account(proposal.account)))
     return {'accion':str(proposal.id),'eslabones':links}

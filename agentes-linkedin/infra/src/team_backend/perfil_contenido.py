@@ -122,9 +122,8 @@ def llm(system,payload,contract,purpose):
 
 
 def _render(system):
-    """The instructions with the name of whose profile it is (still the installation's: phase 7 names the member)."""
-    from . import identidad
-    return identidad.of().render(system)
+    """The instructions with the name of whose profile it is (the running profile job's owner: perfil_marca.owner)."""
+    return brand.owner_identity().render(system)
 
 
 def positioning(context):

@@ -10,7 +10,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 from knowledge import db, providers
-from . import connectors_images as connector, guardas, identidad, infografias, orquestacion
+from . import connectors_images as connector, guardas, identidad, infografias, miembros, orquestacion
 from .models import GalleryPhoto, PieceImage
 
 
@@ -24,12 +24,16 @@ def spent_today(now=None):
         return Decimal(c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose LIKE 'image-%%' AND created_at>=%s",(day,)).fetchone()['spent'])
 
 
-def candidates(ideas=()):
+def candidates(ideas=(),member=None):
+    """Her gallery photos a brief may offer: only `member`'s (organizaciones, phase 4: one member's photo never goes in
+    another's piece). MiembroRequerido among several active members without one."""
+    member=miembros.resolve(member)
     preferred=[p['id'] for idea in ideas for p in idea.get('photos',[])]
-    rows=list(GalleryPhoto.objects.select_related('capture','chosen_piece').filter(category='posts',state__in=['sin_usar','publicada']).order_by('-created_at')[:40])
+    mine=miembros.own(GalleryPhoto.objects.all(),member)
+    rows=list(mine.select_related('capture','chosen_piece').filter(category='posts',state__in=['sin_usar','publicada']).order_by('-created_at')[:40])
     # A proposal's own photos are offered even when the recent gallery page is full.
     by_id={str(p.id):p for p in rows}
-    for p in GalleryPhoto.objects.select_related('capture','chosen_piece').filter(category='posts',id__in=preferred):by_id[str(p.id)]=p
+    for p in mine.select_related('capture','chosen_piece').filter(category='posts',id__in=preferred):by_id[str(p.id)]=p
     rows=sorted(by_id.values(),key=lambda p:(str(p.id) not in preferred,p.state=='publicada',-p.created_at.timestamp()))[:12]
     return [{'id':str(p.id),'note':p.note,'instruction':p.instruction,'instruction_kind':p.instruction_kind,
              'capture_note':p.capture.note if p.capture else '', 'transcript':p.capture.transcript if p.capture else '',
@@ -304,7 +308,7 @@ def prepare(piece,public=(),private=(),client=None):
                 if piece.images.filter(source_photo_id=selection['id']).exists():continue
                 # Claim the source durably, then release DB locks before any paid call.
                 with transaction.atomic():
-                    photo=GalleryPhoto.objects.select_for_update().filter(id=selection['id'],category='posts').first()
+                    photo=miembros.own(GalleryPhoto.objects.select_for_update(),piece.member).filter(id=selection['id'],category='posts').first()
                     if photo is None or (photo.state not in ['sin_usar','publicada'] and photo.chosen_piece_id!=piece.id):continue
                     previous_state=photo.state if photo.state in ('sin_usar','publicada') else 'sin_usar'
                     previous_piece=photo.chosen_piece_id if photo.chosen_piece_id!=piece.id else None

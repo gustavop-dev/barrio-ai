@@ -1,11 +1,29 @@
 """The member's approved profile brand and render constraints, shared with evidence consumers."""
+import contextvars
 import unicodedata
 from collections import Counter
+from contextlib import contextmanager
+
+_OWNER=contextvars.ContextVar('profile_owner',default=None)
+
+@contextmanager
+def owner(ident):
+    """While a profile job runs (perfil.run, perfil_assets.run): whose profile it is, for the readers below that have no
+    proposal at hand (the drafter's instructions, the brand evidence). Organizaciones, phase 4: the profile is hers."""
+    token=_OWNER.set(ident)
+    try:yield ident
+    finally:_OWNER.reset(token)
+
+def owner_identity(member=None):
+    """`member`'s identity, else the running profile job's owner, else the only active member's."""
+    from . import identidad
+    if member is not None:return identidad.of(member)
+    ident=_OWNER.get()
+    return ident if ident is not None else identidad.of()
 
 def brand_version(member=None):
     """Her profile brand version (her profile's `brand_version`; the first member's is the approved addenda 6)."""
-    from . import identidad
-    return identidad.of(member).me('brand_version')
+    return owner_identity(member).me('brand_version')
 SOURCE='docs/funcionalidades/estrategia-perfil.md#marca'
 ACCENT='#0FF1CE';INK='#1E1E2B';PAPER='#F7F6F0';DEEP='#00715E'
 TOKENS={'aguamarina':ACCENT,'tinta':INK,'papel':PAPER,'0ff1ce-hondo':DEEP}

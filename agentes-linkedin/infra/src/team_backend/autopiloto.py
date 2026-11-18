@@ -71,8 +71,35 @@ AUTO_BY_DEFAULT=('INT-03','INT-04','INT-02','CONT-09')
 def autonomy(capability,member=None):
     """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off. The member's own value for a
     capability (miembros.setting) wins over the .env's (organizaciones, phase 2: the CTO starts in «approval» without
-    touching Gustavo's). Without a member, the only active one (MiembroRequerido among several)."""
+    touching Gustavo's). Without a member, the only active one (MiembroRequerido among several).
+    While her voice is provisional (voz.current: a member without a confirmed voice, never the first member), her
+    editorial autonomy (CONT-09) is «approval» whatever is configured: her posts never go out on their own until she
+    confirms her voice (organizaciones, phase 4)."""
     member=operador.member_of(member=member)
+    mode=_configured(capability,member)
+    if capability==PROVISIONAL_HOLDS and mode=='auto' and provisional_voice(member):return 'approval'
+    return mode
+
+PROVISIONAL_HOLDS='CONT-09'  # the capability a provisional voice keeps in approval
+
+def _author(proposal):
+    """Whose text a proposal is: its account's member; None for a draft without an account (the evaluation harness), which
+    the text checks read as the default member, as always."""
+    return operador.member_of(account=proposal.account) if proposal.account_id else None
+
+def provisional_voice(member):
+    """Whether her voice is provisional (no confirmed voice and not the installation's first person)."""
+    if member is None:return False
+    from . import voz
+    return voz.current(member).provisional
+
+def provisional_draft(proposal):
+    """A post written in a provisional voice (its piece's or its own `voice` mark): it never goes out on its own, even
+    after she confirms her voice; a person approves it."""
+    marks=[proposal.voice or {}]+([proposal.piece.voice or {}] if proposal.piece_id else [])
+    return proposal.capability==PROVISIONAL_HOLDS and any(m.get('tipo')=='provisional' for m in marks)
+
+def _configured(capability,member):
     own=(member.settings or {}).get('OPERATOR_AUTONOMY','') if member is not None else ''
     for source in (own,setting('OPERATOR_AUTONOMY','')):
         for item in filter(None,source.split(',')):
@@ -92,8 +119,7 @@ def post_issues(proposal):
     from . import compuertas
     text=proposal.payload.get('text','')
     issues=compuertas.form_rules(text,compuertas.gate_policy(proposal.piece if proposal.piece_id else None))
-    public,private=guardas.blocks()
-    issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    issues+=guardas.text_checks(text,_author(proposal))  # her memory only (phase 4)
     verification=proposal.piece.verification if proposal.piece_id else {}
     if (verification.get('override') or {}).get('text_sha256')==hashlib.sha256(text.encode()).hexdigest():
         # EDI-23: Gustavo dismissed the block of this exact text: only what LinkedIn needs remains (length, image).
@@ -133,8 +159,7 @@ def comment_text_issues(proposal):
     if proposal.post_id and calentamiento.warmup_post(proposal.post):
         from . import sin_posts
         issues+=warmup_text_issues(text)+sin_posts.repeat_issues(proposal)  # phase 5: never the same to two of a company
-    public,private=guardas.blocks()
-    return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    return issues+guardas.text_checks(text,_author(proposal))  # her memory only (phase 4)
 
 def warmup_text_issues(text):
     """The fixed rules of a warm-up comment (calentamiento.warmup_post): 25–40 words, ends with one question, no
@@ -168,6 +193,7 @@ def policy_review(proposal,lead_budget=None):
     if cycle_issues(proposal):return proposal
     mode=autonomy_of(proposal)
     if mode=='approval':return proposal
+    if mode=='auto' and provisional_draft(proposal):return proposal  # a provisional voice's post waits for a person
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
     if proposal.capability==ActionProposal.Capability.PUBLISH and issues and set(issues)<={'Imagen no disponible','Documento no disponible'}:
         logger.warning('Propuesta %s pendiente por archivos no disponibles: %s',proposal.id,'; '.join(issues))
@@ -388,28 +414,40 @@ def tick(user,now=None):
     return report
 
 def _editorial(user,now):
-    """CONT-07: queue the preparation of the next slot (EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead), one at a time,
-    within the editorial daily budget and the CONT-09 caps. Each slot gets one automatic attempt at most."""
+    """CONT-07: queue the preparation of each member's next slot (her EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead),
+    one at a time per member, within the editorial daily budget and her CONT-09 caps. Each slot of hers gets one
+    automatic attempt at most. Each member apart (organizaciones, phase 4): her job carries her (miembros.job_params) and
+    its id her (miembros.job_parts), so one member's job never deduplicates another's, and her failure never stops the
+    next member's (miembros.each_member)."""
     from . import editorial, editor_visual
     editorial.recover_stuck()
-    editor_visual.upgrade_bindings()  # a still valid v1 visual package stops depending on his confirmed facts
-    if autonomy('CONT-09')=='off' or _pending('prepare_piece'):return 0
-    account=editorial.publishing_account()
+    editor_visual.upgrade_bindings()  # a still valid v1 visual package stops depending on her confirmed facts
+    return miembros.each_member(lambda member:_editorial_for(user,now,member),'editorial')
+
+def _pending_for(kind,member):
+    """Whether a job of hers of `kind` is queued or running (job_params' encoding; every job without members)."""
+    rows=Job.objects.filter(kind=kind,state__in=[Job.State.QUEUED,Job.State.RUNNING])
+    return miembros.her_jobs(rows,member).exists()
+
+def _editorial_for(user,now,member):
+    from . import editorial, urgente
+    if autonomy('CONT-09',member)=='off' or _pending_for('prepare_piece',member):return 0
+    account=editorial.publishing_account(member)
     if not editorial.can_publish(account):return 0
     if not editorial.can_afford_preparation(now):return 0
-    from . import urgente
-    extra=urgente.next_extra(now)
+    pieces=miembros.own(EditorialPiece.objects.all(),member);parts=miembros.job_parts(member)
+    extra=urgente.next_extra(now,member)
     if extra:
-        # The post he asked for at a day and hour is an order: prepared right away, outside the CONT-09 caps.
-        attempt=EditorialPiece.objects.filter(slot_date=extra,second_of_day=True).count()
-        _,created=enqueue_operation(user,'prepare_piece',{'slot':extra.isoformat(),'extra':True},
-                                    request_id=_job_id('extra',extra) if not attempt else _job_id('extra',extra,attempt))
+        # The post she asked for at a day and hour is an order: prepared right away, outside the CONT-09 caps.
+        attempt=pieces.filter(slot_date=extra,second_of_day=True).count()
+        _,created=enqueue_operation(user,'prepare_piece',miembros.job_params(member,{'slot':extra.isoformat(),'extra':True}),
+                                    request_id=_job_id('extra',extra,*parts) if not attempt else _job_id('extra',extra,attempt,*parts))
         return int(created)
-    slot=urgente.next_slot(now) or editorial.next_slot(now)
-    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot,operador.member_of(account=account)))<=0:return 0
-    attempt=EditorialPiece.objects.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
-    _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
-                                request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))
+    slot=urgente.next_slot(now,member=member) or editorial.next_slot(now,member=member)
+    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot,member) or editorial.scheduled_for(slot,member))<=0:return 0
+    attempt=pieces.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
+    _,created=enqueue_operation(user,'prepare_piece',miembros.job_params(member,{'slot':slot.isoformat()}),
+                                request_id=_job_id('piece',slot,*parts) if not attempt else _job_id('piece',slot,attempt,*parts))
     return int(created)
 
 def author_cooldown():

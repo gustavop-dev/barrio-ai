@@ -447,13 +447,38 @@ def spent_today(now=None):
 def lead_time():
     return timedelta(hours=float(os.environ.get('EDITORIAL_LEAD_HOURS','12')))
 
-def post_time(member=None):
-    """EDITORIAL_POST_TIME of the member (hers, else the .env's; organizaciones, phase 2). Without a member, the only
-    active one (MiembroRequerido among several)."""
-    member=operador.member_of(member=member)
+def _configured_time(member):
     raw=str(miembros.setting(member,'EDITORIAL_POST_TIME','08:30')).strip();hours,_,minutes=raw.partition(':')
     try:return time(int(hours),int(minutes or 0))
     except ValueError:raise ValueError('EDITORIAL_POST_TIME inválida: usa HH:MM.') from None
+
+def post_stagger():
+    """Minutes between two active members' daily posts (EDITORIAL_POST_STAGGER_MINUTES, 15 by default)."""
+    return max(1,int(os.environ.get('EDITORIAL_POST_STAGGER_MINUTES','15')))
+
+def staggered_times(organization_id):
+    """{member id: her post hour} for the active members of an organization, oldest first: each keeps her
+    EDITORIAL_POST_TIME unless it falls within post_stagger() minutes of an older member's, and then moves later by
+    that many minutes until it does not (organizaciones, phase 4: two members never post at the same time; the first
+    member, Gustavo, never moves). Deterministic: the same settings give the same hours."""
+    from .models import Member
+    step=post_stagger();taken=[];out={}
+    for member in Member.objects.filter(organization_id=organization_id,active=True).order_by('created_at','pk'):
+        try:at=_configured_time(member)
+        except ValueError:continue  # her broken hour fails only her (post_time raises it for her), never the others'
+        minutes=at.hour*60+at.minute
+        while any(abs(minutes-other)<step for other in taken):minutes+=step
+        if minutes>=24*60:raise ValueError('EDITORIAL_POST_TIME: no queda una hora libre ese día para escalonar los posts.')
+        taken.append(minutes);out[member.pk]=time(minutes//60,minutes%60)
+    return out
+
+def post_time(member=None):
+    """Her daily post hour: EDITORIAL_POST_TIME (hers, else the .env's; organizaciones, phase 2), staggered from the
+    other active members' of her organization (staggered_times; phase 4). Without a member, the only active one
+    (MiembroRequerido among several)."""
+    member=operador.member_of(member=member)
+    if member is None or not member.active or miembros.is_first(member):return _configured_time(member)
+    return staggered_times(member.organization_id).get(member.pk) or _configured_time(member)
 
 def scheduled_for(day,member=None):
     when=datetime.combine(day,post_time(member),tzinfo=operador.local_tz())
@@ -501,19 +526,23 @@ def idea_retry(pieces):
     closed=(EditorialPiece.State.SKIPPED,EditorialPiece.State.BLOCKED,EditorialPiece.State.FAILED)
     return bool(pieces) and all(p.state in closed and (p.brief or {}).get('reserved_capture') for p in pieces)
 
-def next_slot(now=None,manual=False):
+def next_slot(now=None,manual=False,member=None):
     """Autopilot: today or tomorrow once the lead time opened and the day has no piece at all (a skip or a
     failure is not retried automatically, except a stop for the daily budget once it renewed and the one second
-    attempt after a content gate, compuertas.gate_retry). Manual: the first of the next 7 days without an open piece."""
+    attempt after a content gate, compuertas.gate_retry). Manual: the first of the next 7 days without an open piece.
+    Her calendar (organizaciones, phase 4): her pieces, her preparation jobs and her post time; another member's piece
+    never takes her day. `member=None`: the only active member (MiembroRequerido among several)."""
+    member=miembros.resolve(member)
     now=now or timezone.now();today=now.astimezone(operador.local_tz()).date()
     for offset in range(8 if manual else 2):
-        day=today+timedelta(days=offset);when=scheduled_for(day)
+        day=today+timedelta(days=offset);when=scheduled_for(day,member)
         if when<=now or (not manual and now<when-lead_time()):continue
-        pieces=EditorialPiece.objects.filter(slot_date=day,second_of_day=False)  # an extra post he asked for is not the day's
+        pieces=miembros.own(EditorialPiece.objects.all(),member).filter(slot_date=day,second_of_day=False)  # an extra post she asked for is not the day's
         if manual and pieces.filter(state__in=OPEN_PIECE_STATES).exists():continue
         if (not manual and pieces.exists() and not budget_retry(pieces,now) and not idea_retry(pieces)
                 and not compuertas.gate_retry(pieces,now,when)):continue
-        if Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat()).exclude(params__contains={'extra':True}).exists():continue
+        jobs=Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat())
+        if miembros.her_jobs(jobs,member).exclude(params__contains={'extra':True}).exists():continue
         return day
     return None
 
@@ -553,10 +582,12 @@ def plan(user,request_id=None,audit_request_id=''):
     if not can_publish(account):raise Conflict('La publicación está en pausa o desactivada (LIVE_LINKEDIN_OFFICIAL); no se prepara una pieza que no saldría.')
     from .autopiloto import autonomy
     if operador.globally_paused() or autonomy('CONT-09',operador.member_of(account=account,member=member))=='off':raise Conflict('La publicación está detenida; no se prepara una pieza.')
-    extra=urgente.next_extra()  # a post he asked for at a day and hour goes first: it is an order
-    slot=extra or urgente.next_slot(manual=True) or next_slot(manual=True)
+    # Her calendar (phase 4): her next free day, her job (job_params carries her for any member but the first).
+    extra=urgente.next_extra(member=member)  # a post she asked for at a day and hour goes first: it is an order
+    slot=extra or urgente.next_slot(manual=True,member=member) or next_slot(manual=True,member=member)
     if slot is None:raise Conflict('No hay un hueco libre en los próximos siete días.')
-    job,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat(),**({'extra':True} if extra else {})},request_id,audit_request_id)
+    params=miembros.job_params(member,{'slot':slot.isoformat(),**({'extra':True} if extra else {})})
+    job,created=enqueue_operation(user,'prepare_piece',params,request_id,audit_request_id)
     return job,created,slot
 
 def recover_stuck():
@@ -576,7 +607,7 @@ def _close(piece,state,note):
     if state in RELEASE_REASON:
         from . import capturas
         capturas.release_ideas(piece,RELEASE_REASON[state])
-        urgente.assign_slots()
+        urgente.assign_slots(member=piece.member)  # her calendar (every member's for a piece without one)
     return piece
 
 class BudgetStop(ValueError):
@@ -678,10 +709,11 @@ def _group(items):
         row[kind]=dict(measured=len(measured),**{f'median_{f}':_median([getattr(m,f) for m in measured]) for f in RESULT_FIELDS})
     return row
 
-def _performance(now):
-    """Deterministic summary of what worked in the last PERFORMANCE_DAYS days, by pillar, modality and GASP type."""
+def _performance(now,member=None):
+    """Deterministic summary of what worked for her in the last PERFORMANCE_DAYS days, by pillar, modality and GASP type
+    (her pieces only: another member's audience is not hers)."""
     since=now.astimezone(operador.local_tz()).date()-timedelta(days=PERFORMANCE_DAYS);published=[]
-    for piece in EditorialPiece.objects.filter(state=EditorialPiece.State.READY,slot_date__gte=since).prefetch_related('post_metrics'):
+    for piece in miembros.own(EditorialPiece.objects.all(),member).filter(state=EditorialPiece.State.READY,slot_date__gte=since).prefetch_related('post_metrics'):
         if status(piece,latest_action(piece))!='published':continue
         brief=piece.brief or {}
         published.append((brief.get('pillar'),brief.get('modality'),brief.get('gasp_type'),{m.kind:m for m in piece.post_metrics.all()}))
@@ -698,9 +730,10 @@ def _lifetime(piece_ids):
     return {piece:{k:v.get(k) for k in ('impressions','saves','sends','followers_gained','source')}
             for piece,v in analitica.for_pieces(piece_ids).items()}
 
-def _history(now):
+def _history(now,member=None):
+    """Her recent pieces and results (her pieces only)."""
     rows=[];mix={m:0 for m in MODALITIES};published={}
-    for piece in EditorialPiece.objects.filter(state=EditorialPiece.State.READY).prefetch_related('post_metrics').order_by('-slot_date')[:HISTORY_LIMIT]:
+    for piece in miembros.own(EditorialPiece.objects.all(),member).filter(state=EditorialPiece.State.READY).prefetch_related('post_metrics').order_by('-slot_date')[:HISTORY_LIMIT]:
         action=latest_action(piece);label=status(piece,action);brief=piece.brief or {}
         row={'date':piece.slot_date,'status':label,'pillar':brief.get('pillar'),'modality':brief.get('modality'),
              'thesis':brief.get('thesis'),'approach':brief.get('approach'),'image':piece.image_kind or None,
@@ -711,23 +744,24 @@ def _history(now):
     for piece,figures in _lifetime(list(published)).items():published[piece]['analitica']=figures
     return rows,mix
 
-def prepare(user,slot,origin_job='',extra=False):
-    """Run the whole circuit for one slot. Each stage is saved as it completes and never repeated. `extra`: the post
-    Gustavo asked for at a day and hour, next to the day's own (urgente.py)."""
+def prepare(user,slot,origin_job='',extra=False,member=None):
+    """Run the whole circuit for one slot of her calendar. Each stage is saved as it completes and never repeated.
+    `extra`: the post she asked for at a day and hour, next to the day's own (urgente.py). `member`: whose piece (the
+    worker passes miembros.of_job(params)); None, the user's member."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
-    member=miembros.member_for(user);account=publishing_account(member)
+    member=member if member is not None else miembros.member_for(user);account=publishing_account(member)
     if account is None:raise ValueError('LinkedIn (API oficial) no está conectado; no se prepara la pieza.')
     from .autopiloto import autonomy
     member=operador.member_of(account=account,member=member)
     if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09',member)=='off':raise Conflict('Publicación detenida antes de preparar.')
-    when=urgente.extra_at(slot) if extra else urgente.reserved_at(slot) or scheduled_for(slot,member);now=timezone.now()
+    when=urgente.extra_at(slot,member) if extra else urgente.reserved_at(slot,member) or scheduled_for(slot,member);now=timezone.now()
     if when is None:raise Conflict('Ya no hay un post pedido para ese día.')
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
     piece=EditorialPiece.objects.filter(origin_job=origin_job).first() if origin_job else None
     if piece is None:
         _guard()  # Preserve the preflight failure: no piece or cycle is created without a budget.
         try:piece=EditorialPiece.objects.create(account=account,slot_date=slot,scheduled_for=when,created_by=user,origin_job=origin_job,
-                                               second_of_day=extra)
+                                               second_of_day=extra,member=member)
         except IntegrityError:raise Conflict('Ya hay una pieza abierta para ese día.') from None
         operador._audit(user,'editorial.piece_started',piece.id,slot=slot.isoformat())
     job=Job.objects.filter(id=origin_job).first() if origin_job else None
@@ -754,32 +788,34 @@ def prepare(user,slot,origin_job='',extra=False):
 
 def _context(piece,now):
     ident=identidad.of_account(piece.account)
-    public,private=identidad.blocks(ident)  # her memory (phase 4 hook): never another member's
-    signals=_signals(now);history,mix=_history(now)
+    member=piece.member if piece.member_id else ident.member  # whose piece: everything below is hers (phase 4)
+    public,private=identidad.blocks(ident)  # her memory and her organization's company facts: never another member's
+    signals=_signals(now);history,mix=_history(now,member)
     memory={'public_facts':public,'private_guidance':private,'orientation':identidad.orientation(ident)}
     # a) Director: idea and brief, or a justified skip.
     from . import preguntas
-    asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in TeamQuestion.objects.filter(state='open')[:20]],
-           'closed_keys':sorted(preguntas.closed_keys()|{q for q in TeamQuestion.objects.filter(state='answered').values_list('memory_key',flat=True)})}
+    questions=miembros.own(TeamQuestion.objects.all(),member)
+    asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in questions.filter(state='open')[:20]],
+           'closed_keys':sorted(preguntas.closed_keys(member)|{q for q in questions.filter(state='answered').values_list('memory_key',flat=True)})}
     from . import capturas, resumen_semanal, perfil
-    urgente.assign_slots(now)
-    ideas=capturas.ideas_for_director(now)
+    urgente.assign_slots(now,member)
+    ideas=capturas.ideas_for_director(now,member)
     # Each idea of his has its own window: the one reserved for this piece is its priority; ideas reserved for other
     # days are not offered here.
     ideas=[i for i in ideas if not i['expected_slot'] or datetime.fromisoformat(i['expected_slot'])==piece.scheduled_for]
     # The extra post he asked for is about that idea only; the day's own post never takes it.
     ideas=[i for i in ideas if i.get('extra') and i['expected_slot']] if piece.second_of_day else [i for i in ideas if not i.get('extra')]
     priority=next((i for i in ideas if i['expected_slot']),None)
-    gallery=imagenes.candidates(ideas)
-    feedback=capturas.feedback_for_director(now)
-    answers=capturas.answer_research_for_director(now)
+    gallery=imagenes.candidates(ideas,member)  # her photos only
+    feedback=capturas.feedback_for_director(now,member)
+    answers=capturas.answer_research_for_director(now,member)
     piece.research=[item['investigation'] for item in ideas+feedback+answers if item.get('investigation')]
     piece.save(update_fields=['research','updated_at'])
     director_input=dict(memory,slot={'date':piece.slot_date,'weekday':piece.slot_date.strftime('%A')},
-                   signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now),
+                   signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now,member),
                    team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=feedback,research_from_answers=answers,
-                   weekly_recommendations=resumen_semanal.for_director(now),gallery=gallery,priority_capture=priority,
-                   profile_guidance=perfil.editorial_guidance())
+                   weekly_recommendations=resumen_semanal.for_director(now,member),gallery=gallery,priority_capture=priority,
+                   profile_guidance=perfil.editorial_guidance(member))
     previous=compuertas.previous_attempts(piece)  # only on the day's second attempt: the first input stays as it was
     if previous:director_input['previous_attempts']=previous
     from . import estrategia
@@ -831,7 +867,8 @@ def _run(piece,user,now,origin_job):
     for item in (brief.get('questions_for_gustavo') or [])[:2]:
         if isinstance(item,dict):
             preguntas.ask('director_editorial',item.get('question'),item.get('purpose'),item.get('memory_key'),
-                          bool(item.get('public')),origin=f'piece:{piece.id}',deadline=piece.scheduled_for)
+                          bool(item.get('public')),origin=f'piece:{piece.id}',deadline=piece.scheduled_for,
+                          member=piece.member)  # her question: it goes to her and her answer is her fact
     piece.brief=brief;piece.signals=[s for s in signals if s['id'] in set(brief.get('signals_used',[]))]
     piece.save(update_fields=['brief','signals','updated_at'])
     if brief.get('decision')!='write':

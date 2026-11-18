@@ -149,6 +149,7 @@ class Command(BaseCommand):
                 from team_backend.models import ReferentControl
                 ReferentControl.objects.create(account=self.fake,issue='Identificar los cinco main iniciales.')
             self.community()
+            if self.cto is not None:Member.objects.filter(pk=self.cto.pk).update(active=True)  # the world is built: she joins
         if options.get('perfil_capturas'):
             # This flow has no worker. Exercise the real routing after committing
             # the seed (knowledge memory uses a separate connection), without push.
@@ -218,8 +219,10 @@ class Command(BaseCommand):
             user.set_password(os.environ.get('QA_PASSWORD') or QA_PASSWORD_DEFAULT);user.save()
             from django.contrib.auth.models import Group
             user.groups.add(*Group.objects.filter(name='revision'))  # bootstrap_local's groups, when present
+            # Inactive while the world is built: every piece, question, capture and summary of the seed is qa's (phase 4:
+            # a content row says whose it is, never «the» member among two); handle() activates her at the end.
             self.cto=Member.objects.create(id=uid('member:qa-cto'),organization=organization,user=user,display_name='CTO de prueba',
-                                           role='CTO',created_at=self.ago(days=1))
+                                           role='CTO',created_at=self.ago(days=1),active=False)
 
     def accounts(self):
         # «running» is the status of a working account: Ajustes shows it as «Conectada» (AJU-02).

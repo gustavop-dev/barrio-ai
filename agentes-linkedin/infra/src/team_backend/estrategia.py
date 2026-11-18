@@ -30,7 +30,7 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from knowledge import db, providers
-from . import compuertas, identidad, operador, posicionamiento
+from . import compuertas, identidad, miembros, operador, posicionamiento
 from .exceptions import Conflict
 from .models import Capture, EditorialPiece, Job, ObservedPost, PostComment, WeeklyPlan
 from .permissions import require
@@ -146,27 +146,32 @@ def _template_slots(monday):
         out.append(slot)
     return out
 
-def ensure(monday):
-    """The stored plan of a week, created from the structure the first time it is needed (free, no model)."""
-    monday=week_start(monday)
-    plan=WeeklyPlan.objects.filter(week_start=monday).first()
+def _plans(member):
+    """Her weekly plans (organizaciones, phase 4: each member plans her own week from the organization's template)."""
+    return miembros.own(WeeklyPlan.objects.all(),member)
+
+def ensure(monday,member=None):
+    """Her stored plan of a week, created from the structure the first time it is needed (free, no model). `member=None`:
+    the only active member (MiembroRequerido among several)."""
+    monday=week_start(monday);member=miembros.resolve(member)
+    plan=_plans(member).filter(week_start=monday).first()
     if plan:return plan
     try:
         with transaction.atomic():
-            return WeeklyPlan.objects.create(week_start=monday,slots=_template_slots(monday),
+            return WeeklyPlan.objects.create(week_start=monday,slots=_template_slots(monday),member=member,
                                              warnings=mix_warnings(allocate(monday)))
     except IntegrityError:
-        return WeeklyPlan.objects.get(week_start=monday)
+        return _plans(member).get(week_start=monday)
 
-def slot_for(day):
-    """The planned slot of `day`: its stored plan's, else the structure's. None with the strategy off."""
+def slot_for(day,member=None):
+    """Her planned slot of `day`: her stored plan's, else the structure's. None with the strategy off."""
     if not enabled():return None
-    plan=WeeklyPlan.objects.filter(week_start=week_start(day)).first()
+    plan=_plans(member).filter(week_start=week_start(day)).first()
     slots=plan.slots if plan else _template_slots(week_start(day))
     return next((s for s in slots if s['date']==day.isoformat()),None)
 
-def day_type(day):
-    slot=slot_for(day)
+def day_type(day,member=None):
+    slot=slot_for(day,member)
     return slot['type'] if slot else None
 
 def piece_type(piece):
@@ -232,28 +237,30 @@ def audience_questions(now):
     return [{'id':f"tema:{r['kind']}:{r['theme']}",'theme':r['label'],'kind':r['kind'],'count':r['count'],'posts':r['posts'],
              'referents':r['referents']} for r in modelos_crecimiento.audience_questions(now=now)]
 
-def comment_questions(now,days=30,limit=8):
-    rows=PostComment.objects.filter(own=False,commented_at__gte=now-timedelta(days=days),text__contains='?').order_by('-commented_at')[:limit]
+def comment_questions(now,days=30,limit=8,member=None):
+    """Questions people left on her posts (her accounts' comments only)."""
+    rows=miembros.mine(PostComment.objects.all(),miembros.resolve(member)).filter(own=False,commented_at__gte=now-timedelta(days=days),text__contains='?').order_by('-commented_at')[:limit]
     return [{'id':str(c.id),'text':' '.join(c.text.split())[:240]} for c in rows]
 
-def owner_captures(now,days=30,limit=6):
-    """His recent ideas: where buyer questions and objections he heard show up. Internal input, never public text."""
-    rows=Capture.objects.filter(state__in=[Capture.State.IDEA,Capture.State.USED],purpose__in=['post','propuesta'],
+def owner_captures(now,days=30,limit=6,member=None):
+    """Her recent ideas: where buyer questions and objections she heard show up. Internal input, never public text."""
+    rows=miembros.own(Capture.objects.all(),member).filter(state__in=[Capture.State.IDEA,Capture.State.USED],purpose__in=['post','propuesta'],
                                 created_at__gte=now-timedelta(days=days)).order_by('-created_at')[:limit]
     return [{'id':str(c.id),'text':' '.join(c.text.split())[:300]} for c in rows]
 
-def results_by_type(now,days=30):
+def results_by_type(now,days=30,member=None):
     from . import editorial
-    rows=(editorial._performance(now).get('by_type') or {})
+    rows=(editorial._performance(now,member).get('by_type') or {})
     return [{'id':f'tipo:{t}','type':t,**values} for t,values in rows.items()]
 
-def audience_signals(now=None):
+def audience_signals(now=None,member=None):
     """With REFERENTES_ANALISIS on, two more, apart and not citeable as evidence (analisis_referentes.editorial_signals):
     `estructura_sostenida`, structures that work for the industry referents beyond one post, one author and one week
     (or hypotheses below that), and `tema_en_tendencia`, what several of them talk about now, with its expiry date."""
-    now=now or timezone.now()
-    out={'referent_outlier':growth_models(now),'comment_question':comment_questions(now),
-         'owner_capture':owner_captures(now),'results_by_type':results_by_type(now),
+    # Her audience (her comments, her ideas, her results); the referents' signals are the organization's.
+    now=now or timezone.now();member=miembros.resolve(member)
+    out={'referent_outlier':growth_models(now),'comment_question':comment_questions(now,member=member),
+         'owner_capture':owner_captures(now,member=member),'results_by_type':results_by_type(now,member=member),
          'audience_question':audience_questions(now)}
     from . import analisis_referentes
     if analisis_referentes.enabled():
@@ -274,11 +281,11 @@ def any_signal(signals):
 
 # --------------------------------------------------------------------------- stories (P)
 
-def used_stories(now=None):
-    """Founder stories told in the last STRATEGY_STORY_REPEAT_WEEKS weeks: never twice in that time."""
+def used_stories(now=None,member=None):
+    """Founder stories she told in the last STRATEGY_STORY_REPEAT_WEEKS weeks: never twice in that time."""
     since=_local(now or timezone.now()).date()-timedelta(weeks=story_repeat_weeks())
     out=[]
-    for piece in EditorialPiece.objects.filter(slot_date__gte=since,brief__has_key='story').exclude(state__in=['failed']):
+    for piece in miembros.own(EditorialPiece.objects.all(),member).filter(slot_date__gte=since,brief__has_key='story').exclude(state__in=['failed']):
         story=(piece.brief or {}).get('story') or {}
         if story.get('protagonist'):
             out.append({'protagonist':story['protagonist'],'company':story.get('company',''),'date':piece.slot_date.isoformat(),
@@ -322,16 +329,17 @@ def type_rules(member=None):
 def director_input(piece,ideas,priority,now):
     """`strategy` of the director's input, or None with the strategy off."""
     if not enabled():return None
-    rules=type_rules(identidad.of_account(piece.account))
-    signals=audience_signals(now)
+    ident=identidad.of_account(piece.account);rules=type_rules(ident)
+    member=piece.member if piece.member_id else ident.member  # her plan, her audience (phase 4)
+    signals=audience_signals(now,member)
     if piece.second_of_day:
         # The type of his own request, as his capture was classified: only that can open a Sales gate on an extra post.
         idea=(priority or {}).get('gasp_type')
         return {'extra':True,'type':None,'rules':rules,'audience_signals':signals,'idea_type':idea if idea in TYPES else None}
-    slot=slot_for(piece.slot_date) or {}
+    slot=slot_for(piece.slot_date,member) or {}
     kind=slot.get('type')
     monday=week_start(piece.slot_date)
-    plan=WeeklyPlan.objects.filter(week_start=monday).first()
+    plan=_plans(member).filter(week_start=monday).first()
     week=[{'date':s['date'],'type':s['type']} for s in (plan.slots if plan else _template_slots(monday))]
     out={'extra':False,'type':kind,'label':LABELS.get(kind),'rule':rules.get(kind),'week':week,'audience_signals':signals,
          'planned':{k:slot.get(k) for k in ('idea','reason','pillar','modality','approach','format','reader','reader_need','audience_evidence')}
@@ -340,7 +348,7 @@ def director_input(piece,ideas,priority,now):
     if kind=='S':out['sales_purpose']=slot.get('modality') or sales_purpose(monday)
     if kind=='P':
         p=next(({'key':k,'words':w,'label':l} for k,w,l in PAINS if k==slot.get('pain')),pain(monday))
-        out.update(pain=p,used_stories=used_stories(now),owner_personal_material=personal_material(ideas,priority))
+        out.update(pain=p,used_stories=used_stories(now,member),owner_personal_material=personal_material(ideas,priority))
     return out
 
 def type_policy(kind,strategy=None):
@@ -516,25 +524,63 @@ def estimate():
     worst=(Decimal(TYPICAL_INPUT_TOKENS*2)*ip*providers.CACHE_WRITE+Decimal(PLAN_MAX_TOKENS)*op)/1000000
     return {'estimated_usd':float(round(typical,2)),'max_usd':float(round(worst,2))}
 
-def _pick(day,options,signals,used_approaches):
-    """The first option whose audience evidence is real, preferring an approach not used yet this week."""
+# --------------------------------------------------------------------------- coordination between members (phase 4)
+
+TOPIC_OVERLAP=0.5  # share of meaningful words two ideas have in common to be the same topic (Jaccard)
+_STOP={'para','como','pero','sobre','entre','desde','cuando','donde','porque','esta','este','estos','estas','esos','esas',
+       'tiene','tienen','hacer','cada','todo','todos','toda','todas','sino','solo','tambien','mucho','muchos','menos',
+       'with','that','from','this','your','what','when','have','about','into'}
+
+def _words(text):
+    plain=unicodedata.normalize('NFKD',str(text or '')).encode('ascii','ignore').decode().lower()
+    return {w for w in re.findall(r'[a-z0-9]+',plain) if len(w)>=4 and w not in _STOP}
+
+def same_topic(a,b):
+    """Whether two planned ideas are the same topic: most of their meaningful words in common. Code, no model."""
+    x,y=_words(a),_words(b)
+    return bool(x and y) and len(x&y)/len(x|y)>=TOPIC_OVERLAP
+
+def team_topics(monday,member):
+    """What the other members of her organization already planned for that week ([{date, idea, pillar}]): her plan avoids
+    repeating them (organizaciones, phase 4). Free: it reads their stored plans, never calls a model."""
+    if member is None:return []
+    from django.db.models import Q
+    from .models import Member
+    others=Q(member__in=Member.objects.filter(organization_id=member.organization_id).exclude(pk=member.pk))
+    if not miembros.is_first(member):others|=Q(member__isnull=True)  # a plan without a member is the first member's
+    out=[]
+    for plan in WeeklyPlan.objects.filter(others,week_start=week_start(monday)).order_by('created_at'):
+        out.extend({'date':slot['date'],'idea':slot['idea'],'pillar':slot.get('pillar')} for slot in plan.slots
+                   if str(slot.get('idea') or '').strip() and slot.get('state')!='discarded')
+    return out
+
+def _repeats(option,team):
+    return any(same_topic(option.get('idea'),topic['idea']) for topic in team)
+
+def _pick(day,options,signals,used_approaches,team=()):
+    """The first option whose audience evidence is real, preferring an approach not used yet this week. Never an idea
+    another member of her organization already planned that week (`team`, team_topics)."""
     valid=[o for o in options if isinstance(o,dict) and str(o.get('idea') or '').strip()]
+    valid=[o for o in valid if not _repeats(o,team)]
     backed=[o for o in valid if valid_evidence(o.get('audience_evidence'),signals)]
     pool=backed or valid
     fresh=[o for o in pool if o.get('approach') not in used_approaches]
     return (fresh or pool or [None])[0],bool(backed)
 
-def _apply(plan,raw,signals):
-    """Merge the model's options into the plan: types stay, owner-edited days stay, mixture checked by code."""
+def _apply(plan,raw,signals,team=()):
+    """Merge the model's options into the plan: types stay, owner-edited days stay, mixture checked by code, and no topic
+    another member already planned that week (`team`)."""
     by_day={str(d.get('date')):d.get('options') or [] for d in (raw.get('days') or []) if isinstance(d,dict)}
-    used=set();slots=[]
+    used=set();slots=[];repeated=[]
     for slot in plan.slots:
         slot=dict(slot)
         if slot.get('owner_edited') or slot.get('state') in ('used',):
             slots.append(slot)
             if slot.get('approach'):used.add(slot['approach'])
             continue
-        choice,backed=_pick(slot['date'],by_day.get(slot['date'],[]),signals,used)
+        options=by_day.get(slot['date'],[])
+        choice,backed=_pick(slot['date'],options,signals,used,team)
+        if choice is None and any(isinstance(o,dict) and _repeats(o,team) for o in options):repeated.append(slot['date'])
         if choice:
             slot.update({k:choice.get(k) for k in ('idea','reason','pillar','approach','format','reader','reader_need')})
             slot['modality']=slot.get('modality') if slot['type']=='S' and slot.get('modality') else choice.get('modality')
@@ -556,6 +602,7 @@ def _apply(plan,raw,signals):
         if pillars.count(pillar)>3:warnings.append(f'El pilar {pillar} aparece más de tres veces.')
     without=[s['date'] for s in slots if s.get('idea') and not s.get('evidence_ok')]
     if without:warnings.append(f'{len(without)} día(s) sin señal de la audiencia que respalde la idea: el director la busca ese día.')
+    if repeated:warnings.append(f'{len(repeated)} día(s) sin idea: sus opciones repetían un tema que otro miembro ya planeó esta semana.')
     return slots,warnings
 
 def _locked_dates(plan,today):
@@ -564,8 +611,10 @@ def _locked_dates(plan,today):
 def plan_system(member=None):
     return identidad.of(member).render(PLAN_SYSTEM)
 
-def run(user,monday,origin_job=''):
-    """plan_week job: one paid call that plans the ideas of a week inside its structure. Owner edits survive."""
+def run(user,monday,origin_job='',member=None):
+    """plan_week job: one paid call that plans the ideas of HER week inside the organization's structure and pillars. Owner
+    edits survive. `member`: whose week (the worker passes miembros.of_job(params)); None, the only active member. It sees
+    what the other members of her organization planned that week and never repeats it (team_topics; no extra call)."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
     from . import capturas, editorial
     if not enabled():raise Conflict('La estrategia semanal está apagada (STRATEGY_ENABLED).')
@@ -573,23 +622,26 @@ def run(user,monday,origin_job=''):
     if monday+timedelta(days=6)<today:raise Conflict('Esa semana ya pasó.')
     if spent_this_week(now)>=plan_budget():raise ValueError('Presupuesto del plan semanal agotado esta semana (STRATEGY_PLAN_LLM_USD).')
     editorial._guard()
-    plan=ensure(monday)
-    # The weekly plan is still the installation's (phase 5 gives each member hers): her identity, never a default one
-    # among several members (identidad.of raises MiembroRequerido).
-    ident=identidad.of()
-    signals=audience_signals(now);public,private=identidad.blocks(ident);history,_=editorial._history(now)
+    member=miembros.resolve(member)
+    plan=ensure(monday,member)
+    ident=identidad.of(member)  # her identity, her memory, her orientation, her ideas and her results
+    signals=audience_signals(now,member);public,private=identidad.blocks(ident);history,_=editorial._history(now,member)
+    team=team_topics(monday,member)
     units,missing,_=operador.course_context(PLAN_COURSE_IDS,operador.COURSE_TOKEN_BUDGET)
     locked=set(_locked_dates(plan,today))
     days=[{'date':s['date'],'weekday':date.fromisoformat(s['date']).strftime('%A'),'type':s['type'],'label':LABELS[s['type']],
            'locked':s['date'] in locked,**({'sales_purpose':s.get('modality')} if s['type']=='S' else {}),
            **({'pain':pain(monday)} if s['type']=='P' else {})} for s in plan.slots]
-    ideas=[{k:i.get(k) for k in ('id','text','date','purpose','gasp_type')} for i in capturas.ideas_for_director(now) if not i.get('expected_slot')]
-    kept=[i for p in WeeklyPlan.objects.filter(week_start__gte=monday-timedelta(days=14),week_start__lte=monday) for i in p.kept_ideas][-10:]
-    message=json.dumps(ident.keyed({'week':{'start':monday,'days':days},'audience_signals':signals,'growth_models':signals['referent_outlier'],
-                        'history':history,'performance_30d':editorial._performance(now),'ideas_from_gustavo':ideas,'kept_ideas':kept,
-                        'used_stories':used_stories(now),'public_facts':public,'private_guidance':private,
-                        'orientation':identidad.orientation(ident),'positioning':posicionamiento.editorial_direction(ident),
-                        'course_units':units},values=False),ensure_ascii=False,default=str)
+    ideas=[{k:i.get(k) for k in ('id','text','date','purpose','gasp_type')} for i in capturas.ideas_for_director(now,member) if not i.get('expected_slot')]
+    kept=[i for p in _plans(member).filter(week_start__gte=monday-timedelta(days=14),week_start__lte=monday) for i in p.kept_ideas][-10:]
+    request={'week':{'start':monday,'days':days},'audience_signals':signals,'growth_models':signals['referent_outlier'],
+             'history':history,'performance_30d':editorial._performance(now,member),'ideas_from_gustavo':ideas,'kept_ideas':kept,
+             'used_stories':used_stories(now,member),'public_facts':public,'private_guidance':private,
+             'orientation':identidad.orientation(ident),'positioning':posicionamiento.editorial_direction(ident),
+             'course_units':units}
+    if team:  # only with another member's plan: alone, the request is the one of before
+        request['team_planned']={'rule':TEAM_RULE,'topics':team}
+    message=json.dumps(ident.keyed(request,values=False),ensure_ascii=False,default=str)
     model=editorial.stage_model('director')
     answer=providers.claude(plan_system(ident),message,max_tokens=PLAN_MAX_TOKENS,output_schema=plan_schema(),effort='medium',purpose=PURPOSE,
                             **({'model':model} if model else {}))
@@ -599,7 +651,7 @@ def run(user,monday,origin_job=''):
     raw['days']=[d for d in raw.get('days') or [] if isinstance(d,dict) and d.get('date') not in locked]
     with transaction.atomic():
         plan=WeeklyPlan.objects.select_for_update().get(pk=plan.pk)
-        plan.slots,plan.warnings=_apply(plan,raw,signals)
+        plan.slots,plan.warnings=_apply(plan,raw,signals,team)
         plan.state=WeeklyPlan.State.PLANNED;plan.summary=' '.join(str(raw.get('summary') or '').split())[:600]
         refs=[r for r in raw.get('signals_read') or [] if isinstance(r,str)][:20]
         plan.signals={'read':refs,'used':[{'date':s['date'],'type':s['type'],**s['audience_evidence']} for s in plan.slots
@@ -615,12 +667,18 @@ def run(user,monday,origin_job=''):
     from .notificaciones import avisar
     oficina_eventos.emit('entrega','director_editorial','gustavo',f'Plan de la semana del {monday:%d/%m}')
     avisar('weekly_plan','La semana ya tiene plan',plan.summary or 'Mira los tipos de cada día en el Calendario.',
-           link='/calendario?vista=semana',ref=f'weekly_plan:{monday.isoformat()}:{len(plan.usage)}')
+           link='/calendario?vista=semana',ref=f'weekly_plan:{monday.isoformat()}:{len(plan.usage)}'
+           +('' if miembros.is_first(member) else f':{member.pk}'))  # hers: never deduplicated by another member's
     operador._audit(user,'strategy.planned',plan.id,week=monday.isoformat(),warnings=len(plan.warnings))
     return plan
 
-def _pending_job():
-    return Job.objects.filter(kind='plan_week',state__in=[Job.State.QUEUED,Job.State.RUNNING]).order_by('created_at').first()
+TEAM_RULE=('Temas que otro miembro de tu organización ya planeó para esta semana: no propongas ninguno de ellos ni uno '
+           'casi igual; busca otro ángulo o tema.')
+
+def _pending_job(member=None):
+    """Her plan_week job queued or running (job_params' encoding)."""
+    rows=Job.objects.filter(kind='plan_week',state__in=[Job.State.QUEUED,Job.State.RUNNING])
+    return miembros.her_jobs(rows,miembros.resolve(member)).order_by('created_at').first()
 
 def due(now):
     """The Monday to plan now: next week's, on Sunday after STRATEGY_PLAN_TIME. None otherwise."""
@@ -629,21 +687,26 @@ def due(now):
     return local.date()+timedelta(days=1)
 
 def queue(user,now=None):
-    """Autopilot: on Sunday after STRATEGY_PLAN_TIME, plan next week once (deterministic job id). Only when posts could go
+    """Autopilot: on Sunday after STRATEGY_PLAN_TIME, plan next week once for each active member (her job id and params
+    carry her: miembros.job_parts/job_params; one member's failure never stops another's). Only when her posts could go
     out; a week left unplanned keeps its structure and the director plans each day."""
-    from . import editorial
-    from .autopiloto import _job_id, autonomy
     if not enabled():return 0
     now=now or timezone.now();monday=due(now)
-    if monday is None or _pending_job():return 0
-    if WeeklyPlan.objects.filter(week_start=monday,state=WeeklyPlan.State.PLANNED).exists():return 0
-    job_id=_job_id('plan_week',monday)
+    if monday is None:return 0
+    return miembros.each_member(lambda member:_queue(user,now,monday,member),'weekly_plan')
+
+def _queue(user,now,monday,member):
+    from . import editorial
+    from .autopiloto import _job_id, autonomy
+    if _pending_job(member):return 0
+    if _plans(member).filter(week_start=monday,state=WeeklyPlan.State.PLANNED).exists():return 0
+    job_id=_job_id('plan_week',monday,*miembros.job_parts(member))
     if Job.objects.filter(id=job_id).exists():return 0
-    account=editorial.publishing_account()
-    if not editorial.can_publish(account) or operador.globally_paused() or autonomy('CONT-09',operador.member_of(account=account))=='off':return 0
+    account=editorial.publishing_account(member)
+    if not editorial.can_publish(account) or operador.globally_paused() or autonomy('CONT-09',operador.member_of(account=account,member=member))=='off':return 0
     if not editorial.can_afford_preparation(now) or spent_this_week(now)>=plan_budget():return 0
     from .jobs import enqueue_operation
-    _,created=enqueue_operation(user,'plan_week',{'week':monday.isoformat()},request_id=job_id)
+    _,created=enqueue_operation(user,'plan_week',miembros.job_params(member,{'week':monday.isoformat()}),request_id=job_id)
     return int(created)
 
 def regenerate(user,monday,request_id=None,audit_request_id=''):
@@ -653,19 +716,19 @@ def regenerate(user,monday,request_id=None,audit_request_id=''):
     if request_id:
         previous=Job.objects.filter(id=request_id,owner=user,kind='plan_week').first()
         if previous:return previous,False
-    today=_local(timezone.now()).date();monday=week_start(monday)
+    today=_local(timezone.now()).date();monday=week_start(monday);member=miembros.member_for(user)  # her own week
     if monday not in (week_start(today),week_start(today)+timedelta(days=7)):raise Conflict('Solo se planea esta semana o la siguiente.')
-    if _pending_job():raise Conflict('El plan ya se está preparando.')
+    if _pending_job(member):raise Conflict('El plan ya se está preparando.')
     if spent_this_week()>=plan_budget():raise Conflict('Presupuesto del plan semanal agotado esta semana (STRATEGY_PLAN_LLM_USD).')
     from .jobs import enqueue_operation
-    return enqueue_operation(user,'plan_week',{'week':monday.isoformat()},request_id or uuid.uuid4(),audit_request_id)
+    return enqueue_operation(user,'plan_week',miembros.job_params(member,{'week':monday.isoformat()}),request_id or uuid.uuid4(),audit_request_id)
 
 # --------------------------------------------------------------------------- Gustavo changes the week
 
 def _editable(plan,day,now):
     today=_local(now).date()
     if day<today:raise Conflict('Ese día ya pasó.')
-    if EditorialPiece.objects.filter(slot_date=day,second_of_day=False,state__in=['preparing','ready']).exists():
+    if miembros.own(EditorialPiece.objects.all(),plan.member).filter(slot_date=day,second_of_day=False,state__in=['preparing','ready']).exists():
         raise Conflict('El post de ese día ya está preparado; su tipo no cambia.')
     slot=next((s for s in plan.slots if s['date']==day.isoformat()),None)
     if slot is None:raise Conflict('Ese día no está en la semana.')
@@ -686,7 +749,7 @@ def change(user,day,kind=None,discard=False):
     if kind is not None and kind not in TYPES:raise ValueError('tipo debe ser G, A, S o P')
     if kind is None and not discard:raise ValueError('Indica un tipo o descartar la idea.')
     with transaction.atomic():
-        plan=WeeklyPlan.objects.select_for_update().get(pk=ensure(day).pk)
+        plan=WeeklyPlan.objects.select_for_update().get(pk=ensure(day,miembros.member_for(user)).pk)  # her own week
         slots=[dict(s) for s in plan.slots];slot=_editable(plan,day,timezone.now());slot=next(s for s in slots if s['date']==slot['date'])
         detail={'date':day.isoformat()}
         if kind is not None and kind!=slot['type']:
@@ -706,7 +769,7 @@ def swap(user,first,second):
     require(user,'operate_linkedin');require(user,'approve_actions')
     if week_start(first)!=week_start(second) or first==second:raise ValueError('Elige dos días distintos de la misma semana.')
     with transaction.atomic():
-        plan=WeeklyPlan.objects.select_for_update().get(pk=ensure(first).pk)
+        plan=WeeklyPlan.objects.select_for_update().get(pk=ensure(first,miembros.member_for(user)).pk)  # her own week
         now=timezone.now();_editable(plan,first,now);_editable(plan,second,now)
         slots=[dict(s) for s in plan.slots]
         a=next(s for s in slots if s['date']==first.isoformat());b=next(s for s in slots if s['date']==second.isoformat())
@@ -718,7 +781,7 @@ def swap(user,first,second):
 def displace(day,capture):
     """An idea of Gustavo takes `day`'s post: his idea wins, and the idea planned there waits in kept_ideas."""
     if not enabled():return
-    plan=WeeklyPlan.objects.filter(week_start=week_start(day)).first()
+    plan=_plans(capture.member).filter(week_start=week_start(day)).first()  # her plan: her idea takes her day
     if plan is None:return
     slots=[dict(s) for s in plan.slots];slot=next((s for s in slots if s['date']==day.isoformat()),None)
     if slot is None or slot.get('capture_id')==str(capture.id):return
@@ -731,7 +794,7 @@ def displace(day,capture):
 def mark_used(piece):
     """The day's post was prepared from its slot: the slot records the piece (the plan keeps the history)."""
     if piece.second_of_day or not enabled():return
-    plan=WeeklyPlan.objects.filter(week_start=week_start(piece.slot_date)).first()
+    plan=_plans(piece.member).filter(week_start=week_start(piece.slot_date)).first()
     if plan is None:return
     slots=[dict(s,piece_id=str(piece.id),state='used') if s['date']==piece.slot_date.isoformat() else s for s in plan.slots]
     WeeklyPlan.objects.filter(pk=plan.pk).update(slots=slots,updated_at=timezone.now())
@@ -740,7 +803,7 @@ def mark_used(piece):
 
 def payload(plan,now=None):
     now=now or timezone.now();today=_local(now).date()
-    pieces={p.slot_date.isoformat():p for p in EditorialPiece.objects.filter(slot_date__gte=plan.week_start,
+    pieces={p.slot_date.isoformat():p for p in miembros.own(EditorialPiece.objects.all(),plan.member).filter(slot_date__gte=plan.week_start,
             slot_date__lte=plan.week_start+timedelta(days=6),second_of_day=False).order_by('created_at')}
     days=[]
     for s in plan.slots:
@@ -756,21 +819,21 @@ def payload(plan,now=None):
     return {'week_start':monday,'week_end':monday+timedelta(days=6),'state':plan.state,'state_label':plan.get_state_display(),
             'summary':plan.summary or None,'warnings':plan.warnings,'days':days,'kept_ideas':plan.kept_ideas,
             'month_share':month_share(week_start(today)),'cost_usd':float(plan.cost_usd) if plan.cost_usd is not None else None,
-            'regenerate':{'available':enabled() and monday in (week_start(today),week_start(today)+timedelta(days=7)) and _pending_job() is None,
-                          'pending':_pending_job() is not None,**estimate()},
+            'regenerate':{'available':enabled() and monday in (week_start(today),week_start(today)+timedelta(days=7)) and _pending_job(plan.member) is None,
+                          'pending':_pending_job(plan.member) is not None,**estimate()},
             'enabled':enabled()}
 
-def week(day,now=None):
-    """GET /api/v1/estrategia/semana: the plan of the week that holds `day`."""
-    return payload(ensure(day),now)
+def week(day,now=None,member=None):
+    """GET /api/v1/estrategia/semana: her plan of the week that holds `day`."""
+    return payload(ensure(day,member),now)
 
-def calendar_days(start,end,now=None):
+def calendar_days(start,end,now=None,member=None):
     """`gasp` of each calendar day: its stored plan's type, the structure's for a coming week, or the type its post
     carried. None with the strategy off or without anything to say."""
     if not enabled():return {}
-    today=_local(now or timezone.now()).date();out={}
-    plans={p.week_start:p for p in WeeklyPlan.objects.filter(week_start__gte=week_start(start),week_start__lte=end)}
-    briefs={p.slot_date:(p.brief or {}).get('gasp_type') for p in EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lte=end,
+    today=_local(now or timezone.now()).date();out={};member=miembros.resolve(member)
+    plans={p.week_start:p for p in _plans(member).filter(week_start__gte=week_start(start),week_start__lte=end)}
+    briefs={p.slot_date:(p.brief or {}).get('gasp_type') for p in miembros.own(EditorialPiece.objects.all(),member).filter(slot_date__gte=start,slot_date__lte=end,
             second_of_day=False).exclude(state__in=['failed']).order_by('created_at')}
     day=start
     while day<=end:

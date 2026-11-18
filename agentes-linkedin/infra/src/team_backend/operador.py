@@ -582,7 +582,7 @@ def observe(user,account,referent_ids=None,limit=5,buyers_only=False):
     referents=Referent.objects.filter(account=account,active=True)
     if referent_ids:referents=referents.filter(id__in=referent_ids)
     if buyers_only:referents=referents.none()
-    context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS})
+    context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS},account=account)
     summary={'referents':0,'new_posts':0,'seen_posts':0,'errors':[],**grounding,'course_context':context,
              'selection_basis':'audience_and_evidence','popularity_implies_fit':False,'evidence':[]}
     from . import modelos_crecimiento
@@ -656,7 +656,8 @@ def set_account_pause(account,reason,actor=None,notify=True):
 # --------------------------------------------------------------------------- proposals
 
 def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None,contact=None,comment=None,voice=None):
-    """`voice`: which voice wrote an agent's text (voz.meta), kept on the proposal; a provisional voice is marked there."""
+    """`voice`: which voice wrote an agent's text (voz.meta), kept on the proposal; a provisional voice is marked there. A
+    piece's post carries its piece's mark when none is given (organizaciones, phase 4: a provisional one waits for a person)."""
     require(user,'operate_linkedin')
     from .orquestacion import current
     if source=='agent' and not origin_job and current():
@@ -680,7 +681,7 @@ def create_proposal(user,post,capability,payload,rationale='',citations=(),risks
             proposal=ActionProposal.objects.create(account_id=account_id,post=post,piece=piece,contact=contact,comment=comment,capability=capability,payload=payload,
                 payload_hash=digest,rationale=rationale,citations=list(citations),risks=list(risks),source=source,
                 origin_job=origin_job,model=model,created_by=user,previous=previous,version=(previous.version+1 if previous else 1),
-                state=state or ActionProposal.State.PROPOSED,voice=voice or {})
+                state=state or ActionProposal.State.PROPOSED,voice=voice or (piece.voice if piece is not None else None) or {})
             _audit(user,'operator.proposed',proposal.id,capability=capability,source=source,state=proposal.state)
     except IntegrityError:
         raise Conflict('Ya existe una acción abierta para este objetivo y capacidad.') from None
@@ -1178,7 +1179,7 @@ def course_block(units):
     """Course units as stable system context: the same units in the same order every time, so they stay cached."""
     return 'Unidades del curso (course_units):\n'+json.dumps(units,ensure_ascii=False,default=str)
 
-def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET,metodologia=None):
+def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET,metodologia=None,member=None,account=None):
     """Stable complete source block and a versioned envelope. No retrieval identity impersonation.
 
     Sources are data, never authorization. Read current active units each time so a retired/changed
@@ -1190,7 +1191,9 @@ def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET,me
     metadata={'course_role':role,'course_citations':loaded,'criterion_sources':sources,
               'course_version':COURSE_VERSION,'course_hashes':{u['unit_id']:u['hash'] for u in units},
               'criterion_version':hashlib.sha256(json.dumps(sources,sort_keys=True).encode()).hexdigest(),
-              'orientation_hash':hashlib.sha256(orientacion.text().encode()).hexdigest(),
+              # Her orientation's hash (organizaciones, phase 4): `member`, else `account`'s owner, else orientacion.text's
+              # own default (the only member); nothing said, nothing is resolved here.
+              'orientation_hash':hashlib.sha256(orientacion.text(member if account is None else member_of(account=account,member=member)).encode()).hexdigest(),
               'course_missing':missing,'course_omitted':omitted,'course_mode':'curated_ids','course_base':list(unit_ids),'course_additional':[],
               'course_status':'Biblioteca no disponible' if missing else 'disponible'}
     if metodologia:metadata['course_methodology']=metodologia
@@ -1417,7 +1420,9 @@ def _run_job(job):
         if job.kind=='prepare_piece':
             from datetime import date
             from .editorial import prepare
-            piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id),extra=bool(params.get('extra')))
+            # Whose piece: params['member'], else the first member (miembros.job_params' encoding; organizaciones, phase 4).
+            piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id),extra=bool(params.get('extra')),
+                          member=miembros.of_job(params))
             return ('failed' if piece.state=='failed' else 'complete'),piece.state,piece.note if piece.state=='failed' else ''
         if job.kind=='override_piece':
             from . import rescate
@@ -1460,17 +1465,17 @@ def _run_job(job):
         if job.kind=='plan_week':
             from datetime import date
             from . import estrategia
-            plan=estrategia.run(user,date.fromisoformat(params['week']),origin_job=str(job.id))
+            plan=estrategia.run(user,date.fromisoformat(params['week']),origin_job=str(job.id),member=miembros.of_job(params))
             return 'complete',f'plan:{plan.week_start}'[:30],''
         if job.kind=='weekly_summary':
             from datetime import date
             from . import resumen_semanal
-            summary=resumen_semanal.run(user,date.fromisoformat(params['week']),origin_job=str(job.id))
+            summary=resumen_semanal.run(user,date.fromisoformat(params['week']),origin_job=str(job.id),member=miembros.of_job(params))
             return 'complete',f'resumen:{summary.week_start}'[:30],''
         if job.kind=='monthly_review':
             from datetime import date
             from . import revision_mensual
-            review=revision_mensual.run(user,date.fromisoformat(params['month']),origin_job=str(job.id))
+            review=revision_mensual.run(user,date.fromisoformat(params['month']),origin_job=str(job.id),member=miembros.of_job(params))
             return 'complete',f'revision:{review.month_start}'[:30],''
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)

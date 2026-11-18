@@ -20,7 +20,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from . import (capturas, compuertas, editor_visual, editorial, guardas, identidad, imagenes, operador, orientacion, orquestacion,
+from . import (capturas, compuertas, editor_visual, editorial, guardas, identidad, imagenes, miembros, operador, orientacion, orquestacion,
                urgente)
 from .grafo import load_graph
 from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, GalleryPhoto, Job
@@ -200,7 +200,7 @@ def _fail(capture, piece, reason):
         piece.save(update_fields=['state', 'note', 'updated_at'])
         operador._audit(None, 'editorial.rework_failed', piece.id, capture=str(capture.id), reason=reason[:500])
     capturas.release_ideas(piece, 'no se pudo aplicar tu comentario')
-    urgente.assign_slots()
+    urgente.assign_slots(member=piece.member)  # her calendar (organizaciones, phase 4)
     _notice('piece_blocked', f'No pude rehacer la pieza del {piece.slot_date:%d/%m}',
             f'{reason}. No sale así: tus ideas vuelven a la mesa editorial para rehacerla.', piece, f'piece_rework:{capture.id}')
     _record(capture, 'aplazada', f'No pude aplicarlo ({_clip(reason, 200)}); la pieza no sale así y tus ideas vuelven a la mesa.',
@@ -261,8 +261,9 @@ def _rework(capture, piece, old):
 
 
 def _apply(capture, piece, old):
-    public, private = guardas.blocks()
-    memory = {'public_facts': public, 'private_guidance': private, 'orientation': orientacion.text()}
+    member = miembros.member_for_account(piece.account)  # her memory and orientation (organizaciones, phase 4)
+    public, private = guardas.blocks(member)
+    memory = {'public_facts': public, 'private_guidance': private, 'orientation': orientacion.text(member)}
     frozen = {k: piece.brief.get(k) for k in FROZEN}
     claims = piece.verification.get('claims') or piece.selection.get('claims') or []
     blocked = (piece.verification or {}).get('verdict') == 'blocked'

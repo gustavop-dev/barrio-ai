@@ -56,11 +56,14 @@ def read_profile(member=None):
     return result
 
 
-def facts(mode):
-    public,private=guardas.blocks()
+def facts(mode,owner=None):
+    """What the profile drafter reads of its owner (organizaciones, phase 4): HER memory and guidance and HER published
+    posts, never another member's. `owner`: the proposal's user (None: the default member)."""
+    member=miembros.member_for(owner) if owner is not None else miembros.resolve()
+    public,private=guardas.blocks(member)
     pieces=[]
-    executions=ActionExecution.objects.filter(proposal__capability='CONT-09',state__in=['confirmed','sent'],
-        proposal__piece__isnull=False).select_related('proposal__piece').order_by('-started_at')[:12]
+    executions=miembros.own(ActionExecution.objects.filter(proposal__capability='CONT-09',state__in=['confirmed','sent'],
+        proposal__piece__isnull=False),member,'proposal__piece__member').select_related('proposal__piece').order_by('-started_at')[:12]
     for execution in executions:
         piece=execution.proposal.piece
         metric=piece.post_metrics.order_by('-captured_at').first()
@@ -70,7 +73,7 @@ def facts(mode):
             'signals':piece.signals})
     return orquestacion.plain({'public_facts':public,'private_guidance':private,'recent_pieces':pieces,
         'section_ids':list(content.MONTHLY if mode=='monthly' else content.SECTIONS),'mode':mode,
-        'brand_version':content.brand_version()})
+        'brand_version':content.brand_version(member)})
 
 
 def _job(proposal):
@@ -103,22 +106,27 @@ def add_months(day,n):
     return day.replace(year=year,month=month,day=min(day.day,calendar.monthrange(year,month)[1]))
 
 
-def owner():
-    """Whose profile the periodic cycle prepares: PROFILE_OWNER_USERNAME's active user when it is set (as before
-    organizations), else the user of the only active member (miembros.default_member). None when neither names one: no
-    members, or several active members (phase 3 gives each member her profile cycle)."""
+def owner(member=None):
+    """Whose profile the periodic cycle prepares for `member` (organizaciones, phase 4: each active member her own):
+    PROFILE_OWNER_USERNAME's active user for the first member (and an installation without members), as before
+    organizations; else her own user when active. `member=None`: the default member (None among several)."""
+    if member is None:
+        try:member=miembros.default_member()
+        except miembros.MiembroRequerido:return None
     username=os.environ.get('PROFILE_OWNER_USERNAME','').strip()
-    if username:return get_user_model().objects.filter(username=username,is_active=True).first()
-    try:member=miembros.default_member()
-    except miembros.MiembroRequerido:return None
+    if username and miembros.is_first(member):return get_user_model().objects.filter(username=username,is_active=True).first()
     return member.user if member is not None and member.user.is_active else None
 
 
-@transaction.atomic
 def schedule(user,now=None):
+    """Autopilot: each active member's periodic profile cycle (her own anchor, her own proposals). The failure of one
+    member's never stops another's (each in its own transaction). Returns how many proposals were queued."""
     if os.environ.get('PROFILE_ENABLED','false').lower()!='true':return 0
-    user=owner()
-    if user is None:return 0
+    return miembros.each_member(lambda member:_schedule(owner(member),now) if owner(member) is not None else 0,'profile_schedule')
+
+
+@transaction.atomic
+def _schedule(user,now=None):
     from .operador import local_tz
     day=(now or timezone.now()).astimezone(local_tz()).date();month=day.strftime('%Y-%m')
     get_user_model().objects.select_for_update().get(pk=user.pk)
@@ -156,7 +164,7 @@ def capture_clarification(capture,user,text):
     question=preguntas.ask('perfil','¿Quieres una propuesta completa para tu perfil de LinkedIn?',
         'Para pedirla, envía una nueva nota con la frase exacta «hazme la propuesta del perfil». '
         'Si era una idea para un post o un dato, vuelve a enviarla eligiendo «Para qué es».',
-        key,origin=f'captura:{capture.id}')
+        key,origin=f'captura:{capture.id}',member=capture.member)  # her question
     if question is None:question=TeamQuestion.objects.filter(memory_key=key).first()
     return ({'question':str(question.id) if question else None},
         {'kind':'anotado','text':'Perfil te dejó una pregunta en la Bandeja','link':'/tu-turno'},
@@ -246,7 +254,7 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                 lambda:cached if cached is not None else client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),
                 key='person:'+orquestacion.digest(request))
             render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},
-                'brand':content.brand_version(),'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION}
+                'brand':content.brand_version(ident),'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION}
             package=runtime.call('perfil_render',render_input,lambda:visual.render_tool({kind:edited},banner),
                 key='render:'+orquestacion.digest(render_input))
             if kind not in package['files']:
@@ -272,7 +280,7 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
             render_evidence=[dict(e,reviewed=True) if e['id'] in ('render.preview_mobile','render.preview_desktop') else e
                 for e in render_evidence]
-            provenance={'references':scoped,'brand_version':content.brand_version(),'base_prompt':visual.BASE_PROMPT,
+            provenance={'references':scoped,'brand_version':content.brand_version(ident),'base_prompt':visual.BASE_PROMPT,
                 'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry'],
                 'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION,
                 'render_version':visual.RENDER_VERSION,'render_evidence':render_evidence,'reused_edit':reused}
@@ -298,7 +306,13 @@ def proposal_state(sections,mode):
     return 'partial' if incomplete else 'ready'
 
 
-def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
+def run(job,**kwargs):
+    """prepare_profile job: her profile (organizaciones, phase 4), written with its owner's identity throughout."""
+    proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
+    with content.brand.owner(identity_of(proposal)):
+        return _run(job,**kwargs)
+
+def _run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
     proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
     if proposal.state in ('cancelled','superseded','ready','partial') or proposal.version!=job.params['version']:return proposal
     runtime=orquestacion.Runtime.open('perfil_periodico',str(proposal.id),job.owner,job,
@@ -308,7 +322,7 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
         with runtime.session():
             prefix=f'v{proposal.version}:'
             previous_context=runtime.snapshot(prefix+'prior',lambda:proposal.context)
-            context=runtime.snapshot(prefix+'facts',lambda:facts(proposal.mode))
+            context=runtime.snapshot(prefix+'facts',lambda:facts(proposal.mode,proposal.owner))
             affected=previous_context.get('affected',[])
             if affected:context['section_ids']=affected
             context['library']=runtime.call('perfil_biblioteca',{'mode':proposal.mode},lambda:(library or content.library)(proposal.mode),key=prefix+'library')
@@ -431,7 +445,7 @@ def _applier(proposal):
 
 def markdown(proposal):
     who=_applier(proposal)
-    lines=[f'# Propuesta de perfil · v{proposal.version}',f'\nMarca: {content.brand_version()}. Ciclo: {proposal.cycle_id or "QA"}.',
+    lines=[f'# Propuesta de perfil · v{proposal.version}',f'\nMarca: {content.brand_version(identity_of(proposal))}. Ciclo: {proposal.cycle_id or "QA"}.',
         f'\nAplicación manual por {who}. Aceptar no significa aplicar ni comprobar.',
         '\n'+content.MICROPHONE_NOTE,'\nRetrato elegido: '+(proposal.photo_choice or 'Pendiente: elige A o B.')]
     invalid=gallery.stale(proposal.references,proposal.owner)
@@ -467,10 +481,13 @@ def no_changes(proposal):
         all(s['readiness']=='ready' and s['action'] in ('keep','not_applicable') for s in proposal.sections))
 
 
-def editorial_guidance():
-    """Accepted activity suggestions are data for the next brief, never a scheduled publication."""
+def editorial_guidance(member=None):
+    """Accepted activity suggestions are data for the next brief, never a scheduled publication. Only her own profile's
+    (organizaciones, phase 4)."""
     result=[]
-    for p in ProfileProposal.objects.filter(state__in=['ready','partial'],updated_at__gte=timezone.now()-timedelta(days=35))[:12]:
+    rows=miembros.own(ProfileProposal.objects.filter(state__in=['ready','partial'],updated_at__gte=timezone.now()-timedelta(days=35)),
+                      member,'owner__member')
+    for p in rows[:12]:
         for row in p.sections:
             if (row['id']=='activity' and row['readiness']=='ready' and row['decision']=='accepted'
                     and row['copy'] and not row.get('superseded_by')):
