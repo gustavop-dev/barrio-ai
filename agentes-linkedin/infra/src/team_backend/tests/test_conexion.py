@@ -21,7 +21,12 @@ from team_backend.models import ApiCredential, AuditEvent, BrowserLogin, Connect
 ENV = {'LINKEDIN_CONEXION_APP': 'true', 'NAVEGADOR_URL': 'http://navegador.interno:8790',
        'NAVEGADOR_TOKEN': 'token-ficticio-0123456789abcdef'}
 SESSION = 'sesion-ficticia-0001'
-LATER = (timezone.now() + timedelta(minutes=10)).isoformat()
+
+
+def later():
+    """When the service says the login expires: ten minutes after the test's own now, read when it answers (never when
+    this module was imported: the full suite reaches some tests more than ten minutes later, CI of phase 7)."""
+    return (timezone.now() + timedelta(minutes=10)).isoformat()
 
 
 def grant(user, *codes):
@@ -39,7 +44,7 @@ class FakeService:
         self.stopped = False
 
     def body(self):
-        return {'sesion': SESSION, 'cuenta': 'cuenta-prueba', 'estado': self.state, 'motivo': '', 'vence': LATER,
+        return {'sesion': SESSION, 'cuenta': 'cuenta-prueba', 'estado': self.state, 'motivo': '', 'vence': later(),
                 'detenida': self.stopped}
 
     def __call__(self, request):
