@@ -125,11 +125,11 @@ class ConfirmMemory(APIView):
     def post(self,request,mid):
         require(request.user,'confirm_memory')
         if isinstance(request.auth,ApiCredential):raise PermissionDenied('La confirmación requiere una sesión humana con CSRF')
-        data=ConfirmationInput(data=request.data);data.is_valid(raise_exception=True)
         scopes=_memory_scopes(request)
-        if scopes is not None:
+        if scopes is not None:  # the fact first: another member's answers 404 whatever the body says
             with db.connect() as c:row=c.execute('SELECT key FROM memory WHERE id=%s',(str(mid),)).fetchone()
             if row is None or not memory.in_scope(row['key'],scopes[0]):raise NotFound()  # only her own facts
+        data=ConfirmationInput(data=request.data);data.is_valid(raise_exception=True)
         result=memory.confirm(str(mid),data.validated_data['expected_version'],
             on_write=lambda connection,result: jobs.audit(request.user,'memory.confirmed',result['id'],request.request_id,connection=connection,version=result['version']))
         return Response(result)

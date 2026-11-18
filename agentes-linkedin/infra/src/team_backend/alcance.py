@@ -10,6 +10,8 @@ module is the one place that says it, in three parts:
    organization's active admin only) and SERVICIO (a credential of its own: a webhook signature, a one-use ticket, the
    login itself). A route that is not here is refused at runtime (RutaClasificada, in DEFAULT_PERMISSION_CLASSES) and
    tests/test_alcance.py fails, so a new route cannot ship without saying whose it is.
+   For a route with an id, OBJETOS says which row the id names, and RutaClasificada checks that it is hers before the
+   view runs (another member's id answers 404 whatever the body says); the views still fetch it with `obtener`.
 2. DUENO says, for each model a member owns, the path from a row to its owner: a member (`member`, 'piece__member'…),
    a LinkedIn account (`account`, 'contact__account'…) or a user. `de(rows, member)` narrows any queryset to hers and
    `obtener(request, Model, **lookup)` fetches one object of hers or raises 404. Views use only these two.
@@ -195,6 +197,52 @@ RAIZ = {
 }
 
 
+# The id in a «del miembro» route: which row it names. RELATIVO: a key or a day inside her own memory or plan (it never
+# names another member's row: hechos.scope, estrategia). Built from the route prefixes below; tests/test_alcance.py
+# checks that every MIEMBRO route with an id has its entry, and every model is in DUENO.
+RELATIVO = 'relativo'
+_IDS = [
+    ('comunidad/fuentes/', {'sid': 'CommunitySource'}),
+    ('runs/', {'rid': 'Job'}),
+    ('memory/', {'mid': 'memory'}),
+    ('comprador/respuestas/', {'did': 'BuyerDraft'}),
+    ('comprador/reservas/', {'bid': 'MeetingBooking'}),
+    ('comprador/entregas/', {'hid': 'LeadHandoff'}),
+    ('perfil/', {'pid': 'ProfileProposal', 'aid': 'ProfileAsset'}),
+    ('preguntas/', {'qid': 'TeamQuestion'}),
+    ('memoria/hechos/', {'key': RELATIVO}),
+    ('estrategia/dias/', {'day': RELATIVO}),
+    ('red/contacts/', {'cid': 'Contact'}),
+    ('editorial/pieces/', {'pid': 'EditorialPiece', 'iid': 'PieceImage'}),
+    ('capturas/', {'cid': 'Capture'}),
+    ('galeria/', {'pid': 'GalleryPhoto'}),
+    ('operador/accounts/', {'aid': 'ConnectorAccount'}),
+    ('operador/conexiones/', {'lid': 'BrowserLogin'}),
+    ('operador/posts/', {'pid': 'ObservedPost'}),
+    ('operador/actions/', {'pid': 'ActionProposal'}),
+    ('conversaciones/', {'cid': 'Conversation'}),
+    ('respuestas/', {'cid': 'PostComment'}),
+    ('resultados/resumen-semanal/', {'sid': 'WeeklySummary'}),
+    ('resultados/revision-mensual/cambios/', {'cid': 'StrategyChange'}),
+    ('resultados/revision-mensual/', {'rid': 'MonthlyReview'}),
+    ('auth/dispositivos/', {'did': 'DeviceToken'}),
+]
+
+
+def _objects():
+    import re
+    out = {}
+    for route in RUTAS:
+        names = re.findall(r'<(?:\w+:)?(\w+)>', route)
+        if not names:
+            continue
+        for prefix, models in _IDS:
+            if route.startswith(prefix):
+                out[route] = {name: models[name] for name in names if name in models}
+                break
+    return out
+
+
 def clase(route, method='GET'):
     """The class of `route` for `method`, or None when the route is not classified."""
     entry = RUTAS.get(route)
@@ -240,7 +288,34 @@ class RutaClasificada(BasePermission):
             raise PermissionDenied('Esta ruta no dice de quién son sus datos (team_backend/alcance.py): se rechaza.')
         if kind == ADMINISTRADOR and miembros.exist() and not miembros.is_admin(request.user):
             raise PermissionDenied('Solo el administrador de la organización.')
+        if kind == MIEMBRO:
+            for name, model in OBJETOS.get(_route(request, view) or '', {}).items():
+                value = (getattr(view, 'kwargs', None) or {}).get(name)
+                if value is not None and model != RELATIVO and not _hers(request, model, value):
+                    raise NotFound()  # another member's row looks like one that does not exist
         return True
+
+
+def _hers(request, model, value):
+    """Whether the row `value` of `model` (an OBJETOS entry) is the request's member's."""
+    from django.apps import apps
+    from django.core.exceptions import ValidationError
+    if model == 'Job':
+        return trabajos(request).filter(pk=value).exists()
+    if model == 'memory':
+        from . import hechos
+        from knowledge import db
+        member = miembro(request)
+        if member is None:
+            return True
+        with db.connect() as c:
+            row = c.execute('SELECT key FROM memory WHERE id=%s', (str(value),)).fetchone()
+        from knowledge import memory
+        return row is not None and memory.in_scope(row['key'], hechos.scope(member))
+    try:
+        return de(apps.get_model('team_backend', model).objects.filter(pk=value), miembro(request)).exists()
+    except ValidationError:
+        return False
 
 
 # --------------------------------------------------------------------------- whose a row is
@@ -280,7 +355,11 @@ DUENO = {
     'Notification': ('member', MIEMBRO_FK),
     'ProfileProposal': ('owner', USUARIO),
     'Job': ('owner', USUARIO),
+    'ProfileAsset': ('proposal__owner', USUARIO),
+    'DeviceToken': ('user', USUARIO),
 }
+
+OBJETOS = _objects()
 
 
 class _Todos:
@@ -379,9 +458,10 @@ def trabajos(request):
     _, Member, _ = miembros._models()
     others = Member.objects.exclude(pk=member.pk)
     rows = rows.exclude(owner_id__in=others.values('user_id'))
-    rows = rows.exclude(params__member__in=[str(pk) for pk in others.values_list('pk', flat=True)])
+    # has_key first: a job without the key is nobody else's (NOT (NULL IN …) would drop it too).
+    rows = rows.exclude(Q(params__has_key='member') & Q(params__member__in=[str(pk) for pk in others.values_list('pk', flat=True)]))
     foreign = ConnectorAccount.objects.exclude(pk__in=accounts(member).values('pk')).values_list('pk', flat=True)
-    return rows.exclude(params__account__in=[str(pk) for pk in foreign])
+    return rows.exclude(Q(params__has_key='account') & Q(params__account__in=[str(pk) for pk in foreign]))
 
 
 def miembro(request):
