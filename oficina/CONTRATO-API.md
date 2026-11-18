@@ -84,6 +84,17 @@ respuesta cambia; cambian de quién son los números:
 - `ContactOutput.next_step` de una persona seguida desde una cuenta que no es de nadie (con varios miembros activos):
   `{ owner: "equipo", text: "Su cuenta no es de ningún miembro: nadie la invitará.", at }`.
 
+**Organizaciones (fase 7, [ORG-34 a ORG-40](../docs/funcionalidades/organizaciones.md#org-34)):** el alta de un miembro.
+- **Un miembro en alta** (inactivo) solo recibe respuesta en `GET yo`, `GET/PATCH yo/perfil`, `GET yo/voz`, `GET ajustes`,
+  `GET linkedin/oauth/start`, `GET linkedin/status`, `GET operador/overview`, `GET operador/accounts` y la conexión de su
+  navegador (`GET/POST operador/accounts/<id>/conexion`, `GET operador/conexiones/<id>`, `POST …/enlace`, `POST …/cancelar`),
+  siempre por sí misma (`alcance.DE_ALTA`). El resto: 400 «Tu miembro está inactivo en la organización.».
+- **Voz provisional:** una tarjeta de aprobación de Tu turno trae `approval.provisional_voice: true` cuando el texto se escribió
+  con la voz provisional de su dueña (también con su capacidad en «auto»), y para una invitación con nota `approval.note` con el
+  texto de la nota. `GET editorial/pieces/<id>` trae `provisional_voice: true` en una pieza escrita con voz provisional. Sin esas
+  claves, todo se ve como antes. Ejecutar un texto así aprobado por otra persona que su dueña responde 409 «Escrito con la voz
+  provisional: sale solo con la aprobación de su dueña.».
+
 **Listados:** los paginados devuelven `{ "count", "next", "previous", "results": [...] }` con 25 por página (`?page=`, `?page_size=` hasta 100).
 
 ## Sesión
@@ -94,6 +105,12 @@ respuesta cambia; cambian de quién son los números:
 | POST `/api/v1/auth/login` | `{ username, password }` | 200 `{ user }`; 400 si las credenciales son inválidas; 429 si hay demasiados intentos. |
 | POST `/api/v1/auth/logout` | — | 204 |
 | GET `/api/v1/yo` | — | «Quién soy» (fase 5 de organizaciones): `{ username, member: { id, display_name, role, active, is_admin, first } \| null, organization: { id, name, slug } \| null, is_admin, provisional_voice, members }`. `member` es null para un usuario que no es miembro y en una instalación sin miembros; `members` cuenta los activos de su organización. Las apps nombran a la persona con esto, nunca con un nombre fijo. |
+| GET `/api/v1/yo/perfil` | — | Su perfil (fase 7): `{ member: { id, display_name, role, active }, profile: { name, role, identity, company_relation, limits, personal_startups }, own, help: { campo: texto }, history: [{ number, created_at, source, changed: [campo…], by }] }` (historial más nuevo primero; `by` es el nombre de quien cambió o «el sistema»). También mientras está en alta. |
+| PATCH `/api/v1/yo/perfil` | `{ name?, role?, identity?, company_relation?, limits?, personal_startups? }` | Sesión humana. Solo ella cambia el suyo: valida todo el perfil, guarda una revisión auditada (y el rol, auditado aparte) y responde lo mismo que el GET más `saved` (false si nada cambió). 400 con el motivo (campo desconocido, nombre con números, llaves, rol de más de 120 caracteres); 403 a una credencial de servicio. |
+| GET `/api/v1/yo/voz` | — | Su voz: `{ state: "provisional" \| "confirmada" \| "inicial", version, label ("Provisional", "Confirmada vN"…), learning_enabled, signals: { texts, minimum, by_kind }, can_propose, proposal: { number, created_at, note, text } \| null, versions: [{ number, state, source, created_at, decided_at }] }`. |
+| POST `/api/v1/yo/voz/proponer` | `{}` | Sesión humana. Una llamada pagada que propone su documento de voz con sus señales: 201 con el GET. 400 si el aprendizaje está apagado, falta muestra o ya hay una propuesta; nunca mientras está en alta. |
+| POST `/api/v1/yo/voz/decidir` | `{ number, decision: "confirmar" \| "descartar", note? }` | Sesión humana. Solo ella decide su propuesta (ni el administrador): responde el GET. Confirmarla no cambia su autonomía. 400 si el cuerpo es inválido; 403 a una credencial de servicio. |
+| GET `/api/v1/organizacion` | — | Solo el administrador (403 a los demás): `{ organization: { id, name, slug }, profile: { version, date, status, language, location, not_wanted, pillars, services, offer, cases, modalities }, members: [{ id, display_name, role, active, is_admin, first, voice, accounts: { official, reader }, since }] }`. Nada privado de ningún miembro. |
 
 ## Máquina autónoma
 

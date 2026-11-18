@@ -10,8 +10,10 @@ resumen, revisión, audiencia, memoria, orientación, preguntas, capturas y gale
 escalonada y los temas coordinados); y sus vistas y sus avisos (fase 5: cada ruta dice de quién son sus datos, el id de otro
 miembro es un 404, el embudo de oportunidades es de la empresa y dice quién trajo cada una, cada aviso tiene dueño); y el
 registro compartido de personas (fase 6: una ficha por persona en la organización, quien la toca primero se la queda, dos o
-tres por empresa, un comentario por post de referente, el reparto de candidatos y los colegas). Con un solo miembro (la instalación de hoy) nada cambia. El alta real del CTO es la fase 7;
-hasta entonces, un miembro nuevo entra **inactivo**.
+tres por empresa, un comentario por post de referente, el reparto de candidatos y los colegas); y el camino de su alta (fase 7:
+alta guiada con ensayo, activación solo con todo en orden, desactivación reversible, «Mi perfil», «Mi voz», «Organización»,
+la voz provisional retenida en toda capacidad y las guardas de memoria del servidor). Con un solo miembro (la instalación de
+hoy) nada cambia. Un miembro nuevo entra **inactivo** y solo `activar-miembro` lo activa.
 
 - **Código:** backend `models.py` (`Organization`, `Member`, `ConnectorAccount.member`), migración `0055_organizaciones`,
   `miembros.py` (API interna), selectores en `editorial.py`, `respuestas.py`, `metricas.py`, `operador.py`,
@@ -59,6 +61,13 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 | [ORG-31](#org-31) | Liberar, pasar y reasignar una persona | backend, PWA, app | funciona (actúa desde dos miembros) |
 | [ORG-32](#org-32) | Referentes de la organización: una lectura y un comentario por post | backend | funciona (actúa desde dos miembros) |
 | [ORG-33](#org-33) | El reparto de candidatos y los colegas | backend | funciona (actúa desde dos miembros) |
+| [ORG-34](#org-34) | Alta guiada de un miembro | backend (comando) | funciona |
+| [ORG-35](#org-35) | Activar solo con todo en orden; desactivar sin tocar a los demás | backend (comando) | funciona |
+| [ORG-36](#org-36) | Mi perfil | backend, PWA, app | funciona |
+| [ORG-37](#org-37) | Mi voz | backend, PWA, app | funciona |
+| [ORG-38](#org-38) | Organización y sus miembros (administrador) | backend, PWA, app | funciona |
+| [ORG-39](#org-39) | Lo escrito con voz provisional nunca sale sin ella | backend, PWA, app | funciona |
+| [ORG-40](#org-40) | Guardas de memoria del servidor | deploy, navegador | funciona; topes por medir en el servidor |
 
 ---
 
@@ -769,3 +778,135 @@ hasta entonces, un miembro nuevo entra **inactivo**.
 - **Brechas código/docs:** la preferencia de rol está apagada hasta que Gustavo la confirme.
 - **Cobertura QA:** `RepartoTests` (1–2), `RegistroTests.test_a_colleague_is_never_a_prospect_…` (3) · 2026-11-18 · pasa en local
 
+### ORG-34 · Alta guiada de un miembro <a id="org-34"></a>
+
+- **Dónde:** backend (comando)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** `operador --usuario gustavo alta-miembro --usuario-nuevo <usuario> --nombre "<Nombre>" --rol CTO`
+  ensaya el alta y dice qué haría; con `--confirmar` crea su usuario sin contraseña y su miembro inactivo, le pone los ajustes
+  prudentes de una cuenta gratuita dormida (rampa 5/25,8/40,10/50 desde la etapa 0, comentarios, respuestas, seguimientos y
+  lecturas de perfil a la mitad, todo en aprobación, su post una hora después del de Gustavo), su perfil mínimo y su voz
+  provisional, registra su cuenta del navegador si se la da, propone (sin aplicarla) la preferencia de rol y lista lo que falta
+  a mano. Repetirlo no duplica nada y respeta lo que el administrador ya fijó.
+- **Código:** `alta.alta`, `prudent`, `post_hour`, `checklist`, `role_preference_proposal`; `identidad.may_start`,
+  `save_profile(on_behalf=True)`; comando `operador alta-miembro`.
+- **Criterios de aceptación:**
+  1. **Dado** el ensayo, **cuando** termina, **entonces** no existe su usuario ni su miembro ni una fila de auditoría nueva.
+  2. **Dado** `--confirmar`, **cuando** termina, **entonces** queda inactiva, con los ajustes prudentes, los grupos `operacion` y
+     `revision`, sin contraseña ni credencial de LinkedIn, con su perfil mínimo y su voz provisional; la preferencia de rol queda
+     propuesta y apagada; Gustavo sigue siendo el miembro por defecto y su estado no cambia.
+  3. **Dado** un segundo `--confirmar` con un ajuste que el administrador cambió, **cuando** termina, **entonces** nada se duplica y
+     ese ajuste se deja.
+  4. **Dado** un miembro que no es administrador, un miembro activo o la cuenta directo de otro, **cuando** se intenta, **entonces**
+     se rechaza sin escribir nada.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `AltaGuiadaTests` (1–4) · 2026-11-18 · pasa en local
+
+### ORG-35 · Activar solo con todo en orden; desactivar sin tocar a los demás <a id="org-35"></a>
+
+- **Dónde:** backend (comando)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** `activar-miembro --miembro <usuario>` comprueba acceso, cuenta oficial, sesión del navegador, hora
+  del post, autonomía, rampa, una pasada en seco sin «¿de qué miembro?» y memoria libre; dice cuáles fallan y solo con
+  `--confirmar` y todo en orden la activa. `desactivar-miembro --miembro <usuario> --motivo "…"` la detiene: sus cuentas no leen
+  ni escriben, su cola se cancela, sus datos quedan y nada de Gustavo cambia; `--sin-acceso` le apaga el usuario. Es reversible.
+- **Código:** `alta.checks`, `dry_run`, `activate`, `deactivate`, `her_jobs`, `free_memory_mb`; `operador.member_hold`,
+  `inactive_job`; `autopiloto.inactive`; `alcance.DE_ALTA`, `en_alta`; `miembros.is_owner(alta=True)`.
+- **Criterios de aceptación:**
+  1. **Dado** su alta sin contraseña ni cuentas, **cuando** se ensaya, **entonces** fallan `acceso`, `cuenta_oficial` y
+     `cuenta_directo`, y cada una se va al conectarse lo suyo.
+  2. **Dado** todo en orden, **cuando** se rompe una sola cosa (hora, autonomía, rampa, memoria, sesión, credencial, una ruta que
+     pide «el» miembro), **entonces** falla solo esa y no se activa.
+  3. **Dado** todo en orden y `--confirmar`, **cuando** termina, **entonces** está activa, auditada, y el estado de Gustavo es igual.
+  4. **Dado** que está inactiva, **cuando** entra, **entonces** solo le responden su perfil, su voz, Ajustes, su LinkedIn y la
+     conexión de su navegador.
+  5. **Dado** que se desactiva, **cuando** el autopiloto corre o se ejecuta lo suyo aprobado, **entonces** nada sale, su cola se
+     cancela, sus filas quedan y Gustavo no cambia; al reactivarla lo aprobado sale.
+- **Brechas código/docs:** el navegador del miembro desactivado sigue abierto hasta que se cierre o se reinicie el contenedor.
+- **Cobertura QA:** `ActivacionTests` (1–3), `AjustesDelMiembroTests.test_while_being_onboarded_…` (4), `DesactivacionTests` (5)
+  · 2026-11-18 · pasa en local
+
+### ORG-36 · Mi perfil <a id="org-36"></a>
+
+- **Dónde:** backend, PWA, app (Ajustes)
+- **Estado:** funciona
+- **Qué hace para el miembro:** ve y edita su nombre, su rol, cómo se presenta, su relación con la empresa, los temas que no
+  domina y si le aplican las startups personales; cada cambio se valida, se audita y queda en su historial. Solo ella lo cambia.
+- **Código:** `identidad_views.Profile` (`GET/PATCH /api/v1/yo/perfil`); `oficina/src/pages/ajustes/MiPerfil.tsx`,
+  `movil/src/ajustes/MiPerfil.tsx`, `compartido/src/logic/miembro.ts`.
+- **Criterios de aceptación:**
+  1. **Dado** su perfil, **cuando** lo abre, **entonces** ve sus valores y su historial; Gustavo ve el suyo.
+  2. **Dado** un cambio válido, **cuando** guarda, **entonces** queda una revisión nueva (y el rol, auditado).
+  3. **Dado** un nombre con números, un campo desconocido, un rol de más de 120 caracteres o llaves, **cuando** guarda, **entonces**
+     400 con el motivo y ninguna revisión; una credencial de servicio recibe 403.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `AjustesDelMiembroTests.test_her_profile_…` (1–3), `AjustesMiembro.test.tsx` (PWA y app) · Maestro
+  `20-ajustes-perfil-voz.yaml` · 2026-11-18 · pasa en local (Maestro sin correr)
+
+### ORG-37 · Mi voz <a id="org-37"></a>
+
+- **Dónde:** backend, PWA, app (Ajustes)
+- **Estado:** funciona
+- **Qué hace para el miembro:** ve con qué voz escribe el equipo (provisional, propuesta lista o confirmada vN), cuántos textos
+  suyos aprobados o editados lleva contra el mínimo, pide una propuesta cuando llega (una llamada pagada), la lee y la confirma o
+  la descarta. Solo ella decide. Confirmarla no levanta ninguna aprobación.
+- **Código:** `identidad_views.Voice`, `VoicePropose`, `VoiceDecide`; `voz.progress`, `pending_proposal`;
+  `oficina/src/pages/ajustes/MiVoz.tsx`, `movil/src/ajustes/MiVoz.tsx`.
+- **Criterios de aceptación:**
+  1. **Dado** su voz provisional sin señales, **cuando** la abre, **entonces** «Provisional», 0 de N y no puede pedir propuesta
+     (pedirla da 400 y no se paga).
+  2. **Dado** el mínimo de textos, **cuando** pide y confirma, **entonces** queda «Confirmada v1» y sus ajustes no cambian.
+  3. **Dado** una decisión mal formada o una credencial de servicio, **cuando** decide, **entonces** 400 o 403.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `AjustesDelMiembroTests.test_her_voice_…` (1–3), `PrimeraSemanaTests` · 2026-11-18 · pasa en local
+
+### ORG-38 · Organización y sus miembros (administrador) <a id="org-38"></a>
+
+- **Dónde:** backend, PWA, app (Ajustes)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** ve el perfil de ProjectApp y sus miembros con su estado (activo, administrador, primer miembro, su
+  voz, si tiene cuenta oficial y de navegador, desde cuándo). Nada privado de nadie. Solo el administrador.
+- **Código:** `identidad_views.OrganizationView` (`GET /api/v1/organizacion`); `Organizacion.tsx` (PWA y app).
+- **Criterios de aceptación:**
+  1. **Dado** el administrador, **cuando** la abre, **entonces** ve a los dos con su estado y nada de sus perfiles privados ni
+     ajustes; el CTO recibe 403.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `AjustesDelMiembroTests.test_the_admin_sees_…` (1) · 2026-11-18 · pasa en local
+
+### ORG-39 · Lo escrito con voz provisional nunca sale sin ella <a id="org-39"></a>
+
+- **Dónde:** backend, PWA, app
+- **Estado:** funciona
+- **Qué hace para el miembro:** todo lo que el equipo escribe en su nombre con la voz provisional (posts, comentarios,
+  respuestas, notas de invitación) le espera en Tu turno marcado «Voz provisional», aunque esa capacidad esté en «auto», y solo
+  sale cuando ella lo aprueba: ni la política ni el administrador lo aprueban por ella. Los mensajes al comprador nunca los
+  envía el sistema. Lo de Gustavo sale como siempre.
+- **Código:** `autopiloto.PROVISIONAL_HOLDS`, `TEXT_CAPABILITIES`, `provisional_draft`, `approved_by_her`, `voice_hold`,
+  `autonomy`; `operador.execute`, `final_write_gate`, `revise`; `red.note_voice`; `rediseno_views.awaiting_approval`,
+  `_provisional`; `editorial_views.PieceDetail`.
+- **Criterios de aceptación:**
+  1. **Dado** su post, comentario, respuesta o nota de invitación con voz provisional y la capacidad en «auto», **cuando** pasa la
+     política, **entonces** queda esperando y Tu turno lo muestra marcado (con la nota).
+  2. **Dado** que lo aprueba Gustavo o lo deja aprobado la política, **cuando** se ejecuta, **entonces** se rechaza y no se escribe.
+  3. **Dado** que lo aprueba ella, **cuando** se ejecuta, **entonces** sale (o lo frena otra compuerta, nunca la de la voz).
+  4. **Dado** su voz confirmada, **cuando** el equipo escribe, **entonces** usa su voz, sin marca; lo provisional de antes sigue
+     esperando; su autonomía no cambia.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `VozProvisionalTests` (1–3), `PrimeraSemanaTests` (4) · 2026-11-18 · pasa en local
+
+### ORG-40 · Guardas de memoria del servidor <a id="org-40"></a>
+
+- **Dónde:** deploy, navegador
+- **Estado:** funciona; los topes por servicio son estimaciones hasta medirlos en el servidor
+- **Qué hace para Gustavo:** con dos navegadores en 4 GB, un servicio desbocado muere dentro de su contenedor antes que la
+  base; el navegador no abre otro Chromium sin memoria; Slack avisa de memoria baja, de un contenedor muerto por memoria y de
+  uno reiniciado; el README dice cuándo crecer el servidor.
+- **Código:** `deploy/compose.prod.yaml`, `deploy/memoria.sh`, `navegador/memoria.py`, `navegador/cuenta.py`.
+- **Criterios de aceptación:**
+  1. **Dado** menos de `MEMORIA_ALERTA_MB` dos lecturas seguidas, un evento `oom` o un reinicio, **cuando** corre el script,
+     **entonces** un aviso por episodio, sin imprimir el webhook.
+  2. **Dado** menos de `NAVEGADOR_MEMORIA_MINIMA_MB` libres, **cuando** una cuenta necesita abrir su navegador, **entonces** 503
+     `memoria`, no sale nada y el backend reintenta sin pausar la cuenta.
+- **Brechas código/docs:** sin medición por servicio en el servidor (ver «Lo que no se puede garantizar» en `deploy/README.md`).
+- **Cobertura QA:** `test_memoria_servidor.py` (1), `navegador/tests/test_memoria.py`, `test_linkedin_directo` (2) · 2026-11-18 ·
+  pasa en local

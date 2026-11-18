@@ -2,8 +2,8 @@
 
 Abierto el 17/11/2026 a pedido de Gustavo: que su CTO use Barrio AI con su propia cuenta de LinkedIn, «pero bien».
 Mismos objetivos, criterios, servicios, biblioteca y estrategia; cambian su nombre, su identidad y su cuenta.
-**Fases 1 a 5 construidas** (17 y 18/11/2026, rama `feat/organizaciones`, sin desplegar): ver «Fase N: lo construido».
-Las fases 6 y 7 no están construidas. Las fichas del catálogo siguen siendo la fuente de verdad de cada función
+**Fases 1 a 7 construidas** (17 y 18/11/2026, rama `feat/organizaciones`, sin desplegar): ver «Fase N: lo construido».
+El CTO no está dado de alta: lo que falta lo hacen personas (al final, «Para dar de alta al CTO»). Las fichas del catálogo siguen siendo la fuente de verdad de cada función
 ([ORG](funcionalidades/organizaciones.md) para esta).
 
 ## Decisiones de Gustavo
@@ -81,7 +81,7 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 | 4 | Contenido por miembro (**hecha**) | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro (**hecha**) | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
 | 6 | Registro compartido de personas (**hecha**) | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
-| 7 | Alta del CTO | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
+| 7 | Alta del CTO (**hecha**: el camino; el alta real la hacen Gustavo y el CTO) | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
 
 ## Fase 1: lo construido
 
@@ -688,30 +688,128 @@ pieza y el sha del documento del perfil) cambian igual entre dos corridas del mi
 
 ### Lo que queda para la fase 7
 
-- El alta real del CTO (activarlo, su OAuth y su sesión del navegador): hasta entonces nada de esta fase actúa.
-- Que Gustavo confirme el reparto (afinidad, luego hash) y si activa `PEOPLE_ROLE_PREFERENCE=lider_tecnologia=CTO`.
-- Un flujo de Maestro con dos miembros («La atiende <nombre>», «Liberar», «Pasar a…»): con un miembro el texto visible no
-  cambia y los flujos de hoy no lo ven.
+Cerrado en la fase 7 (ver «Fase 7: lo construido»): el reclamo de un post de referente ya se libera cuando su propuesta muere,
+y la reutilización de una clasificación ya no lleva la orientación privada de quien la pagó. Siguen abiertos:
+
+- El alta real del CTO (activarlo, su OAuth y su sesión del navegador).
+- Que Gustavo confirme el reparto (afinidad, luego hash) y si activa `PEOPLE_ROLE_PREFERENCE=lider_tecnologia=<usuario del CTO>`.
+- Un flujo de Maestro con dos miembros («La atiende <nombre>», «Liberar», «Pasar a…»).
 - Riesgos conocidos:
-  - La reutilización de una clasificación lleva la orientación privada de quien la pagó (el criterio compartido no la
-    incluye): si las orientaciones de los dos difieren mucho, conviene que cada uno vuelva a clasificar (borrar la clave
-    `criterion` de la ficha).
   - El reasignar del administrador nombra a la persona por un contacto de la organización; la API no lista aún las fichas
     sin contacto suyo.
   - Una persona cuya ficha se creó sin contacto (un comentarista de un post propio a quien se respondió) no entra al reparto
     hasta que alguien la descubre.
-  - El reclamo de un post de referente no se libera cuando su propuesta muere (rechazada, caducada, fallida): ese post se
-    queda sin el comentario del otro miembro. Liberarlo pide mirar la propuesta viva del miembro en `post_issue`,
-    `claim_post` y `claimed_by_others`, con cuidado del orden entre el reclamo y la propuesta en `create_proposal`.
   - Entre miembros, un post de referente lo reclama quien primero tiene una propuesta (también una del agente que nadie
     aprobó todavía): con dos autopilotos, el de Gustavo suele llegar primero a los posts de sus referentes.
+
+## Fase 7: lo construido
+
+Hecho el 18/11/2026 en `feat/organizaciones` (fichas [ORG-34 a ORG-40](funcionalidades/organizaciones.md#org-34)). Deja listo
+el camino para dar de alta al segundo miembro con seguridad; **no da de alta a nadie**: el CTO entra cuando Gustavo corre los
+comandos y el CTO conecta lo suyo (guía para Gustavo: [alta de un miembro](alta-de-un-miembro.md); para el CTO:
+[tu primera semana](tu-primera-semana.md)).
+
+**Con un solo miembro activo nada cambia.** Gustavo nunca tiene voz provisional (es el primer miembro), así que la regla de la
+voz provisional no le toca; las retenciones por miembro inactivo solo actúan sobre cuentas de un miembro inactivo; la marca
+`provisional_voice` y la nota de Tu turno solo aparecen en borradores provisionales. Las 109 huellas de
+`test_identidad_prompts.py` siguen iguales.
+
+**Tres comandos, cada uno con ensayo** (`team_backend/alta.py`; nada cambia sin `--confirmar`):
+
+```
+operador --usuario gustavo alta-miembro --usuario-nuevo <usuario> --nombre "<Nombre>" --rol CTO \
+    [--relacion "Es CTO de ProjectApp."] [--presentacion "…"] [--cuenta-directo <id>] [--confirmar]
+operador --usuario gustavo activar-miembro --miembro <usuario> [--confirmar]
+operador --usuario gustavo desactivar-miembro --miembro <usuario> --motivo "…" [--sin-acceso] [--confirmar]
+```
+
+1. `alta-miembro` crea su usuario (sin contraseña) y su miembro **inactivo**, con los grupos `operacion` y `revision`; le fija
+   los ajustes prudentes (abajo) que no tenga ya (lo que el administrador fijó antes se deja); escribe su perfil mínimo (nombre
+   y relación con la empresa) **mientras ella nunca haya guardado el suyo**; deja su voz provisional; opcionalmente registra su
+   cuenta `directo` (nunca reasigna una de otro); y **propone** sin aplicar `PEOPLE_ROLE_PREFERENCE=lider_tecnologia=<usuario>`.
+   Termina con la lista de lo que queda a mano ([x] hecho, [ ] pendiente, [?] verificar). Es idempotente y rechaza a un miembro
+   activo. Nunca pone una contraseña, nunca conecta una credencial ni una sesión de LinkedIn y nunca la activa.
+2. `activar-miembro` activa **solo si pasan todas** las comprobaciones, y dice cuáles fallan: `acceso` (usuario activo con
+   contraseña), `cuenta_oficial` (su LinkedIn oficial con credencial vigente y sin pausa), `cuenta_directo` (su cuenta del
+   navegador con sesión sana: se pregunta al servicio en el acto), `hora_post` (su hora a más de
+   `EDITORIAL_POST_STAGGER_MINUTES` de la de los demás), `autonomia` (todo lo que escribe en «aprobación» mientras su voz es
+   provisional), `rampa` (etapa 0, como mucho 10 invitaciones al día), `sin_miembro_requerido` (una pasada en seco con ella
+   activa, deshecha al final: un tick del autopiloto, sus trabajos y cada ruta de miembro como cada miembro activo, con toda
+   salida bloqueada; ninguna pide «el» miembro) y `memoria` (`MemAvailable` del servidor por encima de
+   `MEMBER_ACTIVATION_MIN_FREE_MB`, 400 MB; se mira después de abrir su navegador).
+3. `desactivar-miembro` la detiene: el autopiloto salta sus cuentas, `execute` y la última compuerta retienen lo suyo aprobado
+   («El miembro dueño de esta cuenta está inactivo…»), su cola se cancela (`inactive_member`) y un trabajo suyo que llegue a
+   correr se cancela solo. Sus datos quedan; nada de los demás cambia. `--sin-acceso` además apaga su usuario. Para volver:
+   `alta-miembro` (devuelve el acceso) y `activar-miembro` con todas sus comprobaciones.
+
+Mientras está en alta (inactiva) solo le responden su «quién soy», su perfil, su voz, Ajustes, su LinkedIn oficial (OAuth y
+estado) y la conexión de su navegador (`alcance.DE_ALTA`); todo lo demás contesta «Tu miembro está inactivo».
+
+**Ajustes prudentes de una cuenta gratuita dormida** (`alta.prudent`; curso LI-09-V006-K01 «arrancar con 5–10 invitaciones al
+día e ir subiendo en 3–4 semanas» y LI-10-M001-K03 «la cuenta se calienta antes de la campaña, no durante»):
+
+| Ajuste | Valor | Por qué |
+| --- | --- | --- |
+| `LINKEDIN_ACCOUNT_TIER` | `free` | Su cuenta es gratuita: límites de notas y búsquedas de una cuenta free |
+| `OPERATOR_INVITE_RAMP_STAGES` | `5/25,8/40,10/50` | Rampa de cuenta dormida: 5 al día (25 a la semana), luego 8/40 y 10/50 |
+| `OPERATOR_INVITE_RAMP_START` | `0` | Empieza en la etapa más baja; sube sola con aceptación sana |
+| `OPERATOR_DAILY_LIMITS` | `INT-03=7,INT-04=5,RED-01=10` | Comentarios, respuestas y seguimientos a la mitad de los generales mientras la cuenta se calienta |
+| `OPERATOR_PROFILE_READ_DAILY_LIMIT` | `40` | Las lecturas de perfil también se notan: la mitad |
+| `OPERATOR_AUTONOMY` | todo en `approval` | Todo lo que escribe espera su aprobación mientras su voz es provisional |
+| `EDITORIAL_POST_TIME` | la del primer miembro + 1 h (09:30) | Dos posts de la empresa nunca salen a la vez |
+
+**La voz provisional nunca sale sola, en ninguna capacidad** (`autopiloto.PROVISIONAL_HOLDS`, `provisional_draft`,
+`voice_hold`). Un texto escrito con su voz provisional (publicación CONT-09, comentario INT-03, respuesta INT-04, nota de una
+invitación RED-02, también la que viene de un borrador del comprador) queda en «aprobación» aunque su capacidad esté en «auto»;
+`operador.execute` y la última compuerta antes de escribir lo rechazan si no lo aprobó **ella** (la aprobación de la política o
+la del administrador no cuentan). Tu turno lo muestra con «Voz provisional» (y la nota de la invitación); el detalle de la pieza
+también. Los mensajes del comprador nunca los envía el sistema: no existe una capacidad que envíe mensajes. **Confirmar su voz
+no cambia su autonomía** (decisión por defecto: no; la decide el administrador con `operador ajustes`), y lo que se escribió con
+la voz provisional antes de confirmarla sigue esperando su aprobación.
+
+**Pantallas** (PWA y app, Ajustes): «Mi perfil» (ver y editar nombre, rol, presentación, relación con la empresa, temas que no
+domina y startups personales; validado, auditado, con historial), «Mi voz» (provisional, propuesta lista o confirmada vN; sus
+señales contra `VOICE_LEARNING_MIN_TEXTS`; ver la propuesta y confirmarla o descartarla, solo ella) y, para el administrador,
+«Organización» (el perfil de la empresa y sus miembros con su estado: activo, administrador, voz, cuentas; nada privado).
+Rutas: `GET/PATCH yo/perfil`, `GET yo/voz`, `POST yo/voz/proponer`, `POST yo/voz/decidir`, `GET organizacion`
+(clasificadas en `alcance.py`). Flujo Maestro `20-ajustes-perfil-voz.yaml`.
+
+**Memoria del servidor** (`deploy/README.md` «Memoria del servidor»): topes por servicio en `compose.prod.yaml` (la base sin
+tope, con 512 MB reservados y `oom_score_adj -500`; el navegador 2,25 GiB para dos cuentas y `oom_score_adj 300`); el
+navegador no abre otro Chromium con menos de `NAVEGADOR_MEMORIA_MINIMA_MB` (1100) libres (503 `code: memoria`, «no salió»,
+sin pausar la cuenta) y abre uno a la vez; `deploy/memoria.sh` por cron avisa en Slack de memoria baja, de un contenedor que el
+kernel mató por memoria y de uno que Docker reinició solo; el cierre del navegador inactivo sigue apagado (no baja el pico y
+cada reapertura es una carga que LinkedIn ve). Criterio de crecer: la tabla del README (OOM en la base, memoria baja tres días
+de una semana, el navegador que no abre por memoria…); objetivo 8 GB y 2 vCPU. Los topes por servicio son estimaciones del
+total medido el 13/11: hay que medir en el servidor.
+
+**Cierres de las fases 5 y 6:**
+- El reclamo de un post de referente se sostiene mientras su comentario salió (o pudo salir), o su miembro está activo y tiene
+  una propuesta viva en él, o aún no tiene ninguna y no pasó `PEOPLE_POST_CLAIM_GRACE_MINUTES` (10). Muerta su propuesta
+  (rechazada, descartada, caducada, fallida, sustituida sin otra) o inactivo su miembro, el post queda libre y el reclamo pasa,
+  auditado (`people.post_claim_passed`), a quien lo comenta.
+- La clasificación compartida solo se reutiliza entre miembros con el mismo contexto privado (su guía privada y su orientación,
+  como huella): el criterio del clasificador lee la de quien paga. Con Gustavo (que tiene la guía de su brief) y el CTO, cada
+  uno paga la suya. Los prompts no cambian.
+- Los avisos de experimentos de referentes son del miembro de la cuenta; las notas del equipo en una pieza son solo las de su
+  miembro; un administrador que no es el primer miembro no ve los trabajos de contenido del primero.
+- `PEOPLE_ROLE_PREFERENCE` acepta el usuario del miembro (`lider_tecnologia=<usuario del CTO>`); sigue apagada.
+- La lista de alta recuerda verificar que `OPERATOR_ALERT_WEBHOOK` sea un canal privado del primer miembro.
+
+### Pruebas
+
+`tests/test_organizaciones_e2e.py`: `AltaGuiadaTests`, `ActivacionTests`, `DesactivacionTests`, `PrimeraSemanaTests` (el
+recorrido entero con funciones de producción, reloj congelado y conectores falsos, y el estado de Gustavo igual antes y
+después), `VozProvisionalTests` (una prueba por capacidad), `AjustesDelMiembroTests`, `PendientesDeFase6Tests`;
+`tests/test_memoria_servidor.py` (el script sin red). Números y lo que no se corrió: `tasks/active_context.md`.
 
 ## Servidor
 
 Cada navegador abierto ocupa cerca de 1 GB; la máquina tiene 4 GB y 1 vCPU, y la documentación del conector dice que
-dos cuentas «caben justas». Se intenta con el actual (decisión de Gustavo), con estas guardas en la fase 7: límite de
-memoria por servicio, cierre del navegador inactivo, alerta a Slack por memoria baja y un criterio escrito para
-ampliar (si la base de datos o los workers se reinician por memoria, o si los chequeos de salud fallan a diario).
+dos cuentas «caben justas». Se intenta con el actual (decisión de Gustavo), con las guardas de la fase 7: límite de
+memoria por servicio, el navegador que no abre sin memoria, alerta a Slack por memoria baja y por contenedores muertos y un
+criterio escrito para ampliar ([deploy/README.md](../deploy/README.md#memoria-del-servidor)). El cierre del navegador
+inactivo se revisó y queda apagado.
 Las dos cuentas saldrían por la misma IP del servidor; el conector admite una salida propia por cuenta si hiciera falta.
 
 ## La voz de un miembro nuevo
@@ -741,3 +839,26 @@ centrales (`operador.py`, `red.py`, `autopiloto.py`, `lider.py`, `respuestas.py`
 
 1. Del CTO, antes de la fase 7: su trayectoria en pocas líneas, fotos y sus temas. La voz se aprende de su uso.
 2. ¿El CTO publica desde el principio con voz provisional y aprobación, o empieza con red y comentarios?
+
+## Para dar de alta al CTO: lo que falta de personas
+
+Nada de esto lo puede hacer el código. En orden ([guía paso a paso](alta-de-un-miembro.md)):
+
+1. **Gustavo:** desplegar la rama (con un solo miembro no cambia nada) y poner el cron de `deploy/memoria.sh`.
+2. **Gustavo:** verificar que `OPERATOR_ALERT_WEBHOOK` del `.env` del servidor es un canal privado suyo (recibe sus avisos y
+   los de la organización, nunca los del CTO).
+3. **Gustavo:** correr `alta-miembro` (ensayo y luego `--confirmar`), con `--cuenta-directo <id>` (el nombre de la carpeta de
+   la cuenta en el servicio navegador).
+4. **Gustavo:** `manage.py changepassword <usuario>` en el servidor y entregar la contraseña en persona o por un canal privado.
+5. **El CTO:** entrar en la PWA o la app, conectar su LinkedIn oficial (Ajustes › LinkedIn) y abrir la sesión de su navegador
+   (Ajustes › Máquina › «Conectar LinkedIn», con `LINKEDIN_CONEXION_APP=true`, o por SSH con él escribiendo su clave). Nadie
+   más escribe su clave.
+6. **El CTO:** completar «Mi perfil» (cómo se presenta y los temas que no domina); de él, su trayectoria en pocas líneas y fotos.
+7. **Gustavo:** decidir el reparto de candidatos (`PEOPLE_ROLE_PREFERENCE=lider_tecnologia=<usuario>` o nada) y si el CTO
+   publica desde el primer día (con voz provisional y aprobación) o empieza con red y comentarios.
+8. **Gustavo:** `activar-miembro` (ensayo; si algo falla, lo dice) y luego `--confirmar`.
+9. **El CTO, su primera semana:** aprobar o corregir lo que el equipo le propone, grabar audios y contestar preguntas; cuando
+   haya muestra, pedir y confirmar su voz en «Mi voz».
+10. **Gustavo, cuando quiera:** levantar la aprobación de alguna capacidad del CTO (`operador ajustes`); no es automático.
+11. **Gustavo, la primera semana con dos navegadores:** medir `docker stats --no-stream` y `free -m` en el servidor y ajustar los
+    topes si hace falta.
