@@ -2,7 +2,9 @@
 
 Abierto el 17/11/2026 a pedido de Gustavo: que su CTO use Barrio AI con su propia cuenta de LinkedIn, «pero bien».
 Mismos objetivos, criterios, servicios, biblioteca y estrategia; cambian su nombre, su identidad y su cuenta.
-Nada de esto está construido. Las fichas del catálogo siguen siendo la fuente de verdad de cada función.
+**Fase 1 construida** (17/11/2026, rama `feat/organizaciones`, sin desplegar): ver «Fase 1: lo construido». Las fases
+2 a 7 no están construidas. Las fichas del catálogo siguen siendo la fuente de verdad de cada función
+([ORG](funcionalidades/organizaciones.md) para esta).
 
 ## Decisiones de Gustavo
 
@@ -73,13 +75,101 @@ local y la regresión completa en el CI de GitHub, y se despliega sin efecto has
 
 | # | Fase | Qué incluye |
 | --- | --- | --- |
-| 1 | Organización y miembro | Modelos `Organizacion` y `Miembro`; migración que crea ProjectApp y a Gustavo y le asigna sus dos cuentas; `ConnectorAccount.miembro`; los selectores de «la» cuenta pasan a ser por miembro (`publishing_account`, `reader_account`, `_own_posts_reader`, `analitica.account_for`, `perfil.read_profile`, `publications`); `require_gustavo` → dueño de la cuenta; **la vista remota del navegador solo para el dueño** |
+| 1 | Organización y miembro (**hecha**) | Modelos `Organizacion` y `Miembro`; migración que crea ProjectApp y a Gustavo y le asigna sus dos cuentas; `ConnectorAccount.miembro`; los selectores de «la» cuenta pasan a ser por miembro (`publishing_account`, `reader_account`, `_own_posts_reader`, `analitica.account_for`, `perfil.read_profile`, `publications`); `require_gustavo` → dueño de la cuenta; **la vista remota del navegador solo para el dueño** |
 | 2 | Un miembro de LinkedIn por persona | Candado, espaciado, agenda del día, topes de escritura, lecturas de perfil, rampa, notas, tier, pausas, 429 y bloqueos: de globales a por miembro. Reescribir las pruebas que fijan «un solo miembro» |
 | 3 | Identidad fuera del código | `posicionamiento` repartido en perfil de organización y perfil de miembro; los prompts de sistema pasan a funciones que reciben al miembro; voz, autor de infografías y textos con «Gustavo» que llegan al usuario; formulario mínimo de identidad |
 | 4 | Contenido por miembro | Piezas, calendario y sus restricciones por día; plan semanal, resumen, revisión mensual y audiencia; memoria y hechos, preguntas, capturas y galería; orientación |
 | 5 | Vistas y avisos por miembro | Las rutas filtran por el miembro del usuario, con permiso por objeto; avisos y push solo a su dueño; preferencias y «visto» por usuario; Ajustes › LinkedIn y Máquina para varias cuentas |
 | 6 | Registro compartido de personas | Una ficha por persona en la organización; quien la atiende se la queda; no seguir, comentar ni invitar a quien atiende otro miembro; no comentar los dos el mismo post; excluir los perfiles de los colegas; referentes observados una vez |
 | 7 | Alta del CTO | Su usuario, su OAuth y su sesión del navegador; su identidad; rampa de cuenta dormida (5 a 10 invitaciones al día e ir subiendo, LI-09-V006-K01); autonomía en «aprobación» al empezar; hora de publicación escalonada; guardas de memoria del servidor |
+
+## Fase 1: lo construido
+
+Hecho el 17/11/2026 en `feat/organizaciones` (fichas [ORG-01 a ORG-09](funcionalidades/organizaciones.md)). Con un solo
+miembro nada cambia; con ninguno (una base nueva o una prueba que no lo crea), todo funciona como antes.
+
+**Modelos** (`models.py`, migración `0055_organizaciones`). Los nombres van en inglés, como el resto de los modelos:
+- `Organization`: `name`, `slug` (único), `created_at`. Sin filas fijas: admite más de una organización.
+- `Member`: `organization` (FK), `user` (OneToOne con el usuario de Django: una persona, un inicio de sesión),
+  `display_name`, `role` (texto libre: «Fundador», «CTO»), `active`, `is_admin`, `created_at`.
+- `ConnectorAccount.member` (FK opcional, `PROTECT`): de quién es cada cuenta.
+
+**Migración.** Crea ProjectApp y su primer miembro, administrador y activo, con rol «Fundador». Su usuario es el de
+`REFERENTS_GUSTAVO_USERNAME` (settings, si no el entorno, por defecto `gustavo`) si existe y está activo. Si no, es el
+primer superusuario activo por fecha de alta, con contraseña usable y que no sea `barrio-autopiloto` ni `linkedin-service`.
+Ese miembro adopta todas las cuentas sin miembro. Sin nadie así (la base del CI, la de QA antes de `seed_qa`) no crea
+nada. Se revierte sin tocar las cuentas. `bootstrap_local`, que corre en cada arranque, aplica la misma regla
+(`miembros.ensure_first_member`) si todavía no hay miembros. En producción, con `DJANGO_ADMIN_USERNAME=gustavo`, el
+miembro será `gustavo` y sus dos cuentas (API oficial y `directo`) pasarán a ser suyas. Se verifica con
+`manage.py operador --usuario gustavo miembros`.
+
+**API interna** (`team_backend/miembros.py`):
+
+| Función | Qué responde |
+| --- | --- |
+| `member_of_user(user)` | El miembro que es ese usuario (activo o no); `None` para robots, servicios y usuarios sin miembro. |
+| `default_member()` | El único miembro activo. `None` si no hay miembros. `MiembroRequerido` si hay varios activos, o miembros pero ninguno activo. |
+| `resolve(member=None)` | El miembro dado o `default_member()`. |
+| `member_for(user)` | Para quién actúa un pedido: su propio miembro (inactivo: `MiembroRequerido`), si no `default_member()`. |
+| `member_of_account(account)` | De quién es la cuenta: su miembro, o el único activo para una cuenta sin miembro; `None` si no se puede nombrar. |
+| `member_for_account(account)` | Para el trabajo de una cuenta: `member_of_account`, si no `resolve()`. |
+| `accounts(member=None, providers=None)` | Las cuentas del miembro (con las sin miembro mientras sea el único activo). `None`: todas. |
+| `same_member(account)` | Todas las cuentas del dueño de esa cuenta (para las pausas). |
+| `is_owner(user, account)` | Si es el miembro activo dueño de la cuenta. Sin miembros, el usuario de `REFERENTS_GUSTAVO_USERNAME`. |
+| `is_admin(user, organization=None)`, `can_decide(user, account)` | Administrador activo; dueño o administrador de la organización de la cuenta. |
+| `first_owner()`, `ensure_first_member(actor=None)` | La regla del primer miembro y su creación idempotente. |
+| `save_member(admin, username, display_name, role='', *, make_admin=None, active=None, groups=())` | Alta o actualización idempotente; nunca crea cuentas de LinkedIn. |
+
+`MiembroRequerido` es un `ValueError`: una vista responde 400 con el motivo y las guardas del autopiloto siguen con el
+resto del ciclo.
+
+**Comportamiento seguro con varios miembros.** Una cuenta sin miembro es del único miembro activo; con varios activos no
+es de nadie. Una tarea o una ruta que no dice de quién es se detiene con `MiembroRequerido` en lugar de adivinar. Por eso
+`operador miembro` da de alta a los miembros **inactivos** por defecto: hasta la fase 7, Gustavo sigue siendo el miembro
+por defecto y nada se detiene.
+
+**Selectores por miembro:** `editorial.publishing_account`, `respuestas.reader_account`/`publications`/`plan`/`due_pieces`,
+`metricas.publications`/`due`, `operador._own_posts_reader`/`_find_own_post` (en `_publish` y `reconcile`),
+`alertas_slack._reader`, `perfil.read_profile` (y `perfil.owner()` en lugar de exigir `PROFILE_OWNER_USERNAME`),
+`analitica.account_for`/`overview` y `connectors_linkedin.status_payload`. Una cuenta nueva es de quien la registra
+(`operador.register_account`, `connectors_linkedin.connect_member`).
+
+**Permisos.** `referentes.require_gustavo(user, account)`/`is_gustavo`: el dueño de la cuenta o el administrador de su
+organización. La sesión del navegador (`conexion.start`, `poll`, `new_link`, `cancel`, el canje del enlace y
+`forward_auth`) y la credencial oficial (`connect_member`, motivo `dueno`) son **solo del dueño**, también frente al
+administrador. `REFERENTS_GUSTAVO_USERNAME` y `PROFILE_OWNER_USERNAME` siguen valiendo, pero ya no hacen falta.
+
+**Pausas.** `operador.execute` y `final_write_gate` miran solo las cuentas del mismo miembro (`same_member`). La parada
+total (`OPERATOR_PAUSED`, `OperatorControl`) sigue siendo de toda la máquina.
+
+**Comandos.** `manage.py operador --usuario <admin> miembro --nombre … --usuario-nuevo … [--rol …] [--activo] [--admin]
+[--grupo …]` y `… miembros` (listado). `seed_qa --segundo-miembro` añade `qa-cto` con sus dos cuentas simuladas (apagado
+por defecto).
+
+**Pruebas.** `team_backend/tests/test_organizaciones_e2e.py` es el arnés de dos miembros que amplían las fases 2 a 7
+(`DosMiembrosBase`, `Persona`, pasos `piece`, `publish`, `pause`, `oauth`, `plan_as`). Las clases `UnMiembro*` vuelven a
+correr suites existentes con un solo miembro, sin tocar sus expectativas.
+
+### Lo que sigue siendo de toda la instalación (para las fases 2 a 5)
+
+Fase 2, un miembro de LinkedIn por persona (en `operador.py` salvo que se diga):
+- `policy_lock` y `policy_event(action, target='member')`, y quienes toman el candado en `red.py`, `urgente.py`,
+  `calentamiento.py` y `experimentos.py`.
+- Espaciado y agenda: `reserve_spacing`, `release_spacing`, `spacing_ok`, `prepare_day_schedule`, `batch_issue`,
+  `post_due`.
+- Topes: `writes`/`capacity_left` (cuentan ejecuciones de toda la instalación), también en `urgente.free_slot`
+  (líneas 74 y 81) y `oficina_views` (línea 88).
+- Lecturas de perfil: `reserve_profile_read` (`operator.profile_baseline`/`profile_read` con `target='member'`) y
+  `alertas_slack` (línea 228).
+- Red: `red.ramp_state` (`network.ramp`), `red.ramp_limits`, `red.note_policy` (`LINKEDIN_ACCOUNT_TIER`),
+  `red.note_blocked` (`network.notes_blocked`), `red.provider_failure` (`network.provider_limit`, `'member'`),
+  `red.invites_blocked`, `red.budget_left`, `red.invitation_reserved`.
+
+Fases 4 y 5, tareas que aún no dicen de quién son y que con varios miembros activos se detienen con `MiembroRequerido`:
+`urgente.assign_slots` (y con él `editorial.plan`, `next_slot`, `next_extra`), `autopiloto._editorial`, el plan semanal
+(`estrategia`, línea 630), `alertas_slack` (líneas 253, 420, 733 y 867), `perfil.schedule`/`owner()`. Siguen globales
+también el hueco del día (`EditorialPiece.slot_date` único), la audiencia diaria de `metricas`, `perfil.facts`
+(piezas recientes), la memoria (`guardas.blocks`) y las vistas, que aún no filtran por usuario.
 
 ## Servidor
 

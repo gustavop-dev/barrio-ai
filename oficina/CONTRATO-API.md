@@ -6,6 +6,12 @@ Mismo origen en producción. Caddy sirve la PWA en `/` y reenvía `/api/*`, `/ad
 
 **Errores:** JSON `{ "detail": "mensaje en español" }`. Códigos: 400 entrada inválida, 403 sin permiso o decisión humana requerida, 404, 409 conflicto o salvaguarda, 429.
 
+**Organizaciones (fase 1, [plan](../docs/plan-organizaciones.md), [ORG](../docs/funcionalidades/organizaciones.md)):**
+cada usuario puede ser miembro de una organización, con sus propias cuentas de LinkedIn. Las rutas responden por el miembro
+del usuario donde se indica. Con un solo miembro (la instalación de hoy) nada cambia. Con varios miembros activos, una
+ruta que aún no dice de quién es responde 400 `{ detail: "Hay varios miembros activos y esta operación no dice de cuál:
+hay que indicarlo." }` en lugar de adivinar. Un miembro inactivo recibe 400 «Tu miembro está inactivo en la organización.».
+
 **Listados:** los paginados devuelven `{ "count", "next", "previous", "results": [...] }` con 25 por página (`?page=`, `?page_size=` hasta 100).
 
 ## Sesión
@@ -47,17 +53,23 @@ Una cuenta `directo` trae además `connect: { enabled: bool, last: login | null 
 permite entrar en LinkedIn desde la app (`LINKEDIN_CONEXION_APP`) y la última conexión. Cada conexión
 (`login`) es `{ id, state: "abriendo|esperando|conectada|vencida|cancelada|fallida", reason, still_stopped, started_at,
 expires_at, finished_at }` ([AJU-13](../docs/funcionalidades/ajustes.md#aju-13)):
+- Todas estas rutas son **solo del miembro dueño de la cuenta** ([ORG-05](../docs/funcionalidades/organizaciones.md#org-05)):
+  otro usuario, aunque sea el administrador de la organización, recibe 403 «Solo el miembro dueño de esta cuenta abre o
+  maneja su sesión de LinkedIn.» y no se llama al servicio. En una instalación sin miembros, solo el usuario de
+  `REFERENTS_GUSTAVO_USERNAME`.
 - `POST /api/v1/operador/accounts/<id>/conexion` (sesión humana): abre el navegador del servidor en la página de entrada
   de LinkedIn. 201 `{ login, url }`, con `url` un enlace de un solo uso (2 min) a la vista remota; si ya hay una
-  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 429 más de 4 por cuenta
-  y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
+  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 403 no es el dueño, 429
+  más de 4 por cuenta y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
 - `GET /api/v1/operador/conexiones/<id>`: `{ login, url: null }`, preguntando al servicio mientras dura; al terminar
   `conectada`, levanta la pausa de la cuenta si la puso el servicio (detenida o sin sesión) y ya no la tiene detenida.
-- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició (400
-  si ya terminó). `POST …/<id>/cancelar`: la cancela.
+  403 si no es el dueño.
+- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició y sigue
+  siendo el dueño (403; 400 si ya terminó). `POST …/<id>/cancelar`: la cancela (403 si no es el dueño).
 - `GET /api/v1/linkedin/pantalla/entrar?ticket=` (sin sesión: lo abre el navegador del sistema) canjea el enlace por la
   cookie de la vista y redirige a `/conectar/`; 410 si ya se usó o venció. `GET /api/v1/linkedin/pantalla/permitir` es
-  solo para Caddy (`forward_auth`).
+  solo para Caddy (`forward_auth`). Los dos dejan de valer en cuanto quien inició la conexión deja de ser el dueño de la
+  cuenta.
 
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
@@ -140,7 +152,7 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 
 Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
 
-POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco.
+POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco. La pieza se prepara para la cuenta oficial del miembro de quien la pide, nunca la de otro. Con varios miembros activos responde 400 (el calendario y la cola de ideas aún son de toda la instalación: fase 4 del plan de organizaciones).
 
 **Vetar** una pieza es rechazar su acción antes de la hora: `POST /api/v1/operador/actions/<action.id>/reject` con `{ note }` (sesión humana y `approve_actions`). Solo vale con la acción en `proposed` o `approved`; si ya se está ejecutando, 409. El día queda sin publicación (`status: "vetoed"`).
 
@@ -150,7 +162,7 @@ Las notificaciones de piezas (lista, bloqueada, descartada, publicada) abren `/e
 
 Fuente: `agentes-linkedin/infra/src/team_backend/linkedin_views.py` y `connectors_linkedin.status_payload()`.
 
-GET `/api/v1/linkedin/status` (permiso `operate_linkedin`). Nunca incluye el token:
+GET `/api/v1/linkedin/status` (permiso `operate_linkedin`). Es la conexión del miembro de quien pregunta (su credencial más reciente; nunca la de otro miembro). Nunca incluye el token:
 ```json
 { "configured": true, "live": false, "api_version": "202610|null", "scopes_required": ["openid", "profile", "w_member_social"],
   "connected": true, "member_urn": "urn:li:person:…|null", "member_name": "…|null", "scopes": ["openid", "profile", "w_member_social"],
@@ -172,6 +184,7 @@ GET `/api/v1/linkedin/oauth/callback`: lo llama LinkedIn. Como la cookie de sesi
 | `code` | Falta el `code` o es inválido. |
 | `scope` | LinkedIn no concedió `w_member_social`; no se guarda nada. |
 | `canje` | Falló el canje del código o la lectura de `/v2/userinfo`. |
+| `dueno` | Esa cuenta de LinkedIn ya es de otro miembro (solo su dueño la reconecta) o el usuario no tiene un miembro activo al que darle una cuenta nueva; no se guarda nada. La PWA y la app aún no tienen texto propio: muestran el genérico con «motivo: dueno». |
 
 La PWA muestra un mensaje en español para cada motivo y quita `linkedin` y `motivo` de la URL.
 
@@ -466,7 +479,7 @@ Reglas para la PWA:
 
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
-**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
+**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo` del miembro de quien pregunta, servida desde lo importado: nunca llama a LinkedIn. Una `cuenta` de otro miembro responde 400, igual que una desconocida. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
 
 **Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, señal de compra con fuente, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
 
