@@ -1953,3 +1953,94 @@ class UnMiembroReviewApiTests(UnMiembro, rvm.ApiTests):
 
 class UnMiembroReviewDecisionTests(UnMiembro, rvm.DecisionTests):
     pass
+
+
+class RecorridoDelCtoTests(DosMiembrosBase):
+    """Phase 5: the CTO's day with Gustavo active beside her, through the routes the office and the phone use. The
+    registration gives her the groups that work her own account (operador miembro --grupo operacion --grupo revision),
+    the admin hands her a password (manage.py changepassword), and every screen is hers."""
+
+    def test_the_cto_logs_in_works_her_account_and_never_sees_gustavos(self):
+        """Catch a second member who cannot log in, needs Gustavo's permissions, or reads his things: she enters on the
+        office and on her phone, connects her LinkedIn, approves her own draft (marked «voz provisional»), publishes,
+        gets her notice, brings an opportunity to the shared funnel, and none of his things reach her."""
+        from team_backend.models import Opportunity
+        from team_backend.tests.test_alcance import frozen
+        frozen(self)
+        call_command('bootstrap_local', stdout=io.StringIO())
+        cto = self.cto.user
+        cto.user_permissions.clear()  # only what the registration gives her
+        member, _, created = miembros.save_member(self.gustavo, 'cto-test', 'CTO de prueba', 'CTO', active=True,
+                                                  groups=['operacion', 'revision'])
+        self.assertEqual((member, created), (self.cto.member, False))
+        cto.set_password('clave-local-del-cto')  # what `manage.py changepassword cto-test` does
+        cto.save()
+        cto = User.objects.get(pk=cto.pk)
+
+        office = APIClient()
+        self.assertEqual(office.post('/api/v1/auth/login', {'username': 'cto-test', 'password': 'nope'}, format='json').status_code, 400)
+        entered = office.post('/api/v1/auth/login', {'username': 'cto-test', 'password': 'clave-local-del-cto'}, format='json')
+        self.assertEqual(entered.status_code, 200, entered.content)
+        me = office.get('/api/v1/yo').json()
+        self.assertEqual((me['member']['display_name'], me['is_admin'], me['provisional_voice'], me['members']),
+                         ('CTO de prueba', False, True, 2))
+        issued = APIClient().post('/api/v1/auth/token', {'username': 'cto-test', 'password': 'clave-local-del-cto',
+                                                         'device_name': 'Pixel del CTO'}, format='json')
+        self.assertEqual(issued.status_code, 201, issued.content)
+        phone = APIClient()
+        phone.credentials(HTTP_AUTHORIZATION='Bearer ' + issued.json()['token'])
+        self.assertEqual(phone.get('/api/v1/yo').json()['member']['id'], str(self.cto.member.pk))
+
+        # Her LinkedIn, her settings; Gustavo pausing his account is not her warning.
+        self.assertEqual(self.oauth(self.cto, 'cto123', 'AQ-token-del-cto'), '/ajustes?linkedin=ok')
+        self.assertEqual(office.get('/api/v1/linkedin/status').json()['member_urn'], 'urn:li:person:cto123')
+        self.pause(self.g, self.g.official, 'Prueba: Gustavo pausa su cuenta')
+        alerts = lambda client: {c['id'] for c in client.get('/api/v1/tu-turno').json()['alerts']}
+        self.assertIn(f'account_paused:{self.g.official.pk}', alerts(self.g.client()))
+        self.assertFalse(any(a.startswith('account_paused') for a in alerts(office)))
+
+        # Her draft waits for her with «voz provisional»; she approves it and it goes out on her account.
+        account = editorial.publishing_account(self.cto.member)
+        text = self.cto.text
+        piece = EditorialPiece.objects.create(
+            account=account, slot_date=timezone.now().astimezone(operador.local_tz()).date(),
+            scheduled_for=timezone.now() - timedelta(hours=1), state='ready', final_text=text,
+            voice=voz.meta(self.cto.member),  # the voice that wrote it, as the editorial pipeline records it
+            verification={'verdict': 'ready_for_execution', 'text_sha256': hashlib.sha256(text.encode()).hexdigest()})
+        imagenes.fallback(piece, 'Fixture sin proveedores')
+        proposal = autopiloto.policy_review(operador.create_proposal(cto, None, 'CONT-09', {'text': text},
+                                                                     citations=['LI-04-M005-K01'], source='agent', piece=piece))
+        self.assertEqual(proposal.state, 'proposed')
+        waiting = [c for c in office.get('/api/v1/tu-turno').json()['items'] if c['id'] == f'approval:{proposal.id}']
+        self.assertEqual(len(waiting), 1)
+        self.assertTrue(waiting[0]['approval']['provisional_voice'])
+        approved = office.post(f'/api/v1/operador/actions/{proposal.id}/approve', {'expected_hash': proposal.payload_hash}, format='json')
+        self.assertEqual(approved.status_code, 202, approved.content)
+        self.assertEqual(self.publish(proposal).state, 'sent')
+        self.assertEqual(self.writes(), {'gustavo': 0, 'cto': 1})
+        titles = lambda client: [n['kind'] for n in client.get('/api/v1/notificaciones').json()['items']]
+        self.assertIn('piece_published', titles(phone))
+        self.assertNotIn('piece_published', titles(self.g.client()))
+        self.assertIn(str(piece.id), office.get('/api/v1/calendario').content.decode())
+        self.assertNotIn(str(piece.id), self.g.client().get('/api/v1/calendario').content.decode())
+
+        # His things are not hers, on the office nor on the phone.
+        his = self.piece(self.g)
+        for client in (office, phone):
+            self.assertEqual(client.get(f'/api/v1/editorial/pieces/{his.piece_id}').status_code, 404)
+            self.assertEqual(client.post(f'/api/v1/operador/actions/{his.id}/reject', {'note': 'no'}, format='json').status_code, 404)
+        self.assertNotIn(str(his.piece_id), phone.get('/api/v1/editorial/calendar').content.decode())
+
+        # The funnel is the organization's: what she brings, Gustavo sees, and it says who brought it.
+        person = Contact.objects.create(account=self.cto.reader, provider_user_id='lead-del-cto', display_name='Lead del CTO',
+                                        source='incoming', stage='connected')
+        created = office.post('/api/v1/oportunidades', {'contact': str(person.id), 'modality': 'projectapp', 'channel': 'linkedin'},
+                              format='json')
+        self.assertEqual(created.status_code, 201, created.content)
+        item = Opportunity.objects.get()
+        self.assertEqual((item.member, item.origin_member), (self.cto.member, self.cto.member))
+        seen = self.g.client().get(f'/api/v1/oportunidades/{item.id}').json()
+        self.assertEqual((seen['brought_by']['display_name'], seen['contact']), ('CTO de prueba', None))
+        # A service credential, which is nobody's member, reads nothing of either with two members.
+        self.assertEqual(self.api.get('/api/v1/tu-turno').status_code, 400)
+        self.assertEqual(self.api.get('/api/v1/notificaciones').status_code, 400)
