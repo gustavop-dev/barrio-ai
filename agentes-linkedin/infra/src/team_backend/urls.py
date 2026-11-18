@@ -79,6 +79,8 @@ urlpatterns=[
  path('estrategia/semana',es.Week.as_view()),path('estrategia/dias/<str:day>',es.Day.as_view()),
  path('estrategia/mover',es.Swap.as_view()),path('estrategia/planear',es.Plan.as_view()),
  path('red/contacts/<uuid:cid>/notas',rd.ContactNotes.as_view()),
+ path('red/contacts/<uuid:cid>/liberar',rd.ContactRelease.as_view()),path('red/contacts/<uuid:cid>/pasar',rd.ContactPass.as_view()),
+ path('red/contacts/<uuid:cid>/reasignar',rd.ContactReassign.as_view()),
  path('operador/referents/<uuid:rid>',op.ReferentDetail.as_view()),
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),

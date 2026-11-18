@@ -278,6 +278,21 @@ class ContactOutput(serializers.ModelSerializer):
         if stage=='connected':return {'owner':None,'text':'Conectados','at':None}
         if stage=='closed':return {'owner':None,'text':'Invitación ignorada o retirada; no se reinvita','at':None}
         return {'owner':None,'text':'Descartada; no se volverá a proponer','at':None}
+    def _registro(self,obj):
+        """Organizaciones, phase 6: who attends her and to whom she may be passed (registro.view); only while two or more
+        members work the organization (alone the answer is the one of before, without the key)."""
+        from . import registro
+        cache=self.context.setdefault('_registro_shared',{}) if isinstance(self.context,dict) else {}
+        if obj.account_id not in cache:cache[obj.account_id]=registro.shared(registro.organization_id(obj.account))
+        return registro.view(obj) if cache[obj.account_id] else None
+    def to_representation(self,obj):
+        data=super().to_representation(obj)
+        view=self._registro(obj)
+        if view is not None:
+            data['registro']=view
+            if view['attended_by']:  # her colleague's person: no step of this member's team, nothing private of the other
+                data['next_step']={'owner':None,'text':f"La atiende {view['attended_by']['display_name']}",'at':None}
+        return data
     class Meta:
         model=Contact
         fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
@@ -290,6 +305,14 @@ class NoteInput(serializers.Serializer):
 
 class DiscardInput(serializers.Serializer):
     note=serializers.CharField(max_length=1000)
+    for_everyone=serializers.BooleanField(required=False,default=False)  # phase 6: nobody in the organization touches her
+
+class ReleaseInput(serializers.Serializer):
+    reason=serializers.CharField(max_length=500)
+
+class PassInput(serializers.Serializer):
+    member=serializers.UUIDField()
+    reason=serializers.CharField(max_length=500)
 
 class ActionOutput(serializers.ModelSerializer):
     """`post` is null for own content (CONT-09), then `piece_id` and `scheduled_for` identify the target, and for

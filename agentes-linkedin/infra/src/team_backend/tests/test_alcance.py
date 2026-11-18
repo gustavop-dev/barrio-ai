@@ -89,8 +89,8 @@ class RutasTests(SimpleTestCase):
         for route, (kind, _) in alcance.RUTAS.items():
             for one in (set(kind.values()) if isinstance(kind, dict) else {kind}):
                 count[one] = count.get(one, 0) + 1
-        self.assertEqual(len(alcance.RUTAS), 144)  # app/errores is two: POST hers, GET the admin's
-        self.assertEqual(count, {alcance.MIEMBRO: 116, alcance.ORGANIZACION: 18, alcance.ADMINISTRADOR: 4, alcance.SERVICIO: 7})
+        self.assertEqual(len(alcance.RUTAS), 147)  # app/errores is two: POST hers, GET the admin's
+        self.assertEqual(count, {alcance.MIEMBRO: 118, alcance.ORGANIZACION: 18, alcance.ADMINISTRADOR: 5, alcance.SERVICIO: 7})
 
     def test_every_member_route_with_an_id_says_which_row_it_names(self):
         """Catch a new «del miembro» route with an id that RutaClasificada cannot check: OBJETOS names its row, and each

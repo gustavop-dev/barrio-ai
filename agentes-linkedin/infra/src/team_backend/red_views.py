@@ -2,6 +2,7 @@
 import uuid
 from django.db.models import Q
 from django.utils import timezone
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,7 +10,7 @@ from . import alcance, red
 from .models import Contact
 from .operador_views import human_session, valid
 from .permissions import require
-from .serializers import ContactOutput, DiscardInput, NoteInput
+from .serializers import ContactOutput, DiscardInput, NoteInput, PassInput, ReleaseInput
 
 class Contacts(ListAPIView):
     serializer_class=ContactOutput
@@ -40,7 +41,43 @@ class ContactDetail(APIView):
 class ContactDiscard(APIView):
     def post(self,request,cid):
         human_session(request);data=valid(DiscardInput,request);alcance.obtener(request,Contact,id=cid)
-        return Response(ContactOutput(red.discard(request.user,cid,data['note'])).data)
+        return Response(ContactOutput(red.discard(request.user,cid,data['note'],for_everyone=data['for_everyone'])).data)
+
+def _registro(call):
+    """The register's refusals as answers: not hers to decide → 403; a rule (no reason, no such member) → 400 (ValueError)."""
+    try:return call()
+    except PermissionError as exc:raise PermissionDenied(str(exc)) from None
+
+class ContactRelease(APIView):
+    """Personas → «Liberar»: the member who attends her lets her go, with a reason (organizaciones, phase 6)."""
+    def post(self,request,cid):
+        from . import registro
+        human_session(request);data=valid(ReleaseInput,request);require(request.user,'approve_actions')
+        contact=alcance.obtener(request,Contact,id=cid)
+        _registro(lambda:registro.release(request.user,contact,data['reason']))
+        return Response(ContactOutput(Contact.objects.get(pk=contact.pk)).data)
+
+class ContactPass(APIView):
+    """Personas → «Pasar a…»: the member who attends her passes her to another active member, with a reason; the other
+    starts with the basic card, nothing private moves (organizaciones, phase 6)."""
+    def post(self,request,cid):
+        from . import registro
+        human_session(request);data=valid(PassInput,request);require(request.user,'approve_actions')
+        contact=alcance.obtener(request,Contact,id=cid)
+        _registro(lambda:registro.pass_to(request.user,contact,data['member'],data['reason']))
+        return Response(ContactOutput(Contact.objects.get(pk=contact.pk)).data)
+
+class ContactReassign(APIView):
+    """The admin gives a person nobody touched yet to a member (organizaciones, phase 6), naming her by any contact of
+    the organization (a member's contact id); outside his organization the contact does not exist (404)."""
+    def post(self,request,cid):
+        from rest_framework.exceptions import NotFound
+        from . import miembros, registro
+        human_session(request);data=valid(PassInput,request);require(request.user,'approve_actions')
+        admin=miembros.member_for(request.user);contact=Contact.objects.select_related('account').filter(pk=cid).first()
+        if contact is None or admin is None or registro.organization_id(contact.account)!=admin.organization_id:raise NotFound()
+        _registro(lambda:registro.reassign(request.user,contact,data['member'],data['reason']))
+        return Response(ContactOutput(Contact.objects.get(pk=contact.pk)).data)
 
 class ContactConfirmFit(APIView):
     """Personas → «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits."""
