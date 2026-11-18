@@ -342,10 +342,11 @@ CASE_ORIGIN='projectapp:casos'
 def case_key(segment,what):
     return f'projectapp.caso.{segment}.{what}'
 
-def ask_case_questions():
-    """Queue the case questions to Gustavo (TeamQuestion, Tu turno): five per case. Idempotent: preguntas.ask never
-    asks a key that is open, answered, declined or withdrawn, so running it again creates nothing. Returns the
-    questions created now."""
+def ask_case_questions(member=None):
+    """Queue the case questions to a member (`member`, else the only active one; TeamQuestion, Tu turno): five per case.
+    Her answers are hers; the organization's admin shares them with the company (hechos.share) for every member to cite.
+    Idempotent: preguntas.ask never asks a key that is open, answered, declined or withdrawn, so running it again creates
+    nothing. Returns the questions created now."""
     from . import posicionamiento, preguntas
     created=[]
     for segment in CASE_SEGMENTS:
@@ -353,18 +354,20 @@ def ask_case_questions():
             item=preguntas.ask(CASE_AGENT,question.format(case=CASE_LABELS[segment]),
                                f'Caso real de ProjectApp ({posicionamiento.cases()[segment]}). {purpose} Se usa solo con '
                                'compradores del mismo segmento y solo con lo que confirmes.',
-                               case_key(segment,what),suggested_public=True,origin=CASE_ORIGIN,answer_type=kind,options=options)
+                               case_key(segment,what),suggested_public=True,origin=CASE_ORIGIN,answer_type=kind,options=options,
+                               member=member)
             if item is not None:created.append(item)
     return created
 
-def case_facts(segment):
-    """{what: text} of the case answers Gustavo confirmed for public use (uso_publico), plus the base fact of
-    posicionamiento.CASES; a «no» to `cliente` keeps the client unnamed."""
+def case_facts(segment,member=None):
+    """{what: text} of the case answers confirmed for public use (uso_publico): hers (`member`, the one who writes to the
+    buyer) and her organization's company facts (hechos.with_company: a case is the company's once the admin shares it),
+    never another member's; plus the base fact of posicionamiento.CASES. A «no» to `cliente` keeps the client unnamed."""
     from knowledge import memory
-    from . import posicionamiento
+    from . import hechos, posicionamiento
     facts={'caso':posicionamiento.cases()[segment]}
     wanted={case_key(segment,what):(what,question.format(case=CASE_LABELS[segment])) for what,question,*_ in CASE_QUESTIONS}
-    for row in memory.latest(True):
+    for row in hechos.with_company(member):
         what,question=wanted.get(row['key'],(None,''));value=row['value']
         if what is None or memory.retired(value) or not memory.publishable(value):continue
         text=str(value.get('texto') or '').strip()
@@ -381,7 +384,9 @@ def case_for(contact):
     mine=[segment_of(contact),*buyer_of(contact).get('also_segments',[])]
     segment=next((s for s in mine if s in CASE_SEGMENTS),None)
     if segment is None:return None
-    return {'segmento':segment,'caso':CASE_LABELS[segment],'hechos':case_facts(segment)}
+    from . import miembros
+    member=miembros.member_for_account(contact.account) if getattr(contact,'account_id',None) else None
+    return {'segmento':segment,'caso':CASE_LABELS[segment],'hechos':case_facts(segment,member)}
 
 def cited_cases(text):
     """The case segments a text cites (says ProjectApp, we or I built it and names its industry)."""

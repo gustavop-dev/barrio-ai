@@ -33,7 +33,7 @@ from datetime import date, datetime, time, timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import comprador, identidad, operador, secuencia_comprador
+from . import comprador, identidad, miembros, operador, secuencia_comprador
 from .exceptions import Conflict
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation
 from .permissions import require
@@ -284,7 +284,7 @@ def classify(journey,row,now=None):
     from knowledge import presupuesto, providers
     from .mensajes_comprador import person
     now=now or timezone.now()
-    context,grounding=operador.role_context('lider',UNITS,CRITERIA,metodologia=METHODOLOGY)
+    context,grounding=operador.role_context('lider',UNITS,CRITERIA,metodologia=METHODOLOGY,account=journey.contact.account)
     if grounding['course_missing']:raise ValueError('Biblioteca no disponible para clasificar ('+', '.join(grounding['course_missing'])+').')
     if presupuesto.left(now)<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
     message=(row.inputs or {}).get('mensaje') or {}
@@ -368,7 +368,7 @@ PRESSURE=re.compile(r"\b(?:today\s+only|only\s+today|last\s+chance|limited\s+(?:
                     r"no\s+te\s+lo\s+pierdas|reconsider|reconsidera)\b",re.I)
 CALL=re.compile(r"\b(?:call|meeting|zoom|calendar|book|slot|llamada|reuni[oó]n|agenda|calendario|videollamada)\b",re.I)
 
-def text_issues(kind,text,reference=''):
+def text_issues(kind,text,reference='',member=None):
     """The fixed rules of a reply (BIB-11-respuesta-comprador), checked in code before the lead, on what the drafter wrote
     (the booking link is appended by the code afterwards): three lines and 500 characters at most; no link, email, phone
     or hashtag of its own; no selling, prices, promises or pressure; none of the killing formulas; only interesado and
@@ -396,8 +396,7 @@ def text_issues(kind,text,reference=''):
         issues.append('Respuesta que propone una llamada o una reunión a quien no la pidió')
     expected=idioma.mismatch(text,reference)
     if expected:issues.append(f'Respuesta fuera del idioma de la persona ({expected})')
-    public,private=guardas.blocks()
-    return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    return issues+guardas.text_checks(text,member)
 
 def link_issues(kind,text,link):
     """The final text carries one link only, her booking link at its end, and only in interesado and pide_informacion.
@@ -501,7 +500,7 @@ def draft(journey,row,at):
     case=projectapp.case_for(contact) if kind in LINK_TYPES else None
     if case:data['caso_projectapp']=case
     def issues_of(body):
-        return text_issues(kind,body,said)+projectapp.case_issues(body,contact)
+        return text_issues(kind,body,said,miembros.member_for_account(contact.account))+projectapp.case_issues(body,contact)
     ident=identidad.of_account(contact.account)
     answer,out,citations,risks=_write(data,units_,ident)
     body=_body(out);issues=issues_of(body)

@@ -23,9 +23,9 @@ LinkedIn rhythm (miembros.policy_key):
 The initial identity is data: migration 0058 copies it into ProjectApp's and its first member's rows, and
 ensure_first_member does the same for an installation that gets its first member later (bootstrap_local).
 
-Memory and orientation are phase 4. Until each member has her own, facts(), blocks() and orientation() give the first
-member (or an installation without members) what they gave before, and any other member nothing: never another
-member's facts, private guidance or orientation. Phase 4 replaces these three functions."""
+Memory and orientation (phase 4): facts(), blocks() and orientation() give each member her own (hechos.py, orientacion.py):
+the first member (or an installation without members) what they gave before, any other member hers. Never another
+member's facts, private guidance or orientation; company facts, shared by the admin, are every member's."""
 import json
 import re
 import unicodedata
@@ -290,34 +290,26 @@ def owner_name(account):
         return OWNER_FALLBACK
 
 
-# --------------------------------------------------------------------------- phase 4 hooks: memory and orientation
+# --------------------------------------------------------------------------- her memory and orientation (phase 4)
 
 def facts(member=None):
-    """(public_facts, private) of her confirmed memory. Today the memory is the installation's: the first member's.
-    Anyone else has none until phase 4 gives her own (never another member's facts)."""
-    ident = of(member)
-    if not ident.legacy:
-        return [], []
-    from knowledge import memory
-    return memory.confirmed_blocks()
+    """(public_facts, private) of her confirmed memory and her organization's company facts (hechos.confirmed_blocks):
+    the first member's is the memory of before; any other member's, her own. Never another member's facts."""
+    from . import hechos
+    return hechos.confirmed_blocks(of(member).member)
 
 
 def blocks(member=None):
-    """guardas.blocks() for her: confirmed memory, the brief's private guidance and the orientation. Same rule as facts()."""
-    ident = of(member)
-    if not ident.legacy:
-        return [], []
+    """guardas.blocks() for her: her confirmed memory, the brief's private guidance (the first member's) and her
+    orientation."""
     from . import guardas
-    return guardas.blocks()
+    return guardas.blocks(of(member).member)
 
 
 def orientation(member=None):
-    """Her current orientation (orientacion.text()). Same rule as facts()."""
-    ident = of(member)
-    if not ident.legacy:
-        return ''
+    """Her current orientation (orientacion.text)."""
     from . import orientacion
-    return orientacion.text()
+    return orientacion.text(of(member).member)
 
 
 # --------------------------------------------------------------------------- validation

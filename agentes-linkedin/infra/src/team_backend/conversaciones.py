@@ -306,7 +306,7 @@ def _questions(conversation):
         'projectapp':_noul('Si en `conversacion` hay una oportunidad, ¿es un proyecto de software a la medida o un equipo que ProjectApp podría construir?'),
     }
     questions={k:dict(v,instructions=ident.render(v['instructions'])) for k,v in questions.items()}
-    context,grounding=operador.role_context('inbox',INBOX_UNITS,CRITERION_SOURCES)
+    context,grounding=operador.role_context('inbox',INBOX_UNITS,CRITERION_SOURCES,member=ident.member)
     state.update(course_context=context,course_grounding=grounding,
                  course_rule=ident.render('Interés por el interlocutor; un saludo o DM no es venta. Solo necesidad expresada puede justificar proponer reunión a {nombre}. Nunca enviar mensajes.'))
     for key,ids in grounding['criterion_sources'].items():

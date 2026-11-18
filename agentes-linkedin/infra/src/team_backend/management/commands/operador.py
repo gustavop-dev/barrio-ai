@@ -113,6 +113,14 @@ class Command(BaseCommand):
         accion.add_argument('--descartar',type=int,default=None,metavar='N',help='Ella descarta la propuesta N')
         accion.add_argument('--ver',type=int,default=None,metavar='N',help='Imprime el texto de la versión N')
         voz.add_argument('--nota',default='',help='Nota de por qué descarta (opcional)')
+        emp=sub.add_parser('hecho-empresa',help='Hechos de la empresa: sin opciones los lista; --compartir CLAVE --miembro USUARIO '
+                           'hace de un hecho confirmado de ese miembro un hecho de la empresa (lo usan todos los miembros como '
+                           'empresa.CLAVE); --retirar CLAVE lo retira. Solo el administrador de la organización (auditado)')
+        emp.add_argument('--miembro',default=None,help='Usuario de Django del miembro dueño del hecho (con --compartir)')
+        hecho=emp.add_mutually_exclusive_group()
+        hecho.add_argument('--compartir',default=None,metavar='CLAVE',help='Clave del hecho de ese miembro (p. ej. caso.retail.resultado)')
+        hecho.add_argument('--retirar',default=None,metavar='CLAVE',help='Clave del hecho de la empresa que deja de usarse')
+        emp.add_argument('--motivo',default='',help='Por qué se retira (opcional)')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -165,9 +173,13 @@ class Command(BaseCommand):
             if o['accion'] in ('perfil','perfil-organizacion','voz'):
                 self.identity(user,o)
                 return
+            if o['accion']=='hecho-empresa':
+                self.company_facts(user,o)
+                return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp
-                created=projectapp.ask_case_questions()
+                from team_backend import miembros as org
+                created=projectapp.ask_case_questions(org.member_for(user))  # to whoever runs it (her answers are hers)
                 total=len(projectapp.CASE_SEGMENTS)*len(projectapp.CASE_QUESTIONS)
                 self.stdout.write(f'Preguntas de los casos de ProjectApp creadas ahora: {len(created)} de {total}.')
                 for item in created:self.stdout.write(f'  · {item.memory_key}: {item.question}')
@@ -267,6 +279,26 @@ class Command(BaseCommand):
         member=Member.objects.select_related('organization','user').filter(user__username=username).first()
         if member is None:raise CommandError(f'«{username}» no es miembro de ninguna organización.')
         return member
+
+    def company_facts(self,user,o):
+        """hecho-empresa (phase 4): what a member confirmed is hers; the admin makes one of her facts the company's."""
+        from knowledge import memory
+        from team_backend import hechos
+        admin=self._member(user,None)
+        organization=admin.organization
+        if o['compartir']:
+            if not o['miembro']:raise CommandError('--compartir necesita --miembro: de quién es el hecho.')
+            member=self._member(user,o['miembro'])
+            if member.organization_id!=organization.pk:raise CommandError(f'«{o["miembro"]}» no es de {organization.name}.')
+            version=hechos.share(user,member,o['compartir'])
+            self.stdout.write(f'«{o["compartir"]}» de {member.display_name} es un hecho de {organization.name} (versión {version}, '
+                              f'auditado): todos sus miembros lo usan como {hechos.COMPANY_PREFIX}{o["compartir"]}.')
+        elif o['retirar']:
+            version=hechos.unshare(user,organization,o['retirar'],o['motivo'])
+            self.stdout.write(f'«{o["retirar"]}» ya no es un hecho de {organization.name} (versión {version}, auditado).')
+        rows=[r for r in hechos.company_rows(organization) if not memory.retired(r['value'])]
+        self.stdout.write(f'Hechos de la empresa {organization.name}: {len(rows)}.')
+        for row in sorted(rows,key=lambda r:r['key']):self.stdout.write(f'  {hechos.COMPANY_PREFIX}{row["key"]} · versión {row["version"]}')
 
     def identity(self,user,o):
         """perfil, perfil-organizacion and voz (phase 3): identity and voice out of the code."""

@@ -269,21 +269,20 @@ def note_text_issues(text,facts,anchor,reference=''):
     if expected:issues.append(f'Nota fuera del idioma de la persona ({expected})')
     return issues+talk_issues(text,facts)
 
-def message_text_issues(text,facts,anchor,reference=''):
+def message_text_issues(text,facts,anchor,reference='',member=None):
     """The first message's fixed rules: RSP-07's (respuestas.dm_text_issues: length, three lines, links, selling, asking
     for minutes or a meeting, the formulas, her language, private leaks, invented experience) plus «its first line cites
     one of her facts» (the anchor it declares). Whether that line is concrete is the lead's question (dm_toque)."""
     from .respuestas import dm_text_issues
-    issues=dm_text_issues(text,reference)
+    issues=dm_text_issues(text,reference,member)
     if (text or '').strip() and not any(f.get('id')==anchor for f in facts or []):
         issues.append('El primer mensaje no declara un hecho real de la persona')
     return issues+talk_issues(text,facts)
 
-def text_issues(kind,text,facts,anchor,reference=''):
-    if kind==MESSAGE:return message_text_issues(text,facts,anchor,reference)
+def text_issues(kind,text,facts,anchor,reference='',member=None):
+    if kind==MESSAGE:return message_text_issues(text,facts,anchor,reference,member)
     from . import guardas
-    _,private=guardas.blocks()
-    return note_text_issues(text,facts,anchor,reference)+(guardas.private_leaks(text,private) if (text or '').strip() else [])
+    return note_text_issues(text,facts,anchor,reference)+(guardas.text_checks(text,member,experience=False) if (text or '').strip() else [])
 
 # --------------------------------------------------------------------------- the drafter
 
@@ -450,8 +449,8 @@ def _draft(contact,journey,kind,at,number=1):
     def issues_of(text,anchor):
         if not text:return []
         # BAR-25: a case of ProjectApp only to a buyer of its segment and without unconfirmed figures ([] when off).
-        if follow_up:return sequence.text_issues(number,text,earlier,said)+projectapp.case_issues(text,contact)
-        return text_issues(kind,text,facts,anchor,said)+projectapp.case_issues(text,contact)
+        if follow_up:return sequence.text_issues(number,text,earlier,said,ident.member)+projectapp.case_issues(text,contact)
+        return text_issues(kind,text,facts,anchor,said,ident.member)+projectapp.case_issues(text,contact)
     answer,out,citations,risks=_write(kind,data,units,number,ident)
     text=_text(out,kind);issues=issues_of(text,out.get('anchor'))
     redrafted=False

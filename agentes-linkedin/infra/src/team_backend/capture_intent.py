@@ -114,7 +114,9 @@ def jev(capture):
     from . import identidad
     from .lider import _noul
     from .operador import local_tz
-    who=(identidad.of_user(capture.created_by) if capture.created_by_id else identidad.of()).name
+    # Whose capture: its member (organizaciones, phase 4), else its author's, else the default one.
+    who=(identidad.of(capture.member) if capture.member_id else identidad.of_user(capture.created_by) if capture.created_by_id
+         else identidad.of()).name
     text=capture.text
     # Exact spans give a literal evidence quote without asking a generative model to extract one.
     spans=[part.strip() for part in re.split(r'(?<=[.!?;\n])\s*',text) if part.strip()]

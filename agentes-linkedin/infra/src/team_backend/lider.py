@@ -66,14 +66,14 @@ CRITERION_SOURCES={
     'caso_inventa':['LI-06-M001-K07'],
 }
 
-def ground_questions(state,questions):
+def ground_questions(state,questions,member=None):
     """Load the lead's units (and, with a first message to judge, the activated class 09 units; with a warm-up comment,
     the activated class 07/10 units) and point each question at its criterion. If the class 09 units are missing, the
     first message is not judged (no card) and the rest of the review goes on as before. If the warm-up units are missing,
     course_missing says so and the review waits (lider._review: retry): a buyer is never commented without them."""
     def ground(units,metodologia=None):
         return operador.role_context('lider',units,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},
-                                     metodologia=metodologia)
+                                     metodologia=metodologia,member=member)
     if 'calentamiento' in state:
         context,grounding=ground(LEAD_UNITS+[u for u in WARMUP_COMMENT_UNITS if u not in LEAD_UNITS],metodologia='comentario_calentamiento')
     elif 'primer_mensaje' in state:
@@ -427,7 +427,7 @@ def _questions(proposal,orientation,ident=None):
     if state.get('pedido_de_gustavo'):
         checks=[(qid,bound,OWN_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
     questions=_render(ident,questions)
-    ground_questions(state,questions)
+    ground_questions(state,questions,ident.member)
     if 'primer_mensaje' in state:checks.extend(DM_CHECKS)  # still there: its class 09 units were loaded
     if 'calentamiento' in state:checks.extend(CAL_CHECKS)
     return state,questions,_render(ident,checks)
@@ -618,7 +618,8 @@ def review_buyer_draft(draft):
         checks.append(ORIENTATION_CHECK)
     questions,checks=_render(ident,questions),_render(ident,checks)
     context,grounding=operador.role_context('lider',LEAD_UNITS+[u for u in units if u not in LEAD_UNITS],
-                                            {k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},metodologia=metodologia)
+                                            {k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},metodologia=metodologia,
+                                            member=ident.member)
     if grounding['course_missing']:
         return {'decision':'retry','reasons':['Biblioteca no disponible'],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     state.update(course_context=context,course_grounding=grounding,
@@ -680,7 +681,7 @@ def comment_worthy(post):
                      'premio o agradecimiento?'),
     }
     questions=_render(ident,questions)
-    grounding=ground_questions(state,questions)
+    grounding=ground_questions(state,questions,ident.member)
     if grounding['course_missing']:return {'decision':'unavailable','reasons':['Biblioteca no disponible'],'at':now.isoformat(),**grounding}
     try:result=providers.typesafe(ident.keyed(state,values=False),questions,purpose='comment-prefilter')
     except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat(),**grounding}

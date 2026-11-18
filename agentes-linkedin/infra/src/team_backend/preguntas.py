@@ -4,7 +4,11 @@ An agent asks Gustavo only for what nobody else knows, and the question arrives 
 what for, the kind of answer and, if it applies, until when it is useful. The answer becomes confirmed user memory,
 the only source of facts the voice may tell in public (`uso_publico`). «Más tarde» postpones it 3 days and takes it
 out of the counter; «No quiero compartir esto» closes the key for good; «Deshacer» restores the memory as it was
-for a few minutes after answering. Pending memory proposals arrive as confirmation questions."""
+for a few minutes after answering. Pending memory proposals arrive as confirmation questions.
+
+Each member has her own (organizaciones, phase 4): a question is asked to one member (TeamQuestion.member), her answer
+is her memory (hechos.py), and what she knows, declined or was asked is hers: one open question per member and key.
+`member=None` everywhere means the default member (MiembroRequerido among several active ones, never a guess)."""
 import re
 import uuid
 from datetime import date, timedelta
@@ -12,10 +16,11 @@ from decimal import Decimal, InvalidOperation
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from knowledge import memory
+from . import hechos, miembros
 from .exceptions import Conflict
 from .jobs import audit
 from .models import TeamQuestion
-from .permissions import require
+from .permissions import PermissionDenied, require
 
 KEY=re.compile(r'[a-z0-9][a-z0-9_.\-]{1,119}')
 MAX_ANSWER=2000
@@ -31,12 +36,12 @@ def _normal_key(value):
     if not KEY.fullmatch(key):raise ValueError('Clave de memoria inválida')
     return key
 
-def known_keys():
-    """Keys already confirmed (and not withdrawn): nothing to ask."""
-    return {row['key'] for row in memory.latest(True) if not memory.retired(row['value'])}
+def known_keys(member=None):
+    """Her keys already confirmed (and not withdrawn): nothing to ask."""
+    return {row['key'] for row in hechos.latest(member) if not memory.retired(row['value'])}
 
-def closed_keys():
-    return set(TeamQuestion.objects.filter(state__in=['declined','open']).values_list('memory_key',flat=True))
+def closed_keys(member=None):
+    return set(miembros.own(TeamQuestion.objects.filter(state__in=['declined','open']),member).values_list('memory_key',flat=True))
 
 def is_pending(item,now=None):
     """Counts in Tu turno: open, not postponed and, if it has a deadline, before it."""
@@ -44,21 +49,23 @@ def is_pending(item,now=None):
     return (item.state==TeamQuestion.State.OPEN and not (item.postponed_until and item.postponed_until>now)
             and not (item.deadline and item.deadline<now))
 
-def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answer_type='text',options=None,deadline=None):
-    """An agent asks Gustavo for a fact. Idempotent per key; never re-asks a declined, open, withdrawn or known key."""
+def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answer_type='text',options=None,deadline=None,member=None):
+    """An agent asks a member (`member`, the one whose piece, post or profile needs it) for a fact. Idempotent per member
+    and key; never re-asks her a declined, open, withdrawn or known key."""
     try:key=_normal_key(memory_key)
     except ValueError:return None
+    member=miembros.resolve(member)
     question=(question or '').strip();purpose=(purpose or '').strip()
     if answer_type not in TeamQuestion.AnswerType.values:answer_type='text'
     options=[str(o).strip()[:120] for o in (options or []) if str(o).strip()][:12]
     if answer_type=='choice' and len(options)<2:answer_type='text';options=[]
-    withdrawn={r['key'] for r in memory.latest(True) if memory.retired(r['value'])}
-    if not question or key in closed_keys() or key in known_keys() or key in withdrawn:return None
+    withdrawn={r['key'] for r in hechos.latest(member) if memory.retired(r['value'])}
+    if not question or key in closed_keys(member) or key in known_keys(member) or key in withdrawn:return None
     try:
         with transaction.atomic():
             item=TeamQuestion.objects.create(kind=TeamQuestion.Kind.ASK,agent=agent[:60],question=question[:1000],purpose=purpose[:1000],
                                              memory_key=key,suggested_public=bool(suggested_public),origin=origin[:120],
-                                             answer_type=answer_type,options=options,deadline=deadline)
+                                             answer_type=answer_type,options=options,deadline=deadline,member=member)
     except IntegrityError:return None
     audit(None,'team.question_asked',item.id,agent=agent,key=key)
     from .notificaciones import avisar
@@ -118,24 +125,26 @@ def ask_profile(proposal):
         if row.get('superseded_by') or row['id'] in covered:continue
         for missing in row.get('missing',[]):
             ask('perfil',missing['question'],f'{row["title"]}: {missing["purpose"]}',missing['key'],
-                origin=f'perfil:{proposal.id}',suggested_public=True)
+                origin=f'perfil:{proposal.id}',suggested_public=True,member=miembros.member_for(proposal.owner))
 
 def agent_label(agent):
     return {'director_editorial':'Director editorial','posicionamiento':'Posicionamiento','perfil':'Perfil',
             'analista_barrio_resultados':'Analista del barrio','relaciones_comunidad':'Relaciones con la comunidad',
             'conversaciones_inbox':'Conversaciones e inbox'}.get(agent,agent.replace('_',' ').capitalize())
 
-def sync_memory_proposals():
-    """Every user fact whose latest version is still a proposal becomes one confirmation question."""
-    closed=set(TeamQuestion.objects.filter(state__in=['open','declined']).values_list('memory_key',flat=True));created=0
-    for row in memory.latest():
+def sync_memory_proposals(member=None):
+    """Every fact of hers whose latest version is still a proposal becomes one confirmation question to her."""
+    member=miembros.resolve(member)
+    closed=closed_keys(member)|set(miembros.own(TeamQuestion.objects.filter(state='declined'),member).values_list('memory_key',flat=True))
+    created=0
+    for row in hechos.latest(member,confirmed_only=False):
         if row['namespace']!='user' or row['status']!='proposed' or row['key'] in closed:continue
         value=row['value'] if isinstance(row['value'],dict) else {'texto':str(row['value'])}
         try:
             with transaction.atomic():
                 TeamQuestion.objects.create(kind=TeamQuestion.Kind.CONFIRM,agent='posicionamiento',question=CONFIRM_QUESTION,
                     purpose=CONFIRM_PURPOSE,memory_key=row['key'],proposed_value=value,memory_id=row['id'],
-                    suggested_public=memory.publishable(value),origin='memoria')
+                    suggested_public=memory.publishable(value),origin='memoria',member=member)
             created+=1
         except IntegrityError:continue
     return created
@@ -164,13 +173,20 @@ def _typed_text(item,text,value,free=False):
         answer+=f' ({text})' if text else ''
     return f'{item.question} {answer}'
 
+def _hers(user,item):
+    """Only the member the team asked answers, declines, postpones or undoes her question (organizaciones, phase 4): another
+    member never writes her memory. A user without a member (as before organizations) is not stopped."""
+    own=miembros.member_of_user(user)
+    if item.member_id and own is not None and own.pk!=item.member_id:
+        raise PermissionDenied('Esta pregunta es de otro miembro de tu organización.')
+
 def answer(user,question_id,text='',public_use=None,accept=False,value=None,free=False):
-    """Save Gustavo's answer as confirmed memory. A confirmation question may be accepted as proposed."""
+    """Save her answer as her confirmed memory. A confirmation question may be accepted as proposed."""
     require(user,'confirm_memory')
     text=(text or '').strip()
     if len(text)>MAX_ANSWER:raise ValueError(f'La respuesta supera {MAX_ANSWER} caracteres')
     with transaction.atomic():
-        item=TeamQuestion.objects.select_for_update().get(id=question_id)
+        item=TeamQuestion.objects.select_for_update().get(id=question_id);_hers(user,item)
         if item.state!=TeamQuestion.State.OPEN:raise Conflict('La pregunta ya no está abierta.')
         public=item.suggested_public if public_use is None else bool(public_use)
         if item.kind==TeamQuestion.Kind.CONFIRM and accept and not text:
@@ -180,7 +196,8 @@ def answer(user,question_id,text='',public_use=None,accept=False,value=None,free
             stored={'texto':text,'uso_publico':public};shown=text
         else:
             stored={'texto':_typed_text(item,text,value,free),'uso_publico':public};shown=stored['texto']
-        result=memory.set_fact(item.memory_key,stored,f'user:{user.pk}',f'Respuesta de Gustavo en la Bandeja a «{item.question[:200]}» ({item.id})')
+        # Her answer is her memory: the question's member's, whoever wrote it (organizaciones, phase 4).
+        result=hechos.set_fact(item.member,item.memory_key,stored,f'user:{user.pk}',f'Respuesta de Gustavo en la Bandeja a «{item.question[:200]}» ({item.id})')
         item.state=TeamQuestion.State.ANSWERED;item.answer=shown;item.public_use=public;item.memory_version=result['version']
         item.answered_by=user;item.answered_at=timezone.now();item.save()
     audit(user,'team.question_answered',item.id,key=item.memory_key,public=public)
@@ -193,13 +210,13 @@ def undo(user,question_id):
     """«Deshacer» right after answering: the memory goes back to its previous confirmed state and the question reopens."""
     require(user,'confirm_memory')
     with transaction.atomic():
-        item=TeamQuestion.objects.select_for_update().get(id=question_id)
+        item=TeamQuestion.objects.select_for_update().get(id=question_id);_hers(user,item)
         if item.state!=TeamQuestion.State.ANSWERED or item.answered_by_id!=user.pk or not item.answered_at \
            or item.answered_at<timezone.now()-UNDO_WINDOW:
             raise Conflict('Ya no se puede deshacer esta respuesta; corrige el dato en «Lo que el equipo sabe de ti».')
-        previous=[r for r in memory.confirmed_history('user',item.memory_key) if item.memory_version and r['version']<item.memory_version]
+        previous=[r for r in hechos.confirmed_history(item.member,item.memory_key) if item.memory_version and r['version']<item.memory_version]
         restored=previous[0]['value'] if previous else {'retirado':True,'motivo':'Respuesta deshecha'}
-        memory.set_fact(item.memory_key,restored,f'user:{user.pk}',f'Gustavo deshizo su respuesta ({item.id})')
+        hechos.set_fact(item.member,item.memory_key,restored,f'user:{user.pk}',f'Gustavo deshizo su respuesta ({item.id})')
         item.state=TeamQuestion.State.OPEN;item.answer='';item.public_use=None;item.memory_version=None
         item.answered_by=None;item.answered_at=None;item.save()
     audit(user,'team.question_undone',item.id,key=item.memory_key)
@@ -211,7 +228,7 @@ def undo(user,question_id):
 def postpone(user,question_id):
     """«Más tarde»: out of the counter for 3 days."""
     require(user,'confirm_memory')
-    item=TeamQuestion.objects.get(id=question_id)
+    item=TeamQuestion.objects.get(id=question_id);_hers(user,item)
     if item.state!=TeamQuestion.State.OPEN:raise Conflict('La pregunta ya no está abierta.')
     item.postponed_until=timezone.now()+POSTPONE;item.save(update_fields=['postponed_until'])
     audit(user,'team.question_postponed',item.id)
@@ -221,7 +238,7 @@ def decline(user,question_id):
     """«No quiero compartir esto»: the key is never asked again."""
     require(user,'confirm_memory')
     with transaction.atomic():
-        item=TeamQuestion.objects.select_for_update().get(id=question_id)
+        item=TeamQuestion.objects.select_for_update().get(id=question_id);_hers(user,item)
         if item.state!=TeamQuestion.State.OPEN:raise Conflict('La pregunta ya no está abierta.')
         item.state=TeamQuestion.State.DECLINED;item.answered_by=user;item.answered_at=timezone.now();item.save()
     audit(user,'team.question_declined',item.id,key=item.memory_key)
@@ -229,10 +246,12 @@ def decline(user,question_id):
 
 # --------------------------------------------------------------------------- what the team knows about Gustavo
 
-def facts():
-    rows=[r for r in memory.latest(True) if not memory.retired(r['value'])]
+def facts(member=None):
+    """«Lo que el equipo sabe de ti»: her confirmed facts (never another member's)."""
+    member=miembros.resolve(member)
+    rows=[r for r in hechos.latest(member) if not memory.retired(r['value'])]
     asked={}
-    for q in TeamQuestion.objects.filter(state='answered').order_by('answered_at'):asked[q.memory_key]=q
+    for q in miembros.own(TeamQuestion.objects.filter(state='answered'),member).order_by('answered_at'):asked[q.memory_key]=q
     out=[]
     for row in sorted(rows,key=lambda r:r['key']):
         value=row['value'];key=row['key']
@@ -241,21 +260,22 @@ def facts():
         if q:origin={'kind':'question','agent':q.agent,'agent_label':agent_label(q.agent),'question':q.question}
         elif key.startswith('nota.'):origin={'kind':'manual'}
         else:origin={'kind':'memoria'}
-        versions=len([v for v in memory.confirmed_history('user',key) if not memory.retired(v['value'])])
+        versions=len([v for v in hechos.confirmed_history(member,key) if not memory.retired(v['value'])])
         out.append({'key':key,'topic':(value.get('tema') if isinstance(value,dict) else None) or (q.question if q else key),
                     'text':text,'public_use':memory.publishable(value),'version':row['version'],'edits':max(1,versions),
                     'origin':origin,'updated_at':row['created_at']})
     return out
 
 def add_fact(user,text,public_use,topic=''):
-    """«Añadir algo que quieras que sepan»: Gustavo writes it, so it is confirmed directly."""
+    """«Añadir algo que quieras que sepan»: she writes it, so it is confirmed directly, as hers."""
     require(user,'confirm_memory')
+    member=miembros.member_for(user)
     text=(text or '').strip();topic=(topic or '').strip()[:200]
     if not text or len(text)>MAX_ANSWER:raise ValueError(f'Escribe el dato (máximo {MAX_ANSWER} caracteres)')
     key=f'nota.{uuid.uuid4().hex[:10]}'
     value={'texto':text,'uso_publico':bool(public_use)}
     if topic:value['tema']=topic
-    memory.set_fact(key,value,f'user:{user.pk}','Gustavo lo añadió en la Bandeja')
+    hechos.set_fact(member,key,value,f'user:{user.pk}','Gustavo lo añadió en la Bandeja')
     audit(user,'memory.added',key,public=bool(public_use))
     return key
 
@@ -263,24 +283,24 @@ def correct(user,key,text,public_use):
     require(user,'confirm_memory')
     text=(text or '').strip()
     if not text or len(text)>MAX_ANSWER:raise ValueError(f'Escribe el dato corregido (máximo {MAX_ANSWER} caracteres)')
-    key=_normal_key(key)
-    if key not in known_keys():raise Conflict('Ese dato no está en la memoria confirmada.')
-    current=next(r['value'] for r in memory.latest(True) if r['key']==key)
+    key=_normal_key(key);member=miembros.member_for(user)
+    if key not in known_keys(member):raise Conflict('Ese dato no está en la memoria confirmada.')
+    current=next(r['value'] for r in hechos.latest(member) if r['key']==key)
     value={'texto':text,'uso_publico':bool(public_use)}
     if isinstance(current,dict) and current.get('tema'):value['tema']=current['tema']
-    memory.set_fact(key,value,f'user:{user.pk}','Corrección de Gustavo en la Bandeja')
+    hechos.set_fact(member,key,value,f'user:{user.pk}','Corrección de Gustavo en la Bandeja')
     audit(user,'memory.corrected',key,public=bool(public_use))
 
 def retire(user,key,reason=''):
     """Withdraw a fact: a confirmed tombstone; the agents stop using it and its history stays."""
     require(user,'confirm_memory')
-    key=_normal_key(key)
-    if key not in known_keys():raise Conflict('Ese dato no está en la memoria confirmada.')
-    memory.set_fact(key,{'retirado':True,'motivo':(reason or '').strip()[:500]},f'user:{user.pk}','Gustavo retiró el dato en la Bandeja')
+    key=_normal_key(key);member=miembros.member_for(user)
+    if key not in known_keys(member):raise Conflict('Ese dato no está en la memoria confirmada.')
+    hechos.set_fact(member,key,{'retirado':True,'motivo':(reason or '').strip()[:500]},f'user:{user.pk}','Gustavo retiró el dato en la Bandeja')
     audit(user,'memory.retired',key)
 
-def recently_resolved(days=7):
+def recently_resolved(days=7,member=None):
     since=timezone.now()-timedelta(days=days)
     labels={'answered':'Respondida','declined':'No quisiste compartirla'}
     return [{'kind':'question','id':str(q.id),'title':q.question,'agent':q.agent,'at':q.answered_at,'how':labels[q.state]}
-            for q in TeamQuestion.objects.filter(state__in=['answered','declined'],answered_at__gte=since).order_by('-answered_at')]
+            for q in miembros.own(TeamQuestion.objects.filter(state__in=['answered','declined'],answered_at__gte=since),member).order_by('-answered_at')]

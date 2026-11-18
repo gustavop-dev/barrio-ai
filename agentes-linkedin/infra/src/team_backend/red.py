@@ -500,8 +500,8 @@ def discover(user,account,now=None):
     now=now or timezone.now()
     if projectapp.enabled():  # BAR-25: the searches by audience follow the class 08 methodology «con_quien»
         units=operador.REFERENTS_UNITS+[u for u in operador.WHO_UNITS if u not in operador.REFERENTS_UNITS]
-        _,grounding=operador.role_context('investigador',units,metodologia='con_quien')
-    else:_,grounding=operador.role_context('investigador',operador.REFERENTS_UNITS)
+        _,grounding=operador.role_context('investigador',units,metodologia='con_quien',account=account)
+    else:_,grounding=operador.role_context('investigador',operador.REFERENTS_UNITS,account=account)
     summary={'posts':0,'searches':0,'new':0,'skipped':0,'stopped':'',**grounding}
     room=discovery_room(account)
     if room<=0:
@@ -882,7 +882,7 @@ def classify(user,account,now=None,batch=10):
 def _classify_batch(user,account,now,batch):
     pending=list(Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).order_by('discovered_at')[:batch])
     units,methodology=classify_units()
-    context,grounding=operador.role_context('clasificador',units,metodologia=methodology)
+    context,grounding=operador.role_context('clasificador',units,metodologia=methodology,account=account)
     if grounding['course_missing']:return {'classified':0,'fit':0,'stopped':'Biblioteca no disponible',**grounding}
     contacts=_enrich(account,pending)
     if not contacts:return {'classified':0,'fit':0,'stopped':'Sin perfiles legibles hoy; se clasifican mañana.' if pending else '',**grounding}
@@ -1256,7 +1256,7 @@ def invites_blocked(now=None,member=None):
 
 def _propose(user,contact,capability,payload,grounding=None):
     reason=contact.classification.get('reason') or ''
-    if grounding is None:_,grounding=operador.role_context('relaciones',NETWORK_UNITS)
+    if grounding is None:_,grounding=operador.role_context('relaciones',NETWORK_UNITS,account=contact.account)
     try:
         proposal=operador.create_proposal(user,None,capability,payload,rationale=reason,source='agent',
                                           model=contact.classification.get('model') or '',contact=contact,
@@ -1354,7 +1354,7 @@ def plan(user,account,now=None):
     now=now or timezone.now()
     review_health(account,now)
     account.refresh_from_db()
-    _,grounding=operador.role_context('relaciones',NETWORK_UNITS)
+    _,grounding=operador.role_context('relaciones',NETWORK_UNITS,account=account)
     summary={'follow':0,'invite':0,'accept':0,**grounding,'distribution':[]}
     summary['rhythm']=weekly_rhythm(now,member=member)
     for row in BARRIO_TABLE:

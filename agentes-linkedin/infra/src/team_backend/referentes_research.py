@@ -72,7 +72,7 @@ SCOPES = {
 
 
 def context(account):
-    course, grounding = operador.role_context('investigador_lider', operador.REFERENTS_UNITS)
+    course, grounding = operador.role_context('investigador_lider', operador.REFERENTS_UNITS, account=account)
     ident = identidad.of_account(account)
     facts, private = identidad.facts(ident)
     orientation = identidad.orientation(ident)

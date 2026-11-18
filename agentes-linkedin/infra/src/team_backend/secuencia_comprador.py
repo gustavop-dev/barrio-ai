@@ -209,18 +209,18 @@ def repeats(text,earlier):
         if any(' '.join(words[i:i+REPEAT_RUN]) in runs for i in range(len(words)-REPEAT_RUN+1)):return True
     return False
 
-def text_issues(number,text,previous=(),reference=''):
+def text_issues(number,text,previous=(),reference='',member=None):
     """The fixed rules of follow-up `number` (BIB-09-secuencia-mensajes), checked in code before the lead: the first
     message's (respuestas.dm_text_issues: three lines and 500 characters, no links, no selling, no asking for minutes or
     a meeting, no formulas, her language, no private leaks, no invented experience) and, per number: M2 does not say an
     earlier message again and does not apologise; M3 asks whether she is the right person or who handles it; M4 asks
-    for nothing and does not beg. `previous`: the texts already sent to her. Reads only Gustavo's public and private
-    blocks (guardas.blocks, through the first message's rules)."""
+    for nothing and does not beg. `previous`: the texts already sent to her. Reads only the public and private blocks of
+    `member`, the owner of the account (guardas.text_checks, through the first message's rules)."""
     text=(text or '').strip()
     if not text:return []
     from .respuestas import dm_text_issues
     label=f'Mensaje {number}'
-    issues=[i.replace('Primer mensaje',label) for i in dm_text_issues(text,reference)]
+    issues=[i.replace('Primer mensaje',label) for i in dm_text_issues(text,reference,member)]
     earlier=[previous] if isinstance(previous,str) else list(previous or ())
     if repeats(text,earlier):issues.append(f'{label} que repite un mensaje anterior (el mismo dolor va contado de otra forma)')
     if number==2 and APOLOGY.search(text):issues.append('Mensaje 2 que se disculpa por escribir de nuevo')

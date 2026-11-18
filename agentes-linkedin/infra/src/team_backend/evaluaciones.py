@@ -45,7 +45,7 @@ from knowledge import db, memory, presupuesto, providers
 from knowledge.clases import METODOLOGIAS_ACTIVAS, legible_por_agentes
 from knowledge.config import live
 from knowledge.ingest import ENC
-from . import autopiloto, catalogo, compuertas, editorial, guardas, identidad, lider, operador, orientacion, red
+from . import autopiloto, catalogo, compuertas, editorial, guardas, hechos, identidad, lider, miembros, operador, orientacion, red
 from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, LibraryCatalog, PostMetric
 
 GO_LIVE=date(2026,11,6)  # the machine went live in production
@@ -358,10 +358,11 @@ class Run:
         self.since=datetime.combine(since or GO_LIVE,time(),tzinfo=operador.local_tz())
         self.limit=limit;self.execute=execute;self.max_usd=max_usd;self.lead=lead
         self.spent=Decimal(0);self.spend={};self.stopped='';self._units={}
-        self.public,self.private=guardas.blocks()  # editorial and the classifier read these
-        self.comment_facts,self.comment_guidance=memory.confirmed_blocks()  # propose_comment reads these
-        self.orientation=orientacion.text()
-        self.identity=identidad.of()  # whose prompts the requests are written with (the request builders read no member)
+        member=harness_member()  # the harness replays the first member's history, with her memory only
+        self.public,self.private=guardas.blocks(member)  # editorial and the classifier read these
+        self.comment_facts,self.comment_guidance=memory.confirmed_blocks(hechos.scope(member))  # propose_comment reads these
+        self.orientation=orientacion.text(member)
+        self.identity=identidad.of(member)  # whose prompts the requests are written with (the request builders read no member)
 
     def pieces(self):
         return EditorialPiece.objects.filter(created_at__gte=self.since).order_by('-created_at')
@@ -1346,7 +1347,16 @@ def case_methodology(role):
 def course_case_context(role):
     """The case's units as its role loads them; an activated outbound methodology unlocks only its own units."""
     case=COURSE_CASES[role]
-    return operador.role_context(role,case['units'],metodologia=case_methodology(role))
+    return operador.role_context(role,case['units'],metodologia=case_methodology(role),member=harness_member())
+
+
+def harness_member():
+    """The evaluation harness is the first member's (organizaciones, phase 4): it replays Gustavo's decisions since the
+    machine went live (GO_LIVE), so it reads his memory, orientation and identity, never another member's. None without
+    members."""
+    from .models import Member
+    first=miembros.first_member_id()
+    return Member.objects.select_related('organization','user').get(pk=first) if first else None
 
 
 def corpus_fingerprint():

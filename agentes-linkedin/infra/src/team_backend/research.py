@@ -132,7 +132,7 @@ def capture_question(capture):
     question=safe_question(data.get('research_question')) if requested and data.get('research_public') is True else ''
     if question:
         from .guardas import blocks, private_leaks
-        if private_leaks(question,blocks()[1]):question=''
+        if private_leaks(question,blocks(capture.member)[1]):question=''  # her guidance (organizaciones, phase 4)''
     return requested,question
 
 

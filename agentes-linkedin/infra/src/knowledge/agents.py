@@ -24,7 +24,7 @@ hipótesis, información pendiente y siguiente paso. Si falta evidencia, indíca
 No afirmes que una respuesta fue revisada por humanos. Las citas deben proceder del contexto.
 '''
 
-def context(task,agent,mode='lexical',token_budget=16000):
+def context(task,agent,mode='lexical',token_budget=16000,memory_scope=''):
     found=search(task,agent,limit=6,mode=mode)
     ids=[r['id'] for r in found['results']]
     # Keep the strongest semantic evidence in the bounded context even when
@@ -45,10 +45,11 @@ def context(task,agent,mode='lexical',token_budget=16000):
         if tokens+n>token_budget:omitted.append(uid);continue
         chosen.append(entry);tokens+=n
     return {'retrieval':found,'units':chosen,'omitted_for_budget':omitted,'context_tokens':tokens,
-            'confirmed_user_memory':memory.latest(True),
+            # Only one member's confirmed memory (team_backend/hechos.scope; '' the keys of before, the first member's).
+            'confirmed_user_memory':memory.latest(True,memory_scope),
             'review':'Contexto técnico con unidades originales; revisión humana pendiente.'}
 
-def run(agent,task,execute=False,mode='lexical',request_id=None):
+def run(agent,task,execute=False,mode='lexical',request_id=None,memory_scope=''):
     if agent not in AGENTS:raise ValueError('Agente desconocido')
     rid=str(uuid.UUID(request_id)) if request_id else str(uuid.uuid4())
     identity={'agent':agent,'task':task,'execute':execute,'mode':mode}
@@ -60,7 +61,7 @@ def run(agent,task,execute=False,mode='lexical',request_id=None):
             if existing['payload'].get('request')!=identity:raise ValueError('request_id ya pertenece a otra solicitud')
             return existing
     try:
-        ctx=context(task,agent,mode)
+        ctx=context(task,agent,mode,memory_scope=memory_scope)
         payload={'request':identity,'context':ctx,'human_review':False}
         status='preview'
         if execute:

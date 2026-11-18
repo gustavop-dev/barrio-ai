@@ -32,14 +32,32 @@ EXPERIENCE=re.compile(r"\b(?:I|we)(?:'ve| have)?\s+(?:built|shipped|led|launched
                       r"migramos|escalamos|fundamos|contratamos|desplegamos|reescribimos|entregamos)\b|"
                       r"\b(?:mis|mi|nuestr[oa]s?)\s+(?:clientes?|equipo|startup|empresa|agencia|proyectos?|producto)\b",re.I)
 
-def blocks():
-    """(public_facts, private_guidance): confirmed memory, the brief's private orientation and Gustavo's current
-    orientation, so the leak checks also protect what he tells the team."""
-    from knowledge import memory
+def blocks(member=None):
+    """(public_facts, private_guidance) of one member (organizaciones, phase 4): her confirmed memory and her organization's
+    company facts (hechos.confirmed_blocks), the brief's private orientation when she is the installation's first person
+    (BASELINE_GUIDANCE is Gustavo's brief) and her current orientation, so the leak checks also protect what she tells the
+    team. Never another member's. `member=None`: the default member (MiembroRequerido among several active ones)."""
+    from . import hechos, miembros
     from .orientacion import text
-    public,private=memory.confirmed_blocks()
-    current=text()
-    return public,private+BASELINE_GUIDANCE+([{'key':'orientacion','guidance':current}] if current else [])
+    member=miembros.resolve(member)
+    public,private=hechos.confirmed_blocks(member)
+    current=text(member)
+    baseline=BASELINE_GUIDANCE if miembros.is_first(member) else []
+    return public,private+baseline+([{'key':'orientacion','guidance':current}] if current else [])
+
+def text_checks(text,member=None,experience=True):
+    """private_leaks and invented_experience of a text written in one member's name, against HER blocks and naming her
+    (organizaciones, phase 4): never another member's facts or guidance. `member=None`: the default member's blocks
+    (MiembroRequerido among several active ones) and the name of always (OWNER): a check that is not told whose text it
+    is reads no identity."""
+    public,private=blocks(member)
+    if member is None:
+        name=OWNER
+    else:
+        from . import identidad
+        name=identidad.of(member).name
+    reasons=private_leaks(text,private,name)
+    return reasons+invented_experience(text,public,name) if experience else reasons
 
 def _words(value):
     raw=value if isinstance(value,str) else json.dumps(value,ensure_ascii=False)
@@ -49,10 +67,12 @@ def _shingles(value,n=6):
     words=_words(value)
     return {' '.join(words[i:i+n]) for i in range(len(words)-n+1)}
 
-def private_leaks(text,private_guidance=()):
-    """Reasons why `text` would expose private guidance; empty when it does not."""
+OWNER='Gustavo'  # the name the reasons used before organizations; callers pass the member's (identidad.of(...).name)
+
+def private_leaks(text,private_guidance=(),name=OWNER):
+    """Reasons why `text` would expose private guidance; empty when it does not. `name`: whose guidance, for the reason."""
     reasons=[]
-    if PRIVATE.search(text or ''):reasons.append('Deja traslucir orientación privada de Gustavo (prioridades, segmento o condiciones)')
+    if PRIVATE.search(text or ''):reasons.append(f'Deja traslucir orientación privada de {name} (prioridades, segmento o condiciones)')
     shingles=_shingles(text or '')
     for item in private_guidance:
         if shingles & _shingles(item.get('guidance','')):
@@ -111,7 +131,7 @@ def experience_claims(text):
         if match:claims.append((sentence.strip(),match.group(0)))
     return claims
 
-def invented_experience(text,public_facts):
+def invented_experience(text,public_facts,name=OWNER):
     """Reasons why `text` attributes experience to Gustavo that his confirmed public facts do not support.
     With no public facts, any first-person experience is invented. With facts, each claim (the sentence around the
     trigger) is compared with them and flagged only when nothing backs it: a number about his work that no fact
@@ -119,15 +139,15 @@ def invented_experience(text,public_facts):
     enough, and having a team, company or clients counts as one family): the verifier stays the main judge."""
     claims=experience_claims(text)
     if not public_facts:
-        return [f'Atribuye experiencia a Gustavo sin hechos públicos confirmados («{trigger}»)' for _,trigger in claims[:MAX_CLAIMS]]
+        return [f'Atribuye experiencia a {name} sin hechos públicos confirmados («{trigger}»)' for _,trigger in claims[:MAX_CLAIMS]]
     facts=' '.join(_fact_text(f) for f in public_facts)
     known_words,known_numbers=_evidence(facts),_numbers(facts)
     reasons=[]
     for sentence,trigger in claims:
         quote=sentence if len(sentence)<=160 else sentence[:157]+'...'
         numbers=_numbers(sentence);figures=sorted(numbers-known_numbers)
-        if figures:reasons.append(f'Cifra sobre el trabajo de Gustavo que no consta en sus hechos públicos («{figures[0]}» en «{quote}»)')
+        if figures:reasons.append(f'Cifra sobre el trabajo de {name} que no consta en sus hechos públicos («{figures[0]}» en «{quote}»)')
         elif not (_evidence(sentence)&known_words or numbers&known_numbers):
-            reasons.append(f'Atribuye a Gustavo una experiencia que no consta en sus hechos públicos («{quote}»)')
+            reasons.append(f'Atribuye a {name} una experiencia que no consta en sus hechos públicos («{quote}»)')
         if len(reasons)>=MAX_CLAIMS:break
     return reasons
