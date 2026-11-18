@@ -340,8 +340,13 @@ def miembro(request):
 def obtener(request, model, **lookup):
     """One object of the request's member (a model or a queryset), or 404: another member's id looks like one that
     does not exist."""
-    rows = model if hasattr(model, 'model') else model.objects.all()
-    found = de(rows.filter(**lookup), miembro(request)).first()
+    from django.core.exceptions import ValidationError
+    from django.db.models import QuerySet
+    rows = model if isinstance(model, QuerySet) else model.objects.all()
+    try:
+        found = de(rows.filter(**lookup), miembro(request)).first()
+    except ValidationError:  # a malformed id is a missing object too
+        found = None
     if found is None:
         raise NotFound()
     return found
@@ -351,12 +356,8 @@ def cuenta(request, account_id):
     """The account `account_id` if it is hers, else 404; None when no id was given."""
     if not account_id:
         return None
-    from django.core.exceptions import ValidationError
     from .models import ConnectorAccount
-    try:
-        return obtener(request, ConnectorAccount, pk=account_id)
-    except ValidationError:  # a malformed uuid is a missing account too
-        raise NotFound() from None
+    return obtener(request, ConnectorAccount, pk=account_id)
 
 
 def solo_administrador(request):
