@@ -404,6 +404,14 @@ class QuienSoyTests(DosMiembrosAlcanceBase):
         self.assertEqual((his['member']['display_name'], his['is_admin'], his['members']), ('Gustavo', True, 2))
         self.assertIn(APIClient().get('/api/v1/yo').status_code, (401, 403))
 
+    def test_a_buyers_signal_names_the_member_whose_buyer_it_is(self):
+        """Catch «Comentó en un post de Gustavo» on the CTO's buyer: the stored value is the same, its name is hers;
+        his stays the label of always."""
+        from team_backend import comprador
+        self.assertEqual(comprador.signal_name('comento_post', self.cto.reader), 'Comentó en un post de CTO de prueba')
+        self.assertEqual(comprador.signal_name('nos_siguio', self.cto.reader), 'Siguió a CTO de prueba')
+        self.assertEqual(comprador.signal_name('comento_post', self.g.reader), 'Comentó en un post de Gustavo')
+
 
 class AvisosTests(DosMiembrosAlcanceBase):
     """Each notice is someone's: hers goes to her devices only, the organization's to everyone with each one's own

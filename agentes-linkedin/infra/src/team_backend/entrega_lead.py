@@ -56,7 +56,7 @@ def _entry(journey,state):
     first=signals[0] if signals else None
     return {'entrada':journey.entry,'ruta':journey.route,'elegida':_iso(journey.chosen_at),
             'motivo':_short((contact.classification or {}).get('reason',''),300),
-            'senal':{'tipo':first.kind,'nombre':Kind(first.kind).label,'fecha':_iso(first.at)} if first else None}
+            'senal':{'tipo':first.kind,'nombre':comprador.signal_name(first.kind,contact.account),'fecha':_iso(first.at)} if first else None}
 
 def _touches(state,touches):
     counts={}

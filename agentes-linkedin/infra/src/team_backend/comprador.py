@@ -32,6 +32,16 @@ log=logging.getLogger(__name__)
 Step=BuyerJourney.Step;Kind=BuyerTouch.Kind;Direction=BuyerTouch.Direction;Source=BuyerTouch.Source
 RestReason=BuyerJourney.RestReason;ExitReason=BuyerJourney.ExitReason;Route=BuyerJourney.Route
 
+def signal_name(kind,account):
+    """How a signal is named to the member whose buyer it is: the label of always («Comentó en un post de Gustavo») for
+    the first member and without members; another member's own name instead (organizaciones, phase 5). The stored
+    value never changes: «gustavo» in values and labels is «the member who owns it»."""
+    from . import miembros
+    label=Kind(kind).label
+    member=miembros.member_of_account(account) if account is not None else None
+    if member is None or miembros.is_first(member):return label
+    return label.replace('Gustavo',member.display_name)
+
 # The active steps in order; «descanso» and «salio» stand apart from them.
 STEPS=[Step.CHOSEN,Step.WARMING,Step.INVITED,Step.ACCEPTED,Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4,
        Step.REPLIED,Step.INTERESTED,Step.MEETING]
@@ -712,7 +722,7 @@ def temperature(person,now=None,weigh=None):
                for f in facts(contact) if DIRECTION[f['kind']]==IN]
         invited=contact.invited_at
     found.sort(key=lambda s:s[0],reverse=True)
-    signals=[{'tipo':kind,'nombre':Kind(kind).label,'at':at.isoformat(),'dias':round((now-at).total_seconds()/86400,1),
+    signals=[{'tipo':kind,'nombre':signal_name(kind,contact.account),'at':at.isoformat(),'dias':round((now-at).total_seconds()/86400,1),
               'antes_de_invitar':not invited or at<invited,'detalle':detail,'ref':refs} for at,kind,detail,refs in found]
     by_kind={}
     for s in signals:by_kind[s['tipo']]=by_kind.get(s['tipo'],0)+1
