@@ -15,6 +15,7 @@ come only from LinkedIn reads: profiles and companies Gustavo names, people sear
 service, and contacts already known; a free headline prefilter drops who clearly sells something else before any read
 is spent. The web research only looks for evidence about the candidates that passed the measurable criteria, and the
 selection model only writes claims that the code then checks against the cited sources."""
+import functools
 from contextlib import contextmanager
 from contextvars import ContextVar
 from copy import deepcopy
@@ -979,13 +980,18 @@ def funnel(linkedin, discarded, evaluated):
     return out, line
 
 
+def for_job_account(func):
+    """An industry search runs for the member of the job's account (for_account). A decorator, so the search's body (and
+    what it pays with) stays in `run`, where tests/test_grafo_propositos reads each edge's purposes from the source."""
+    @functools.wraps(func)
+    def wrapper(job):
+        with for_account(ConnectorAccount.objects.get(pk=job.params['account'])):
+            return func(job)
+    return wrapper
+
+
+@for_job_account
 def run(job):
-    """The industry search for the member of the job's account (for_account): see _run."""
-    with for_account(ConnectorAccount.objects.get(pk=job.params['account'])):
-        return _run(job)
-
-
-def _run(job):
     """The industry search, as review_referents with params[industria]. Mirrors referentes_research.run: the review
     row is created first, the cycle checkpoints every paid call, and a failure leaves an incomplete review, never a
     repeated payment. A later attempt of the month (params.intento) is its own review row, ledger and research keys,

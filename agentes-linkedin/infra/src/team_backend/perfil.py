@@ -306,13 +306,20 @@ def proposal_state(sections,mode):
     return 'partial' if incomplete else 'ready'
 
 
-def run(job,**kwargs):
-    """prepare_profile job: her profile (organizaciones, phase 4), written with its owner's identity throughout."""
-    proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
-    with content.brand.owner(identity_of(proposal)):
-        return _run(job,**kwargs)
+def as_owner(func):
+    """A profile job runs with its owner's identity throughout (perfil_marca.owner; organizaciones, phase 4: the profile is
+    hers). A decorator, so the job's body (and what it pays with) stays in `run`, where tests/test_grafo_propositos reads
+    each edge's purposes from the source."""
+    @functools.wraps(func)
+    def wrapper(job,**kwargs):
+        proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
+        with content.brand.owner(identity_of(proposal)):
+            return func(job,**kwargs)
+    return wrapper
 
-def _run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
+@as_owner
+def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
+    """prepare_profile job: her profile (organizaciones, phase 4), written with its owner's identity throughout (as_owner)."""
     proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
     if proposal.state in ('cancelled','superseded','ready','partial') or proposal.version!=job.params['version']:return proposal
     runtime=orquestacion.Runtime.open('perfil_periodico',str(proposal.id),job.owner,job,

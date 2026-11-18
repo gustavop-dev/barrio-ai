@@ -123,8 +123,10 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
         outcomes,order=self.run_case()
         grade=evaluaciones.grade_projectapp_case(outcomes,order)
         self.assertEqual((grade['errors'],grade['right']),(BASELINE_ERRORS,'2/8'),(outcomes,order))
-        # The buyers of a traditional company go by the score of a startup buyer: the 5-person business ties the academy.
-        self.assertEqual(order,['P1','P4','P2','P3'])
+        # The buyers of a traditional company go by the score of a startup buyer: the 5-person business ties the academy
+        # (both 59, asserted below), so which of the two goes third is the tie-break's (discovery date, then id), not the case's.
+        self.assertEqual(order[:2],['P1','P4'])
+        self.assertEqual(sorted(order[2:]),['P2','P3'])
         self.assertEqual({v:outcomes[v]['score'] for v in ('P1','P2','P3','P4','P7')},{'P1':82,'P2':59,'P3':59,'P4':70,'P7':99})
 
     def test_despues_with_the_switch_on_every_person_goes_where_gustavo_said(self):

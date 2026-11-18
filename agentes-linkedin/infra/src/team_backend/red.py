@@ -1388,7 +1388,7 @@ def plan(user,account,now=None):
         # Phase 2: a buyer with a journey waits for the warm-up (calentamiento.invite_ready); everyone else as before.
         followed=(calentamiento.invitable(followed,now) if warmup else
                   followed.filter(Q(followed_at__lte=now-invite_after())|Q(source=Contact.Source.OWN_POST)))
-        candidates=list(followed.order_by('-classification__confidence','followed_at'))
+        candidates=list(followed.order_by('-classification__confidence','followed_at','discovered_at','id'))  # equals never dance
         candidates=diverse_candidates(candidates)
         # Whoever answered a follow (desenlaces RED-01: accepted, commented, replied, invited us) goes first among the
         # eligible; the order inside each group stays. Context for the order, never a new proposal or more volume.
@@ -1438,7 +1438,7 @@ def plan(user,account,now=None):
         # Leaders are followed too (their posts are where the team comments); only invitations leave them out.
         # Phase 5: a bridge whose buyer left the journey is not followed (no bridge exists with the switch off).
         for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).exclude(bridge_for__step='salio')
-                                   .order_by('discovered_at')):
+                                   .order_by('discovered_at','id')):
             if room(RED.FOLLOW)<=0:break
             summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id},grounding))
     if autonomy(RED.ACCEPT,member)!='off':
@@ -1485,7 +1485,9 @@ def prioritized(contacts):
     """The United States, then Latin America, then the rest (ubicacion.rank); in each, buyers first: those in the target
     market or with business there before the others; then the buyer's priority (nivel_comprador.priority: the score says
     who the person is, the temperature what she did back; the temperature only with BUYER_WARMUP_ENABLED, through
-    calentamiento.heats); the rest of the community, and ties, by the classifier's confidence."""
+    calentamiento.heats); the rest of the community, and ties, by the classifier's confidence. A sort that keeps the order
+    it is given (stable): whoever is still tied keeps the order of the query that read them, which ends with the discovery
+    date and then the id (plan), so two people with the same score come out in the same order every time."""
     from . import calentamiento
     targets=[c for c in contacts if outbound_target(c)]
     heat=calentamiento.heats([c for c in targets if c.classification.get('role')=='comprador']) if calentamiento.enabled() and targets else {}
