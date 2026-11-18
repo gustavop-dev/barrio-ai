@@ -117,6 +117,14 @@ describe('Tu turno', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/operador/actions/a-1/approve')[0]?.body).toEqual({ expected_hash: 'a'.repeat(64) }));
     expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
     expect(server.find('POST', '/api/v1/operador/actions/a-1/reject')).toHaveLength(0);
+    expect(screen.queryByText('Voz provisional')).toBeNull();
+  });
+
+  it('marks a draft written in her provisional voice (organizations, phase 5)', async () => {
+    const provisional = { ...APPROVAL_CARD, approval: { ...APPROVAL_CARD.approval!, provisional_voice: true } };
+    await renderTurno(turno({ items: [provisional], count: 1, critical: false }));
+    expect(await screen.findByText('¿Apruebas seguir a Laura Prueba?')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('turno-card-approval:a-1')).getByText('Voz provisional')).toBeOnTheScreen();
   });
 
   it('shows a conversation as its title and her message in two lines; «Ver más» opens why it matters', async () => {

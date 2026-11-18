@@ -165,8 +165,17 @@ describe('Tu turno · Pendiente', () => {
     expect(view.getByTestId('suggested-message')).toHaveTextContent(MESSAGE_CARD.message!.text);
     expect(view.getByRole('button', { name: 'Copiar' })).toBeInTheDocument();
     expect(view.getByText('La app nunca envía mensajes: lo envías tú desde LinkedIn.')).toBeInTheDocument();
+    expect(view.queryByText('Voz provisional')).not.toBeInTheDocument();
     await userEvent.click(view.getByRole('button', { name: 'Hecho, le escribí' }));
     await waitFor(() => expect(api.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
+  });
+
+  it('marks a draft written in her provisional voice (organizations, phase 5)', async () => {
+    const provisional = { ...MESSAGE_CARD, message: { ...MESSAGE_CARD.message!, provisional_voice: true } };
+    server(busyTurno({ items: [provisional], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [], mensajes: [provisional] } }));
+    renderApp('/tu-turno');
+    const card = await cardTitled('Marta Ejemplo aceptó tu invitación');
+    expect(within(card).getByText('Voz provisional')).toBeInTheDocument();
   });
 
   it('labels the first message of a buyer who accepted by the fact it cites, not as a comment on his post', async () => {

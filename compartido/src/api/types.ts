@@ -18,6 +18,27 @@ export interface Session {
   user: User | null;
 }
 
+/**
+ * GET /api/v1/yo, «quién soy» (organizaciones, phase 5): who the signed-in person is. The apps name people with it,
+ * never with a fixed name. `member` is null for a user who is not a member (and in an installation without members).
+ */
+export interface Yo {
+  username: string;
+  member: { id: string; display_name: string; role: string; active: boolean; is_admin: boolean; first: boolean } | null;
+  organization: { id: string; name: string; slug: string } | null;
+  is_admin: boolean;
+  /** The team writes with her provisional voice: her drafts carry `provisional_voice`. */
+  provisional_voice: boolean;
+  /** Active members of her organization. */
+  members: number;
+}
+
+/** A member as an opportunity names her (`registered_by`, `brought_by`). */
+export interface MemberRef {
+  id: string;
+  display_name: string;
+}
+
 // ---------------------------------------------------------------- native app (device token, Expo push)
 
 /** A device signed in with a token (the native app): GET /api/v1/auth/dispositivos and Ajustes › `devices`. */
@@ -465,6 +486,8 @@ export interface ContactOpportunity {
 }
 
 export interface ContactNextStep {
+  /** 'gustavo' is the API's historical value for «the member who reads it» (organizations, phase 5): every member only
+   * sees her own contacts, so it always means «tú» and the apps never show it as a name. Kept to not break the wire. */
   owner: 'equipo' | 'gustavo' | null;
   text: string;
   at: string | null;
@@ -1014,6 +1037,8 @@ export interface TurnoMessage {
    */
   text_label?: string;
   origin?: 'recorrido';
+  /** Written in her provisional voice (organizaciones, phase 5): the apps show «Voz provisional». Absent otherwise. */
+  provisional_voice?: boolean;
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
 }
 
@@ -1071,6 +1096,8 @@ export interface TurnoApproval {
   network: boolean;
   /** When it stops waiting (the piece's hour, or the proposal's TTL). */
   expires_at: string | null;
+  /** Written in her provisional voice (organizaciones, phase 5): the apps show «Voz provisional». Absent otherwise. */
+  provisional_voice?: boolean;
 }
 
 export interface TurnoCard {
@@ -1465,6 +1492,12 @@ export interface Opportunity {
   updated_at: string;
   stage_changed_at: string;
   closed_at: string | null;
+  /**
+   * The funnel is the organization's (organizaciones, phase 5): with several members, who registered it and whose person
+   * it came from. Absent with one member. `contact` is null when the person is another member's.
+   */
+  registered_by?: MemberRef | null;
+  brought_by?: MemberRef | null;
 }
 
 /** POST needs `modality` and `contact` or `person_name`; PATCH accepts any field. */

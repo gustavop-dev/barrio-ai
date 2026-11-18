@@ -51,6 +51,7 @@ import type {
   Unit,
   User,
   WeeklySummaries,
+  Yo,
   WeeklySummaryDecision,
   WeeklySummaryGenerateResponse,
 } from './types';
@@ -138,6 +139,8 @@ export const overridePiece = (pieceId: string, requestId?: string, note = '') =>
 
 // ---------------------------------------------------------------- official LinkedIn
 export const getLinkedInStatus = () => api.get<LinkedInStatus>('/api/v1/linkedin/status');
+/** «Quién soy» (organizaciones, phase 5): her member, role and organization. */
+export const getYo = () => api.get<Yo>('/api/v1/yo');
 /** Opened with a full navigation (never fetch): Django redirects to LinkedIn and back to /ajustes. */
 export const LINKEDIN_OAUTH_START = '/api/v1/linkedin/oauth/start';
 

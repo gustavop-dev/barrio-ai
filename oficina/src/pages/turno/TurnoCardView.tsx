@@ -11,7 +11,7 @@ import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, CopyBut
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
 import { messageText } from '../personas/ConversationBlock';
 import { OportunidadForm } from '../personas/OportunidadForm';
-import { createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from './model';
+import { createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL, PROVISIONAL_VOICE_LABEL, provisionalVoice } from './model';
 import { QuestionForm } from './QuestionForm';
 import type { ObserveCard } from './useSeenCards';
 
@@ -449,6 +449,7 @@ export function TurnoCardView({ card, priority, isNew = false, observe }: TurnoC
           {priority === 'importante' ? <Badge tone="warn">{PRIORITY_LABEL.importante}</Badge> : null}
           {priority === 'cuando_puedas' ? <Badge tone="info">{PRIORITY_LABEL.cuando_puedas}</Badge> : null}
           {expired ? <Badge tone="muted">Caducada</Badge> : null}
+          {provisionalVoice(card) ? <Badge tone="info">{PROVISIONAL_VOICE_LABEL}</Badge> : null}
         </span>
       </div>
       {deadline ? <p className={deadline.soon ? 'turno-deadline soon' : 'turno-deadline'}>{deadline.text}</p> : null}

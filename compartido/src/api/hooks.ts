@@ -27,6 +27,7 @@ import {
   getContact,
   getFeed,
   getLinkedInStatus,
+  getYo,
   getOrientacion,
   getOverview,
   getPiece,
@@ -130,6 +131,11 @@ export function useContacts(stage: ContactStage | '', page: number) {
 
 export function useContact(contactId: string) {
   return useQuery({ queryKey: keys.contact(contactId), queryFn: () => getContact(contactId), enabled: Boolean(contactId), refetchInterval: REFRESH.personas });
+}
+
+/** «Quién soy»: her member and organization (organizaciones, phase 5). Changes only with the session. */
+export function useYo() {
+  return useQuery({ queryKey: keys.yo, queryFn: getYo, staleTime: 5 * 60_000 });
 }
 
 export function useLinkedInStatus() {

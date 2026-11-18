@@ -4,7 +4,9 @@ import type { PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
 import type { AccountCanary, AccountLogin, Ajustes, Overview, RedSummary } from '../api/types';
 import { padHour } from './format';
-import { canaryLine, capLines, connectLabel, loginActive, loginLine, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
+import { canaryLine, capLines, connectLabel, loginActive, loginLine, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, sessionLabel, spacingLabel, spendLine, spendRows } from './ajustes';
+import { PROVISIONAL_VOICE_LABEL, provisionalVoice } from './turno';
+import type { TurnoCard } from '../api/types';
 import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
 import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
 
@@ -167,5 +169,32 @@ describe('Galería', () => {
     expect(rejectedMessage([])).toBeNull();
     expect(isFiltro('elegidas')).toBe(true);
     expect(isFiltro(undefined)).toBe(false);
+  });
+});
+
+describe('Quién soy (organizaciones, fase 5)', () => {
+  const yo = {
+    username: 'ana',
+    member: { id: 'm2', display_name: 'Ana Pérez', role: 'CTO', active: true, is_admin: false, first: false },
+    organization: { id: 'o1', name: 'ProjectApp', slug: 'projectapp' },
+    is_admin: false,
+    provisional_voice: true,
+    members: 2,
+  };
+
+  it('names her member, role and organization, and the username without a member or before /yo answers', () => {
+    expect(sessionLabel('ana', yo)).toBe('Has entrado como Ana Pérez (CTO) · ProjectApp.');
+    expect(sessionLabel('ana', { ...yo, member: { ...yo.member, role: '' }, organization: null })).toBe('Has entrado como Ana Pérez.');
+    expect(sessionLabel('servicio', { ...yo, member: null })).toBe('Has entrado como servicio.');
+    expect(sessionLabel('gustavo', undefined)).toBe('Has entrado como gustavo.');
+  });
+
+  it('marks a draft written in her provisional voice, and nothing else', () => {
+    const card = (extra: Partial<TurnoCard>) => ({ id: 'x', type: 'aprobacion', ...extra }) as unknown as TurnoCard;
+    expect(provisionalVoice(card({ approval: { provisional_voice: true } as TurnoCard['approval'] }))).toBe(true);
+    expect(provisionalVoice(card({ message: { provisional_voice: true } as TurnoCard['message'] }))).toBe(true);
+    expect(provisionalVoice(card({ approval: { proposal_id: 'p' } as TurnoCard['approval'] }))).toBe(false);
+    expect(provisionalVoice(card({}))).toBe(false);
+    expect(PROVISIONAL_VOICE_LABEL).toBe('Voz provisional');
   });
 });

@@ -2,6 +2,7 @@
 // of a conversation, the opportunity form and the referents.
 import { contactFixture, conversationFixture, opportunityFixture, redSummaryFixture, referentFixture } from '../fixtures/personas';
 import {
+  broughtByText,
   leadDoubtText,
   nextActionText,
   nextStepView,
@@ -123,5 +124,15 @@ describe('Personas rules', () => {
     const now = Date.parse('2026-11-07T15:00:00Z');
     expect(referentMeta(referentFixture('r-1', { last_observed_at: '2026-10-26T10:00:00Z', contacts_count: 1 }), now)).toBe('Observado hace 12 días · 1 persona del barrio salió de sus posts');
     expect(referentMeta(referentFixture('r-1', { contacts_count: 0 }), now)).toBe('Aún sin observar · 0 personas del barrio salieron de sus posts');
+  });
+});
+
+describe('Who brought the opportunity (organizations, phase 5)', () => {
+  it('names the member whose contact it came from', () => {
+    expect(broughtByText({ brought_by: { id: 'm-2', display_name: 'Laura' } })).toBe('Trajo: Laura');
+  });
+
+  it.each([undefined, null, { id: 'm-1', display_name: '  ' }])('says nothing with one member or no name (%p)', (brought_by) => {
+    expect(broughtByText({ brought_by })).toBe('');
   });
 });

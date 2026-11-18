@@ -6,7 +6,7 @@ import type { Opportunity, OpportunityStage } from '../../api/types';
 import { OPPORTUNITY_STAGES } from '../../api/types';
 import { IconChevronDown, IconPlus } from '../../components/icons';
 import { Avatar, Badge, Button, EmptyState, ErrorRetry, Skeleton, useToast } from '../../components/ui';
-import { nextActionText, undoFailedToast } from '../../../../compartido/src/logic/barrio';
+import { broughtByText, nextActionText, undoFailedToast } from '../../../../compartido/src/logic/barrio';
 import { OPPORTUNITY_BOARD_KEY, useOpportunityBoard } from './api';
 import { BOARD_STAGES, daysInStage, longDate, MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from './labels';
 import { OportunidadForm } from './OportunidadForm';
@@ -35,6 +35,7 @@ interface CardProps {
 
 function OpportunityCard({ opportunity, onMove, onEdit, draggable = false }: CardProps) {
   const next = nextActionText(opportunity);
+  const brought = broughtByText(opportunity);
   const name = opportunity.person || opportunity.person_name || 'Sin nombre';
   return (
     <article
@@ -55,6 +56,7 @@ function OpportunityCard({ opportunity, onMove, onEdit, draggable = false }: Car
         <div className="opp-card-who">
           <PersonName opportunity={opportunity} />
           {opportunity.company ? <p className="opp-sub">{opportunity.company}</p> : null}
+          {brought ? <p className="opp-sub">{brought}</p> : null}
         </div>
         <Badge tone="muted">{MODALITY_SHORT[opportunity.modality] ?? opportunity.modality}</Badge>
       </div>

@@ -197,7 +197,8 @@ tags: [ajustes]
     direction: DOWN
     centerElement: true
     timeout: 30000
-- assertVisible: "Has entrado como qa\\."
+# seed_qa: «qa» is ProjectApp's only member, Gustavo (Fundador); the name comes from GET /api/v1/yo (organizations, phase 5).
+- assertVisible: "Has entrado como Gustavo \\(Fundador\\) · ProjectApp\\."
 - assertVisible: "Versión: app .*"
 - takeScreenshot: 15-ajustes-09-sesion
 - tapOn:

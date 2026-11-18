@@ -3,7 +3,7 @@
 // Pure: shared by the PWA and the native app, each draws it with its own components.
 import type { AjustesConPush, PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
+import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary, Yo } from '../api/types';
 import { formatTime, formatUsd, timeAgo } from './format';
 import type { Tone } from './tone';
 
@@ -320,3 +320,17 @@ export function factsLabel(count: number | null | undefined): string {
 
 export const ART_CREDIT = 'Arte: LimeZu — Modern Interiors';
 export const ART_CREDIT_URL = 'https://limezu.itch.io/moderninteriors';
+
+// ---------------------------------------------------------------- Sesión: quién soy (organizaciones, phase 5)
+
+/**
+ * «Has entrado como Ana (CTO) · ProjectApp.»: the name, role and organization of GET /api/v1/yo. Without a member (a
+ * user who is not one, an installation without organizations) or before /yo answers, the username, as before.
+ */
+export function sessionLabel(username: string, yo: Yo | null | undefined): string {
+  const member = yo?.member;
+  if (!member) return `Has entrado como ${username}.`;
+  const role = member.role ? ` (${member.role})` : '';
+  const organization = yo?.organization ? ` · ${yo.organization.name}` : '';
+  return `Has entrado como ${member.display_name}${role}${organization}.`;
+}

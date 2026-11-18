@@ -3,6 +3,7 @@ import { ApiError } from './client';
 
 export const keys = {
   session: ['session'] as const,
+  yo: ['yo'] as const,
   overview: ['overview'] as const,
   feed: ['feed'] as const,
   activity: ['activity'] as const,

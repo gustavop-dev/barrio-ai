@@ -1,9 +1,9 @@
 // Ajustes › Lo que el equipo sabe de ti (link) and Sesión y Acerca de (logout, version, art credit).
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { ART_CREDIT, ART_CREDIT_URL, factsLabel } from '../../../../compartido/src/logic/ajustes';
+import { ART_CREDIT, ART_CREDIT_URL, factsLabel, sessionLabel } from '../../../../compartido/src/logic/ajustes';
 import { logout } from '../../api/endpoints';
-import { useAjustes } from '../../api/hooks';
+import { useAjustes, useYo } from '../../api/hooks';
 import { keys } from '../../api/queryClient';
 import { SIGNED_OUT, useSession } from '../../auth/session';
 import { IconChevronRight } from '../../components/icons';
@@ -44,11 +44,12 @@ export function SesionSection() {
     },
   });
   const user = session.data?.user;
+  const yo = useYo(); // her member and organization (GET /api/v1/yo), never a fixed name
 
   return (
     <Section label="Sesión y Acerca de" id="sesion">
       <Card className="aj-card">
-        <p className="t-cuerpo">{user ? `Has entrado como ${user.username}.` : 'Sin sesión.'}</p>
+        <p className="t-cuerpo">{user ? sessionLabel(user.username, yo.data) : 'Sin sesión.'}</p>
         <Button variant="secondary" block loading={signOut.isPending} loadingLabel="Cerrando…" onClick={() => signOut.mutate()}>
           Cerrar sesión
         </Button>

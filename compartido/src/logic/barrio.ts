@@ -205,6 +205,13 @@ export function nextActionText(opportunity: Pick<Opportunity, 'next_action' | 'n
   return [opportunity.next_action, relativeDay(opportunity.next_action_at)].filter(Boolean).join(' · ');
 }
 
+/** «Trajo: Laura» when the opportunity came from another member's contacts (organizations, phase 5); the API only
+ * sends `brought_by` when the organization has several members, so with one member nothing changes. */
+export function broughtByText(opportunity: Pick<Opportunity, 'brought_by'>): string {
+  const name = opportunity.brought_by?.display_name?.trim();
+  return name ? `Trajo: ${name}` : '';
+}
+
 /** «Faro Salud · ProjectApp · cerrada el 30 de octubre». */
 export function closedMeta(opportunity: Opportunity): string {
   return [opportunity.company, MODALITY_SHORT[opportunity.modality], opportunity.closed_at ? `cerrada el ${longDate(opportunity.closed_at)}` : ''].filter(Boolean).join(' · ');
