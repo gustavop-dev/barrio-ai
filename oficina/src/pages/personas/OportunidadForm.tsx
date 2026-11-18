@@ -7,7 +7,7 @@ import type { Opportunity, OpportunityAttribution, OpportunityChannel, Opportuni
 import { OPPORTUNITY_STAGES } from '../../api/types';
 import { IconSearch } from '../../components/icons';
 import { Avatar, Button, ErrorRetry, Modal, Segmented, useToast } from '../../components/ui';
-import { initialModality, type OpportunityPerson, type PersonMode } from '../../../../compartido/src/logic/barrio';
+import { initialModality, othersPersonText, personModeOf, type OpportunityPerson, type PersonMode } from '../../../../compartido/src/logic/barrio';
 import { ATTRIBUTION_LABEL, CHANNEL_LABEL, fromDateInput, OPPORTUNITY_MODALITY_LABEL, OPPORTUNITY_STAGE_LABEL, toDateInput } from './labels';
 import './personas.css';
 
@@ -91,7 +91,7 @@ export function OportunidadForm({ opportunity, person, defaults, onClose, onSave
   const startPerson: OpportunityPerson | null = opportunity?.contact
     ? { id: opportunity.contact.id, display_name: opportunity.contact.display_name, headline: opportunity.contact.headline }
     : (person ?? null);
-  const [mode, setMode] = useState<PersonMode>(opportunity && !opportunity.contact ? 'fuera' : 'red');
+  const [mode, setMode] = useState<PersonMode>(personModeOf(opportunity));
   const [picked, setPicked] = useState<OpportunityPerson | null>(startPerson);
   const [personName, setPersonName] = useState(opportunity?.person_name ?? '');
   const [company, setCompany] = useState(opportunity?.company ?? '');
@@ -108,7 +108,8 @@ export function OportunidadForm({ opportunity, person, defaults, onClose, onSave
   const [touched, setTouched] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const personError = mode === 'red' ? (picked ? null : 'Elige a alguien de Personas.') : personName.trim() ? null : 'Escribe el nombre de la persona.';
+  const personError =
+    mode === 'ajena' ? null : mode === 'red' ? (picked ? null : 'Elige a alguien de Personas.') : personName.trim() ? null : 'Escribe el nombre de la persona.';
   const errors = {
     person: personError,
     modality: modality ? null : 'Elige la modalidad.',
@@ -122,8 +123,8 @@ export function OportunidadForm({ opportunity, person, defaults, onClose, onSave
     setTouched(true);
     if (invalid || saving) return;
     const input: OpportunityInput = {
-      contact: mode === 'red' ? (picked?.id ?? null) : null,
-      person_name: mode === 'fuera' ? personName.trim() : '',
+      // Another member's person is never sent: the opportunity keeps it (organizations, phase 5).
+      ...(mode === 'ajena' ? {} : { contact: mode === 'red' ? (picked?.id ?? null) : null, person_name: mode === 'fuera' ? personName.trim() : '' }),
       company: company.trim(),
       modality: modality as OpportunityModality,
       channel,
@@ -197,16 +198,20 @@ export function OportunidadForm({ opportunity, person, defaults, onClose, onSave
           <legend className="field-label">
             Persona <span className="field-flag">· obligatoria</span>
           </legend>
-          <Segmented<PersonMode>
-            label="Quién es"
-            options={[
-              { value: 'red', label: 'De Personas' },
-              { value: 'fuera', label: 'Alguien fuera de la red' },
-            ]}
-            value={mode}
-            onChange={setMode}
-          />
-          {mode === 'red' ? (
+          {mode === 'ajena' && opportunity ? (
+            <p className="opp-sub">{othersPersonText(opportunity)}</p>
+          ) : (
+            <Segmented<PersonMode>
+              label="Quién es"
+              options={[
+                { value: 'red', label: 'De Personas' },
+                { value: 'fuera', label: 'Alguien fuera de la red' },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+          )}
+          {mode === 'ajena' ? null : mode === 'red' ? (
             picked ? (
               <div className="opp-picked">
                 <Avatar name={picked.display_name} size={32} />

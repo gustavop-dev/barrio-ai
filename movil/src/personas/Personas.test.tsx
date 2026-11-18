@@ -468,6 +468,29 @@ describe('Personas · Oportunidades', () => {
     await waitFor(() => expect(server.find('DELETE', '/api/v1/oportunidades/o-1')).toHaveLength(1));
     expect(await screen.findByText('Oportunidad eliminada')).toBeOnTheScreen();
   });
+
+  it('says who brought another member\'s opportunity and edits it without touching its person (organizations, phase 5)', async () => {
+    const others = { ...board[0]!, contact: null, person: 'Lucía Ficticia', person_name: '', brought_by: { id: 'm-1', display_name: 'Gustavo' } };
+    const server = await renderPersonas(
+      {
+        'GET /api/v1/oportunidades': page([others]),
+        'PATCH /api/v1/oportunidades/o-1': (request) => ({ body: { ...others, ...(request.body as object) } }),
+      },
+      { pestana: 'oportunidades' },
+    );
+    expect(await screen.findByText('Trajo: Gustavo')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole('button', { name: 'Editar la oportunidad con Lucía Ficticia' }));
+    const form = within(await screen.findByTestId('opportunity-form'));
+    expect(form.getByTestId('opp-others-person')).toHaveTextContent('Lucía Ficticia · de los contactos de Gustavo. Solo quien la trajo cambia la persona.');
+    expect(form.queryByTestId('opp-name')).toBeNull();
+    await fireEvent.changeText(form.getByTestId('opp-budget'), '8.000 USD');
+    await fireEvent.press(form.getByText('Guardar cambios'));
+    await waitFor(() => expect(server.find('PATCH', '/api/v1/oportunidades/o-1')).toHaveLength(1));
+    const body = server.find('PATCH', '/api/v1/oportunidades/o-1')[0]!.body as Record<string, unknown>;
+    expect(body).toMatchObject({ budget: '8.000 USD' });
+    expect(body).not.toHaveProperty('contact');
+    expect(body).not.toHaveProperty('person_name');
+  });
 });
 
 describe('Personas · Referentes', () => {

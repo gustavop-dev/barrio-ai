@@ -87,6 +87,10 @@ def update(user,opportunity_id,data):
     require(user,'approve_actions')
     with transaction.atomic():
         item=Opportunity.objects.select_for_update().get(id=opportunity_id)
+        if item.contact_id is not None and not alcance.is_hers(item.contact,miembros.member_for(user)):
+            # Another member's person: she sees only its name (no card), so her form cannot name it again. She moves
+            # and edits the opportunity; its person stays as it is (organizaciones, phase 5).
+            data={key:value for key,value in data.items() if key not in ('contact','person_name')}
         _apply(item,data,user)
         if 'contact' in data:item.origin_member=_origin(item)
         if data.get('stage'):_set_stage(item,data['stage'])

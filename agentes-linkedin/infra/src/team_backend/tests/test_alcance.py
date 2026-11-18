@@ -40,6 +40,7 @@ from team_backend.tests.test_perfil import synthetic
 from team_backend.tests.test_resumen_semanal import analysis as summary_analysis
 
 FIXED = datetime(2026, 11, 18, 14, 36, 0, tzinfo=dt_timezone.utc)  # a Wednesday, 09:36 in Bogotá
+NOBODYS = uuid.UUID('7e57a1ca-0000-4000-8000-000000000404')  # an id no row has
 PARAM = re.compile(r'<(?:(\w+):)?(\w+)>')
 PARAM_NAMES = re.compile(r'<(?:\w+:)?(\w+)>')
 METHODS = ('get', 'post', 'put', 'patch', 'delete')
@@ -100,8 +101,9 @@ class RutasTests(SimpleTestCase):
                 with self.subTest(route=route):
                     self.assertEqual(set(alcance.OBJETOS.get(route, {})), names)
         for models in alcance.OBJETOS.values():
-            for model in models.values():
-                self.assertTrue(model in alcance.DUENO or model in (alcance.RELATIVO, 'memory'), model)
+            for entry in models.values():
+                for model in entry if isinstance(entry, tuple) else (entry,):
+                    self.assertTrue(model in alcance.DUENO or model in (alcance.RELATIVO, 'memory'), model)
 
 
 class DosMiembrosAlcanceBase(DosMiembrosBase):
@@ -323,11 +325,11 @@ class DelMiembroTests(DosMiembrosAlcanceBase):
                     self.assertEqual(response.status_code, 200, self.body(response)[:300])
 
     def test_an_id_that_does_not_exist_looks_the_same(self):
-        """A random id answers 404 on the same routes, so the other member's 404 says nothing about her rows."""
+        """An id no row has answers 404 on the same routes, so the other member's 404 says nothing about her rows."""
         client = self.cto.client()
         for route in ('red/contacts/<uuid:cid>', 'operador/actions/<uuid:pid>/approve', 'conversaciones/<uuid:cid>/cerrar',
                       'comprador/respuestas/<uuid:did>/agendo', 'preguntas/<uuid:qid>/responder'):
-            path = '/api/v1/' + PARAM.sub(lambda m: str(uuid.uuid4()), route)
+            path = '/api/v1/' + PARAM.sub(str(NOBODYS), route)
             method = 'get' if not route.endswith(('approve', 'cerrar', 'agendo', 'responder')) else 'post'
             with self.subTest(route=route):
                 self.assertEqual(self.call(client, method, path).status_code, 404)
@@ -371,6 +373,32 @@ class OrganizacionYAdministradorTests(DosMiembrosAlcanceBase):
         self.assertEqual((theirs['person'], theirs['contact']), ('Ana SECRETO-GUSTAVO', None))
         self.assertIsNotNone(self.g.client().get('/api/v1/oportunidades').json()['results'][0]['contact'])
 
+    def test_she_moves_his_opportunity_but_never_its_person(self):
+        """Catch a member rewriting another member's person: her form only knows its name, so what it sends for the person
+        (none, or a name outside the network) is ignored; the stage and the next step are hers to move. He still can."""
+        his = self.rows[self.g.member.pk]['contact']
+        item = Opportunity.objects.create(modality='projectapp', contact=his, member=self.g.member, origin_member=self.g.member,
+                                          created_by=self.g.user)
+        response = self.cto.client().patch(f'/api/v1/oportunidades/{item.pk}', {'contact': None, 'person_name': 'Otra persona',
+                                           'stage': 'reunion', 'next_action': 'Llamar el lunes'}, format='json')
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        self.assertIsNone(response.json()['contact'])
+        item.refresh_from_db()
+        self.assertEqual((item.contact_id, item.person_name, item.stage, item.next_action, item.origin_member_id),
+                         (his.pk, '', 'reunion', 'Llamar el lunes', self.g.member.pk))
+        outside = Opportunity.objects.create(modality='projectapp', person_name='Alguien de fuera', member=self.cto.member,
+                                             origin_member=self.cto.member, created_by=self.cto.user)
+        for answer in (self.cto.client().post('/api/v1/oportunidades', {'contact': str(his.pk), 'modality': 'projectapp'}, format='json'),
+                       self.cto.client().patch(f'/api/v1/oportunidades/{outside.pk}', {'contact': str(his.pk)}, format='json')):
+            self.assertEqual((answer.status_code, answer.json()['detail']), (400, 'Persona inexistente'))  # his person is not hers to link
+        outside.refresh_from_db()
+        self.assertEqual((Opportunity.objects.count(), outside.contact_id), (2, None))
+        response = self.g.client().patch(f'/api/v1/oportunidades/{item.pk}', {'contact': None, 'person_name': 'Fuera de la red'},
+                                         format='json')
+        self.assertEqual(response.status_code, 200, response.content[:300])
+        item.refresh_from_db()
+        self.assertEqual((item.contact_id, item.person_name), (None, 'Fuera de la red'))
+
     def test_administrator_routes_refuse_the_cto(self):
         """Catch a member reading the installation's diagnostics: integrity, audit and the app's error reports are the
         admin's; the CTO gets 403 even with manage_jobs."""
@@ -378,7 +406,7 @@ class OrganizacionYAdministradorTests(DosMiembrosAlcanceBase):
             with self.subTest(path=path), patch('team_backend.views.ingest.verify', return_value={'ok': True}):
                 self.assertEqual(self.cto.client().get(path).status_code, 403)
                 self.assertNotEqual(self.g.client().get(path).status_code, 403)
-        cycle = f'/api/v1/equipo/ciclos/{uuid.uuid4()}/decision'
+        cycle = f'/api/v1/equipo/ciclos/{NOBODYS}/decision'
         self.assertEqual(self.cto.client().post(cycle, {}, format='json').status_code, 403)
         self.assertEqual(self.cto.client().post('/api/v1/app/errores', {'message': 'x'}, format='json').status_code
                          in (201, 400), True)  # reporting is hers
@@ -391,6 +419,61 @@ class OrganizacionYAdministradorTests(DosMiembrosAlcanceBase):
             response = self.g.client().get('/api/v1/yo')
         self.assertEqual(response.status_code, 403)
         self.assertIn('alcance.py', response.json()['detail'])
+
+
+class CruzadosTests(DosMiembrosAlcanceBase):
+    """Ids that come in a body or name a second kind of row: the cross actions the route table alone does not show."""
+
+    def test_a_buyer_message_closes_on_her_route_and_never_on_the_other_one(self):
+        """Catch the «Mensaje sugerido» of a buyer (a BuyerDraft id on respuestas/<id>/mensaje) refused to its owner, or
+        closable by the other member."""
+        for persona in (self.g, self.cto):
+            his = self.rows[self.other(persona).member.pk]['draft']
+            refused = persona.client().post(f'/api/v1/respuestas/{his.pk}/mensaje', {'how': 'enviado'}, format='json')
+            self.assertEqual(refused.status_code, 404)
+            his.refresh_from_db()
+            self.assertEqual(his.state, 'listo')
+        for persona in (self.g, self.cto):
+            own = self.rows[persona.member.pk]['draft']
+            closed = persona.client().post(f'/api/v1/respuestas/{own.pk}/mensaje', {'how': 'enviado'}, format='json')
+            self.assertEqual((closed.status_code, closed.json()['id']), (200, str(own.pk)), closed.content[:300])
+
+    def test_a_capture_cannot_name_his_person_piece_or_question(self):
+        """Catch a capture tied to another member's row: it would print his row's label and write her note into his
+        person, rework his post or answer his question. His id answers like one that does not exist; hers works."""
+        gustavo = self.rows[self.g.member.pk]
+        before = (Contact.objects.get(pk=gustavo['contact'].pk).notes, Capture.objects.count())
+        for kind, row in (('persona', gustavo['contact']), ('pieza', gustavo['piece']), ('pregunta', gustavo['question'])):
+            with self.subTest(kind=kind):
+                answer = self.cto.client().post('/api/v1/capturas', {'nota': 'Nota del CTO', 'contexto_tipo': kind,
+                                                                     'contexto_id': str(row.pk)})
+                self.assertEqual((answer.status_code, answer.json()['detail']), (400, 'El elemento ligado a la captura no existe.'))
+        self.assertEqual((Contact.objects.get(pk=gustavo['contact'].pk).notes, Capture.objects.count()), before)
+        own = self.cto.client().post('/api/v1/capturas', {'nota': 'Nota del CTO', 'contexto_tipo': 'persona',
+                                                          'contexto_id': str(self.rows[self.cto.member.pk]['contact'].pk)})
+        self.assertEqual(own.status_code, 201, own.content[:300])
+
+    def test_her_lead_becomes_an_opportunity_without_her_conversation(self):
+        """Catch an organization route that prints a member's private conversation: the lead's opportunity notes, which
+        every member reads, say where the conversation is, not what it says."""
+        handoff = self.rows[self.cto.member.pk]['handoff']
+        handoff.data = {**handoff.data, 'conversacion': ['Tú: LINEA-PRIVADA primer mensaje', 'Ella: LINEA-PRIVADA respuesta']}
+        handoff.save(update_fields=['data'])
+        answer = self.cto.client().post(f'/api/v1/comprador/entregas/{handoff.pk}/oportunidad', {}, format='json')
+        self.assertEqual(answer.status_code, 200, answer.content[:300])
+        funnel = self.g.client().get('/api/v1/oportunidades').json()['results']
+        self.assertEqual(len(funnel), 1)
+        self.assertEqual(funnel[0]['notes'], 'Entrega de la máquina de LinkedIn: la conversación está en la entrega del lead, en Comprador.')
+        self.assertNotIn('LINEA-PRIVADA', str(funnel))  # the person's name is the funnel's; what they said is not
+
+    def test_the_admins_audit_never_shows_another_members_own_actions(self):
+        """Catch the admin reading her private notes through the audit trail (a conversation's closing note)."""
+        from team_backend.models import AuditEvent
+        AuditEvent.objects.create(actor=self.cto.user, action='conversation.closed', target='x', metadata={'note': 'SECRETO-CTO cierre'})
+        AuditEvent.objects.create(actor=self.g.user, action='conversation.closed', target='y', metadata={'note': 'nota de Gustavo'})
+        text = self.g.client().get('/api/v1/audit?page_size=100').content.decode()
+        self.assertNotIn('SECRETO-CTO', text)
+        self.assertIn('nota de Gustavo', text)
 
 
 class QuienSoyTests(DosMiembrosAlcanceBase):
@@ -507,6 +590,10 @@ class AvisosTests(DosMiembrosAlcanceBase):
         self.cto.client().post('/api/v1/tu-turno/vistos', {'ids': ['machine_paused']}, format='json')
         self.assertEqual(sorted(InboxSeen.objects.values_list('item_id', flat=True)),
                          sorted(['machine_paused', f'u:{self.cto.user.pk}:machine_paused']))
+        # Gustavo's ids are stored bare: naming her key would mark her card; it is kept as his own, apart.
+        InboxSeen.objects.filter(item_id__startswith='u:').delete()
+        self.g.client().post('/api/v1/tu-turno/vistos', {'ids': [f'u:{self.cto.user.pk}:machine_paused']}, format='json')
+        self.assertEqual(cards(self.cto)['machine_paused'], 'nueva')
 
     def test_a_notice_that_names_nobody_is_dropped_never_guessed(self):
         with self.assertLogs('team_backend.notificaciones', 'WARNING'):

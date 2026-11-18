@@ -249,7 +249,21 @@ export interface OpportunityPerson {
   modality?: string | null;
 }
 
-export type PersonMode = 'red' | 'fuera';
+/** 'ajena': the person of an opportunity another member brought (organizations, phase 5). Only her name comes (no card):
+ * the form shows it fixed and never sends it, so editing the opportunity keeps it. */
+export type PersonMode = 'red' | 'fuera' | 'ajena';
+
+/** How the form starts: her person (or a new one) from Personas, a name outside the network, or another member's. */
+export function personModeOf(opportunity: Opportunity | null | undefined): PersonMode {
+  if (!opportunity || opportunity.contact) return 'red';
+  return opportunity.person && !opportunity.person_name ? 'ajena' : 'fuera';
+}
+
+/** «Laura Prueba · de los contactos de Gustavo. Solo quien la trajo cambia la persona.» */
+export function othersPersonText(opportunity: Pick<Opportunity, 'person' | 'brought_by'>): string {
+  const owner = opportunity.brought_by?.display_name?.trim() || 'otro miembro';
+  return `${opportunity.person || 'Esta persona'} · de los contactos de ${owner}. Solo quien la trajo cambia la persona.`;
+}
 
 export function initialModality(opportunity: Opportunity | null | undefined, person: OpportunityPerson | null | undefined): OpportunityModality | '' {
   if (opportunity) return opportunity.modality;
@@ -278,7 +292,8 @@ export interface OpportunityDraft {
 /** The required fields that are missing (null when fine). */
 export function opportunityErrors(draft: OpportunityDraft): { person: string | null; modality: string | null; attribution: string | null } {
   return {
-    person: draft.mode === 'red' ? (draft.picked ? null : 'Elige a alguien de Personas.') : draft.personName.trim() ? null : 'Escribe el nombre de la persona.',
+    person:
+      draft.mode === 'ajena' ? null : draft.mode === 'red' ? (draft.picked ? null : 'Elige a alguien de Personas.') : draft.personName.trim() ? null : 'Escribe el nombre de la persona.',
     modality: draft.modality ? null : 'Elige la modalidad.',
     attribution: draft.attribution ? null : 'Elige cómo llegó.',
   };
@@ -287,8 +302,7 @@ export function opportunityErrors(draft: OpportunityDraft): { person: string | n
 /** The body of POST /oportunidades or PATCH /oportunidades/<id>. */
 export function opportunityInput(draft: OpportunityDraft): OpportunityInput {
   return {
-    contact: draft.mode === 'red' ? (draft.picked?.id ?? null) : null,
-    person_name: draft.mode === 'fuera' ? draft.personName.trim() : '',
+    ...(draft.mode === 'ajena' ? {} : { contact: draft.mode === 'red' ? (draft.picked?.id ?? null) : null, person_name: draft.mode === 'fuera' ? draft.personName.trim() : '' }),
     company: draft.company.trim(),
     modality: draft.modality as OpportunityModality,
     channel: draft.channel,

@@ -5,7 +5,7 @@ import { asList, listContacts } from '@compartido/api/endpoints';
 import { useCreateOportunidad, useDeleteOportunidad, useUpdateOportunidad } from '@compartido/api/hooks';
 import { keys } from '@compartido/api/queryClient';
 import { OPPORTUNITY_STAGES, type Opportunity, type OpportunityAttribution, type OpportunityChannel, type OpportunityModality, type OpportunityStage } from '@compartido/api/types';
-import { initialModality, opportunityErrors, opportunityInput, type OpportunityDraft, type OpportunityPerson, type PersonMode } from '@compartido/logic/barrio';
+import { initialModality, opportunityErrors, opportunityInput, othersPersonText, personModeOf, type OpportunityDraft, type OpportunityPerson, type PersonMode } from '@compartido/logic/barrio';
 import { ATTRIBUTION_LABEL, CHANNEL_LABEL, fromDateInput, OPPORTUNITY_MODALITY_LABEL, OPPORTUNITY_STAGE_LABEL, toDateInput } from '@compartido/logic/personas';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -100,7 +100,7 @@ export function OportunidadForm({ opportunity, person, onClose, onSaved }: Oport
     ? { id: opportunity.contact.id, display_name: opportunity.contact.display_name, headline: opportunity.contact.headline }
     : (person ?? null);
   const [draft, setDraft] = useState<OpportunityDraft>(() => ({
-    mode: opportunity && !opportunity.contact ? 'fuera' : 'red',
+    mode: personModeOf(opportunity),
     picked: startPerson,
     personName: opportunity?.person_name ?? '',
     company: opportunity?.company ?? '',
@@ -189,8 +189,12 @@ export function OportunidadForm({ opportunity, person, onClose, onSaved }: Oport
             <T variant="detalle">
               Persona<T variant="detalle" soft>{' · obligatoria'}</T>
             </T>
-            <Options<PersonMode> legend="Quién es" options={PERSON_MODES} value={draft.mode} onChange={(mode) => set('mode', mode)} />
-            {draft.mode === 'red' ? (
+            {draft.mode === 'ajena' && opportunity ? (
+              <T testID="opp-others-person">{othersPersonText(opportunity)}</T>
+            ) : (
+              <Options<PersonMode> legend="Quién es" options={PERSON_MODES} value={draft.mode} onChange={(mode) => set('mode', mode)} />
+            )}
+            {draft.mode === 'ajena' ? null : draft.mode === 'red' ? (
               draft.picked ? (
                 <View style={styles.picked} testID="opp-picked">
                   <Avatar name={draft.picked.display_name} size={32} />

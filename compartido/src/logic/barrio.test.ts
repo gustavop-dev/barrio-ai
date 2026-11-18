@@ -8,7 +8,9 @@ import {
   nextStepView,
   opportunityErrors,
   opportunityInput,
+  othersPersonText,
   personMeta,
+  personModeOf,
   referentMeta,
   stageCount,
   stageGroups,
@@ -134,5 +136,18 @@ describe('Who brought the opportunity (organizations, phase 5)', () => {
 
   it.each([undefined, null, { id: 'm-1', display_name: '  ' }])('says nothing with one member or no name (%p)', (brought_by) => {
     expect(broughtByText({ brought_by })).toBe('');
+  });
+
+  it('keeps another member\'s person fixed: no error, never in the body', () => {
+    const others = opportunityFixture('o-9', { contact: null, person: 'Laura Prueba', person_name: '', brought_by: { id: 'm-1', display_name: 'Gustavo' } });
+    expect(personModeOf(others)).toBe('ajena');
+    expect(personModeOf(opportunityFixture('o-1', { contact: null, person: 'Mario', person_name: 'Mario' }))).toBe('fuera');
+    expect(personModeOf(null)).toBe('red');
+    expect(othersPersonText(others)).toBe('Laura Prueba · de los contactos de Gustavo. Solo quien la trajo cambia la persona.');
+    expect(opportunityErrors(draft({ mode: 'ajena' })).person).toBeNull();
+    const body = opportunityInput(draft({ mode: 'ajena', modality: 'projectapp', attribution: 'lo_dijo', stage: 'reunion' }));
+    expect(body).not.toHaveProperty('contact');
+    expect(body).not.toHaveProperty('person_name');
+    expect(body).toMatchObject({ stage: 'reunion', modality: 'projectapp' });
   });
 });

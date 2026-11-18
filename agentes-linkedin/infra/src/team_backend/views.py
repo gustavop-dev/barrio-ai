@@ -13,7 +13,7 @@ from rest_framework.response import Response
 from rest_framework.exceptions import NotFound,PermissionDenied
 from knowledge import db,ingest,memory,providers,retrieval
 from knowledge.clases import CLASES_BIBLIOTECA,rango
-from . import alcance,hechos,jobs
+from . import alcance,hechos,jobs,miembros
 from .models import KnowledgeUnit,KnowledgeRun,Worker,AuditEvent,ApiCredential
 from .permissions import require
 from .serializers import SearchInput,RunInput,JobOutput,UnitOutput,ProposalInput,ConfirmationInput,AuditOutput
@@ -140,7 +140,13 @@ class Integrity(APIView):
         return Response(ingest.verify())
 
 class Audit(ListAPIView):
+    """The installation's audit trail, for its admin. Never another member's own actions (their metadata can carry her
+    private notes, e.g. a conversation's closing note): organizaciones, phase 5. With one member, everything as before."""
     serializer_class=AuditOutput
     def get_queryset(self):
         require(self.request.user,'manage_jobs')
-        return AuditEvent.objects.all()
+        rows=AuditEvent.objects.all()
+        member=miembros.member_of_user(self.request.user)
+        if member is not None:
+            rows=rows.exclude(actor_id__in=miembros._models()[1].objects.exclude(pk=member.pk).values('user_id'))
+        return rows

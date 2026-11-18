@@ -198,8 +198,9 @@ RAIZ = {
 
 
 # The id in a «del miembro» route: which row it names. RELATIVO: a key or a day inside her own memory or plan (it never
-# names another member's row: hechos.scope, estrategia). Built from the route prefixes below; tests/test_alcance.py
-# checks that every MIEMBRO route with an id has its entry, and every model is in DUENO.
+# names another member's row: hechos.scope, estrategia). A tuple: the view accepts a row of any of those models (the id is
+# hers if it is a row of hers of one of them). Built from the route prefixes below; tests/test_alcance.py checks that
+# every MIEMBRO route with an id has its entry, and every model is in DUENO.
 RELATIVO = 'relativo'
 _IDS = [
     ('comunidad/fuentes/', {'sid': 'CommunitySource'}),
@@ -221,7 +222,7 @@ _IDS = [
     ('operador/posts/', {'pid': 'ObservedPost'}),
     ('operador/actions/', {'pid': 'ActionProposal'}),
     ('conversaciones/', {'cid': 'Conversation'}),
-    ('respuestas/', {'cid': 'PostComment'}),
+    ('respuestas/', {'cid': ('PostComment', 'BuyerDraft')}),  # a comment's DM, or a buyer's first message or reply
     ('resultados/resumen-semanal/', {'sid': 'WeeklySummary'}),
     ('resultados/revision-mensual/cambios/', {'cid': 'StrategyChange'}),
     ('resultados/revision-mensual/', {'rid': 'MonthlyReview'}),
@@ -300,8 +301,17 @@ def _hers(request, model, value):
     """Whether the row `value` of `model` (an OBJETOS entry) is the request's member's."""
     from django.apps import apps
     from django.core.exceptions import ValidationError
+    if isinstance(model, tuple):
+        return any(_hers(request, one, value) for one in model)
     if model == 'Job':
-        return trabajos(request).filter(pk=value).exists()
+        if trabajos(request).filter(pk=value).exists():
+            return True
+        # A historical run (KnowledgeRun, before jobs had owners and before organizations): the first member's, read by
+        # whoever holds manage_jobs (views.RunDetail); never another member's.
+        from .models import KnowledgeRun
+        member = miembro(request)
+        return (request.user.has_perm('team_backend.manage_jobs') and (member is None or miembros.is_first(member))
+                and KnowledgeRun.objects.filter(pk=value).exists())
     if model == 'memory':
         from . import hechos
         from knowledge import db
@@ -440,8 +450,8 @@ def vista(user, item_id):
     if first is None:
         return item_id
     _, Member, _ = miembros._models()
-    if Member.objects.filter(pk=first, user_id=user.pk).exists():
-        return item_id
+    if Member.objects.filter(pk=first, user_id=user.pk).exists() and not item_id.startswith('u:'):
+        return item_id  # a card id never starts with «u:»: that would be another person's key
     return f'u:{user.pk}:{item_id}'
 
 

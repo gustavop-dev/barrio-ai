@@ -210,11 +210,17 @@ def _discard(names):
 
 # --------------------------------------------------------------------------- context
 
-def context_object(kind,ident):
-    """The TeamQuestion, Contact or EditorialPiece a capture is tied to, or None."""
+def context_object(kind,ident,member=None):
+    """The TeamQuestion, Contact or EditorialPiece a capture is tied to, or None. With `member` (a new capture), only one
+    of hers: another member's question, person or piece is «does not exist» (organizaciones, phase 5)."""
     if not kind or not ident or not UUID.fullmatch(str(ident)):return None
     model={'pregunta':TeamQuestion,'persona':Contact,'pieza':EditorialPiece}.get(kind)
-    return model.objects.filter(id=ident).first() if model else None
+    if model is None:return None
+    rows=model.objects.filter(id=ident)
+    if member is not None:
+        from . import alcance
+        rows=alcance.de(rows,member)
+    return rows.first()
 
 def context_label(kind,obj):
     if obj is None:return None
@@ -241,7 +247,9 @@ def create(user,data,audio=None,photos=()):
     if purpose=='galeria' and not photos:raise ValueError('Para la galería, añade al menos una foto.')
     if bool(kind)!=bool(ident):raise ValueError('contexto_tipo y contexto_id van juntos.')
     if kind:
-        target=context_object(kind,ident)
+        from . import alcance, miembros
+        member=miembros.member_for(user)
+        target=context_object(kind,ident,alcance.TODOS if member is None else member)
         if target is None:raise ValueError('El elemento ligado a la captura no existe.')
         ident=str(target.id)
     if kind=='pregunta' or purpose in ('dato','respuesta'):require(user,'confirm_memory')

@@ -12,7 +12,7 @@ Only Gustavo creates the opportunity (PRS-09): the handoff's Tu turno card «Cre
 that person. An opportunity he creates by hand from Personas links the handoff too (on_opportunity)."""
 from django.db import transaction
 from django.utils import timezone
-from . import alcance, comprador, identidad, operador
+from . import alcance, comprador, identidad, miembros, operador
 from .exceptions import Conflict
 from .models import BuyerDraft, BuyerTouch, Contact, LeadHandoff, Opportunity
 from .permissions import require
@@ -178,10 +178,14 @@ def confirm(user,handoff_id):
         item=_open(handoff.contact)
         if item is None:
             company=(handoff.data.get('empresa') or {}).get('nombre','')
+            # The funnel is the organization's (every member reads its notes): with several members the conversation
+            # stays in her lead (comprador/entregas), never in a note the others read (organizaciones, phase 5).
+            lines=' / '.join(handoff.data.get('conversacion') or []) if len(miembros.active_members())<=1 else \
+                'la conversación está en la entrega del lead, en Comprador.'
             item=oportunidades.create(user,{'contact':str(handoff.contact_id),'modality':_modality(handoff),'channel':'linkedin',
                                             'stage':Opportunity.Stage.MEETING,'company':company,'next_action':'Reunión agendada (Cal.com)',
                                             'next_action_at':handoff.meeting_at,
-                                            'notes':'Entrega de la máquina de LinkedIn: '+' / '.join(handoff.data.get('conversacion') or [])})
+                                            'notes':'Entrega de la máquina de LinkedIn: '+lines})
             handoff.refresh_from_db()
         if not handoff.opportunity_id:_link(handoff,item,now)
         if handoff.contact_id:comprador.on_contact(handoff.contact,'oportunidad')
