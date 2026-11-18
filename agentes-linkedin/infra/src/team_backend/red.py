@@ -805,16 +805,31 @@ def criterion_version(system,minimum_confidence,course_version,orientation):
         'course_version':course_version,'orientation':orientation,
     },sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
 
-def shared_criterion(minimum_confidence,course_version):
+def shared_criterion(minimum_confidence,course_version,private=''):
     """Organizaciones, phase 6: the organization's part of the classifier's criterion (its instructions before any
-    member's name, the threshold, the course and the buyer of ProjectApp on or off), with no member's name nor private
-    orientation: another member's classification of the same person made with it is reused (registro.reusable)."""
+    member's name, the threshold, the course and the buyer of ProjectApp on or off), with no member's name: another
+    member's classification of the same person made with it is reused (registro.reusable). Phase 7: the classifier also
+    reads the private guidance and orientation of whoever pays (_classify_batch), and a verdict shaped by them is not
+    another member's to take: `private` (private_context) enters the criterion, so a classification is reused only
+    between members whose private context is the same (none, typically), never across different ones. The prompts and
+    criterion_version do not change."""
     from .evidencia import CRITERION_VERSION
     on=projectapp.enabled()
     return CRITERION_VERSION+':org:'+hashlib.sha256(json.dumps({
         'system':CLASSIFY_SYSTEM_PROJECTAPP if on else CLASSIFY_SYSTEM,'minimum_confidence':minimum_confidence,
-        'course_version':course_version,'projectapp':on,
+        'course_version':course_version,'projectapp':on,**({'private':private} if private else {}),
     },sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
+
+def private_context(private,orientation):
+    """A digest of what only this member's classifier reads (her private guidance and orientation): never the text."""
+    if not private and not orientation:return ''
+    return hashlib.sha256(json.dumps({'private_guidance':private,'orientation':orientation},sort_keys=True,ensure_ascii=False,
+                                     default=str).encode()).hexdigest()[:16]
+
+def private_context_of(account):
+    ident=identidad.of_account(account)
+    _,private=identidad.blocks(ident)
+    return private_context(private,identidad.orientation(ident))
 
 def no_fit_rule(member=None):
     """The reason a buyer with evidence against leaves the neighborhood, with who decided it."""
@@ -914,7 +929,8 @@ def _shared_classifications(account,pending,now,grounding):
     from . import registro
     org=registro.organization_id(account)
     if not registro.shared(org) or not pending:return pending,0
-    colleagues=registro.colleague_ids(org);criterion=shared_criterion(min_confidence(),grounding.get('course_version'))
+    colleagues=registro.colleague_ids(org)
+    criterion=shared_criterion(min_confidence(),grounding.get('course_version'),private_context_of(account))
     rest=[];settled=0;when=(now or timezone.now()).isoformat()
     from .evidencia import record_classification
     for contact in pending:
@@ -968,7 +984,7 @@ def _classify_batch(user,account,now,batch):
     version=criterion_version(system,min_confidence(),grounding.get('course_version'),orientation)
     from . import registro
     organization=registro.organization_id(account);organization_shared=registro.shared(organization)
-    org_criterion=shared_criterion(min_confidence(),grounding.get('course_version')) if organization_shared else ''
+    org_criterion=shared_criterion(min_confidence(),grounding.get('course_version'),private_context(private,orientation)) if organization_shared else ''
     classified_at=now or timezone.now();when=classified_at.isoformat();fits=0;classified=0;uncited=0
     for contact in contacts:
         result=results.get(str(contact.id))
@@ -1339,13 +1355,21 @@ def invites_blocked(now=None,member=None):
             return True,f'LinkedIn rechazó una invitación por límite el {execution.started_at:%d/%m}; se reanuda sola en 7 días.'
     return False,''
 
-def _propose(user,contact,capability,payload,grounding=None):
+def note_voice(account,draft=None):
+    """The voice mark of an invitation note (organizaciones, phase 7): the buyer's draft's when the note is that draft,
+    else the voice of the account's member now. Only a provisional voice is kept on the proposal, so nothing changes for
+    a member with her own voice (and her proposals read as before)."""
+    from . import voz
+    mark=(draft.voice or {}) if draft is not None else voz.meta(identidad.of_account(account))
+    return mark if mark.get('tipo')==voz.PROVISIONAL_KIND else None
+
+def _propose(user,contact,capability,payload,grounding=None,voice=None):
     reason=contact.classification.get('reason') or ''
     if grounding is None:_,grounding=operador.role_context('relaciones',NETWORK_UNITS,account=contact.account)
     try:
         proposal=operador.create_proposal(user,None,capability,payload,rationale=reason,source='agent',
                                           model=contact.classification.get('model') or '',contact=contact,
-                                          citations=grounding['course_citations'])
+                                          citations=grounding['course_citations'],voice=voice)
     except Conflict:return None
     from .evidencia import contact_context
     proposal.review=dict(grounding,case_evidence={'contact':str(contact.id),'classification':contact.classification,
@@ -1521,8 +1545,10 @@ def plan(user,account,now=None):
                 payload.update(note=c['invitation_note'],note_reason=c['note_reason'],without_note_fallback=True)
                 try:operador.validate_payload(RED.INVITE,payload,account)
                 except ValueError:payload={'user_id':contact.provider_user_id}
-            proposal=_propose(user,contact,RED.INVITE,payload,grounding)
-            if proposal is not None and draft is not None and payload.get('note')==draft.text:mensajes_comprador.use_note(draft,proposal)
+            from_draft=draft is not None and payload.get('note')==draft.text
+            voice=note_voice(account,draft if from_draft else None) if payload.get('note') else None
+            proposal=_propose(user,contact,RED.INVITE,payload,grounding,voice=voice)
+            if proposal is not None and from_draft:mensajes_comprador.use_note(draft,proposal)
             summary['invite']+=bool(proposal)
             if proposal:invited.append(contact)
         reparto.planned(summary['role_quota'],invited)

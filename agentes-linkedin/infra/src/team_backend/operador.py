@@ -708,8 +708,11 @@ def revise(user,proposal_id,payload,note=''):
         if old.state not in (ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED):
             raise Conflict('Solo se revisan propuestas aún no ejecutadas.')
         old.state=ActionProposal.State.SUPERSEDED;old.decision_note=note;old.save(update_fields=['state','decision_note'])
+        # The edited version keeps the voice mark of the draft it comes from (organizaciones, phase 7: a provisional
+        # draft she touched up still goes out only with her approval).
         return create_proposal(user,old.post,old.capability,payload,rationale=old.rationale,citations=old.citations,
-                               risks=old.risks,source='human',previous=old,piece=old.piece,contact=old.contact,comment=old.comment)
+                               risks=old.risks,source='human',previous=old,piece=old.piece,contact=old.contact,comment=old.comment,
+                               voice=old.voice or None)
 
 def approve(user,proposal_id,expected_hash,note=''):
     """Human decision on an exact version. Returns the execution job (enqueued)."""
@@ -847,9 +850,12 @@ def _record_metrics(proposal,post):
 @transaction.atomic
 def final_write_gate(execution,proposal,user):
     """Recheck after slow preflight/upload. The current execution already owns its capacity slot."""
-    policy_lock(member_of(account=proposal.account))
+    member=member_of(account=proposal.account)
+    policy_lock(member)
     from .orquestacion import cycle_issues
     issues=cycle_issues(proposal)
+    held=member_hold(member) or voice_hold(proposal)  # organizaciones, phase 7: rechecked right before writing
+    if held:issues.append(held)
     from . import experimentos
     issues.extend(experimentos.execution_issues(proposal))
     # One person's pause stops only her own writes (organizaciones, phase 1); the total stop is the whole machine's.
@@ -919,6 +925,18 @@ def _defer(execution,proposal,exc,user):
                kind=exc.kind,retry_at=at.isoformat())
     return OperatorBlocked(f'No salió nada ({exc}). Queda aprobada; se intenta de nuevo desde las {at.astimezone(local_tz()):%H:%M}.')
 
+INACTIVE_HOLD='El miembro dueño de esta cuenta está inactivo: sus acciones esperan a que el administrador lo reactive.'
+
+def member_hold(member):
+    """'' or why nothing is written for `member` (organizaciones, phase 7): an inactive member (in onboarding, or
+    deactivated) writes nothing, whatever was approved; her rows stay as they are."""
+    return INACTIVE_HOLD if member is not None and not member.active else ''
+
+def voice_hold(proposal):
+    """autopiloto.voice_hold: a provisional-voice text that no person approved is never written."""
+    from . import autopiloto
+    return autopiloto.voice_hold(proposal)
+
 def execute(user,proposal_id):
     """Execute one approved proposal exactly once. Safety gates run before any write."""
     require(user,'execute_actions')
@@ -947,6 +965,8 @@ def execute(user,proposal_id):
         if proposal.state!=ActionProposal.State.APPROVED:raise Conflict('Solo se ejecutan propuestas aprobadas.')
         if not (proposal.approved_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
+        held=member_hold(member) or voice_hold(proposal)  # organizaciones, phase 7
+        if held:raise OperatorBlocked(held)
         account=ConnectorAccount.objects.select_for_update().get(pk=proposal.account_id)
         if miembros.same_member(account).filter(paused=True).exclude(pk=account.pk).exists():
             raise OperatorBlocked('Otro conector de la misma cuenta está en pausa.')
@@ -1364,8 +1384,23 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
 NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','check_buyer_stages':'check_buyer_stages',
               'plan_network':'plan','sync_network':'sync'}
 
+def inactive_job(job):
+    """'' or why a job does not run (organizaciones, phase 7): it works for an inactive member, on her account
+    (params['account']) or for her content (params['member']). Its rows stay; the autopilot queues her work again once she
+    is active."""
+    from .models import Member
+    params=job.params or {}
+    if params.get('member'):
+        member=Member.objects.filter(pk=params['member']).first()
+        if member is not None and not member.active:return INACTIVE_HOLD
+    if params.get('account'):
+        account=ConnectorAccount.objects.select_related('member').filter(pk=params['account']).first()
+        if account is not None and account.member_id and not account.member.active:return INACTIVE_HOLD
+    return ''
+
 def run_job(job):
     from . import orquestacion
+    if inactive_job(job):return 'cancelled','inactive_member',inactive_job(job)
     if job.kind=='prepare_profile_assets':
         from .perfil_assets import run
         proposal=run(job)

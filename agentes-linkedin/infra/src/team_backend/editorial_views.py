@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import alcance, capturas, editorial, operador, rescate, respuestas, resultados, imagenes
+from . import alcance, capturas, editorial, operador, rescate, respuestas, resultados, imagenes, voz
 from .jobs import enqueue_operation
 from .models import EditorialPiece, PieceImage
 from .capturas_views import FileView, serve
@@ -61,7 +61,9 @@ class PieceDetail(APIView):
             images=[imagenes.payload(row) for row in piece.images.all()],image_review=piece.image_review,
             image_document_url=f'/api/v1/editorial/pieces/{piece.id}/document' if piece.image_document else None,
             # EDI-23: what he can do about a block («Pedir un cambio», «Desestimar el bloqueo»), or null.
-            rescue=rescate.options(piece),override=(piece.verification or {}).get('override')))
+            rescue=rescate.options(piece),override=(piece.verification or {}).get('override'),
+            # Organizaciones, phase 7: «Voz provisional» on a piece written in her provisional voice (absent otherwise).
+            **voz.marca(piece)))
 
 
 class PieceOverride(APIView):

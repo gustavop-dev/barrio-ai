@@ -77,10 +77,14 @@ def autonomy(capability,member=None):
     confirms her voice (organizaciones, phase 4)."""
     member=operador.member_of(member=member)
     mode=_configured(capability,member)
-    if capability==PROVISIONAL_HOLDS and mode=='auto' and provisional_voice(member):return 'approval'
+    if capability in PROVISIONAL_HOLDS and mode=='auto' and provisional_voice(member):return 'approval'
     return mode
 
-PROVISIONAL_HOLDS='CONT-09'  # the capability a provisional voice keeps in approval
+# Organizaciones, phase 7: nothing written in a provisional voice goes out without a person, in ANY capability. The
+# capabilities that always write a text in her name are held in «approval» while her voice is provisional (phase 4 did it
+# for the post); an invitation writes a text only with its note, so RED-02 is held per proposal (provisional_draft).
+PROVISIONAL_HOLDS=('CONT-09','INT-03','INT-04')
+TEXT_CAPABILITIES=PROVISIONAL_HOLDS+('RED-02',)
 
 def _author(proposal):
     """Whose text a proposal is: its account's member; None for a draft without an account (the evaluation harness), which
@@ -93,11 +97,34 @@ def provisional_voice(member):
     from . import voz
     return voz.current(member).provisional
 
+def writes_text(proposal):
+    """Whether the proposal puts a text in her name on LinkedIn: a post, a comment, a reply, or an invitation with a note."""
+    return proposal.capability in PROVISIONAL_HOLDS or (proposal.capability=='RED-02' and bool((proposal.payload or {}).get('note')))
+
 def provisional_draft(proposal):
-    """A post written in a provisional voice (its piece's or its own `voice` mark): it never goes out on its own, even
-    after she confirms her voice; a person approves it."""
+    """A text written in a provisional voice: its own `voice` mark (or its piece's) says provisional, or it carries no mark
+    at all (a path that did not record its voice) and its author's voice is provisional now. It never goes out on its own,
+    even after she confirms her voice: a person approves it (policy_review leaves it waiting; operador.execute refuses it
+    without her approval, voice_hold)."""
+    if not writes_text(proposal):return False
     marks=[proposal.voice or {}]+([proposal.piece.voice or {}] if proposal.piece_id else [])
-    return proposal.capability==PROVISIONAL_HOLDS and any(m.get('tipo')=='provisional' for m in marks)
+    if any(m.get('tipo')=='provisional' for m in marks):return True
+    if any(m.get('tipo') for m in marks):return False  # written with a confirmed (or the initial) voice
+    return provisional_voice(_author(proposal))
+
+def approved_by_her(proposal):
+    """Whether a person approved this exact version: the user of the member who owns the account (her own approval; the
+    policy never sets decided_by). Without members, any human user (the installation's person)."""
+    if not proposal.decided_by_id or proposal.approved_hash!=proposal.payload_hash:return False
+    owner=_author(proposal)
+    if owner is not None:return proposal.decided_by_id==owner.user_id
+    return proposal.decided_by.get_username() not in miembros.ROBOTS
+
+def voice_hold(proposal):
+    """'' or why an approved proposal may not be written: a provisional-voice text that no person approved."""
+    if provisional_draft(proposal) and not approved_by_her(proposal):
+        return 'Escrito con la voz provisional: sale solo con la aprobación de su dueña.'
+    return ''
 
 def _configured(capability,member):
     own=(member.settings or {}).get('OPERATOR_AUTONOMY','') if member is not None else ''
@@ -352,7 +379,9 @@ def tick(user,now=None):
     # The lead (Jev, up to 60 s per call) reviews at most LEAD_MAX_REVIEWS_PER_TICK proposals per tick, oldest first; after
     # a plan_network the rest wait for the next ticks instead of blocking this one for minutes.
     lead_budget={'left':lead_reviews_per_tick(),'deferred':0}
-    for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
+    for proposal in ActionProposal.objects.select_related('post','piece','contact','account__member').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
+        if inactive(proposal.account):  # organizaciones, phase 7: an inactive member's proposals wait, untouched
+            report['inactive']=report.get('inactive',0)+1;continue
         try:policy_review(proposal,lead_budget)
         except miembros.MiembroRequerido:  # an account of nobody among several members: no rhythm decides for it
             report['unowned']=report.get('unowned',0)+1;continue
@@ -367,9 +396,11 @@ def tick(user,now=None):
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     members=miembros.exist()
-    for account in ConnectorAccount.objects.filter(paused=False):
+    for account in ConnectorAccount.objects.select_related('member').filter(paused=False):
         if members and miembros.member_of_account(account) is None:  # organizaciones, phase 2: an account of nobody among
             report['unowned']=report.get('unowned',0)+1;continue  # several members has no rhythm: it neither reads nor writes
+        if inactive(account):  # phase 7: a member in onboarding or deactivated: her accounts neither read nor write
+            report['inactive']=report.get('inactive',0)+1;continue
         try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
         except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
@@ -412,6 +443,11 @@ def tick(user,now=None):
     try:report['monthly_review']=_monthly_review(user,now)
     except Exception as exc:report['monthly_review_error']=type(exc).__name__  # the monthly review never stops the rest
     return report
+
+def inactive(account):
+    """Whether `account` belongs to an inactive member (organizaciones, phase 7: one being onboarded, or deactivated). The
+    autopilot leaves it alone: nothing is read, proposed, reviewed or written for her until she is active."""
+    return bool(account is not None and account.member_id and not account.member.active)
 
 def _editorial(user,now):
     """CONT-07: queue the preparation of each member's next slot (her EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead),

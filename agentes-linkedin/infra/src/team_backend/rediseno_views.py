@@ -18,7 +18,6 @@ from .operador_views import get_or_404, human_session, valid
 from .permissions import require
 from . import expo
 from .movil_views import devices_payload
-from .voz import marca as provisional
 
 LABELS={'INT-03':'Comentario','INT-04':'Respuesta en tu post','INT-02':'Reacción','CONT-09':'Publicación','RED-01':'Seguimiento',
         'RED-02':'Invitación sin nota','RED-04':'Invitación aceptada'}
@@ -238,7 +237,8 @@ def awaiting_approval(member):
     out=[]
     for p in rows:
         try:
-            if autopiloto.autonomy_of(p)=='approval':out.append(p)
+            # A provisional-voice text waits for her even when its capability is in «auto» (phase 7: it never goes out alone).
+            if autopiloto.autonomy_of(p)=='approval' or autopiloto.provisional_draft(p):out.append(p)
         except miembros.MiembroRequerido:continue
     return out
 
@@ -250,6 +250,13 @@ def approval_expiry(p):
 def approval_sentence(p):
     if p.capability=='CONT-09':return f'La pieza del {p.piece.slot_date:%d/%m}' if p.piece_id else 'Una publicación'
     return APPROVAL_SENTENCE.get(approval_key(p),LABELS.get(p.capability,p.capability)+' · {name}').format(name=_target(p)['name'] or 'una persona')
+
+def _provisional(p):
+    """«Voz provisional» on a draft that autopiloto.provisional_draft holds (organizaciones, phase 7: the same rule that keeps
+    it from going out alone), with the invitation's note when that is the text she approves. Nothing for any other draft,
+    so a member with her own voice reads the card exactly as before."""
+    if not autopiloto.provisional_draft(p):return {}
+    return {'provisional_voice':True,**({'note':p.payload['note']} if p.capability=='RED-02' and p.payload.get('note') else {})}
 
 def _approval_card(p):
     """«¿Apruebas seguir a Laura Gómez?» (importante): Aprobar sends the exact version (`expected_hash`); Vetar asks for
@@ -264,7 +271,7 @@ def _approval_card(p):
     expires=approval_expiry(p)
     return _card(f'approval:{p.id}','aprobacion',title,p.rationale or 'El equipo lo propone y espera tu aprobación.',actions,
                  agent=ACTOR.get(p.capability,'operador_cuenta'),priority='importante',deadline=expires,created_at=p.created_at,
-                 approval={**(provisional(p) or (provisional(p.piece) if p.piece_id else {})),'proposal_id':str(p.id),'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
+                 approval={**_provisional(p),'proposal_id':str(p.id),'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
                            'reaction':p.payload.get('reaction'),'target':target,'piece_id':str(p.piece_id) if p.piece_id else None,
                            'network':p.capability.startswith('RED-'),'expires_at':expires})
 
