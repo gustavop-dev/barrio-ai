@@ -1777,6 +1777,9 @@ def discard(user,contact_id,note_text,for_everyone=False):
         if contact.stage not in ACTIVE_STAGES:raise Conflict('Solo se descartan personas aún en curso (sin invitación ni conexión).')
         if contact.proposals.filter(state__in=['executing','sent','uncertain']).exists():
             raise Conflict('Hay una acción ejecutándose para esta persona; espera a que termine.')
+        if for_everyone:
+            from . import registro
+            if reason:=registro.exclusion_issue(contact):raise Conflict(reason)
         for proposal in contact.proposals.filter(state__in=['proposed','approved']):
             proposal.state=ActionProposal.State.REJECTED;proposal.decided_by=user;proposal.decided_at=timezone.now()
             proposal.decision_note='Persona descartada: '+note_text.strip()

@@ -783,6 +783,16 @@ def release_stale(organization, now=None):
 
 # --------------------------------------------------------------------------- exclusions
 
+def exclusion_issue(contact):
+    """red.discard(for_everyone): only the member who attends her (or anyone while nobody does) excludes her for the
+    whole organization; '' when she may."""
+    card = card_of(contact)
+    member = miembros.member_of_account(contact.account)
+    if card is not None and card.owner_id and (member is None or card.owner_id != member.pk):
+        return f'La atiende {card.owner.display_name}: solo quien la atiende la descarta para toda la organización.'
+    return ''
+
+
 def exclude(uid, account, kind, reason, member=None):
     """She is excluded for the organization (LinkedIn refused her invitation; she asked not to be contacted; a member
     discarded her for everyone). The member whose history caused it keeps today's rules for her own contact."""

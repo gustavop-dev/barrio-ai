@@ -2317,6 +2317,33 @@ class RegistroTests(RegistroBase):
             operador.create_proposal(self.g.user, None, 'RED-01', {'user_id': colleague.provider_user_id}, contact=colleague)
         self.assertIn('ACocto-propia', registro.known_uids(self.g.reader))
 
+    def test_only_who_attends_her_excludes_her_for_everyone_and_the_admin_never_reads_anothers_contact(self):
+        """Catch the API letting a member take away a person her colleague attends, or the admin reading the CTO's contact
+        through a reassignment: while Gustavo attends her, the CTO's discard «for everyone» is a 409 and changes nothing
+        (her plain discard of her own contact still works); naming a person by the CTO's contact, the admin's reassign
+        answers the card and nothing of her contact."""
+        uid = self.person('ana-seed')
+        his, hers = self.known(self.g, uid), self.known(self.cto, uid)
+        self.execute(self.approved(self.g, his))
+        office, gustavo = self.cto.client(), self.g.client()
+        refused = office.post(f'/api/v1/red/contacts/{hers.id}/discard', {'note': 'No es para nosotros.', 'for_everyone': True},
+                              format='json')
+        self.assertEqual(refused.status_code, 409, refused.content)
+        self.assertIn('La atiende Gustavo', refused.json()['detail'])
+        hers.refresh_from_db()
+        self.assertEqual((self.card(uid).excluded, hers.stage), ('', 'fit'))
+        own = office.post(f'/api/v1/red/contacts/{hers.id}/discard', {'note': 'No es para mí.'}, format='json')
+        self.assertEqual((own.status_code, self.card(uid).excluded, self.card(uid).owner), (200, '', self.g.member))
+        bea = self.known(self.cto, self.person('bea-libre'),
+                         notes=[{'id': 'n1', 'text': 'NOTA-PRIVADA-DE-LA-CTO', 'at': self.now.isoformat()}])
+        given = gustavo.post(f'/api/v1/red/contacts/{bea.id}/reasignar', {'member': str(self.cto.member.pk),
+                                                                          'reason': 'Es de su red.'}, format='json')
+        self.assertEqual(given.status_code, 200, given.content)
+        self.assertEqual((given.json()['display_name'], given.json()['assigned_to']['display_name']),
+                         (bea.display_name, 'CTO de prueba'))
+        self.assertNotIn('NOTA-PRIVADA-DE-LA-CTO', given.content.decode())
+        self.assertNotIn('notes', given.json())
+
     def test_excluded_for_everyone_nobody_touches_her(self):
         """Catch an exclusion that stays with one member: the CTO discards her for the whole organization (with a reason);
         Gustavo cannot propose nor execute anything for her. LinkedIn refusing his invitation blocks her for the CTO."""

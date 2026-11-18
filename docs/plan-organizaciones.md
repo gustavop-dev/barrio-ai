@@ -619,10 +619,12 @@ sus propias reglas (`sin_posts`, `COMPANY_MAX`).
 **Liberar, pasar y reasignar** (`POST /api/v1/red/contacts/<id>/liberar|pasar|reasignar`): quien la atiende la libera o la
 pasa a otro miembro activo, siempre con motivo y auditado (`people.released`, `people.passed`); el que la recibe empieza con la
 ficha básica (`registro.card_for`: nombre, titular, perfil y la clasificación de la organización); notas, mensajes y
-borradores se quedan con quien los tenía. El administrador reasigna solo a quien nadie ha tocado (`people.reassigned`). Una
+borradores se quedan con quien los tenía. El administrador reasigna solo a quien nadie ha tocado (`people.reassigned`; la
+respuesta es la ficha de la organización, nunca el contacto de otro miembro). Una
 persona en descanso o descartada sin exclusión para todos y sin actividad de su dueño durante `PEOPLE_RELEASE_AFTER_DAYS`
 (180) queda libre (`registro.release_stale`, en `red.plan`). Descartar con `for_everyone: true` excluye para toda la
-organización.
+organización; solo quien la atiende, o cualquiera mientras nadie la atiende (si la atiende otro, 409:
+`registro.exclusion_issue`, hallazgo de la pasada de seguridad de la fase).
 
 **Colegas.** `ConnectorAccount.linkedin_ids` guarda el perfil propio de cada cuenta (lo lee `check_account` de `/me`); esos
 perfiles nunca se clasifican (salen como no encaja sin llamada pagada, `red.COLLEAGUE_RULE`), nunca se proponen ni se
@@ -688,6 +690,11 @@ y las colas de `red.plan`, `autopiloto._propose` y `autopiloto._observe` compara
     sin contacto suyo.
   - Una persona cuya ficha se creó sin contacto (un comentarista de un post propio a quien se respondió) no entra al reparto
     hasta que alguien la descubre.
+  - El reclamo de un post de referente no se libera cuando su propuesta muere (rechazada, caducada, fallida): ese post se
+    queda sin el comentario del otro miembro. Liberarlo pide mirar la propuesta viva del miembro en `post_issue`,
+    `claim_post` y `claimed_by_others`, con cuidado del orden entre el reclamo y la propuesta en `create_proposal`.
+  - Entre miembros, un post de referente lo reclama quien primero tiene una propuesta (también una del agente que nadie
+    aprobó todavía): con dos autopilotos, el de Gustavo suele llegar primero a los posts de sus referentes.
 
 ## Servidor
 

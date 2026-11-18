@@ -69,15 +69,17 @@ class ContactPass(APIView):
 
 class ContactReassign(APIView):
     """The admin gives a person nobody touched yet to a member (organizaciones, phase 6), naming her by any contact of
-    the organization (a member's contact id); outside his organization the contact does not exist (404)."""
+    the organization (a member's contact id); outside his organization the contact does not exist (404). The answer is
+    the organization's card, never the contact: another member's contact is hers (not even the admin reads it)."""
     def post(self,request,cid):
         from rest_framework.exceptions import NotFound
         from . import miembros, registro
         human_session(request);data=valid(PassInput,request);require(request.user,'approve_actions')
         admin=miembros.member_for(request.user);contact=Contact.objects.select_related('account').filter(pk=cid).first()
         if contact is None or admin is None or registro.organization_id(contact.account)!=admin.organization_id:raise NotFound()
-        _registro(lambda:registro.reassign(request.user,contact,data['member'],data['reason']))
-        return Response(ContactOutput(Contact.objects.get(pk=contact.pk)).data)
+        card=_registro(lambda:registro.reassign(request.user,contact,data['member'],data['reason']))
+        return Response({'person':str(card.pk),'display_name':card.display_name,'headline':card.headline,
+                         'assigned_to':{'id':str(card.assigned_to_id),'display_name':card.assigned_to.display_name}})
 
 class ContactConfirmFit(APIView):
     """Personas → «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits."""

@@ -714,17 +714,19 @@ hasta entonces, un miembro nuevo entra **inactivo**.
   quien la recibe empieza con la ficha básica y sus notas y mensajes se quedan con él. Como administrador, reasigna a quien
   nadie ha tocado. Una persona en descanso o descartada sin actividad por 180 días queda libre.
 - **Código:** `registro.release`, `pass_to`, `card_for`, `reassign`, `release_stale`; `red_views.ContactRelease`, `ContactPass`,
-  `ContactReassign`; `red.discard(…, for_everyone)`; `compartido` (`releaseContact`, `passContact`, `useReleaseContact`,
+  `ContactReassign`; `red.discard(…, for_everyone)`, `registro.exclusion_issue`; `compartido` (`releaseContact`, `passContact`, `useReleaseContact`,
   `usePassContact`, `attendedBy`, `passTargets`).
 - **Criterios de aceptación:**
   1. **Dado** una persona suya, **cuando** la pasa al CTO con motivo, **entonces** el CTO la atiende con una ficha sin sus notas
      y queda auditado con el motivo; sin motivo, 400.
   2. **Dado** que ya no la atiende, **cuando** intenta liberarla, **entonces** 403; quien la atiende la libera con motivo.
   3. **Dado** el administrador, **cuando** reasigna a alguien sin tocar, **entonces** queda asignada; si alguien la atiende, 400;
-     el CTO (no administrador) recibe 403.
+     el CTO (no administrador) recibe 403. Nombrándola por el contacto del CTO, la respuesta es la ficha, nada de su contacto.
+  4. **Dado** que Gustavo la atiende, **cuando** el CTO la descarta «para todos», **entonces** 409 y nada cambia; su descarte de
+     su propio contacto sí se hace.
 - **Brechas código/docs:** falta un flujo de Maestro con dos miembros (fase 7).
-- **Cobertura QA:** `RegistroTests.test_release_and_pass_…` (1–3); `Persona.test.tsx`, `PersonaScreen.test.tsx` · 2026-11-18 ·
-  pasa en local
+- **Cobertura QA:** `RegistroTests.test_release_and_pass_…` (1–3), `RegistroTests.test_only_who_attends_her_excludes_…` (3–4);
+  `Persona.test.tsx`, `PersonaScreen.test.tsx` · 2026-11-18 · pasa en local
 
 ### ORG-32 · Referentes de la organización: una lectura y un comentario por post <a id="org-32"></a>
 

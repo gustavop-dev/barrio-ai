@@ -341,7 +341,7 @@ Valores que muestra la PWA:
 - `network_distance`: «1.er grado», «2.º grado», «3.er grado», «Fuera de tu red»; vacío no se muestra.
 - `confidence` (0 a 1) se muestra como porcentaje entero.
 
-POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`. Organizaciones, fase 6: `{ note, for_everyone: true }` además la excluye para toda la organización (ningún miembro la toca); sin `for_everyone` (o `false`) es lo de siempre.
+POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`. Organizaciones, fase 6: `{ note, for_everyone: true }` además la excluye para toda la organización (ningún miembro la toca); solo puede hacerlo quien la atiende, o cualquiera mientras nadie la atiende: si la atiende otro miembro, 409 «La atiende <nombre>: …» y nada cambia. Sin `for_everyone` (o `false`) es lo de siempre.
 
 **El registro de personas (organizaciones, fase 6).** Solo con dos o más miembros activos; con uno, `ContactOutput` no trae la clave y nada cambia.
 
@@ -356,7 +356,7 @@ POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requi
 - `mine`: el miembro que lee la atiende; `pass_to` son los otros miembros activos a quienes puede pasarla (vacío si no la atiende).
 - POST `/api/v1/red/contacts/<id>/liberar` con `{ reason }` (obligatorio): quien la atiende deja de atenderla; 403 si no la atiende, 400 sin motivo. Devuelve `ContactOutput`.
 - POST `/api/v1/red/contacts/<id>/pasar` con `{ member, reason }`: la pasa a otro miembro activo con cuenta lectora; él empieza con la ficha básica y nada privado se mueve. 403 si no la atiende; 400 sin motivo o con un miembro que no existe, no está activo o no tiene cuenta.
-- POST `/api/v1/red/contacts/<id>/reasignar` con `{ member, reason }`: solo el administrador; da a un miembro una persona que nadie ha tocado (el id es el de cualquier contacto de la organización; fuera de ella, 404). 400 si ya la atiende alguien.
+- POST `/api/v1/red/contacts/<id>/reasignar` con `{ member, reason }`: solo el administrador; da a un miembro una persona que nadie ha tocado (el id es el de cualquier contacto de la organización; fuera de ella, 404). 400 si ya la atiende alguien. Devuelve solo la ficha de la organización, `{ person, display_name, headline, assigned_to: { id, display_name } }`, nunca el contacto (el de otro miembro es suyo).
 - Cualquier propuesta para una persona que atiende otro miembro, excluida para todos o colega (`POST /api/v1/operador/actions`, un comentario en su post) responde 409 con el motivo («La atiende <nombre>.», «Este post ya lo comenta <nombre>.», «Es un colega de la organización: no es un prospecto.»). Todas con sesión humana, CSRF y `approve_actions`; auditadas (`people.released`, `people.passed`, `people.reassigned`).
 
 ### Resumen
