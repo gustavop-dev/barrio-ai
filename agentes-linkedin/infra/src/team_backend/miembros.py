@@ -219,6 +219,8 @@ def ensure_first_member(actor=None):
     from .jobs import audit
     audit(actor, 'organization.member_saved', member.pk, created=True, adopted=adopted, source='bootstrap',
           username=owner.get_username())
+    from . import identidad
+    identidad.seed_first(member, actor)  # phase 3: the installation's identity and voice, as migration 0058 does
     return member, True
 
 

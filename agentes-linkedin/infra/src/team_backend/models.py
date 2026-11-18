@@ -134,6 +134,10 @@ class Organization(models.Model):
     name=models.CharField(max_length=120)
     slug=models.SlugField(max_length=60,unique=True)
     created_at=models.DateTimeField(default=timezone.now)
+    # What the organization is and sells (phase 3, identidad.ORGANIZATION_FIELDS): positioning version and status,
+    # language, pillars, services, offer, cases, modalities and the neighborhood. Validated and audited by
+    # identidad.save_profile (each change leaves an IdentityRevision); empty: the installation's initial identity.
+    profile=models.JSONField(default=dict,blank=True)
     def __str__(self):return self.name
 
 class Member(models.Model):
@@ -153,8 +157,81 @@ class Member(models.Model):
     # the environment (LINKEDIN_ACCOUNT_TIER, OPERATOR_DAILY_LIMITS…). Only miembros.MEMBER_SETTINGS, validated by
     # miembros.save_settings; a variable she does not set takes the .env's value (miembros.setting).
     settings=models.JSONField(default=dict,blank=True)
+    # Who she is for the agents (phase 3, identidad.MEMBER_FIELDS): the name the team writes, how she presents herself,
+    # her relation to the organization, her limits, whether the personal startup modality is hers. Only she changes it
+    # (identidad.save_profile, audited with an IdentityRevision). Her voice is VoiceDocument.
+    profile=models.JSONField(default=dict,blank=True)
     class Meta:ordering=['created_at']
     def __str__(self):return f'{self.display_name} ({self.organization.slug})'
+
+
+class IdentityRevision(models.Model):
+    """One change of an identity profile, the organization's (`subject`='organization') or a member's ('member:<id>'):
+    who, when, which fields, the whole profile before and after. Only added, never edited (identidad.save_profile)."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='identity_revisions')
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='identity_revisions')
+    subject=models.CharField(max_length=60)
+    number=models.PositiveIntegerField()
+    changed=models.JSONField(default=list,blank=True)
+    before=models.JSONField(default=dict,blank=True)
+    after=models.JSONField(default=dict,blank=True)
+    actor=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    source=models.CharField(max_length=20)  # migracion, semilla, comando
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['created_at']
+        constraints=[models.UniqueConstraint(fields=['organization','subject','number'],name='one_identity_revision_number')]
+
+
+class VoiceDocument(models.Model):
+    """A member's voice document (voz.py), versioned. Used only once she confirms it; the latest confirmed one is her
+    voice. Gustavo's points to recursos/tono-de-voz.md (`resource`); a learned one keeps its text and the references to
+    the signals it came from (`signals`, never copies of them)."""
+    class State(models.TextChoices):
+        PROPOSED='propuesta','Propuesta; espera su confirmación'
+        CONFIRMED='confirmada','Confirmada por ella'
+        DISCARDED='descartada','Descartada'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='voice_documents')
+    number=models.PositiveIntegerField()
+    state=models.CharField(max_length=12,choices=State.choices,default=State.PROPOSED,db_index=True)
+    source=models.CharField(max_length=20)  # recurso (a file of recursos/), aprendida (proposed from her signals)
+    guide=models.TextField(blank=True)  # how the team applies it on LinkedIn; empty: voz.GENERIC_GUIDE
+    text=models.TextField(blank=True)
+    resource=models.CharField(max_length=120,blank=True)
+    sha256=models.CharField(max_length=64,blank=True)
+    signals=models.JSONField(default=list,blank=True)
+    usage=models.JSONField(default=dict,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    note=models.TextField(blank=True)
+    class Meta:
+        ordering=['-number']
+        constraints=[models.UniqueConstraint(fields=['member','number'],name='one_voice_document_number')]
+
+
+class VoiceSignal(models.Model):
+    """A trace of her style that already lives in the system (voz.collect_signals): a reference to the row, never a copy
+    of its text. One per member, kind and row."""
+    class Kind(models.TextChoices):
+        APPROVED='aprobado','Aprobó un borrador sin cambios'
+        EDITED='editado','Editó un borrador (antes y después)'
+        REJECTED='rechazado','Rechazó un borrador con su motivo'
+        ANSWER='respuesta','Respondió una pregunta del equipo'
+        CAPTURE='captura','Grabó un audio o escribió una nota'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='voice_signals')
+    kind=models.CharField(max_length=12,choices=Kind.choices)
+    source_model=models.CharField(max_length=40)
+    source_id=models.CharField(max_length=64)
+    occurred_at=models.DateTimeField()
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-occurred_at']
+        constraints=[models.UniqueConstraint(fields=['member','kind','source_model','source_id'],name='one_voice_signal_per_row')]
 
 
 # ---------------------------------------------------------------------------
@@ -418,6 +495,9 @@ class EditorialPiece(models.Model):
     citations=models.JSONField(default=list,blank=True)
     signals=models.JSONField(default=list,blank=True)
     usage=models.JSONField(default=list,blank=True)
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     # APRE-01, first metric: impressions read back when the publication is reconciled (null ≠ 0).
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
@@ -724,6 +804,9 @@ class ActionProposal(models.Model):
     decision_note=models.TextField(blank=True)
     # Agente líder (lider.py): the typed judgments, thresholds and decision that replaced a human approval.
     review=models.JSONField(default=dict,blank=True)
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-created_at']
         # One executor per action: a single open proposal per target (post, piece or contact) and capability.
@@ -1837,6 +1920,9 @@ class BuyerDraft(models.Model):
     citations=models.JSONField(default=list,blank=True)
     issues=models.JSONField(default=list,blank=True)  # the fixed rules it broke (after the single redraft)
     review=models.JSONField(default=dict,blank=True)  # the lead's verdict, with the course grounding it read
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     model=models.CharField(max_length=100,blank=True)
     show_at=models.DateTimeField(null=True,blank=True)  # a message's card never shows the minute she accepted
     proposal=models.ForeignKey(ActionProposal,on_delete=models.SET_NULL,null=True,blank=True,related_name='buyer_drafts')

@@ -32,7 +32,7 @@ knowledge = "knowledge.cli:main"
 
 [tool.setuptools.package-data]
 knowledge = ["schema.sql", "console.html"]
-team_backend = ["migrations/*.sql", "recursos/*.md", "recursos/*.html", "recursos/fonts/*"]
+team_backend = ["migrations/*.sql", "recursos/*.md", "recursos/*.html", "recursos/*.json", "recursos/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
