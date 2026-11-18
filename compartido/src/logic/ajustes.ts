@@ -20,10 +20,29 @@ export const AJUSTES_SECTIONS = [
   { id: 'sesion', label: 'Sesión y Acerca de' },
 ] as const;
 
-export type AjustesSection = (typeof AJUSTES_SECTIONS)[number]['id'];
+/** Organizaciones, phase 7: her own profile and voice (every member), and the organization (only its admin). They go
+ *  after Notificaciones, before «Lo que el equipo sabe de ti». Without a member (an installation without members) none. */
+export const MEMBER_SECTIONS = [
+  { id: 'perfil', label: 'Mi perfil' },
+  { id: 'voz', label: 'Mi voz' },
+] as const;
+export const ADMIN_SECTIONS = [{ id: 'organizacion', label: 'Organización' }] as const;
+
+const ALL_SECTIONS = [...AJUSTES_SECTIONS, ...MEMBER_SECTIONS, ...ADMIN_SECTIONS] as const;
+
+export type AjustesSection = (typeof ALL_SECTIONS)[number]['id'];
 
 export function isAjustesSection(value: unknown): value is AjustesSection {
-  return AJUSTES_SECTIONS.some((section) => section.id === value);
+  return ALL_SECTIONS.some((section) => section.id === value);
+}
+
+/** The sections this person sees, in order: the member ones only for a member, Organización only for its admin. */
+export function ajustesSections(yo: Pick<Yo, 'member' | 'is_admin'> | null | undefined): { id: AjustesSection; label: string }[] {
+  const extra: { id: AjustesSection; label: string }[] = [];
+  if (yo?.member) extra.push(...MEMBER_SECTIONS);
+  if (yo?.member && yo.is_admin) extra.push(...ADMIN_SECTIONS);
+  const at = AJUSTES_SECTIONS.findIndex((section) => section.id === 'sabe');
+  return [...AJUSTES_SECTIONS.slice(0, at), ...extra, ...AJUSTES_SECTIONS.slice(at)];
 }
 
 /** The backend does not have this endpoint yet (404/501): DISENO-VISTAS «Aún no disponible», never an error. */

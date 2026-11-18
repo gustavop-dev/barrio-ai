@@ -1,0 +1,203 @@
+# cubre: ORG-36, ORG-37, ORG-38
+# Ajustes for a member of the organization (organizaciones, phase 7). seed_qa: «qa» is Gustavo, ProjectApp's first
+# member, active and admin, with his voice confirmed (VoiceDocument 1: «Confirmada v1»). «Mi perfil»: he rewrites «Cómo
+# te presentas», saves, reads «Guardado.» and the new revision on top of the history; «Mi voz»: the label of his
+# voice and his texts against the minimum for a proposal (nothing paid is asked for here); «Organización», only for the
+# admin: Gustavo listed as active admin. At the end the original text goes back (copied before the edit and pasted
+# back), so the flows after this one find the seed as it was.
+appId: co.projectapp.office
+name: Ajustes · mi perfil, mi voz y organización
+tags: [ajustes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "MÁQUINA"
+    timeout: 20000
+# An active member never sees the onboarding notice.
+- assertNotVisible:
+    id: ajustes-alta
+
+# ---------------------------------------------------------------- Mi perfil: rewrite «Cómo te presentas» and save
+# cubre: ORG-36
+# ?ancla=perfil scrolls to the section.
+- openLink: "oficina0ff1ce://ajustes?ancla=perfil"
+- extendedWaitUntil:
+    visible:
+      text: "MI PERFIL"
+      childOf:
+        id: ajustes-mi-perfil
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Cómo te presentas"
+# Nothing changed yet: saving is off.
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: perfil-guardar
+    enabled: false
+- takeScreenshot: 20-perfil-01-inicial
+# Keep the seed's text to put it back at the end.
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- copyTextFrom:
+    id: perfil-identity
+# A tap leaves the cursor under the finger, mid-text: erase, tap again and erase what is left.
+- tapOn:
+    id: perfil-identity
+- eraseText: 600
+- tapOn:
+    id: perfil-identity
+- eraseText: 600
+- inputText: Me presento en una frase corta, de prueba QA.
+- hideKeyboard
+- assertVisible: ".*45 / 600"
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: perfil-guardar
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: perfil-estado
+      text: "Guardado\\."
+    timeout: 15000
+- takeScreenshot: 20-perfil-02-guardado
+# The history gains the revision on top: who, from where and what changed.
+- scrollUntilVisible:
+    element:
+      text: "Historial \\(\\d+\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Historial \\(\\d+\\)"
+- scrollUntilVisible:
+    element:
+      text: "#\\d+ · .* · desde la app · cambió: Cómo te presentas"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 20-perfil-03-historial
+
+# ---------------------------------------------------------------- Mi voz: confirmed, and his texts against the minimum
+# cubre: ORG-37
+- openLink: "oficina0ff1ce://ajustes?ancla=voz"
+- extendedWaitUntil:
+    visible:
+      text: "MI VOZ"
+      childOf:
+        id: ajustes-mi-voz
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: voz-estado
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    text: "CONFIRMADA V1"
+    childOf:
+      id: voz-estado
+- assertVisible: "El equipo escribe con tu voz confirmada \\(versión 1\\)\\."
+- scrollUntilVisible:
+    element:
+      text: "\\d+ de \\d+ textos aprobados o editados"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Muestra para una propuesta"
+# No proposal is waiting: nothing to confirm or discard.
+- assertNotVisible:
+    id: voz-confirmar
+- assertNotVisible:
+    id: voz-descartar
+- takeScreenshot: 20-voz-01-confirmada
+
+# ---------------------------------------------------------------- Organización: only the admin, Gustavo active admin
+# cubre: ORG-38
+- openLink: "oficina0ff1ce://ajustes?ancla=organizacion"
+- extendedWaitUntil:
+    visible:
+      text: "ORGANIZACIÓN"
+      childOf:
+        id: ajustes-organizacion
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Miembros \\(\\d+\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "ADMINISTRADOR"
+      childOf:
+        id: ajustes-organizacion
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "Gustavo"
+    childOf:
+      id: ajustes-organizacion
+- assertVisible:
+    text: "ACTIVO"
+    childOf:
+      id: ajustes-organizacion
+- assertVisible: "API oficial: .* · Navegador: .*"
+- takeScreenshot: 20-organizacion-01-miembros
+
+# ---------------------------------------------------------------- the seed's text back
+- openLink: "oficina0ff1ce://ajustes?ancla=perfil"
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: perfil-identity
+- eraseText: 600
+- tapOn:
+    id: perfil-identity
+- eraseText: 600
+- pasteText
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: perfil-guardar
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: perfil-estado
+      text: "Guardado\\.|Sin cambios: ya tenías esos valores\\."
+    timeout: 15000
+- takeScreenshot: 20-perfil-04-restaurado

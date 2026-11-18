@@ -274,3 +274,8 @@ export const PROVISIONAL_VOICE_LABEL = 'Voz provisional';
 export function provisionalVoice(card: TurnoCard): boolean {
   return Boolean(card.approval?.provisional_voice || card.message?.provisional_voice);
 }
+
+/** The heading of an approval's note (organizaciones, phase 7): a RED-02 invitation carries the note it sends. */
+export function approvalNoteLabel(approval: Pick<NonNullable<TurnoCard['approval']>, 'capability'>): string {
+  return approval.capability === 'RED-02' ? 'Nota de la invitación' : 'Nota';
+}

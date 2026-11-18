@@ -6,7 +6,7 @@ import type { MemoryFact, TuTurno } from '../api/types';
 import { CaptureProvider } from '../capture/CaptureContext';
 import { turnoAnchor } from '../components/Layout';
 import { fakeServer, SESSION_OK, type Handler, type Reply } from '../test/fakeServer';
-import { cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, MESSAGE_CARD, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
+import { APPROVAL_CARD, cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, MESSAGE_CARD, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
 import { renderAt } from '../test/render';
 import { TuTurno as TuTurnoPage } from './TuTurno';
 import { PROFILE_CARD, PROFILE_PROPOSAL } from '../../../compartido/src/fixtures/perfil';
@@ -168,6 +168,30 @@ describe('Tu turno · Pendiente', () => {
     expect(view.queryByText('Voz provisional')).not.toBeInTheDocument();
     await userEvent.click(view.getByRole('button', { name: 'Hecho, le escribí' }));
     await waitFor(() => expect(api.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
+  });
+
+  it('an invitation in her provisional voice shows the mark and the note it sends (organizations, phase 7)', async () => {
+    const invitation = {
+      ...APPROVAL_CARD,
+      title: '¿Apruebas invitar a Laura Prueba?',
+      approval: { ...APPROVAL_CARD.approval!, capability: 'RED-02', label: 'Invitación', provisional_voice: true, note: 'Hola Laura, me gustó tu charla sobre marketplaces.' },
+    };
+    server(busyTurno({ items: [invitation], alerts: [], questions: [] }));
+    renderApp('/tu-turno');
+    const card = await cardTitled('¿Apruebas invitar a Laura Prueba?');
+    expect(within(card).getByText('Voz provisional')).toBeInTheDocument();
+    const note = within(card).getByTestId('approval-note');
+    expect(note).toHaveTextContent('Nota de la invitación');
+    expect(note).toHaveTextContent('“Hola Laura, me gustó tu charla sobre marketplaces.”');
+  });
+
+  it('an approval without those keys renders as before: no voice mark, no note', async () => {
+    server(busyTurno({ items: [APPROVAL_CARD], alerts: [], questions: [] }));
+    renderApp('/tu-turno');
+    const card = await cardTitled('¿Apruebas seguir a Laura Prueba?');
+    expect(within(card).getByText('Lidera producto en un marketplace B2B.')).toBeInTheDocument();
+    expect(within(card).queryByText('Voz provisional')).not.toBeInTheDocument();
+    expect(within(card).queryByTestId('approval-note')).not.toBeInTheDocument();
   });
 
   it('marks a draft written in her provisional voice (organizations, phase 5)', async () => {

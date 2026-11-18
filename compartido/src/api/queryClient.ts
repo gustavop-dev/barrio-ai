@@ -4,6 +4,10 @@ import { ApiError } from './client';
 export const keys = {
   session: ['session'] as const,
   yo: ['yo'] as const,
+  // Phase 7 of organizaciones: under «yo», so changing her profile or voice refreshes «quién soy» too.
+  miPerfil: ['yo', 'perfil'] as const,
+  miVoz: ['yo', 'voz'] as const,
+  organizacion: ['organizacion'] as const,
   overview: ['overview'] as const,
   feed: ['feed'] as const,
   activity: ['activity'] as const,

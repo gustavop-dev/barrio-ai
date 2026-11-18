@@ -7,7 +7,7 @@ import { CALENDAR_TZ, longDay, todayIn } from '@compartido/logic/dates';
 import { pieceStatus } from '@compartido/logic/editorial';
 import { formatTime } from '@compartido/logic/format';
 import { isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from '@compartido/logic/piece';
-import { turnoAnchor } from '@compartido/logic/turno';
+import { PROVISIONAL_VOICE_LABEL, turnoAnchor } from '@compartido/logic/turno';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useNow } from '@/calendario/useNow';
@@ -147,6 +147,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
         <PageHeader title={`Pieza del ${day}`} />
         <View style={styles.status}>
           <Badge tone={status.tone}>{status.label}</Badge>
+          {piece.provisional_voice ? <Badge tone="info">{PROVISIONAL_VOICE_LABEL}</Badge> : null}
           {when && when !== 'Día sin pieza' ? (
             <T variant="detalle" soft>
               {when}

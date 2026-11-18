@@ -1,14 +1,17 @@
 // Ajustes (Ajustes.dc.html, DISENO-VISTAS «6. Ajustes», rev 18), opened from the top bar: the
 // machine controls, the team's orientation, autonomy and caps (folded), AI spend, the official
 // LinkedIn, capture, the profile photos (the Galería left the app on 12/11/2026), this phone's notifications and devices, what the team knows, and
-// the session. `/ajustes#maquina` (the `ancla` param) scrolls to that section, also while the
+// the session; for a member of an organization also Mi perfil and Mi voz, and Organización for its admin, with the
+// onboarding notice while the member is inactive. `/ajustes#maquina` (the `ancla` param) scrolls to that section, also while the
 // sections above it are still loading; `?linkedin=…&motivo=…` shows the OAuth return message.
+import { useYo } from '@compartido/api/hooks';
 import { isAjustesSection, type AjustesSection } from '@compartido/logic/ajustes';
+import { ALTA_NOTICE, inOnboarding } from '@compartido/logic/miembro';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { PageHeader, pageContent } from '@/components/ui';
+import { Note, PageHeader, pageContent } from '@/components/ui';
 import { colors, space } from '@/theme/tokens';
 import { AutonomiaSection } from './Autonomia';
 import { CapturaSection } from './Captura';
@@ -16,7 +19,10 @@ import { FotosPerfilSection } from './FotosPerfil';
 import { GastoSection } from './Gasto';
 import { LinkedInSection } from './LinkedIn';
 import { MaquinaSection } from './Maquina';
+import { MiPerfilSection } from './MiPerfil';
+import { MiVozSection } from './MiVoz';
 import { NotificacionesSection } from './Notificaciones';
+import { OrganizacionSection } from './Organizacion';
 import { OrientacionSection } from './Orientacion';
 import { SabeLink, SesionSection } from './Sesion';
 
@@ -40,6 +46,8 @@ export function AjustesScreen() {
   /** The section a link asked for, until it is on screen and Gustavo scrolls by himself. */
   const pending = useRef<AnchorId | null>(null);
   const anchor = isAnchor(params.ancla) ? params.ancla : null;
+  const yo = useYo();
+  const member = yo.data?.member ?? null;
 
   const scrollTo = useCallback((id: AnchorId, animated = true) => {
     const y = positions.current[id];
@@ -78,6 +86,13 @@ export function AjustesScreen() {
         }}
       >
         <PageHeader title="Ajustes" />
+        {inOnboarding(yo.data) ? (
+          <View style={styles.alta} testID="ajustes-alta">
+            <Note tone="warn" title="Tu cuenta está en alta">
+              {ALTA_NOTICE}
+            </Note>
+          </View>
+        ) : null}
         <Anchor {...anchorProps('maquina')}>
           <MaquinaSection />
         </Anchor>
@@ -102,6 +117,21 @@ export function AjustesScreen() {
         <Anchor {...anchorProps('notificaciones')}>
           <NotificacionesSection />
         </Anchor>
+        {member ? (
+          <Anchor {...anchorProps('perfil')}>
+            <MiPerfilSection onFieldFocus={() => scrollTo('perfil')} />
+          </Anchor>
+        ) : null}
+        {member ? (
+          <Anchor {...anchorProps('voz')}>
+            <MiVozSection />
+          </Anchor>
+        ) : null}
+        {member && yo.data?.is_admin ? (
+          <Anchor {...anchorProps('organizacion')}>
+            <OrganizacionSection />
+          </Anchor>
+        ) : null}
         <Anchor {...anchorProps('sabe')}>
           <SabeLink />
         </Anchor>
@@ -121,4 +151,4 @@ function Anchor({ children, onLayout, testID }: { children: ReactNode; onLayout:
   );
 }
 
-const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: colors.paper } });
+const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: colors.paper }, alta: { marginBottom: space[3] } });

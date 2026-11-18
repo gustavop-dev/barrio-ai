@@ -30,6 +30,12 @@ import {
   getFeed,
   getLinkedInStatus,
   getYo,
+  getMiPerfil,
+  getMiVoz,
+  getOrganizacion,
+  saveMiPerfil,
+  proposeMiVoz,
+  decideMiVoz,
   getOrientacion,
   getOverview,
   getPiece,
@@ -138,6 +144,50 @@ export function useContact(contactId: string) {
 /** «Quién soy»: her member and organization (organizaciones, phase 5). Changes only with the session. */
 export function useYo() {
   return useQuery({ queryKey: keys.yo, queryFn: getYo, staleTime: 5 * 60_000 });
+}
+
+// ================================================================ her profile, her voice, the organization (phase 7)
+
+/** Ajustes › Mi perfil: her own profile (also while her member is inactive, in onboarding). */
+export function useMiPerfil(enabled = true) {
+  return useQuery({ queryKey: keys.miPerfil, queryFn: getMiPerfil, enabled });
+}
+
+/** Saves the fields sent; refreshes her profile and «quién soy» (her name and role). */
+export function useSaveMiPerfil() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: saveMiPerfil,
+    // The answer is her profile as saved: shown at once, then «yo» (her name and role) refreshes with it.
+    onSuccess: ({ saved: _saved, ...perfil }) => client.setQueryData(keys.miPerfil, perfil),
+    onSettled: () => invalidate(client, keys.yo),
+  });
+}
+
+/** Ajustes › Mi voz: which voice the team writes with for her and how far her learning is. */
+export function useMiVoz(enabled = true) {
+  return useQuery({ queryKey: keys.miVoz, queryFn: getMiVoz, enabled });
+}
+
+/** Paid: one proposal of her voice document. Refreshes her voice and «quién soy». */
+export function useProposeMiVoz() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: proposeMiVoz, onSuccess: (voz) => client.setQueryData(keys.miVoz, voz), onSettled: () => invalidate(client, keys.yo) });
+}
+
+/** She confirms or discards a proposal; confirming ends «voz provisional» (`yo.provisional_voice`), so «yo» refreshes. */
+export function useDecideMiVoz() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: decideMiVoz,
+    onSuccess: (voz) => client.setQueryData(keys.miVoz, voz),
+    onSettled: () => invalidate(client, keys.yo, keys.organizacion),
+  });
+}
+
+/** Ajustes › Organización: only for the organization's admin (`yo.is_admin`). */
+export function useOrganizacion(enabled = true) {
+  return useQuery({ queryKey: keys.organizacion, queryFn: getOrganizacion, enabled });
 }
 
 export function useLinkedInStatus() {
