@@ -19,7 +19,13 @@ and fakes) and the steps piece() / publish() / pause() / oauth(); a phase adds i
 Phase 2 (RitmoPorMiembroTests, ConcurrenciaTests, AjustesTests, EstadoDeGustavoTests, VigilantesTests): each member is
 one LinkedIn member with her own rhythm (lock, spacing and day schedule, daily and weekly caps, profile reads, the
 invitation ramp and its health, notes and tier, provider blocks); the total stop, the AI budget and «one person, one
-invitation» stay the organization's; Gustavo's state of before organizations is his first member's, untouched."""
+invitation» stay the organization's; Gustavo's state of before organizations is his first member's, untouched.
+
+Phase 6 (RegistroTests, ReferentesDeLaOrganizacionTests, RepartoTests, RegistroConcurrenciaTests, RegistroMigracionTests,
+UnMiembro*Red/Comprador): one card per person in the organization (registro.py); the first real touch keeps her and the
+other member writes, comments, replies and drafts nothing for her, even through the API; one comment per referent's
+post and the author's wait across both; referents read once; the company rule; release and pass without anything
+private; colleagues never prospects; a stable, fair share of the untouched; one member exactly as before."""
 import hashlib
 import importlib
 import io
@@ -49,9 +55,11 @@ from rest_framework.test import APIClient
 
 from knowledge import db
 from team_backend import (alertas_slack, analitica, autopiloto, bucle_resultados, capturas, conexion, connectors_linkedin as li, editor_visual,
+                          mensajes_comprador, registro,
                           editorial, estrategia, guardas, hechos, identidad, imagenes, metricas, miembros, operador, perfil,
                           posicionamiento, red, referentes, respuestas, voz)
 from team_backend.connectors import ConnectorError, FakeConnector
+from team_backend.models import BuyerDraft, Person, PostClaim
 from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, BrowserLogin, BuyerJourney,
                                  Capture, ConnectorAccount, Contact, EditorialPiece, IdentityRevision, Job, LinkedInCredential,
                                  Member, MonthlyReview, Notification, ObservedPost, OperatorControl, Organization, PostComment,
@@ -62,6 +70,8 @@ from team_backend.tests import test_estrategia as est
 from team_backend.tests import test_metricas as met
 from team_backend.tests import test_operador as op
 from team_backend.tests import test_publicacion as pub
+from team_backend.tests import test_comprador_e2e as buyer_e2e
+from team_backend.tests import test_red as net
 from team_backend.tests import test_rediseno as rd
 from team_backend.tests import test_respuestas as resp
 from team_backend.tests import test_resumen_semanal as rsm
@@ -2044,3 +2054,498 @@ class RecorridoDelCtoTests(DosMiembrosBase):
         # A service credential, which is nobody's member, reads nothing of either with two members.
         self.assertEqual(self.api.get('/api/v1/tu-turno').status_code, 400)
         self.assertEqual(self.api.get('/api/v1/notificaciones').status_code, 400)
+
+
+# ---------------------------------------------------------------------- phase 6: the shared register of people
+
+SUBSTANTIVE = 'The hard part is not the model, it is deciding which step of the sales workflow you automate first.'
+
+
+class RegistroBase(RitmoBase):
+    """Phase 6 steps: the same LinkedIn person on both members' fakes (the same id for both, as directo's since
+    14/11/2026), each member's contact of her, and her touches through operador.execute."""
+
+    def setUp(self):
+        super().setUp()
+        env = patch.dict(os.environ, {'NETWORK_ENABLED': 'true', 'NETWORK_SCAN_DAYS': '3650', 'NETWORK_SEARCH_QUERIES': '',
+                                      'NETWORK_INVITE_AFTER_HOURS': '48', 'NETWORK_DAILY_LLM_USD': '1', 'NETWORK_READ_CAPS': '',
+                                      'NETWORK_BUYER_REGION': '', 'NETWORK_STAGE_CHECK': 'false', 'NETWORK_SEARCH_LOCATION': '',
+                                      'NETWORK_BATCHES': '', 'NETWORK_SIGNALS_PER_DAY': '0', 'PEOPLE_ROLE_PREFERENCE': ''})
+        env.start()
+        self.addCleanup(env.stop)
+        self.autobot = self.bot()
+        self.now = timezone.now()
+        self.paid = []
+
+    def person(self, slug, headline='Founder at Seedco', **seed):
+        """She exists on LinkedIn: both members' browsers know her."""
+        for persona in (self.g, self.cto):
+            user = persona.browser().seed_person(slug, slug.replace('-', ' ').title(), headline=headline, **seed)
+        return user['id']
+
+    def known(self, persona, uid, stage='fit', source='manual', headline='Founder at Seedco', classification=None, **fields):
+        """Her contact of that person, as discovery and the classifier leave it (a fitting buyer by default)."""
+        if classification is None:
+            classification = {'fit': True, 'role': 'comprador', 'confidence': 0.9, 'reason': 'Encaja.',
+                              'classified_at': self.now.isoformat()}
+        return Contact.objects.create(account=persona.reader, provider_user_id=uid, display_name=uid, headline=headline,
+                                      source=source, stage=stage, classification=classification, **fields)
+
+    def approved(self, persona, contact, capability='RED-01'):
+        """Her approved proposal, through operador.create_proposal (the register's check at creation)."""
+        proposal = operador.create_proposal(persona.user, None, capability, {'user_id': contact.provider_user_id},
+                                            contact=contact, state='approved', source='agent')
+        ActionProposal.objects.filter(pk=proposal.pk).update(approved_hash=proposal.payload_hash)
+        return proposal
+
+    def execute(self, proposal):
+        return operador.execute(self.autobot, proposal.id)
+
+    def card(self, uid):
+        return Person.objects.select_related('owner').get(organization=self.organization, provider_user_id=uid)
+
+    def network_writes(self, persona):
+        return persona.browser().state['writes']
+
+    def classifier(self, verdicts):
+        """verdicts: {display_name: (fit, confidence)}; every call is counted in self.paid."""
+        def fake(system, message, max_tokens=None, output_schema=None, effort=None, purpose='agent-run', model=None, context=None):
+            data = json.loads(message)
+            self.paid.append([p['name'] for p in data['people']])
+            out = [{'id': p['id'], 'fit': verdicts[p['name']][0], 'role': 'comprador', 'modality': 'projectapp',
+                    'affinity': 'desconocida', 'reason': f'Razón para {p["name"]}', 'confidence': verdicts[p['name']][1],
+                    'course_citations': ['LI-03-M005-K06'], 'invitation_note': 'Nota privada de quien clasificó',
+                    'note_reason': 'Motivo privado'} for p in data['people'] if p['name'] in verdicts]
+            return {'text': json.dumps({'contacts': out}), 'model': model, 'estimated_usd': 0.002, 'request_id': 'req_net'}
+        return patch('knowledge.providers.claude', side_effect=fake)
+
+    def referent(self, slug, posts):
+        """A referent on Gustavo's list (the organization's), with her posts on both browsers."""
+        ref = Referent.objects.create(account=self.g.reader, public_identifier=slug, provider_user_id='ACo' + slug,
+                                      display_name=slug.title(), reason='Pertinente para el barrio.', active=True)
+        for persona in (self.g, self.cto):
+            persona.browser().seed_user(slug, slug.title(), posts=posts)
+        return ref
+
+
+class RegistroTests(RegistroBase):
+    def test_the_same_person_found_by_both_is_classified_once_and_not_discovered_again(self):
+        """Catch a second paid classification of the same person: the CTO's contact takes Gustavo's verdict (without his
+        private note), the card is one, and her search does not add someone the organization already has."""
+        uid = self.person('ana-seed')
+        his = self.known(self.g, uid, stage='candidate', classification={})
+        hers = self.known(self.cto, uid, stage='candidate', classification={})
+        with self.classifier({uid: (True, 0.9)}):
+            self.assertEqual(red.classify(self.g.user, self.g.reader, self.now)['classified'], 1)
+            result = red.classify(self.cto.user, self.cto.reader, self.now)
+        self.assertEqual((self.paid, result['classified'], result['shared']), ([[uid]], 1, 1))
+        his.refresh_from_db()
+        hers.refresh_from_db()
+        card = self.card(uid)
+        self.assertEqual((his.stage, hers.stage, hers.classification['fit']), ('fit', 'fit', True))
+        self.assertEqual(hers.classification['shared_from'], str(card.pk))
+        self.assertNotIn('invitation_note', hers.classification)
+        self.assertEqual(his.classification['invitation_note'], 'Nota privada de quien clasificó')
+        self.assertEqual((Person.objects.filter(provider_user_id=uid).count(), card.owner_id), (1, None))  # classifying is not touching
+        # Her search finds someone only Gustavo has, and someone new: only the new one becomes her contact.
+        bea = self.person('bea-solo')
+        self.known(self.g, bea)
+        cira = self.person('cira-nueva')
+        for slug in ('bea-solo', 'cira-nueva'):
+            self.cto.browser().seed_person(slug, slug.title(), headline='Founder at Otra', search='founder pre-seed')
+        with patch.dict(os.environ, {'NETWORK_SEARCH_QUERIES': 'founder pre-seed'}):
+            red.discover(self.cto.user, self.cto.reader, self.now)
+        mine = set(Contact.objects.filter(account=self.cto.reader).values_list('provider_user_id', flat=True))
+        self.assertEqual((bea in mine, cira in mine), (False, True))
+
+    def test_the_first_follow_keeps_her_and_the_other_member_loses_her_queue_and_cannot_touch_her(self):
+        """Catch two members on one person: Gustavo's follow makes him her owner; the CTO's open proposal and draft for
+        her leave their queues; she cannot propose, approve, execute, comment, reply or get a draft for her, not even
+        through the API with her own ids; her Personas shows «La atiende Gustavo» and nothing of his."""
+        uid = self.person('ana-seed')
+        his = self.known(self.g, uid, notes=[{'id': 'n1', 'text': 'NOTA-PRIVADA-DE-GUSTAVO', 'at': self.now.isoformat()}])
+        hers = self.known(self.cto, uid)
+        waiting = operador.create_proposal(self.cto.user, None, 'RED-01', {'user_id': uid}, contact=hers, source='agent')
+        journey = BuyerJourney.objects.create(contact=hers, step=BuyerJourney.Step.ACCEPTED, chosen_at=self.now)
+        draft = BuyerDraft.objects.create(contact=hers, kind=BuyerDraft.Kind.MESSAGE, state=BuyerDraft.State.REVIEWING, text='Hola')
+
+        self.assertEqual(self.execute(self.approved(self.g, his)).state, 'confirmed')
+        card = self.card(uid)
+        self.assertEqual((card.owner, card.touch, card.stage), (self.g.member, 'RED-01', 'seguida'))
+        waiting.refresh_from_db()
+        draft.refresh_from_db()
+        self.assertEqual((waiting.state, draft.state), ('discarded', 'reemplazado'))
+        self.assertIn('La atiende Gustavo', waiting.decision_note)
+
+        # Nothing of hers reaches the person: creation, a row approved meanwhile, the API, a draft, a comment.
+        for capability in ('RED-01', 'RED-02'):
+            with self.assertRaisesMessage(registro.Atendida, 'La atiende Gustavo.'):
+                operador.create_proposal(self.cto.user, None, capability, {'user_id': uid}, contact=hers)
+        ActionProposal.objects.filter(pk=waiting.pk).update(state='approved', approved_hash=waiting.payload_hash)
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'La atiende Gustavo.'):
+            self.execute(waiting)
+        waiting.refresh_from_db()
+        self.assertEqual(waiting.state, 'discarded')
+        self.assertEqual(self.network_writes(self.cto), 0)
+        post = ObservedPost.objects.create(account=self.cto.reader, provider_post_id='activity:ana-1', author_provider_id=uid,
+                                           author_name='Ana', text=SUBSTANTIVE, posted_at=self.now)
+        office = self.cto.client()
+        answer = office.post('/api/v1/operador/actions', {'post': str(post.id), 'capability': 'INT-03',
+                                                          'payload': {'text': 'Buen punto.'}}, format='json')
+        self.assertEqual((answer.status_code, answer.json()['detail']), (409, 'La atiende Gustavo.'))
+        self.assertEqual(office.get(f'/api/v1/red/contacts/{his.id}').status_code, 404)  # his contact is not hers
+        self.assertEqual(mensajes_comprador.prepare(self.cto.user, {'contact': str(hers.id), 'kind': 'mensaje'}),
+                         {'decision': 'skip', 'reason': 'La atiende Gustavo.'})
+        self.assertEqual(journey.contact_id, hers.pk)
+        shown = office.get(f'/api/v1/red/contacts/{hers.id}')
+        self.assertEqual(shown.status_code, 200, shown.content)
+        self.assertEqual(shown.json()['registro']['attended_by']['display_name'], 'Gustavo')
+        self.assertEqual(shown.json()['next_step'], {'owner': None, 'text': 'La atiende Gustavo', 'at': None})
+        self.assertNotIn('NOTA-PRIVADA-DE-GUSTAVO', shown.content.decode())
+        # Her planner does not propose her again; his own page says it is his.
+        red.plan(self.cto.user, self.cto.reader, self.now)
+        self.assertFalse(ActionProposal.objects.filter(contact=hers, state__in=['proposed', 'approved']).exists())
+        self.assertTrue(self.g.client().get(f'/api/v1/red/contacts/{his.id}').json()['registro']['mine'])
+
+    def test_one_company_two_or_three_people_never_two_of_the_same_cargo_and_none_new_without_a_reason(self):
+        """Catch two members opening the same company at will (LI-08-V006-K02): where Gustavo attends two people of Acme
+        the CTO opens nobody new there without a reason of her own; with one (an incoming invitation) never the same
+        cargo, and never a fourth person of the company."""
+        for slug, headline in (('ana-acme', 'CTO at Acme'), ('bea-acme', 'CEO at Acme')):
+            uid = self.person(slug, headline)
+            self.execute(self.approved(self.g, self.known(self.g, uid, headline=headline)))
+        cases = [('carla-acme', 'CFO at Acme', 'manual', 'Gustavo ya atiende a alguien de Acme'),
+                 ('dora-acme', 'CTO at Acme', 'incoming', 'mismo cargo (cto)'),
+                 ('eva-acme', 'CFO at Acme', 'incoming', ''),
+                 ('fran-acme', 'COO at Acme', 'incoming', 'máximo 3 por empresa')]
+        for slug, headline, source, refused in cases:
+            with self.subTest(person=slug):
+                contact = self.known(self.cto, self.person(slug, headline), headline=headline, source=source)
+                if refused:
+                    with self.assertRaisesMessage(registro.Atendida, refused):
+                        self.approved(self.cto, contact)
+                else:
+                    self.assertEqual(self.execute(self.approved(self.cto, contact)).state, 'confirmed')
+        # A referral keeps its own rules (sin_posts), and another company is free.
+        self.approved(self.cto, self.known(self.cto, self.person('gina-acme', 'CMO at Acme'), headline='CMO at Acme', source='referido'))
+        self.approved(self.cto, self.known(self.cto, self.person('hugo-globex', 'CTO at Globex'), headline='CTO at Globex'))
+
+    def test_release_and_pass_are_audited_with_a_reason_and_move_nothing_private(self):
+        """Catch a pass that hands over his notes, or a release by someone who does not attend her: Gustavo passes her to
+        the CTO with a reason (she starts with the basic card), the CTO releases her; reasons are required and audited;
+        the admin reassigns only someone untouched."""
+        uid = self.person('ana-seed')
+        his = self.known(self.g, uid, notes=[{'id': 'n1', 'text': 'NOTA-PRIVADA-DE-GUSTAVO', 'at': self.now.isoformat()}])
+        self.execute(self.approved(self.g, his))
+        gustavo, office = self.g.client(), self.cto.client()
+        self.assertEqual(gustavo.post(f'/api/v1/red/contacts/{his.id}/pasar', {'member': str(self.cto.member.pk)},
+                                      format='json').status_code, 400)  # no reason
+        passed = gustavo.post(f'/api/v1/red/contacts/{his.id}/pasar', {'member': str(self.cto.member.pk),
+                                                                      'reason': 'Ella habla con CTOs.'}, format='json')
+        self.assertEqual(passed.status_code, 200, passed.content)
+        self.assertEqual(passed.json()['registro']['attended_by']['display_name'], 'CTO de prueba')
+        hers = Contact.objects.get(account=self.cto.reader, provider_user_id=uid)
+        self.assertEqual((self.card(uid).owner, self.card(uid).touch), (self.cto.member, 'traspaso'))
+        self.assertEqual(hers.notes, [])
+        self.assertNotIn('NOTA-PRIVADA-DE-GUSTAVO', json.dumps(hers.history) + json.dumps(hers.classification))
+        event = AuditEvent.objects.get(action='people.passed')
+        self.assertEqual((event.metadata['reason'], event.metadata['to'], event.actor), ('Ella habla con CTOs.', str(self.cto.member.pk), self.g.user))
+        # He no longer attends her: he cannot release her; she can, with a reason.
+        self.assertEqual(gustavo.post(f'/api/v1/red/contacts/{his.id}/liberar', {'reason': 'x'}, format='json').status_code, 403)
+        self.assertEqual(office.post(f'/api/v1/red/contacts/{hers.id}/liberar', {}, format='json').status_code, 400)
+        released = office.post(f'/api/v1/red/contacts/{hers.id}/liberar', {'reason': 'No respondió.'}, format='json')
+        self.assertEqual(released.status_code, 200, released.content)
+        self.assertIsNone(self.card(uid).owner)
+        self.assertEqual(AuditEvent.objects.get(action='people.released').metadata['reason'], 'No respondió.')
+        # The admin gives an untouched person to the CTO; never one somebody attends; she cannot reassign.
+        bea = self.known(self.g, self.person('bea-libre'))
+        self.assertEqual(office.post(f'/api/v1/red/contacts/{bea.id}/reasignar', {'member': str(self.cto.member.pk),
+                                                                                 'reason': 'x'}, format='json').status_code, 403)
+        given = gustavo.post(f'/api/v1/red/contacts/{bea.id}/reasignar', {'member': str(self.cto.member.pk),
+                                                                          'reason': 'Es de su red.'}, format='json')
+        self.assertEqual(given.status_code, 200, given.content)
+        self.assertEqual(self.card(bea.provider_user_id).assigned_to, self.cto.member)
+        self.execute(self.approved(self.g, self.known(self.g, self.person('cora-tocada'))))
+        cora = Contact.objects.get(account=self.g.reader, provider_user_id='ACocora-tocada')
+        refused = gustavo.post(f'/api/v1/red/contacts/{cora.id}/reasignar', {'member': str(self.cto.member.pk), 'reason': 'x'},
+                               format='json')
+        self.assertEqual(refused.status_code, 400)
+        self.assertIn('La atiende Gustavo', refused.json()['detail'])
+
+    def test_a_colleague_is_never_a_prospect_and_an_employee_never_a_buyer(self):
+        """Catch the team prospecting the CTO herself or someone who works at ProjectApp: her own profile (read from /me)
+        is never classified, proposed or discovered; an employee leaves as not a buyer."""
+        stub = type('Connector', (), {'client': type('Client', (), {'me': {'fsd': 'ACocto-propia', 'public_id': 'cto-propia'}})()})()
+        registro.remember_own(self.cto.reader, stub)
+        self.assertEqual(ConnectorAccount.objects.get(pk=self.cto.reader.pk).linkedin_ids, ['ACocto-propia', 'cto-propia'])
+        colleague = self.known(self.g, self.person('cto-propia'), stage='candidate', classification={})
+        employee = self.known(self.g, self.person('dev-pa', 'Developer at ProjectApp'), stage='candidate', classification={},
+                              headline='Developer at ProjectApp')
+        with self.classifier({employee.provider_user_id: (True, 0.9)}):
+            red.classify(self.g.user, self.g.reader, self.now)
+        self.assertEqual(self.paid, [[employee.provider_user_id]])  # the colleague never reaches the paid call
+        colleague.refresh_from_db()
+        employee.refresh_from_db()
+        self.assertEqual((colleague.stage, colleague.classification['rule']), ('discarded', red.COLLEAGUE_RULE))
+        self.assertEqual((employee.stage, employee.classification['rule']), ('discarded', red.EMPLOYEE_RULE))
+        with self.assertRaisesMessage(registro.Atendida, 'colega'):
+            operador.create_proposal(self.g.user, None, 'RED-01', {'user_id': colleague.provider_user_id}, contact=colleague)
+        self.assertIn('ACocto-propia', registro.known_uids(self.g.reader))
+
+    def test_excluded_for_everyone_nobody_touches_her(self):
+        """Catch an exclusion that stays with one member: the CTO discards her for the whole organization (with a reason);
+        Gustavo cannot propose nor execute anything for her. LinkedIn refusing his invitation blocks her for the CTO."""
+        uid = self.person('ana-seed')
+        his, hers = self.known(self.g, uid), self.known(self.cto, uid)
+        early = self.approved(self.g, his)
+        office = self.cto.client()
+        discarded = office.post(f'/api/v1/red/contacts/{hers.id}/discard', {'note': 'Pidió no ser contactada.',
+                                                                          'for_everyone': True}, format='json')
+        self.assertEqual(discarded.status_code, 200, discarded.content)
+        self.assertEqual((self.card(uid).excluded, self.card(uid).excluded_by), ('descarte', self.cto.member))
+        with self.assertRaisesMessage(registro.Atendida, 'Excluida para toda la organización'):
+            operador.create_proposal(self.g.user, None, 'RED-01', {'user_id': uid}, contact=his)
+        with self.assertRaisesMessage(operador.OperatorBlocked, 'Excluida para toda la organización'):
+            self.execute(early)
+        self.assertEqual(self.network_writes(self.g), 0)
+        # LinkedIn refused his invitation to Bea: she is out for the CTO too; he keeps today's rule for his own contact.
+        bea = self.person('bea-seed')
+        refused = self.proposal(self.g, 'RED-02', contact=self.known(self.g, bea))
+        red.provider_failure(self.g.reader, refused, ConnectorError('cannot resend', status=422, kind='provider/cannot_resend_yet'),
+                             self.g.user)
+        self.assertEqual(self.card(bea).excluded, 'rechazo_linkedin')
+        self.assertIn('Excluida', registro.issue(self.cto.member, self.organization.pk, bea))
+        self.assertEqual(registro.issue(self.g.member, self.organization.pk, bea), '')
+
+
+class RegistroConcurrenciaTests(RegistroBase):
+    def test_two_members_following_her_at_once_one_wins_and_the_other_writes_nothing(self):
+        """Two executions at once on the same person by Gustavo and the CTO: exactly one writes and keeps her; the other
+        is refused before writing and its proposal discarded (the card's row FOR UPDATE)."""
+        uid = self.person('ana-carrera')
+        proposals = {'g': self.approved(self.g, self.known(self.g, uid)), 'c': self.approved(self.cto, self.known(self.cto, uid))}
+        start = threading.Barrier(2)
+
+        def race(key):
+            close_old_connections()
+            try:
+                start.wait(5)
+                return key, operador.execute(self.autobot, proposals[key].id).state
+            except operador.OperatorBlocked as exc:
+                return key, f'refused: {exc}'
+            finally:
+                close_old_connections()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            outcome = dict(pool.map(race, ['g', 'c']))
+        self.assertEqual(sorted(v.split(':')[0] for v in outcome.values()), ['confirmed', 'refused'], outcome)
+        winner = next(k for k, v in outcome.items() if v == 'confirmed')
+        owner = {'g': self.g, 'c': self.cto}[winner]
+        self.assertEqual(self.card(uid).owner, owner.member)
+        self.assertEqual(self.network_writes(self.g) + self.network_writes(self.cto), 1)
+        loser = proposals['c' if winner == 'g' else 'g']
+        loser.refresh_from_db()
+        self.assertEqual(loser.state, 'discarded')
+        self.assertIn(f'La atiende {owner.member.display_name}', loser.decision_note)
+
+
+class ReferentesDeLaOrganizacionTests(RegistroBase):
+    def test_a_referents_post_is_read_once_commented_by_one_member_and_her_commenters_enter_unowned(self):
+        """Catch the same post read and commented twice: each referent is read by one account (the stable split); her
+        posts reach both members; the first member with a proposal keeps the post and the other's is refused (also via
+        the API and the autopilot); the commenters are read once and enter the register without an owner."""
+        refs = [self.referent(f'ref-{n}', [f'{SUBSTANTIVE} ({n})']) for n in range(4)]
+        readers = [a.pk for a in registro.readers(self.organization.pk)]
+        expected = {ref.pk: readers[registro._stable(self.organization.pk, ref.public_identifier) % 2] for ref in refs}
+        read = {}
+        for persona in (self.g, self.cto):
+            read[persona.reader.pk] = set(referentes.to_read(persona.reader).values_list('pk', flat=True))
+            operador.observe(persona.user, persona.reader)
+        self.assertEqual(read[self.g.reader.pk] | read[self.cto.reader.pk], {r.pk for r in refs})
+        self.assertFalse(read[self.g.reader.pk] & read[self.cto.reader.pk])  # never both
+        self.assertEqual({pk: next(a for a, ids in read.items() if pk in ids) for pk in expected}, expected)
+        pid = 'activity:ref-0-0'
+        his, hers = (ObservedPost.objects.get(account=p.reader, provider_post_id=pid) for p in (self.g, self.cto))
+        self.assertEqual((his.referent_id, hers.referent_id), (refs[0].pk, refs[0].pk))
+        # One comment per post: Gustavo's proposal claims it; hers is refused, by creation, the API and the autopilot.
+        operador.create_proposal(self.g.user, his, 'INT-03', {'text': 'Una opinión con fundamento.'}, source='agent')
+        self.assertEqual(PostClaim.objects.get(provider_post_id=pid).member, self.g.member)
+        with self.assertRaisesMessage(registro.Atendida, 'Este post ya lo comenta Gustavo.'):
+            operador.create_proposal(self.cto.user, hers, 'INT-03', {'text': 'Otra opinión.'}, source='agent')
+        answer = self.cto.client().post('/api/v1/operador/actions', {'post': str(hers.id), 'capability': 'INT-03',
+                                                                     'payload': {'text': 'Otra opinión.'}}, format='json')
+        self.assertEqual(answer.status_code, 409)
+        self.assertIn(pid, registro.claimed_by_others(self.cto.reader))
+        with self.assertRaisesMessage(registro.Atendida, 'Este post ya lo comenta Gustavo.'):
+            operador.propose_comment(self.cto.user, hers.id)  # never a paid draft for it
+        # Her commenters: read once by whoever scans first; the other copy is not read again.
+        self.g.browser().seed_person('dani-comenta', 'Dani', headline='Founder at Dataco', comment_on=pid, comment=SUBSTANTIVE)
+        red.discover(self.g.user, self.g.reader, self.now)
+        hers.refresh_from_db()
+        self.assertIsNotNone(hers.commenters_scanned_at)
+        self.assertIsNone(self.card('ACodani-comenta').owner)
+
+    def test_the_authors_wait_counts_both_members(self):
+        """Catch the cooldown counted per account: Gustavo's comment on one post of a referent makes the CTO's other post
+        of hers wait too."""
+        ref = self.referent('ref-espera', [f'{SUBSTANTIVE} (uno)', f'{SUBSTANTIVE} (dos)'])
+        for persona in (self.g, self.cto):
+            operador.observe(persona.user, persona.reader)
+        first = ObservedPost.objects.get(account=self.g.reader, provider_post_id='activity:ref-espera-0')
+        second = ObservedPost.objects.get(account=self.cto.reader, provider_post_id='activity:ref-espera-1')
+        self.assertNotIn(ref.pk, autopiloto.recent_comment_authors(self.cto.reader, self.now))
+        operador.create_proposal(self.g.user, first, 'INT-03', {'text': 'Una opinión con fundamento.'}, source='agent',
+                                 state='approved')
+        self.assertIn(ref.pk, autopiloto.recent_comment_authors(self.cto.reader, timezone.now()))
+        draft = ActionProposal(account=self.cto.reader, post=second, capability='INT-03', payload={'text': 'x'})
+        self.assertTrue(autopiloto.comment_author_issues(draft))
+
+
+class RepartoTests(RegistroBase):
+    def test_the_share_of_the_untouched_is_stable_fair_and_follows_affinity_and_the_role_preference(self):
+        """Catch a share that moves or leans: 200 untouched people split near half and half, the same every time; a
+        person who invited the CTO is hers; with PEOPLE_ROLE_PREFERENCE a technology lead goes to the CTO; the planner of
+        each member only goes after hers, and the CTO gets the basic card of the ones Gustavo found for her."""
+        members = [self.g.member, self.cto.member]
+        cards = [Person.objects.create(organization=self.organization, provider_user_id=f'ACoreparto-{i}', stage='candidata',
+                                       classification={'fit': True}) for i in range(200)]
+        first = [registro.taker(c, members) for c in cards]
+        self.assertEqual(first, [registro.taker(c, members) for c in cards])
+        self.assertTrue(70 <= first.count(self.cto.member.pk) <= 130, first.count(self.cto.member.pk))
+        theirs = next(c for c, m in zip(cards, first) if m == self.g.member.pk)
+        Contact.objects.create(account=self.cto.reader, provider_user_id=theirs.provider_user_id, source='incoming', stage='incoming')
+        self.assertEqual(registro.taker(theirs, members), self.cto.member.pk)
+        lead = next(c for c, m in zip(cards, first) if m == self.g.member.pk and c.pk != theirs.pk)
+        Person.objects.filter(pk=lead.pk).update(classification={'fit': True, 'buyer': {'papel': 'lider_tecnologia'}})
+        lead.refresh_from_db()
+        with patch.dict(os.environ, {'PEOPLE_ROLE_PREFERENCE': 'lider_tecnologia=CTO'}):
+            self.assertEqual(registro.taker(lead, members), self.cto.member.pk)
+        self.assertEqual(registro.taker(lead, members), self.g.member.pk)
+        # The planners: Gustavo found 24 fitting people; each member goes only after the ones the share gives her.
+        found = []
+        for n in range(24):
+            uid = self.person(f'hallada-{n}')
+            found.append(self.known(self.g, uid, stage='fit'))
+        gate = registro.gate(self.g.member, self.g.reader)
+        his = [c for c in found if not gate(c, 'RED-01')]
+        given = [c for c in found if gate(c, 'RED-01') == registro.SHARE_REASON]
+        self.assertEqual(len(his) + len(given), 24)
+        self.assertTrue(his and given)
+        red.plan(self.g.user, self.g.reader, self.now)
+        red.plan(self.cto.user, self.cto.reader, self.now)
+        proposed = lambda p: set(ActionProposal.objects.filter(account=p.reader, capability='RED-01').values_list(
+            'payload__user_id', flat=True))
+        self.assertTrue(proposed(self.g) <= {c.provider_user_id for c in his})
+        self.assertTrue(proposed(self.cto) <= {c.provider_user_id for c in given})
+        copies = Contact.objects.filter(account=self.cto.reader, provider_user_id__in=[c.provider_user_id for c in given])
+        self.assertTrue(copies.exists())
+        self.assertTrue(all(c.history[0]['event'] == 'shared' and not c.notes for c in copies))
+
+
+class RegistroMigracionTests(Migraciones, TransactionTestCase):
+    """Migration 0063 on the historical models: today's data is Gustavo's (the first member); he owns whom he touched,
+    the untouched stay free, refusals and definitive exits exclude for everyone, his comments claim their posts; run
+    again it changes nothing; back, the register is empty."""
+
+    def test_todays_people_become_gustavos_cards_idempotently_and_reversibly(self):
+        apps = self.at(('team_backend', '0062_registro_de_personas'))
+        User = apps.get_model('auth', 'User')
+        Organization, Member = apps.get_model('team_backend', 'Organization'), apps.get_model('team_backend', 'Member')
+        Account, Contact_ = apps.get_model('team_backend', 'ConnectorAccount'), apps.get_model('team_backend', 'Contact')
+        Proposal, Execution = apps.get_model('team_backend', 'ActionProposal'), apps.get_model('team_backend', 'ActionExecution')
+        Journey, Audit = apps.get_model('team_backend', 'BuyerJourney'), apps.get_model('team_backend', 'AuditEvent')
+        Referent_, Post = apps.get_model('team_backend', 'Referent'), apps.get_model('team_backend', 'ObservedPost')
+        user = User.objects.create(username='gustavo', password='x')
+        org = Organization.objects.create(name='ProjectApp', slug='projectapp')
+        member = Member.objects.create(organization=org, user=user, display_name='Gustavo', is_admin=True)
+        account = Account.objects.create(provider='directo', external_account_id='cuenta-gustavo', label='Navegador', member=member)
+        now = timezone.now()
+
+        def contact(uid, stage='fit', **fields):
+            return Contact_.objects.create(account=account, provider_user_id=uid, display_name=uid, stage=stage,
+                                           headline='CTO at Acme', **fields)
+        contact('seguida', 'followed', followed_at=now)
+        contact('libre', 'fit', classification={'fit': True, 'classified_at': now.isoformat(), 'evidence': {'x': 1}})
+        written = contact('comentada', 'fit')
+        done = Proposal.objects.create(account=account, contact=written, capability='RED-01', payload={}, payload_hash='h' * 64,
+                                       state='confirmed')
+        Execution.objects.create(proposal=done, idempotency_key='k1', provider='directo', state='confirmed', wrote=True,
+                                 executed_by=user)
+        contact('rechazada', 'followed', followed_at=now)
+        Audit.objects.create(action='network.recipient_blocked', target='rechazada')
+        out = contact('no-quiere', 'connected', connected_at=now)
+        Journey.objects.create(contact=out, step='salio', exit_reason='pidio_no_contacto', chosen_at=now)
+        contact('me', 'candidate')
+        ref = Referent_.objects.create(account=account, public_identifier='ref', reason='r')
+        post = Post.objects.create(account=account, referent=ref, provider_post_id='activity:ref-1')
+        Proposal.objects.create(account=account, post=post, capability='INT-03', payload={'text': 'x'}, payload_hash='i' * 64,
+                                state='sent')
+
+        apps = self.at(('team_backend', '0063_registro_inicial'))
+        Person_ = apps.get_model('team_backend', 'Person')
+
+        def state():
+            return {p.provider_user_id: (p.owner_id is not None, p.excluded, p.touch) for p in Person_.objects.all()}
+        expected = {'seguida': (True, '', 'antes'), 'libre': (False, '', ''), 'comentada': (True, '', 'antes'),
+                    'rechazada': (True, 'rechazo_linkedin', 'antes'), 'no-quiere': (True, 'no_contactar', 'antes')}
+        self.assertEqual(state(), expected)
+        libre = Person_.objects.get(provider_user_id='libre')
+        self.assertNotIn('evidence', libre.classification)  # only the organization's part
+        self.assertEqual(apps.get_model('team_backend', 'Contact').objects.filter(person__isnull=False).count(), 5)
+        claim = apps.get_model('team_backend', 'PostClaim').objects.get()
+        self.assertEqual((claim.provider_post_id, claim.member_id), ('activity:ref-1', member.pk))
+        importlib.import_module('team_backend.migrations.0063_registro_inicial').forwards(apps, None)
+        self.assertEqual((state(), apps.get_model('team_backend', 'PostClaim').objects.count()), (expected, 1))
+        apps = self.at(('team_backend', '0062_registro_de_personas'))
+        self.assertFalse(apps.get_model('team_backend', 'Person').objects.exists())
+        self.assertFalse(apps.get_model('team_backend', 'Contact').objects.filter(person__isnull=False).exists())
+
+
+# One member: the network and the buyer's path exactly as before (the register only records).
+
+class UnMiembroDiscoveryAndFollowTests(UnMiembro, net.DiscoveryAndFollowTests):
+    pass
+
+
+class UnMiembroInvitationTests(UnMiembro, net.InvitationTests):
+    pass
+
+
+class UnMiembroVetoAndSafetyTests(UnMiembro, net.VetoAndSafetyTests):
+    pass
+
+
+class UnMiembroTodayBuyerPathTests(UnMiembro, buyer_e2e.TodayBuyerPathTests):
+    pass
+
+
+
+class UnMiembroRegistroTests(UnMiembro, EditorialBase):
+    """Alone (the only member, made by production): the register records, and every answer is the one of before."""
+
+    def test_alone_the_register_changes_no_answer(self):
+        """Catch phase 6 changing Gustavo's day before a second member exists: no «registro» in Personas, no share, no
+        company rule, no referent split or copies, her own exclusions do not stop her, nothing more is «known»."""
+        now = timezone.now()
+        self.assertFalse(registro.shared(self.member.organization_id))
+        person = Contact.objects.create(account=self.account, provider_user_id='ACoana', display_name='Ana', stage='fit',
+                                        headline='CTO at Acme', classification={'fit': True, 'role': 'comprador'})
+        card = Person.objects.get(provider_user_id='ACoana')  # recorded, with no owner until a touch
+        self.assertEqual((card.owner_id, card.company, card.stage), (None, 'Acme', 'candidata'))
+        client = APIClient()
+        client.force_login(self.gustavo)
+        shown = client.get(f'/api/v1/red/contacts/{person.id}').json()
+        self.assertNotIn('registro', shown)
+        self.assertEqual(shown['next_step']['text'], 'El equipo la seguirá')
+        self.assertEqual(registro.gate(self.member, self.account)(person, 'RED-01'), '')
+        for n in range(4):  # Acme as full as the company rule allows: alone it does not apply
+            Person.objects.create(organization=self.member.organization, provider_user_id=f'ACoacme-{n}', headline=f'CTO at Acme',
+                                  owner=self.member)
+        self.assertEqual(registro.issue(self.member, self.member.organization_id, 'ACoana', opening=True, contact=person), '')
+        registro.exclude('ACoana', self.account, 'rechazo_linkedin', 'LinkedIn la rechazó.')
+        self.assertEqual(registro.issue(self.member, self.member.organization_id, 'ACoana'), '')  # today's rule decides
+        self.assertEqual(registro.known_uids(self.account), set())
+        self.assertEqual(registro.peers(self.account), [self.account.pk])
+        ref = Referent.objects.create(account=self.account, public_identifier='ref', reason='r', active=True)
+        self.assertEqual(list(referentes.to_read(self.account)), [ref])
+        self.assertEqual(referentes.share_posts(self.account, ['activity:ref-0']), 0)
+        self.assertEqual(registro.release_stale(self.member.organization_id, now), 0)
