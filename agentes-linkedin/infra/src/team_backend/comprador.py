@@ -32,6 +32,16 @@ log=logging.getLogger(__name__)
 Step=BuyerJourney.Step;Kind=BuyerTouch.Kind;Direction=BuyerTouch.Direction;Source=BuyerTouch.Source
 RestReason=BuyerJourney.RestReason;ExitReason=BuyerJourney.ExitReason;Route=BuyerJourney.Route
 
+def signal_name(kind,account):
+    """How a signal is named to the member whose buyer it is: the label of always («Comentó en un post de Gustavo») for
+    the first member and without members; another member's own name instead (organizaciones, phase 5). The stored
+    value never changes: «gustavo» in values and labels is «the member who owns it»."""
+    from . import miembros
+    label=Kind(kind).label
+    member=miembros.member_of_account(account) if account is not None else None
+    if member is None or miembros.is_first(member):return label
+    return label.replace('Gustavo',member.display_name)
+
 # The active steps in order; «descanso» and «salio» stand apart from them.
 STEPS=[Step.CHOSEN,Step.WARMING,Step.INVITED,Step.ACCEPTED,Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4,
        Step.REPLIED,Step.INTERESTED,Step.MEETING]
@@ -712,7 +722,7 @@ def temperature(person,now=None,weigh=None):
                for f in facts(contact) if DIRECTION[f['kind']]==IN]
         invited=contact.invited_at
     found.sort(key=lambda s:s[0],reverse=True)
-    signals=[{'tipo':kind,'nombre':Kind(kind).label,'at':at.isoformat(),'dias':round((now-at).total_seconds()/86400,1),
+    signals=[{'tipo':kind,'nombre':signal_name(kind,contact.account),'at':at.isoformat(),'dias':round((now-at).total_seconds()/86400,1),
               'antes_de_invitar':not invited or at<invited,'detalle':detail,'ref':refs} for at,kind,detail,refs in found]
     by_kind={}
     for s in signals:by_kind[s['tipo']]=by_kind.get(s['tipo'],0)+1
@@ -747,7 +757,8 @@ def drafts(journeys=None):
     first=messages.filter(number=1)
     ready=first.filter(state=State.READY).count();follow_ups=messages.filter(number__gt=1,state=State.READY).count()
     # A journey draft is pending only while its card can show (its switch on); RSP-07's as before.
-    pending=(sum(1 for row in _dm_rows() if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
+    from . import alcance
+    pending=(sum(1 for row in _dm_rows(alcance.TODOS) if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
              +(follow_ups if secuencia_comprador.enabled() else 0))
     sent=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.MESSAGE).count()
     declined=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.NO_MESSAGE).count()
@@ -858,10 +869,11 @@ def _replies(journeys):
     from . import respuesta_comprador
     return respuesta_comprador.funnel(journeys)
 
-def funnel(weeks=8,now=None,account=None):
+def funnel(weeks=8,now=None,account=None,accounts=None):
     """The buyer's funnel (GET /api/v1/resultados/embudo-comprador): cumulative and by week (cohorts by the week they
     were chosen, plus that week's activity), the comparisons that matter and the drafts. Stages that do not exist yet
-    (messages 2–4, interested, meeting) come at zero with their final shape. Read-only."""
+    (messages 2–4, interested, meeting) come at zero with their final shape. Read-only. `accounts`: only the buyers of
+    those accounts (a member's, alcance.accounts; organizaciones phase 5)."""
     from . import operador
     try:weeks=int(weeks)
     except (TypeError,ValueError):raise ValueError('semanas debe ser un número entre 1 y 26.') from None
@@ -869,6 +881,7 @@ def funnel(weeks=8,now=None,account=None):
     now=now or timezone.now()
     rows=BuyerJourney.objects.select_related('contact')
     if account is not None:rows=rows.filter(contact__account=account)
+    if accounts is not None:rows=rows.filter(contact__account__in=accounts)
     rows=list(rows)
     outbound=[j for j in rows if j.entry==BuyerJourney.Entry.OUTBOUND]
     inbound=[j for j in rows if j.entry==BuyerJourney.Entry.INBOUND]
@@ -897,7 +910,7 @@ def funnel(weeks=8,now=None,account=None):
     if projectapp.enabled():
         test={'por_linea':{line:block(j for j in outbound if (j.line or 'startup')==line) for line in projectapp.LINES},
               'por_segmento':{s:block(j for j in outbound if j.line=='projectapp' and j.segment==s) for s in projectapp.SEGMENTS},
-              'prueba_projectapp':projectapp.test_progress(account,now)}
+              'prueba_projectapp':projectapp.test_progress(account,now,accounts=accounts)}
     return {**({'ruta_sin_posts':route} if route else {}),**test,
             'generado':now.isoformat(),'zona_horaria':str(operador.local_tz()),'definiciones':DEFINITIONS,
             'acumulado':block(outbound),'semanas':weekly,

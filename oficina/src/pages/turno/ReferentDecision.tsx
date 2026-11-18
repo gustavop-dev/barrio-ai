@@ -66,5 +66,5 @@ export function ReferentDecision({ card }: { card: TurnoCard }) {
     </Modal> : null}
   </div>;
 }
-const FIELD_LABELS = { reason: 'Motivo', outgoing: 'Sale', name: 'Nombre del candidato', url: 'Perfil de LinkedIn', niche: 'Nicho', audience: 'Audiencia observada', contribution: 'Aporte de Gustavo', source: 'Fuente pública del cambio' };
+const FIELD_LABELS = { reason: 'Motivo', outgoing: 'Sale', name: 'Nombre del candidato', url: 'Perfil de LinkedIn', niche: 'Nicho', audience: 'Audiencia observada', contribution: 'Tu aporte', source: 'Fuente pública del cambio' };
 const PLAN_LABELS = { hypothesis: 'Hipótesis', audience: 'Público', comparison: 'Comparación', min_classified: 'Muestra mínima clasificada', min_coverage: 'Cobertura mínima (0 a 1)', min_fit_week: 'Personas con encaje por semana', min_exposure: 'Comentarios publicados mínimos' };

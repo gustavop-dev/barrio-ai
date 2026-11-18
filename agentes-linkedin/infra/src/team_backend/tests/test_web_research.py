@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import httpx
 from django.db import close_old_connections, connections
-from django.test import SimpleTestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.utils import timezone
 from knowledge import db, memory, providers
 from team_backend import capturas, editorial, preguntas, research, web_sources
@@ -70,7 +70,7 @@ def tool_limits():
     return providers.WebTools('web_search_20250305','web_fetch_20250910',2,2,4000,25000,Decimal('.01'))
 
 
-class PublicURLTests(SimpleTestCase):
+class PublicURLTests(TestCase):  # safe_question reads the members' names (identidad.private_names)
     def test_the_default_web_tools_are_the_ones_that_return_native_citations(self):
         # The dynamic-filtering tools search from code execution and their text has no citations: zero findings. The
         # defaults are read from the settings source, so the machine's own environment cannot hide them.

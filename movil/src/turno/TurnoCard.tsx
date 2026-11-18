@@ -9,7 +9,7 @@ import type { TurnoAction, TurnoCard as TurnoCardData, TurnoOpportunity, TurnoPr
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '@compartido/logic/format';
 import { messageText } from '@compartido/logic/personas';
 import { APPROVE_HINT, evidenceLines, metricName } from '@compartido/logic/revisionMensual';
-import { clock, createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from '@compartido/logic/turno';
+import { approvalNoteLabel, clock, createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL, PROVISIONAL_VOICE_LABEL, provisionalVoice } from '@compartido/logic/turno';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
@@ -197,6 +197,14 @@ function ApprovalDetails({ card }: { card: TurnoCardData }) {
       {target?.kind === 'person' && target.headline ? <T soft>{target.headline}</T> : null}
       {approval.text ? <Quote>{approval.text}</Quote> : null}
       {approval.reaction ? <T>Reacción: {approval.reaction}</T> : null}
+      {approval.note ? (
+        <View style={styles.block} testID="approval-note">
+          <T variant="etiqueta" soft>
+            {approvalNoteLabel(approval)}
+          </T>
+          <Quote>{approval.note}</Quote>
+        </View>
+      ) : null}
       {card.body ? (
         <View style={styles.block}>
           <T variant="etiqueta" soft>
@@ -559,6 +567,7 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
               {priority === 'importante' ? <Badge tone="warn">{PRIORITY_LABEL.importante}</Badge> : null}
               {priority === 'cuando_puedas' ? <Badge tone="info">{PRIORITY_LABEL.cuando_puedas}</Badge> : null}
               {expired ? <Badge tone="muted">Caducada</Badge> : null}
+              {provisionalVoice(card) ? <Badge tone="info">{PROVISIONAL_VOICE_LABEL}</Badge> : null}
             </View>
           </View>
           {deadline ? (

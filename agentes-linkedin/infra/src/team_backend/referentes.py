@@ -2,15 +2,14 @@
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
-import os
 import re
 import uuid
 from urllib.parse import urlsplit
 
-from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
+from . import identidad, miembros
 from .jobs import Conflict, audit
 from .models import (AuditEvent, ConnectorAccount, Notification, Referent, ReferentChange,
                      ReferentControl, ReferentNotice, ReferentReview)
@@ -20,17 +19,24 @@ TZ = ZoneInfo('America/Bogota')
 TERMINAL = {'approved', 'aplicada_por_plazo', 'rejected'}
 
 
-def is_gustavo(user):
-    # An explicit stable installation identity, never superuser/staff/operate_linkedin as a proxy.
-    username = getattr(settings, 'REFERENTS_GUSTAVO_USERNAME', os.environ.get('REFERENTS_GUSTAVO_USERNAME', 'gustavo'))
-    return bool(user and user.is_authenticated and user.is_active and user.get_username() == username)
+def is_gustavo(user, account=None):
+    """Who decides on an account's referents and experiments (organizaciones, phase 1): the member who owns the account
+    or the admin of its organization (miembros.can_decide), never superuser/staff/operate_linkedin as a proxy. Without an
+    account, any active admin. Without members at all (an installation before organizations), the explicit installation
+    identity REFERENTS_GUSTAVO_USERNAME, as before."""
+    from . import miembros
+    if not (user and user.is_authenticated and user.is_active):
+        return False
+    if not miembros.exist():
+        return user.get_username() == miembros.legacy_owner_username()
+    return miembros.can_decide(user, account) if account is not None else miembros.is_admin(user)
 
 
-def require_gustavo(user):
+def require_gustavo(user, account=None):
     from .orquestacion import current
     require(user, 'operate_linkedin')
-    if not is_gustavo(user) or current() is not None:
-        raise PermissionDenied('Solo Gustavo puede decidir cambios de referentes y experimentos.')
+    if not is_gustavo(user, account) or current() is not None:
+        raise PermissionDenied('Solo el dueño de la cuenta o el administrador decide cambios de referentes y experimentos.')
 
 
 def month_start(now):
@@ -84,7 +90,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
     control = lock(ref.account)
     ref = Referent.objects.select_for_update().get(pk=ref.pk)
     if ref.protected or 'protected' in changes or replacement:
-        require_gustavo(user)
+        require_gustavo(user, ref.account)
     if ref.revision != version:
         raise Conflict('La ficha cambió. Recarga antes de guardar.')
     before = snapshot(ref)
@@ -98,7 +104,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
         target_before = snapshot(target)
         target.protected, target.position, target.active = ref.protected, ref.position, True
         ref.protected, ref.active, ref.archived_at = False, False, timezone.now()
-        changed(control, user, target, target_before, source, 'Reemplazo explícito de Gustavo')
+        changed(control, user, target, target_before, source, f'Reemplazo explícito de {identidad.owner_name(ref.account)}')
         audit(user,'referents.main_replaced',ref.pk,source=source,outgoing=str(ref.pk),incoming=str(target.pk),
               outgoing_before=before,incoming_before=target_before,incoming_after=snapshot(target))
     for field, value in changes.items():
@@ -107,7 +113,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
                 ref.active, ref.archived_at = False, timezone.now()
         else:
             setattr(ref, field, value)
-    changed(control, user, ref, before, source, 'Decisión explícita de Gustavo')
+    changed(control, user, ref, before, source, f'Decisión explícita de {identidad.owner_name(ref.account)}')
     capacity(ref.account)
     return ref
 
@@ -115,7 +121,7 @@ def manage(user, ref, *, version, changes, source='personas', replacement=None):
 @transaction.atomic
 def initialize(user, account, ids):
     """Recovery only after an ambiguous migration; never pick five by order/popularity."""
-    require_gustavo(user)
+    require_gustavo(user, account)
     control = lock(account)
     if control.initialized:
         raise Conflict('Los main iniciales ya están registrados; usa la gestión de protegidos.')
@@ -186,8 +192,11 @@ def notice(review, event, title, detail, now):
     payload = {'title': title, 'detail': detail, 'deadline': review.deadline.isoformat()}
     row, created = ReferentNotice.objects.get_or_create(review=review, event=event, defaults={'payload': payload, 'created_at': now})
     if created:
-        Notification.objects.create(kind='referents_review', layer='conversaciones', title=title, detail=detail,
-            link='/personas?pestana=referentes' if event=='closed' else '/tu-turno', ref=f'referents:{review.pk}:{event}', created_at=now)
+        # The decision is the account owner's (or the admin's): the notice is hers (organizaciones, phase 5).
+        from .notificaciones import _ref
+        owner = miembros.member_of_account(review.account)
+        Notification.objects.create(kind='referents_review', layer='conversaciones', title=title, detail=detail, member=owner,
+            link='/personas?pestana=referentes' if event=='closed' else '/tu-turno', ref=_ref(f'referents:{review.pk}:{event}', owner), created_at=now)
     return row
 
 
@@ -279,9 +288,9 @@ def _apply(item, control, user, automatic, now):
 @transaction.atomic
 def decide(user, item_id, version, decision, proposal=None, now=None, note=''):
     """`note`: Gustavo's why, kept in the history; a rejected industry candidate's note is shown to the next search."""
-    require_gustavo(user)
-    now = now or timezone.now()
     item = ReferentChange.objects.select_related('review__account').get(pk=item_id)
+    require_gustavo(user, item.review.account)
+    now = now or timezone.now()
     control = lock(item.review.account)
     item = ReferentChange.objects.select_for_update().select_related('review').get(pk=item_id)
     if item.version != version or item.state in TERMINAL:
@@ -375,18 +384,17 @@ def tick(user, now=None):
     if ReferentExperiment.objects.filter(state='approved').exists():
         enqueue_operation(user,'advance_experiments',{},request_id=uuid.uuid5(uuid.NAMESPACE_URL,f'experiments:{local:%Y-%m-%d-%H}'))
     if operador.within_window(now):
-        from .alerts import notify
-        from .notificaciones import push_enabled
-        for pending in ReferentNotice.objects.filter(pushed_at__isnull=True).select_related('review'):
+        from .notificaciones import empujar
+        for pending in ReferentNotice.objects.filter(pushed_at__isnull=True).select_related('review__account'):
             if pending.event == 'day1' and now < bounds(pending.review.month)[0] + timedelta(hours=9):
                 continue
             with transaction.atomic():
                 pending = ReferentNotice.objects.select_for_update().get(pk=pending.pk)
                 if pending.pushed_at:
                     continue
-                if push_enabled('referents_review'):
-                    notify(pending.payload['title'], pending.payload['detail'][:200],
-                           url='/personas?pestana=referentes' if pending.event=='closed' else '/tu-turno', tag=f'referents-{pending.pk}')
+                empujar('referents_review', pending.payload['title'], pending.payload['detail'][:200],
+                        '/personas?pestana=referentes' if pending.event=='closed' else '/tu-turno', f'referents-{pending.pk}',
+                        member=miembros.member_of_account(pending.review.account))  # the account owner's devices
                 pending.pushed_at = now
                 pending.save(update_fields=['pushed_at'])
     tomorrow = (local + timedelta(days=1)).date()
@@ -402,3 +410,70 @@ def tick(user, now=None):
 
 def history(ref):
     return list(AuditEvent.objects.filter(target=str(ref.pk), action='referents.changed').values('actor__username', 'created_at', 'metadata')[:10])
+
+
+# --------------------------------------------------------------------------- organizaciones, phase 6: read once
+
+def to_read(account):
+    """The active referents an account reads (operador.observe, autopiloto._observe). Alone (one active member): its own,
+    as before. Among two or more members the referents are the organization's (every member's account), each one read
+    by ONE reader account of the organization, a stable hash of the referent over the readers: the same post is never
+    read twice; share_posts copies it to the others, so each member may comment on it (registro.claim_post: only one
+    does)."""
+    from . import registro
+    own = Referent.objects.filter(account=account, active=True)
+    org = registro.organization_id(account)
+    if not registro.shared(org):
+        return own
+    readers = [a.pk for a in registro.readers(org)]
+    if account.pk not in readers:
+        return own
+    chosen, seen = [], set()
+    for ref in (Referent.objects.filter(account__in=registro.accounts(org), active=True)
+                .order_by('account__created_at', 'created_at', 'pk')):
+        key = ref.public_identifier or ref.provider_user_id
+        if key in seen:
+            continue  # the same person on two members' lists is read once (the oldest list's row)
+        seen.add(key)
+        if readers[registro._stable(org, key) % len(readers)] == account.pk:
+            chosen.append(ref.pk)
+    return Referent.objects.filter(pk__in=chosen)
+
+
+SHARED_POST_FIELDS = ('referent_id', 'share_url', 'author_name', 'author_public_identifier', 'author_provider_id', 'text',
+                      'posted_at', 'comments_count', 'reactions_count', 'is_repost', 'reposts_count', 'media')
+
+
+def share_posts(account, provider_post_ids):
+    """After an observation among two or more members: the referents' posts just read are copied to the other members'
+    reader accounts (their own row, for their own comment proposal), with what the reader already scanned. Alone:
+    nothing (as before). Returns the copies made or refreshed."""
+    from . import registro
+    from .models import ObservedPost
+    org = registro.organization_id(account)
+    if not provider_post_ids or not registro.shared(org):
+        return 0
+    others = [a for a in registro.readers(org) if a.pk != account.pk]
+    done = 0
+    for post in ObservedPost.objects.filter(account=account, provider_post_id__in=list(provider_post_ids), referent__isnull=False):
+        values = {name: getattr(post, name) for name in SHARED_POST_FIELDS}
+        for other in others:
+            copy, created = ObservedPost.objects.update_or_create(account=other, provider_post_id=post.provider_post_id,
+                                                                  defaults=values)
+            if created and post.commenters_scanned_at and not copy.commenters_scanned_at:
+                ObservedPost.objects.filter(pk=copy.pk).update(commenters_scanned_at=post.commenters_scanned_at)
+            done += 1
+    return done
+
+
+def scanned_everywhere(post, now):
+    """red.discover read a referent's post's commenters: the organization's other copies of the post are not read again
+    (only among two or more members; alone there are no copies)."""
+    from . import registro
+    from .models import ObservedPost
+    org = registro.organization_id(post.account)
+    if post.referent_id is None or not registro.shared(org):
+        return 0
+    return (ObservedPost.objects.filter(account__in=registro.accounts(org), provider_post_id=post.provider_post_id,
+                                        commenters_scanned_at__isnull=True).exclude(pk=post.pk)
+            .update(commenters_scanned_at=now))

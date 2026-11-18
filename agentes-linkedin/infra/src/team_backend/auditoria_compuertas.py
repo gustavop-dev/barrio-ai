@@ -272,7 +272,7 @@ def vigilar(now=None):
     COMPUERTAS_ALERTA_MIN decisions), and one per day that ended without a post because of a gate. COMPUERTAS_ALERTAS=false
     turns both off."""
     if os.environ.get('COMPUERTAS_ALERTAS','true').strip().lower()=='false':return 0
-    from .notificaciones import avisar
+    from .notificaciones import ORGANIZACION, avisar, de_contenido
     now=now or timezone.now();report=auditar(7,now);sent=0
     year,week,_=now.astimezone(operador.local_tz()).isocalendar()
     for row in report['compuertas']:
@@ -281,16 +281,19 @@ def vigilar(now=None):
         top=', '.join(f'{k} ({n})' for k,n in row['motivos'][:3])
         created=avisar('gate_alert',f'{row["nombre"]}: frenó {row["paradas"]} de {decided} en 7 días',
                        (f'Lo que más la para: {top}. ' if top else '')+'Antes de tocar umbrales, mira la auditoría (compuertas auditar).',
-                       link='/calendario?vista=lista&no_salio=1',ref=f'gate_alert:{row["compuerta"]}:{year}-W{week:02d}')
+                       link='/calendario?vista=lista&no_salio=1',ref=f'gate_alert:{row["compuerta"]}:{year}-W{week:02d}',
+                       member=ORGANIZACION)  # the gates are the machine's: counts and check ids, nothing of anyone's
         sent+=int(created is not None)
     yesterday=(now.astimezone(operador.local_tz())-timedelta(days=1)).date().isoformat()
     for day in report['callejones_sin_salida']:
         if day['fecha']!=yesterday:continue
         gate=day['causa'].split(':',1)[1]
+        piece=EditorialPiece.objects.filter(pk=day['pieza']).first() if day['pieza'] else None
         created=avisar('gate_alert',f'El {day["fecha"][8:10]}/{day["fecha"][5:7]} no salió post: lo paró {label(gate)}',
                        'Nadie lo reintentó ni desestimó el bloqueo. Revisa el motivo en el detalle de la pieza.',
                        link=f'/calendario/pieza/{day["pieza"]}' if day['pieza'] else '/calendario?vista=lista&no_salio=1',
-                       ref=f'gate_day:{day["fecha"]}')
+                       ref=f'gate_day:{day["fecha"]}'+(f':{piece.member_id}' if piece is not None and piece.member_id else ''),
+                       member=de_contenido(piece) if piece is not None else ORGANIZACION)  # her day without a post
         sent+=int(created is not None)
     return sent
 

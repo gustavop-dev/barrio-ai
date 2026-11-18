@@ -18,6 +18,27 @@ export interface Session {
   user: User | null;
 }
 
+/**
+ * GET /api/v1/yo, «quién soy» (organizaciones, phase 5): who the signed-in person is. The apps name people with it,
+ * never with a fixed name. `member` is null for a user who is not a member (and in an installation without members).
+ */
+export interface Yo {
+  username: string;
+  member: { id: string; display_name: string; role: string; active: boolean; is_admin: boolean; first: boolean } | null;
+  organization: { id: string; name: string; slug: string } | null;
+  is_admin: boolean;
+  /** The team writes with her provisional voice: her drafts carry `provisional_voice`. */
+  provisional_voice: boolean;
+  /** Active members of her organization. */
+  members: number;
+}
+
+/** A member as an opportunity names her (`registered_by`, `brought_by`). */
+export interface MemberRef {
+  id: string;
+  display_name: string;
+}
+
 // ---------------------------------------------------------------- native app (device token, Expo push)
 
 /** A device signed in with a token (the native app): GET /api/v1/auth/dispositivos and Ajustes › `devices`. */
@@ -401,6 +422,19 @@ export interface Contact extends ContactBrief {
   lead_doubt?: ContactLeadDoubt | null;
   /** BAR-24 (absent on older backends). */
   buyer?: ContactBuyer | null;
+  /** Organizaciones, phase 6: only while two or more members work the organization (absent alone, as before). */
+  registro?: ContactRegistro;
+}
+
+/** The organization's register of people (phase 6): who attends her, and to whom her owner may pass her. Nothing
+ * private of another member ever comes here: only her name and since when. */
+export interface ContactRegistro {
+  attended_by: { id: string; display_name: string; since: string | null } | null;
+  /** True when the member who reads it attends her (then «Liberar» and «Pasar a…»). */
+  mine: boolean;
+  pass_to: { id: string; display_name: string }[];
+  /** Why nobody in the organization touches her, or null. */
+  excluded: string | null;
 }
 
 /** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */
@@ -465,6 +499,8 @@ export interface ContactOpportunity {
 }
 
 export interface ContactNextStep {
+  /** 'gustavo' is the API's historical value for «the member who reads it» (organizations, phase 5): every member only
+   * sees her own contacts, so it always means «tú» and the apps never show it as a name. Kept to not break the wire. */
   owner: 'equipo' | 'gustavo' | null;
   text: string;
   at: string | null;
@@ -803,6 +839,8 @@ export interface PieceDetail extends PieceSummary {
   commenters?: PieceCommenter[] | null;
   /** The comments and the team's replies (INT-04); null when the team never read them. */
   comments?: PieceComments | null;
+  /** Written in the member's provisional voice (organizaciones, phase 7): the apps show «Voz provisional». Absent otherwise. */
+  provisional_voice?: boolean;
 }
 
 export interface PlanResponse {
@@ -1014,6 +1052,8 @@ export interface TurnoMessage {
    */
   text_label?: string;
   origin?: 'recorrido';
+  /** Written in her provisional voice (organizaciones, phase 5): the apps show «Voz provisional». Absent otherwise. */
+  provisional_voice?: boolean;
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
 }
 
@@ -1071,6 +1111,10 @@ export interface TurnoApproval {
   network: boolean;
   /** When it stops waiting (the piece's hour, or the proposal's TTL). */
   expires_at: string | null;
+  /** Written in her provisional voice (organizaciones, phase 5): the apps show «Voz provisional». Absent otherwise. */
+  provisional_voice?: boolean;
+  /** The note of a RED-02 invitation, written in her provisional voice (organizaciones, phase 7). Absent otherwise. */
+  note?: string;
 }
 
 export interface TurnoCard {
@@ -1465,6 +1509,12 @@ export interface Opportunity {
   updated_at: string;
   stage_changed_at: string;
   closed_at: string | null;
+  /**
+   * The funnel is the organization's (organizaciones, phase 5): with several members, who registered it and whose person
+   * it came from. Absent with one member. `contact` is null when the person is another member's.
+   */
+  registered_by?: MemberRef | null;
+  brought_by?: MemberRef | null;
 }
 
 /** POST needs `modality` and `contact` or `person_name`; PATCH accepts any field. */
@@ -1949,4 +1999,129 @@ export interface StrategyChangeDecision {
 export interface MonthlyReviewGenerateResponse {
   month_start: string;
   job: Job;
+}
+
+// ---------------------------------------------------------------- her profile, her voice, the organization (organizaciones, phase 7)
+
+/** The fields of her profile the apps edit (GET/PATCH /api/v1/yo/perfil). `limits` is «temas que no domina». */
+export interface MemberProfile {
+  name: string;
+  role: string;
+  identity: string;
+  company_relation: string;
+  limits: string;
+  personal_startups: boolean;
+}
+
+export type MemberProfileField = keyof MemberProfile;
+
+/** One change of her profile: who, when, from where («app», «comando», «alta», «semilla»…) and which fields. */
+export interface ProfileRevision {
+  number: number;
+  created_at: string;
+  /** Username of who changed it; null for the system (a migration, the seed). */
+  by: string | null;
+  source: string;
+  changed: string[];
+}
+
+/**
+ * GET /api/v1/yo/perfil: her own profile, also while her member is inactive (in onboarding). `own` false: the values
+ * are the initial or neutral ones (she never saved hers). `history` newest first.
+ */
+export interface MiPerfil {
+  member: { id: string; display_name: string; role: string; active: boolean };
+  profile: MemberProfile;
+  own: boolean;
+  /** Help text per field, from the backend (identidad.MEMBER_FIELDS). */
+  help: Partial<Record<MemberProfileField, string>>;
+  history: ProfileRevision[];
+}
+
+/** PATCH /api/v1/yo/perfil answers the profile again and whether anything changed (`saved: false`: no changes). */
+export interface MiPerfilSaved extends MiPerfil {
+  saved: boolean;
+}
+
+export type MemberProfilePatch = Partial<MemberProfile>;
+
+export type VoiceState = 'provisional' | 'confirmada' | 'inicial';
+export type VoiceVersionState = 'confirmada' | 'propuesta' | 'descartada';
+export type VoiceSignalKind = 'aprobado' | 'editado' | 'rechazado' | 'respuesta' | 'captura';
+
+/** A proposal of her voice document, waiting for her decision (only she confirms or discards it). */
+export interface VoiceProposal {
+  number: number;
+  created_at: string;
+  note: string;
+  text: string;
+}
+
+export interface VoiceVersion {
+  number: number;
+  state: VoiceVersionState;
+  source: string;
+  created_at: string;
+  decided_at: string | null;
+}
+
+/**
+ * GET /api/v1/yo/voz: which voice the team writes with for her and how far her learning is. `signals.texts` counts the
+ * texts she approved or edited; a proposal needs `signals.minimum` of them (VOICE_LEARNING_MIN_TEXTS).
+ */
+export interface MiVoz {
+  state: VoiceState;
+  version: number | null;
+  /** «Provisional», «Confirmada v2», «Inicial de la instalación». */
+  label: string;
+  learning_enabled: boolean;
+  signals: { texts: number; minimum: number; by_kind: Partial<Record<VoiceSignalKind, number>> };
+  /** Learning is on, the sample is enough and nothing waits for her decision: a paid proposal (~0,17 USD) may be asked. */
+  can_propose: boolean;
+  proposal: VoiceProposal | null;
+  versions: VoiceVersion[];
+}
+
+/** POST /api/v1/yo/voz/decidir. */
+export interface VoiceDecision {
+  number: number;
+  decision: 'confirmar' | 'descartar';
+  note?: string;
+}
+
+/** A member as the admin sees the organization: nothing private, only who, her state and what she has connected. */
+export interface OrganizationMember {
+  id: string;
+  display_name: string;
+  role: string;
+  active: boolean;
+  is_admin: boolean;
+  /** The installation's first member. */
+  first: boolean;
+  voice: VoiceState;
+  accounts: { official: boolean; reader: boolean };
+  /** AAAA-MM-DD. */
+  since: string;
+}
+
+/** The organization's profile (Organization.profile): what it is and sells, shared by every member. */
+export interface OrganizationProfile {
+  version: string;
+  date: string;
+  status: string;
+  language: string;
+  location: string;
+  not_wanted: string;
+  pillars: Record<string, string>;
+  services: Record<string, { label: string; source: string; terms: string[] }>;
+  offer: Record<string, string>;
+  cases: Record<string, string>;
+  modalities: Record<string, { purpose: string; neighborhood: string }>;
+}
+
+/** GET /api/v1/organizacion: only the organization's admin (403 to anyone else). */
+export interface Organizacion {
+  organization: { id: string; name: string; slug: string };
+  profile: OrganizationProfile;
+  members: OrganizationMember[];
 }

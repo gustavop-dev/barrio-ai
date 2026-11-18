@@ -87,6 +87,24 @@ describe('Detalle de una pieza', () => {
     expect(within(result).getByText('Los comentarios aún no se han leído.')).toBeInTheDocument();
   });
 
+  it('marks a piece written in the member’s provisional voice (organizaciones, phase 7)', async () => {
+    server({ ...SCHEDULED, provisional_voice: true });
+    vi.setSystemTime(new Date('2026-11-07T15:00:00Z'));
+    renderCalendario('/calendario/pieza/p8');
+    expect(await screen.findByRole('heading', { name: 'Pieza del domingo 8 de noviembre' })).toBeInTheDocument();
+    expect(screen.getByText('Programada')).toBeInTheDocument();
+    expect(screen.getByText('Voz provisional')).toBeInTheDocument();
+  });
+
+  it('shows no voice mark when the piece does not carry provisional_voice', async () => {
+    server(SCHEDULED);
+    vi.setSystemTime(new Date('2026-11-07T15:00:00Z'));
+    renderCalendario('/calendario/pieza/p8');
+    expect(await screen.findByRole('heading', { name: 'Pieza del domingo 8 de noviembre' })).toBeInTheDocument();
+    expect(screen.getByText('Programada')).toBeInTheDocument();
+    expect(screen.queryByText('Voz provisional')).not.toBeInTheDocument();
+  });
+
   it('vetoes a scheduled piece from its detail', async () => {
     const api = server(SCHEDULED, { 'POST /api/v1/operador/actions/act-8/reject': { body: {} } });
     const user = userEvent.setup();

@@ -187,7 +187,7 @@ class SchedulingTests(ReviewBase):
         self.assertEqual(jobs.OPERATION_PERMISSIONS['monthly_review'],['operate_linkedin','run_agents','use_paid_providers'])
         self.assertIn('monthly_review',jobs.PAID_OPERATIONS)
         self.assertEqual(notificaciones.FEED_KINDS['monthly_review'],('tuyo',True,'Revisión mensual lista'))
-        self.assertTrue(notificaciones.push_enabled('monthly_review'))
+        self.assertTrue(notificaciones.push_enabled('monthly_review',None))
 
 
 class StatsTests(ReviewBase):

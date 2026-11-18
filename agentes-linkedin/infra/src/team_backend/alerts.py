@@ -7,19 +7,21 @@ import httpx
 
 logger=logging.getLogger('team_backend.alerts')
 
-def notify(title,message,url='/maquina',tag='barrio-alerta',urgent=False):
+def notify(title,message,url='/maquina',tag='barrio-alerta',urgent=False,users=None,webhook=True):
+    """Push to `users`' devices (None: every device, an installation without members) and, with `webhook`, to
+    OPERATOR_ALERT_WEBHOOK (the first member's channel: notificaciones.avisar never sends another member's notice there)."""
     delivered=False
     try:
         from .push import broadcast
-        delivered=broadcast(title,message,url=url,tag=tag)>0
+        delivered=broadcast(title,message,url=url,tag=tag,users=users)>0
     except Exception:
         logger.warning('alert_push_failed title=%s',title)
     try:
         from . import expo
-        delivered=expo.broadcast(title,message,url=url,tag=tag,urgent=urgent)>0 or delivered
+        delivered=expo.broadcast(title,message,url=url,tag=tag,urgent=urgent,users=users)>0 or delivered
     except Exception:
         logger.warning('alert_expo_failed title=%s',title)
-    webhook=os.environ.get('OPERATOR_ALERT_WEBHOOK','').strip()
+    webhook=os.environ.get('OPERATOR_ALERT_WEBHOOK','').strip() if webhook else ''
     if webhook:
         try:
             with httpx.Client(timeout=10.0) as client:

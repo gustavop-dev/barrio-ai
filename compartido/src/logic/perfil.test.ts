@@ -7,7 +7,7 @@ describe('Perfil manual and scoped gallery consent', () => {
   it('does not equate acceptance, manual application and a verified reread', () => {
     expect(applicationLabel(PROFILE_HEADLINE)).toBe('Pendiente de revisar');
     expect(applicationLabel({ ...PROFILE_HEADLINE, decision: 'accepted' })).toBe('Aceptado; pendiente de aplicar');
-    expect(applicationLabel({ ...PROFILE_HEADLINE, application: 'applied' })).toBe('Aplicado por Gustavo, pendiente de comprobar');
+    expect(applicationLabel({ ...PROFILE_HEADLINE, application: 'applied' })).toBe('Aplicado por ti, pendiente de comprobar');
     expect(applicationLabel({ ...PROFILE_HEADLINE, id: 'about', application: 'applied' })).toContain('comprobación automática no disponible');
     expect(applicationLabel({ ...PROFILE_HEADLINE, application: 'checked' })).toBe('Comprobado');
   });

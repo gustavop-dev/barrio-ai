@@ -4,7 +4,7 @@ import json
 import uuid
 from decimal import Decimal
 from unittest.mock import Mock, patch
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.utils import timezone
 from knowledge import providers
 from team_backend import imagenes, orquestacion, perfil, perfil_assets, perfil_galeria as gallery, perfil_visual as visual
@@ -211,7 +211,7 @@ class ExplanationContinuationTests(ProfileBase):
 
     def test_new_assets_version_does_not_reuse_the_completed_pre_fix_job(self):
         proposal=self.pending_banner();refs=gallery.references(self.gustavo)
-        signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.BRAND_VERSION,
+        signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.brand_version(),
             'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION,'review':visual.REVIEW_VERSION,
             'model':perfil_assets.connectors_images.EDIT_MODEL,'transparent':perfil_assets.connectors_images.supports_transparency()})
         old_id=uuid.uuid5(perfil.NS,f'{proposal.id}:v{proposal.version}:assets:{signature}')
@@ -220,7 +220,7 @@ class ExplanationContinuationTests(ProfileBase):
         self.assertNotEqual(perfil_assets.queue(self.gustavo,proposal.id).pk,old_id)
 
 
-class ExplanationContractTests(SimpleTestCase):
+class ExplanationContractTests(TestCase):  # the brand version is the member's profile (phase 3)
     def test_small_writer_contract_and_mobile_scope_with_fake_provider(self):
         with patch.object(providers,'claude',return_value={'text':json.dumps(REPAIRED)}) as provider:
             self.assertEqual(perfil_assets.repair_explanation({'section':{'id':'banner'}}),REPAIRED)

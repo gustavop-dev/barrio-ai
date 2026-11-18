@@ -85,14 +85,15 @@ def test_line(progress):
     return (f'Prueba ProjectApp, {week}: invitaciones a compradores por segmento: {segments}; partners '
             f'{progress["partner"]["invitaciones"]}. {sample.capitalize()}. Revisión el {projectapp.REVIEW}.')
 
-def read(now=None,account=None):
+def read(now=None,account=None,accounts=None):
     """The week's reading: the table, where it breaks first (or the small sample), its cause and ONE change, this week
     against the last one, drafts pending against sent, and `lineas` (five at most) for Slack."""
     now=now or timezone.now()
     rows=BuyerJourney.objects.filter(entry=BuyerJourney.Entry.OUTBOUND)
     if account is not None:rows=rows.filter(contact__account=account)
+    if accounts is not None:rows=rows.filter(contact__account__in=accounts)  # a member's buyers (organizaciones, phase 5)
     journeys=list(rows)
-    funnel=comprador.funnel(weeks=2,now=now,account=account)
+    funnel=comprador.funnel(weeks=2,now=now,account=account,accounts=accounts)
     invitations=funnel['acumulado']['invitaciones'];small=invitations<comprador.SMALL_SAMPLE
     table=_checks(journeys,now)
     broken=None if small else next((row for row in table if row['rota']),None)

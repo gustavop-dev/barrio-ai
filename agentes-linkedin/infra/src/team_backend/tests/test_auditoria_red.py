@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from django.utils import timezone
 
-from team_backend import autopiloto, lider, operador, red
+from team_backend import autopiloto, identidad, lider, operador, red
 from team_backend.connectors import ConnectorError, FakeConnector
 from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job
 from team_backend.tests.test_red import SUBSTANTIVE, NetworkBase
@@ -204,7 +204,7 @@ class LeadByRoleTests(NetworkBase,LeadBase):
     def test_the_lead_reads_the_role_and_reason_of_the_classifier_and_the_bio(self):
         proposal,body=self.review('founder-ana')
         self.assertEqual(proposal.state,'approved')
-        self.assertEqual(body['state']['clasificacion'],{'papel':lider.ROLE_MEANING['comprador'],'razon':'Fundó una empresa de software de inventario'})
+        self.assertEqual(body['state']['clasificacion'],{'papel':identidad.of().render(lider.ROLE_MEANING['comprador']),'razon':'Fundó una empresa de software de inventario'})
         self.assertTrue(body['state']['clasificacion']['papel'].startswith('comprador (hipótesis)'))
         person=body['state']['persona']
         self.assertEqual((person['bio'],person['seguidores']),('Construyo software de inventario para tiendas de barrio.',1200))

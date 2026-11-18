@@ -12,10 +12,10 @@ from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas
+from . import alcance, capturas
 from .jobs import audit
 from .models import AIEdit, Capture, GalleryPhoto, OfficePreference
-from .operador_views import get_or_404, human_session, valid
+from .operador_views import human_session, valid
 from .permissions import require
 
 RANGE=re.compile(r'bytes=(\d*)-(\d*)$')
@@ -111,7 +111,8 @@ class Captures(ListAPIView):
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
         capturas.reconcile_stale();capturas.expire_ideas()
-        qs=Capture.objects.exclude(state=Capture.State.UNDONE).prefetch_related('photos')
+        # Her captures (organizaciones, phase 4): «Lo que enviaste» never lists another member's.
+        qs=alcance.de(Capture.objects.exclude(state=Capture.State.UNDONE),alcance.miembro(self.request)).prefetch_related('photos')
         state=self.request.query_params.get('estado')
         return qs.filter(state=state) if state else qs
     def post(self,request):
@@ -124,10 +125,10 @@ class Captures(ListAPIView):
 class CaptureDetail(APIView):
     def get(self,request,cid):
         require(request.user,'operate_linkedin');capturas.reconcile_stale()
-        return Response(CaptureOutput(get_or_404(Capture,id=cid)).data)
+        return Response(CaptureOutput(alcance.obtener(request,Capture,id=cid)).data)
     def delete(self,request,cid):
         """«Deshacer» within 2 minutes; 409 afterwards."""
-        human_session(request);require(request.user,'approve_actions');get_or_404(Capture,id=cid)
+        human_session(request);require(request.user,'approve_actions');alcance.obtener(request,Capture,id=cid)
         return Response(CaptureOutput(capturas.undo(request.user,cid)).data)
 
 class CaptureDay(APIView):
@@ -140,7 +141,7 @@ class CaptureDay(APIView):
         from . import urgente
         data=request.data if isinstance(request.data,dict) else {}
         if data.get('decision') not in ('siguiente','descartar'):raise ValidationError('decision debe ser siguiente o descartar')
-        get_or_404(Capture,id=cid)
+        alcance.obtener(request,Capture,id=cid)
         capture,_=urgente.confirm_day(request.user,cid,data['decision'])
         when=capture.publish_asap_expected_slot
         return Response({'id':str(capture.id),'day_request':capture.day_request,'state':capture.state,
@@ -149,7 +150,7 @@ class CaptureDay(APIView):
 class CaptureAudio(FileView):
     def get(self,request,cid):
         require(request.user,'operate_linkedin')
-        capture=get_or_404(Capture,id=cid)
+        capture=alcance.obtener(request,Capture,id=cid)
         if not capture.audio:raise NotFound('Esta captura no tiene audio.')
         return serve(request,capture.audio,capture.audio_mime or 'application/octet-stream',ranges=True)
 
@@ -163,7 +164,7 @@ class Gallery(ListAPIView):
         require(self.request.user,'operate_linkedin')
         key=self.request.query_params.get('filtro') or 'todas'
         if key not in GALLERY_FILTERS:raise ValidationError({'filtro':'Usa todas, sin_usar, elegidas, publicadas o perfil.'})
-        qs=GalleryPhoto.objects.select_related('chosen_piece')
+        qs=alcance.de(GalleryPhoto.objects.select_related('chosen_piece'),alcance.miembro(self.request))  # her photos
         if key=='perfil':return qs.filter(category='perfil')
         return qs.filter(state__in=GALLERY_FILTERS[key]) if GALLERY_FILTERS[key] else qs
     def post(self,request):
@@ -179,29 +180,30 @@ class Gallery(ListAPIView):
 class PhotoDetail(APIView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        return Response(PhotoOutput(get_or_404(GalleryPhoto,id=pid)).data)
+        return Response(PhotoOutput(alcance.obtener(request,GalleryPhoto,id=pid)).data)
     def patch(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
         serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
-        data=serializer.validated_data;photo=get_or_404(GalleryPhoto,id=pid)
+        data=serializer.validated_data;photo=alcance.obtener(request,GalleryPhoto,id=pid)
         from .perfil_galeria import update
         photo=update(request.user,photo,data)
         return Response(PhotoOutput(photo).data)
     def delete(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
-        capturas.delete_photo(request.user,get_or_404(GalleryPhoto,id=pid))
+        capturas.delete_photo(request.user,alcance.obtener(request,GalleryPhoto,id=pid))
         return Response(status=204)
 
 class PhotoImage(FileView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        photo=get_or_404(GalleryPhoto,id=pid)
+        photo=alcance.obtener(request,GalleryPhoto,id=pid)
         return serve(request,photo.image,photo.mime)
 
 # --------------------------------------------------------------------------- preferences
 
-def _preferences():
-    current=OfficePreference.current()
+def _preferences(user):
+    """Her own preferences (OfficePreference.of: each user hers; organizaciones, phase 5)."""
+    current=OfficePreference.of(user)
     return {'gallery_ai_edit':current.gallery_ai_edit,'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'push_enabled':current.push_enabled,
             'updated_at':current.updated_at}
 
@@ -210,10 +212,10 @@ class Preferences(APIView):
     (push_disabled: turned off; push_enabled: turned on although off by default)."""
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(_preferences())
+        return Response(_preferences(request.user))
     def patch(self,request):
         human_session(request);require(request.user,'approve_actions')
-        data=valid(PreferencesInput,request);current=OfficePreference.current()
+        data=valid(PreferencesInput,request);current=OfficePreference.of(request.user)
         if not data:raise ValidationError('Envía gallery_ai_edit_default, push_disabled o push_enabled')
         if 'gallery_ai_edit_default' in data:current.gallery_ai_edit_default=data['gallery_ai_edit_default']
         if 'gallery_ai_edit' in data and 'gallery_ai_edit_default' in data:raise ValidationError('Envía solo gallery_ai_edit')
@@ -229,6 +231,6 @@ class Preferences(APIView):
             if 'push_enabled' not in data:on=set(current.push_enabled or [])-off
             current.push_disabled=sorted(off);current.push_enabled=sorted(on)
         current.updated_by=request.user;current.updated_at=timezone.now();current.save()
-        audit(request.user,'office.preferences',1,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled,
+        audit(request.user,'office.preferences',current.pk,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled,
               push_enabled=current.push_enabled)
-        return Response(_preferences())
+        return Response(_preferences(request.user))

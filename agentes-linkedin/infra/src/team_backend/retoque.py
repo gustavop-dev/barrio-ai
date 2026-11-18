@@ -20,7 +20,8 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from . import capturas, compuertas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
+from . import (capturas, compuertas, editor_visual, editorial, guardas, identidad, imagenes, miembros, operador, orientacion, orquestacion,
+               urgente)
 from .grafo import load_graph
 from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, GalleryPhoto, Job
 
@@ -93,8 +94,8 @@ def _record(capture, state, text, **extra):
 
 
 def _notice(kind, title, detail, piece, ref):
-    from .notificaciones import avisar
-    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=ref)
+    from .notificaciones import avisar, de_contenido
+    avisar(kind, title, detail[:300], link=f'/calendario/pieza/{piece.id}', ref=ref, member=de_contenido(piece))
 
 
 # --------------------------------------------------------------------------- entry point (job process_capture)
@@ -160,7 +161,7 @@ def _hold(old, capture):
             return False
         proposal.state = ActionProposal.State.SUPERSEDED
         proposal.decided_at = timezone.now()
-        proposal.decision_note = 'Gustavo la comentó: el equipo la rehace antes de publicarla'
+        proposal.decision_note = f'{identidad.owner_name(proposal.account)} la comentó: el equipo la rehace antes de publicarla'
         proposal.save(update_fields=['state', 'decided_at', 'decision_note'])
         operador._audit(None, 'operator.superseded', proposal.id, reason='comment', capture=str(capture.id))
     return True
@@ -195,11 +196,11 @@ def _fail(capture, piece, reason):
     with transaction.atomic():
         piece = EditorialPiece.objects.select_for_update().get(pk=piece.pk)
         piece.state = EditorialPiece.State.BLOCKED
-        piece.note = ('No se pudo aplicar el comentario de Gustavo: ' + reason)[:2000]
+        piece.note = (f'No se pudo aplicar el comentario de {identidad.owner_name(piece.account)}: ' + reason)[:2000]
         piece.save(update_fields=['state', 'note', 'updated_at'])
         operador._audit(None, 'editorial.rework_failed', piece.id, capture=str(capture.id), reason=reason[:500])
     capturas.release_ideas(piece, 'no se pudo aplicar tu comentario')
-    urgente.assign_slots()
+    urgente.assign_slots(member=piece.member)  # her calendar (organizaciones, phase 4)
     _notice('piece_blocked', f'No pude rehacer la pieza del {piece.slot_date:%d/%m}',
             f'{reason}. No sale así: tus ideas vuelven a la mesa editorial para rehacerla.', piece, f'piece_rework:{capture.id}')
     _record(capture, 'aplazada', f'No pude aplicarlo ({_clip(reason, 200)}); la pieza no sale así y tus ideas vuelven a la mesa.',
@@ -260,8 +261,9 @@ def _rework(capture, piece, old):
 
 
 def _apply(capture, piece, old):
-    public, private = guardas.blocks()
-    memory = {'public_facts': public, 'private_guidance': private, 'orientation': orientacion.text()}
+    member = miembros.member_for_account(piece.account)  # her memory and orientation (organizaciones, phase 4)
+    public, private = guardas.blocks(member)
+    memory = {'public_facts': public, 'private_guidance': private, 'orientation': orientacion.text(member)}
     frozen = {k: piece.brief.get(k) for k in FROZEN}
     claims = piece.verification.get('claims') or piece.selection.get('claims') or []
     blocked = (piece.verification or {}).get('verdict') == 'blocked'
@@ -361,7 +363,7 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.edited, row.cropped = True, False  # the edit starts from the original: no plain crop is left in it
             row.data = {k: v for k, v in (row.data or {}).items() if k != 'crop'}
             row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
-            row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
+            row.reason = _clip(f'Comentario de {identidad.owner_name(piece.account)}: ' + capture.text, 1000)
             imagenes.forget_rejected(row)
             row.save()
             row.source_photo.state = 'editada'
@@ -384,7 +386,7 @@ def _redesign(piece, public, private, client, findings, kind=None):
         target = kind or (piece.image_kind if piece.image_kind in ('infografia', 'carrusel') else 'infografia')
         if piece.image_kind != target:
             piece.image_kind, piece.image_spec = target, {}
-        piece.image_reason = _clip('Rehecha por un comentario de Gustavo', 500)
+        piece.image_reason = _clip(f'Rehecha por un comentario de {identidad.owner_name(piece.account)}', 500)
         piece.image_review = {'started': True, 'visual_binding': binding}
         piece.save(update_fields=['image_kind', 'image_spec', 'image_reason', 'image_review', 'updated_at'])
     result = imagenes.design(piece, public, private, client, findings=findings, previous=piece.image_spec or None)
@@ -445,7 +447,7 @@ def _propose(capture, piece, old, record):
                                                                 'Conservada como observación')) and r not in dropped]
         risks += compuertas.observation_risks((piece.verification or {}).get('observations') or [])
         if changed:
-            risks.append(_clip('Rehecha por un comentario de Gustavo: ' + summary, 500))
+            risks.append(_clip(f'Rehecha por un comentario de {identidad.owner_name(piece.account)}: ' + summary, 500))
         new = operador.create_proposal(old.created_by, None, 'CONT-09',
             {'text': piece.final_text, 'media': imagenes.manifest(piece)}, rationale=old.rationale,
             citations=piece.citations or old.citations, risks=risks, source='agent', origin_job=old.origin_job,

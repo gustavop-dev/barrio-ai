@@ -70,14 +70,29 @@ class Reviews(APIView):
             'experiments': list(ReferentExperiment.objects.filter(review=r).values('id', 'state', 'plan', 'results', 'history'))} for r in rows[:12]])
 
 
-def cards(user, card, now):
+def cards(user, card, now, mine=False):
+    """The referents' cards. `mine` (Tu turno, organizaciones phase 5): only the decisions this user can take (her
+    accounts', or every account's for the admin); the referents themselves stay the organization's (Personas). Without
+    members (an installation before organizations) nothing is filtered, as before."""
+    from . import miembros
     out = []
-    human = referentes.is_gustavo(user)
+    deciders = {}
+    mine = mine and miembros.exist()
+
+    def human(account):
+        # Who decides is per account (organizaciones, phase 1): its owner or the organization's admin.
+        if account.pk not in deciders:
+            deciders[account.pk] = referentes.is_gustavo(user, account)
+        return deciders[account.pk]
     for control in ReferentControl.objects.filter(initialized=False).exclude(account__provider__in=['linkedin','linkedin_fake']).select_related('account'):
+        if mine and not human(control.account):
+            continue
         out.append(card(f'referents_setup:{control.account_id}', 'aviso', 'Identificar los cinco referentes main',
             control.issue, [{'label': 'Gestionar protegidos', 'href': '/personas?pestana=referentes'}], agent='investigador_lider'))
     for item in ReferentChange.objects.select_related('review__account').exclude(state__in=referentes.TERMINAL).filter(review__published_at__isnull=False):
         p, review = item.proposal, item.review
+        if mine and not human(review.account):
+            continue
         outgoing = Referent.objects.filter(pk=p.get('outgoing')).first() if p.get('outgoing') else None
         incoming = p.get('incoming')
         industry = review.kind == 'industria'
@@ -89,7 +104,7 @@ def cards(user, card, now):
         actions = [{'label': {'add': 'Aprobar alta', 'remove': 'Aprobar baja', 'swap': 'Aprobar sustitución'}[p['kind']],
                     'endpoint': endpoint, 'body': {'version': item.version, 'decision': 'approve'}, 'primary': True},
                    *[{'label': label, 'endpoint': endpoint, 'body': {'version': item.version, 'decision': decision}}
-                     for label, decision in [('Rechazar', 'reject'), ('Pedir ajuste', 'adjust'), ('Más tarde', 'later')]]] if human else []
+                     for label, decision in [('Rechazar', 'reject'), ('Pedir ajuste', 'adjust'), ('Más tarde', 'later')]]] if human(review.account) else []
         sources = review.dossier.get('sources', [])
         current = Referent.objects.filter(account=review.account, active=True, archived_at__isnull=True)
         total, main = current.count(), current.filter(protected=True).count()
@@ -104,17 +119,19 @@ def cards(user, card, now):
                 'proposal': p, 'outgoing': referentes.snapshot(outgoing) if outgoing else None, 'sources': sources,
                 'evidence': review.dossier.get('evidence', {}), 'limitations': review.dossier.get('limitations', []),
                 'occupancy': {'before': total, 'after': total + (1 if p['kind'] == 'add' else -1 if p['kind'] == 'remove' else 0), 'main': main, 'variables': total-main},
-                'can_decide': human, 'conflict': item.conflict, 'endpoint': endpoint}))
-    for exp in ReferentExperiment.objects.select_related('referent').filter(state__in=['proposed', 'postponed', 'adjustment', 'approved']):
+                'can_decide': human(review.account), 'conflict': item.conflict, 'endpoint': endpoint}))
+    for exp in ReferentExperiment.objects.select_related('referent', 'account').filter(state__in=['proposed', 'postponed', 'adjustment', 'approved']):
+        if mine and not human(exp.account):
+            continue
         endpoint = f'/api/v1/referentes/experimentos/{exp.pk}/decidir'
         choices = [('Detener', 'stop')] if exp.state == 'approved' else [('Aprobar experimento', 'approve'), ('Pedir ajuste', 'adjust'), ('Descartar', 'discard'), ('Más tarde', 'later')]
-        actions = [{'label': label, 'endpoint': endpoint, 'body': {'version': exp.version, 'decision': decision}, 'primary': n == 0} for n, (label, decision) in enumerate(choices)] if human else []
+        actions = [{'label': label, 'endpoint': endpoint, 'body': {'version': exp.version, 'decision': decision}, 'primary': n == 0} for n, (label, decision) in enumerate(choices)] if human(exp.account) else []
         out.append(card(f'referent_experiment:{exp.pk}', 'experimento', f'Experimento: {exp.referent.display_name}',
             exp.plan['hypothesis'], actions, agent='investigador_lider', created_at=exp.created_at,
             state_override='pospuesta' if exp.state == 'postponed' else None,
             referent_experiment={'id': str(exp.pk), 'version': exp.version, 'state': exp.state, 'plan': exp.plan,
                 'starts_at': exp.starts_at, 'focus_at': exp.focus_at, 'followup_at': exp.followup_at, 'ends_at': exp.ends_at,
-                'can_decide': human, 'endpoint': endpoint, 'results': exp.results}))
+                'can_decide': human(exp.account), 'endpoint': endpoint, 'results': exp.results}))
     return out
 
 

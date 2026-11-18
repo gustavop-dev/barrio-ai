@@ -16,7 +16,7 @@ from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import operador
+from . import miembros, operador
 from .connectors import ConnectorError, get_connector, same_text
 from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, PostMetric
 from .permissions import require
@@ -88,21 +88,28 @@ def _read(account,kind,now=None):
 
 # --------------------------------------------------------------------------- what is due
 
-def publications(now=None):
-    """Published CONT-09 executions (PUBLISHED) within max_age, each with the snapshot ages it reached and still lacks."""
-    now=now or timezone.now();rows=[]
+def publications(now=None,member=None):
+    """Published CONT-09 executions (PUBLISHED) within max_age of the member's accounts, each with the snapshot ages it
+    reached and still lacks. Without a member, miembros.default_member() (organizaciones, phase 1)."""
+    now=now or timezone.now();rows=[];member=miembros.resolve(member)
     executions=(ActionExecution.objects.select_related('proposal__piece').prefetch_related('proposal__piece__post_metrics')
                 .filter(PUBLISHED,proposal__capability='CONT-09',proposal__piece__isnull=False,started_at__gte=now-max_age())
                 .order_by('started_at'))
+    if member is not None:executions=executions.filter(proposal__account__in=miembros.accounts(member))
     for execution in executions:
         done={m.kind for m in execution.proposal.piece.post_metrics.all()}
         due=[kind for kind,age in AGES.items() if now-execution.started_at>=age and kind not in done]
         rows.append((execution,due))
     return rows
 
-def due(now=None):
-    """Cheap check for the autopilot (no reads): a snapshot age reached and missing, or no audience snapshot today."""
-    return any(d for _,d in publications(now)) or not AudienceSnapshot.objects.filter(day=local_day(now)).exists()
+def due(now=None,member=None):
+    """Cheap check for the autopilot (no reads): a snapshot age of the member's posts reached and missing, or no
+    audience snapshot of hers today (one per member and day: organizaciones, phase 4)."""
+    return any(d for _,d in publications(now,member)) or not _audience(member).filter(day=local_day(now)).exists()
+
+def _audience(member):
+    """Her audience snapshots (organizaciones, phase 4: one per member and day; another member's never counts as hers)."""
+    return miembros.own(AudienceSnapshot.objects.all(),member)
 
 # --------------------------------------------------------------------------- own posts
 
@@ -200,8 +207,8 @@ def collect_posts(account,connector,now,summary):
     """Find each recent publication among Gustavo's own posts: by an id already known (_known_id), by the urn of its
     write like with like, by its exact text, or as the only own post LinkedIn dates within NEAR of the write. Capture
     the snapshots it is due and refresh EditorialPiece.metrics with the latest values read; a due cut not captured is
-    listed in summary['pending'] with its reason (PENDING_REASONS)."""
-    rows=publications(now)
+    listed in summary['pending'] with its reason (PENDING_REASONS). Only the posts of the reading account's member."""
+    rows=publications(now,miembros.member_for_account(account))
     if not any(d for _,d in rows):return
     try:
         _read(account,'posts',now)
@@ -254,8 +261,8 @@ def collect_posts(account,connector,now,summary):
 def collect_audience(account,connector,now,summary):
     """One AudienceSnapshot per local day. Profile views are optional: if LinkedIn refuses or does not give them they
     stay null and summary['views_error'] says why; they are asked for the window the connector answers (views_window)."""
-    day=local_day(now)
-    if AudienceSnapshot.objects.filter(day=day).exists():summary['audience']='ya';return
+    day=local_day(now);member=miembros.member_for_account(account)  # the reading account's member: her audience
+    if _audience(member).filter(day=day).exists():summary['audience']='ya';return
     _read(account,'profile',now)
     audience=connector.own_audience()
     views,days=None,views_window(connector)
@@ -265,7 +272,7 @@ def collect_audience(account,connector,now,summary):
     except (ReadCapReached,ConnectorError) as exc:summary['views_error']=str(exc)  # never pauses: profile views are a bonus
     try:
         with transaction.atomic():
-            snapshot=AudienceSnapshot.objects.create(day=day,followers=audience['followers'],connections=audience['connections'],
+            snapshot=AudienceSnapshot.objects.create(day=day,member=member,followers=audience['followers'],connections=audience['connections'],
                                             profile_views=views,profile_views_days=days if views is not None else None,captured_at=now)
             from .evidencia import ingest_audience
             ingest_audience(account,snapshot)
@@ -281,7 +288,7 @@ def collect(user,account,now=None):
     require(user,'operate_linkedin')
     if account.provider not in PROVIDERS:raise ValueError('Las métricas se leen con la cuenta de LinkedIn directo.')
     now=now or timezone.now();connector=get_connector(account)
-    context,grounding=operador.role_context('analista',ANALYSIS_UNITS,
+    context,grounding=operador.role_context('analista',ANALYSIS_UNITS,account=account,criteria=
         {'ventanas':['LI-06-V008-K01','LI-06-V008-K02'],'limites_de_inferencia':['LI-06-V006-K04','LI-06-V007-K05']})
     summary={'captured':0,'pending':[],'no_impressions':[],'refreshed':0,'audience':'no','stopped':'',**grounding,'course_context':context,
              'sales_inferred':False,'identities_inferred':False,'divulgadores_have_value':True,

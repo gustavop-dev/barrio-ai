@@ -2,12 +2,17 @@
 // of a conversation, the opportunity form and the referents.
 import { contactFixture, conversationFixture, opportunityFixture, redSummaryFixture, referentFixture } from '../fixtures/personas';
 import {
+  attendedBy,
+  broughtByText,
   leadDoubtText,
   nextActionText,
   nextStepView,
   opportunityErrors,
   opportunityInput,
+  othersPersonText,
+  passTargets,
   personMeta,
+  personModeOf,
   referentMeta,
   stageCount,
   stageGroups,
@@ -123,5 +128,41 @@ describe('Personas rules', () => {
     const now = Date.parse('2026-11-07T15:00:00Z');
     expect(referentMeta(referentFixture('r-1', { last_observed_at: '2026-10-26T10:00:00Z', contacts_count: 1 }), now)).toBe('Observado hace 12 días · 1 persona del barrio salió de sus posts');
     expect(referentMeta(referentFixture('r-1', { contacts_count: 0 }), now)).toBe('Aún sin observar · 0 personas del barrio salieron de sus posts');
+  });
+});
+
+describe('Who brought the opportunity (organizations, phase 5)', () => {
+  it('names the member whose contact it came from', () => {
+    expect(broughtByText({ brought_by: { id: 'm-2', display_name: 'Laura' } })).toBe('Trajo: Laura');
+  });
+
+  it.each([undefined, null, { id: 'm-1', display_name: '  ' }])('says nothing with one member or no name (%p)', (brought_by) => {
+    expect(broughtByText({ brought_by })).toBe('');
+  });
+
+  it('keeps another member\'s person fixed: no error, never in the body', () => {
+    const others = opportunityFixture('o-9', { contact: null, person: 'Laura Prueba', person_name: '', brought_by: { id: 'm-1', display_name: 'Gustavo' } });
+    expect(personModeOf(others)).toBe('ajena');
+    expect(personModeOf(opportunityFixture('o-1', { contact: null, person: 'Mario', person_name: 'Mario' }))).toBe('fuera');
+    expect(personModeOf(null)).toBe('red');
+    expect(othersPersonText(others)).toBe('Laura Prueba · de los contactos de Gustavo. Solo quien la trajo cambia la persona.');
+    expect(opportunityErrors(draft({ mode: 'ajena' })).person).toBeNull();
+    const body = opportunityInput(draft({ mode: 'ajena', modality: 'projectapp', attribution: 'lo_dijo', stage: 'reunion' }));
+    expect(body).not.toHaveProperty('contact');
+    expect(body).not.toHaveProperty('person_name');
+    expect(body).toMatchObject({ stage: 'reunion', modality: 'projectapp' });
+  });
+});
+
+describe('The register of people (organizations, phase 6)', () => {
+  it('says who attends another member\'s person and offers the pass only to whoever attends her', () => {
+    const cto = { id: 'm-cto', display_name: 'CTO de prueba' };
+    expect([attendedBy(contactFixture('c-1')), passTargets(contactFixture('c-1'))]).toEqual([null, []]);  // alone: nothing
+    const others = contactFixture('c-1', { registro: { attended_by: { ...cto, since: null }, mine: false, pass_to: [], excluded: null } });
+    expect([attendedBy(others), passTargets(others)]).toEqual(['La atiende CTO de prueba', []]);
+    const mine = contactFixture('c-1', { registro: { attended_by: null, mine: true, pass_to: [cto], excluded: null } });
+    expect([attendedBy(mine), passTargets(mine)]).toEqual([null, [cto]]);
+    const free = contactFixture('c-1', { registro: { attended_by: null, mine: false, pass_to: [cto], excluded: null } });
+    expect(passTargets(free)).toEqual([]);
   });
 });

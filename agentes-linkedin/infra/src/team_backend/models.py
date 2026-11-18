@@ -125,6 +125,116 @@ class UsageEntry(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Organizations (docs/plan-organizaciones.md, phase 1): who each LinkedIn account belongs to. The organization holds what
+# is shared because the goal is the same (ProjectApp); a member is one person with her own login and her own accounts.
+# team_backend/miembros.py is the one way to ask «whose is this»; no code reads these tables directly for that.
+
+class Organization(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    name=models.CharField(max_length=120)
+    slug=models.SlugField(max_length=60,unique=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    # What the organization is and sells (phase 3, identidad.ORGANIZATION_FIELDS): positioning version and status,
+    # language, pillars, services, offer, cases, modalities and the neighborhood. Validated and audited by
+    # identidad.save_profile (each change leaves an IdentityRevision); empty: the installation's initial identity.
+    profile=models.JSONField(default=dict,blank=True)
+    def __str__(self):return self.name
+
+class Member(models.Model):
+    """One person of an organization: her Django user (her login), the name the team uses for her and her role. `active`
+    off: she keeps her accounts but nothing resolves to her and she owns nothing (miembros.py). `is_admin`: may add
+    members and decide on the organization's referents; never opens another member's LinkedIn session."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='members')
+    # One login, one member (one organization per user for now; a FK unique per organization if that ever changes).
+    user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.PROTECT,related_name='member')
+    display_name=models.CharField(max_length=120)
+    role=models.CharField(max_length=120,blank=True)  # free text: «Fundador», «CTO»
+    active=models.BooleanField(default=True)
+    is_admin=models.BooleanField(default=False)
+    created_at=models.DateTimeField(default=timezone.now)
+    # Her LinkedIn rhythm when it differs from the .env (phase 2): {VARIABLE: value} with the same names and formats as
+    # the environment (LINKEDIN_ACCOUNT_TIER, OPERATOR_DAILY_LIMITS…). Only miembros.MEMBER_SETTINGS, validated by
+    # miembros.save_settings; a variable she does not set takes the .env's value (miembros.setting).
+    settings=models.JSONField(default=dict,blank=True)
+    # Who she is for the agents (phase 3, identidad.MEMBER_FIELDS): the name the team writes, how she presents herself,
+    # her relation to the organization, her limits, whether the personal startup modality is hers. Only she changes it
+    # (identidad.save_profile, audited with an IdentityRevision). Her voice is VoiceDocument.
+    profile=models.JSONField(default=dict,blank=True)
+    class Meta:ordering=['created_at']
+    def __str__(self):return f'{self.display_name} ({self.organization.slug})'
+
+
+class IdentityRevision(models.Model):
+    """One change of an identity profile, the organization's (`subject`='organization') or a member's ('member:<id>'):
+    who, when, which fields, the whole profile before and after. Only added, never edited (identidad.save_profile)."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='identity_revisions')
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='identity_revisions')
+    subject=models.CharField(max_length=60)
+    number=models.PositiveIntegerField()
+    changed=models.JSONField(default=list,blank=True)
+    before=models.JSONField(default=dict,blank=True)
+    after=models.JSONField(default=dict,blank=True)
+    actor=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    source=models.CharField(max_length=20)  # migracion, semilla, comando
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['created_at']
+        constraints=[models.UniqueConstraint(fields=['organization','subject','number'],name='one_identity_revision_number')]
+
+
+class VoiceDocument(models.Model):
+    """A member's voice document (voz.py), versioned. Used only once she confirms it; the latest confirmed one is her
+    voice. Gustavo's points to recursos/tono-de-voz.md (`resource`); a learned one keeps its text and the references to
+    the signals it came from (`signals`, never copies of them)."""
+    class State(models.TextChoices):
+        PROPOSED='propuesta','Propuesta; espera su confirmación'
+        CONFIRMED='confirmada','Confirmada por ella'
+        DISCARDED='descartada','Descartada'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='voice_documents')
+    number=models.PositiveIntegerField()
+    state=models.CharField(max_length=12,choices=State.choices,default=State.PROPOSED,db_index=True)
+    source=models.CharField(max_length=20)  # recurso (a file of recursos/), aprendida (proposed from her signals)
+    guide=models.TextField(blank=True)  # how the team applies it on LinkedIn; empty: voz.GENERIC_GUIDE
+    text=models.TextField(blank=True)
+    resource=models.CharField(max_length=120,blank=True)
+    sha256=models.CharField(max_length=64,blank=True)
+    signals=models.JSONField(default=list,blank=True)
+    usage=models.JSONField(default=dict,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    note=models.TextField(blank=True)
+    class Meta:
+        ordering=['-number']
+        constraints=[models.UniqueConstraint(fields=['member','number'],name='one_voice_document_number')]
+
+
+class VoiceSignal(models.Model):
+    """A trace of her style that already lives in the system (voz.collect_signals): a reference to the row, never a copy
+    of its text. One per member, kind and row."""
+    class Kind(models.TextChoices):
+        APPROVED='aprobado','Aprobó un borrador sin cambios'
+        EDITED='editado','Editó un borrador (antes y después)'
+        REJECTED='rechazado','Rechazó un borrador con su motivo'
+        ANSWER='respuesta','Respondió una pregunta del equipo'
+        CAPTURE='captura','Grabó un audio o escribió una nota'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='voice_signals')
+    kind=models.CharField(max_length=12,choices=Kind.choices)
+    source_model=models.CharField(max_length=40)
+    source_id=models.CharField(max_length=64)
+    occurred_at=models.DateTimeField()
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-occurred_at']
+        constraints=[models.UniqueConstraint(fields=['member','kind','source_model','source_id'],name='one_voice_signal_per_row')]
+
+
+# ---------------------------------------------------------------------------
 # Account operator: the single executor of external LinkedIn actions.
 # Proposal -> approval of an exact payload hash -> one execution -> confirmation.
 
@@ -151,6 +261,12 @@ class ConnectorAccount(models.Model):
     # directo), or null. Ids an audit event kept before then are of the scheme before and are never reused
     # (metricas._known_id, red.search_location).
     ids_since=models.DateTimeField(null=True,blank=True)
+    # Whose LinkedIn this is (organizaciones, phase 1). Null only for an account created before any member existed or by a
+    # test: it belongs to the only active member, and to nobody once there are several (miembros.member_of_account).
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='accounts')
+    # The account's own LinkedIn profile ids ([fsd id, public id]), learned when the connector reads /me (check_account):
+    # a member's own profile is never a prospect of a colleague (registro.colleague_ids, organizaciones phase 6).
+    linkedin_ids=models.JSONField(default=list,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
@@ -293,6 +409,18 @@ class ObservedPost(models.Model):
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
     def __str__(self):return f'{self.author_name}: {self.text[:60]}'
 
+
+class PostClaim(models.Model):
+    """Organizaciones, phase 6: a referent's post admits the comment of ONE member of the organization, the first one
+    with a proposal on it (registro.claim_post); her colleagues' copies of the post are not commented."""
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='post_claims')
+    provider_post_id=models.CharField(max_length=200)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='post_claims')
+    proposal=models.UUIDField(null=True,blank=True)
+    claimed_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['organization','provider_post_id'],name='one_comment_claim_per_post')]
+
 class Contact(models.Model):
     """A person of Gustavo's neighborhood (RED-09 relationship memory): discovered, classified and moved
     through follow -> invitation without note -> connection. Only the operator writes to LinkedIn."""
@@ -343,13 +471,84 @@ class Contact(models.Model):
     # Phase 5 (sin_posts.py): this person is the bridge («puente») to the buyer of that journey, a colleague at the
     # same company who does post. Its own contact with its own role, never a second buyer. Null for everyone else.
     bridge_for=models.ForeignKey('BuyerJourney',on_delete=models.SET_NULL,null=True,blank=True,related_name='bridges')
+    # Organizaciones, phase 6: the organization's card of this person (registro.py), shared by every member's contact of
+    # her. The contact keeps what is private to its member (notes, history, conversations, drafts, journey).
+    person=models.ForeignKey('Person',on_delete=models.SET_NULL,null=True,blank=True,related_name='contacts')
     class Meta:
         ordering=['-updated_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_contact_per_account')]
     def __str__(self):return self.display_name or self.provider_user_id
 
+
+class Person(models.Model):
+    """One LinkedIn person in an organization (organizaciones, phase 6; registro.py): the shared card every member sees
+    (name, headline, company, the classification's role, level and score, the general stage, whether she is excluded for
+    everyone) and which member attends her since when. The first real action of a member on her (follow, comment on her
+    post, invite, accept her invitation, reply to her) makes that member her `owner`; from then on no other member
+    follows, comments, invites, replies or drafts for her. Nothing private lives here: notes, conversations, drafts,
+    messages, the journey and the touches stay on each member's Contact."""
+    class Stage(models.TextChoices):
+        CANDIDATE='candidata','Candidata'
+        FOLLOWED='seguida','Seguida'
+        INVITED='invitada','Invitada'
+        CONNECTED='conectada','Conectada'
+        DISCARDED='descartada','Descartada'
+        RESTING='descanso','En descanso'
+    class Exclusion(models.TextChoices):
+        DO_NOT_CONTACT='no_contactar','Pidió no ser contactada'
+        REFUSED='rechazo_linkedin','LinkedIn rechazó la invitación'
+        DISCARDED='descarte','Descartada para toda la organización'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='people')
+    provider_user_id=models.CharField(max_length=200)
+    public_identifier=models.CharField(max_length=100,blank=True)
+    display_name=models.CharField(max_length=200,blank=True)
+    headline=models.TextField(blank=True)
+    company=models.CharField(max_length=120,blank=True)
+    # The organization's criteria applied to her (registro.SHARED_KEYS: fit, role, modality, level, score…), the shared
+    # criterion it was made with and the contact it came from: another member reuses it instead of paying again.
+    classification=models.JSONField(default=dict,blank=True)
+    stage=models.CharField(max_length=12,choices=Stage.choices,default=Stage.CANDIDATE)
+    excluded=models.CharField(max_length=20,choices=Exclusion.choices,blank=True)
+    excluded_reason=models.TextField(blank=True)
+    excluded_at=models.DateTimeField(null=True,blank=True)
+    # The member whose history excluded her: she keeps today's rules for her own contact; nobody else touches her.
+    excluded_by=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    owner=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='people')
+    owned_since=models.DateTimeField(null=True,blank=True)
+    touch=models.CharField(max_length=10,blank=True)  # the capability of her owner's first touch
+    touch_proposal=models.UUIDField(null=True,blank=True)
+    # The admin's assignment of an untouched person (registro.reassign): who may take her; null follows the reparto.
+    assigned_to=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-updated_at']
+        constraints=[models.UniqueConstraint(fields=['organization','provider_user_id'],name='one_person_per_organization')]
+    def __str__(self):return self.display_name or self.provider_user_id
+
 OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']
 OPEN_PIECE_STATES=['preparing','ready']
+
+
+def _her_content(row,account=None):
+    """Phase 4 of organizations: a content row created without saying whose is the member of its account (a piece), else
+    the default member (miembros.content_member: MiembroRequerido among several active members, never a guess). Without
+    members it stays without one, as before organizations."""
+    if row.member_id is None and row._state.adding:
+        from .miembros import content_member
+        member=content_member(account=account)
+        if member is not None:row.member=member
+
+
+def _whose_upload(row):
+    """A capture or a photo is of the member who recorded or uploaded it (created_by); a robot, a service or nobody: the
+    default member (_her_content)."""
+    if row.member_id is None and row._state.adding and row.created_by_id:
+        from .miembros import member_of_user
+        own=member_of_user(row.created_by)
+        if own is not None:row.member=own
+    _her_content(row)
 
 class EditorialPiece(models.Model):
     """CONT-01..07: one own publication prepared by the editorial circuit for a local calendar day.
@@ -362,6 +561,8 @@ class EditorialPiece(models.Model):
         READY='ready','Lista; publicación propuesta'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='pieces')
+    # Whose piece (organizaciones, phase 4): her calendar, her day's post and her second one. Set from the account's member.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='pieces')
     slot_date=models.DateField(db_index=True)
     scheduled_for=models.DateTimeField()
     state=models.CharField(max_length=20,choices=State.choices,default=State.PREPARING,db_index=True)
@@ -382,6 +583,9 @@ class EditorialPiece(models.Model):
     citations=models.JSONField(default=list,blank=True)
     signals=models.JSONField(default=list,blank=True)
     usage=models.JSONField(default=list,blank=True)
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     # APRE-01, first metric: impressions read back when the publication is reconciled (null ≠ 0).
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
@@ -394,11 +598,16 @@ class EditorialPiece(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
     class Meta:
         ordering=['-slot_date','-created_at']
-        constraints=[models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=False),
-                                             name='one_open_piece_per_day'),
-                     models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=True),
-                                             name='one_second_piece_per_day')]
+        # One open post of the day and one second post per member and day (phase 4); without members (member null) one per
+        # day for the whole installation, as before (NULLS NOT DISTINCT).
+        constraints=[models.UniqueConstraint(fields=['member','slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=False),
+                                             name='one_open_piece_per_member_day',nulls_distinct=False),
+                     models.UniqueConstraint(fields=['member','slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=True),
+                                             name='one_second_piece_per_member_day',nulls_distinct=False)]
     def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self,self.account if self.account_id else None)
+        super().save(*args,**kwargs)
 
 class PostMetric(models.Model):
     """APRE-01: cumulative counters of an own published post at a fixed age, read through the directo account (metricas.py).
@@ -472,15 +681,21 @@ class AudienceSnapshot(models.Model):
     """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through the directo account.
     Cumulative counters: net growth is the difference between two snapshots. Null means no data, never zero."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    day=models.DateField(unique=True)
+    # One per member and day (organizaciones, phase 4); without members, one per day.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='audience')
+    day=models.DateField()
     followers=models.IntegerField(null=True,blank=True)
     connections=models.IntegerField(null=True,blank=True)
     # LinkedIn reports profile views over a trailing window (List Profile Views, date_range in days).
     profile_views=models.IntegerField(null=True,blank=True)
     profile_views_days=models.PositiveSmallIntegerField(null=True,blank=True)
     captured_at=models.DateTimeField(default=timezone.now)
-    class Meta:ordering=['-day']
+    class Meta:
+        ordering=['-day']
+        constraints=[models.UniqueConstraint(fields=['member','day'],name='one_audience_per_member_day',nulls_distinct=False)]
     def __str__(self):return str(self.day)
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 # ---------------------------------------------------------------------------
 # Creator analytics of a `directo` account (analitica.py): LinkedIn's own export of the account, imported by day, per
@@ -688,6 +903,9 @@ class ActionProposal(models.Model):
     decision_note=models.TextField(blank=True)
     # Agente líder (lider.py): the typed judgments, thresholds and decision that replaced a human approval.
     review=models.JSONField(default=dict,blank=True)
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-created_at']
         # One executor per action: a single open proposal per target (post, piece or contact) and capability.
@@ -808,9 +1026,13 @@ class Orientation(models.Model):
     text=models.TextField(blank=True)
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
     updated_at=models.DateTimeField(null=True,blank=True)
+    # Whose orientation (organizaciones, phase 4): row 1 is the first member's (and an installation's without members),
+    # the one of before; any other member gets her own row (orientacion.row).
+    member=models.OneToOneField(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='orientation')
     @classmethod
-    def current(cls):
-        return cls.objects.get_or_create(pk=1)[0]
+    def current(cls,member=None):
+        from .orientacion import row
+        return row(member)
 
 class TeamQuestion(models.Model):
     """«Preguntas del equipo» (Tu turno): what an agent needs to know from Gustavo, delivered complete.
@@ -851,10 +1073,15 @@ class TeamQuestion(models.Model):
     answered_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     answered_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
+    # Whom the team asks (organizaciones, phase 4): her answer is her memory, never another member's.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='questions')
     class Meta:
         ordering=['-created_at']
-        constraints=[models.UniqueConstraint(fields=['memory_key'],condition=models.Q(state='open'),name='one_open_question_per_key')]
+        constraints=[models.UniqueConstraint(fields=['member','memory_key'],condition=models.Q(state='open'),
+                                             name='one_open_question_per_member_key',nulls_distinct=False)]
     def __str__(self):return self.question[:80]
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 class Opportunity(models.Model):
     """A business opportunity (Personas → Oportunidades; Resultados → «¿Genera negocio?»). Gustavo registers and
@@ -899,6 +1126,11 @@ class Opportunity(models.Model):
     notes=models.TextField(blank=True)
     history=models.JSONField(default=list,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # The organization's one funnel (organizaciones, phase 5): every member sees and moves every opportunity, and each says
+    # which member registered it (`member`) and whose person or journey it came from (`origin_member`). Empty: the first
+    # member's (registered before organizations; migration 0061 fills them).
+    member=models.ForeignKey(Member,on_delete=models.SET_NULL,null=True,blank=True,related_name='registered_opportunities')
+    origin_member=models.ForeignKey(Member,on_delete=models.SET_NULL,null=True,blank=True,related_name='brought_opportunities')
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
     stage_changed_at=models.DateTimeField(default=timezone.now)
@@ -954,6 +1186,9 @@ class Capture(models.Model):
         UNDONE='deshecha','Deshecha'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # Whose capture (organizaciones, phase 4): her ideas, facts and photos feed only her pieces. The member of whoever
+    # recorded it, else the default member.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='captures')
     created_at=models.DateTimeField(default=timezone.now,db_index=True)
     note=models.TextField(blank=True)
     purpose=models.CharField(max_length=12,choices=Purpose.choices,blank=True)
@@ -990,6 +1225,8 @@ class Capture(models.Model):
     error=models.TextField(blank=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.created_at:%Y-%m-%d %H:%M} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _whose_upload(self);super().save(*args,**kwargs)
     @property
     def text(self):
         """The note plus the transcript: what the team routes."""
@@ -1036,9 +1273,14 @@ class GalleryPhoto(models.Model):
     published_at=models.DateTimeField(null=True,blank=True)
     capture=models.ForeignKey(Capture,on_delete=models.SET_NULL,null=True,blank=True,related_name='photos')
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    # Whose photo (organizaciones, phase 4): only her pieces may use it. Her capture's member, else whoever uploaded it.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='photos')
     created_at=models.DateTimeField(default=timezone.now,db_index=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.id} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        if self.member_id is None and self._state.adding and self.capture_id and self.capture.member_id:self.member_id=self.capture.member_id
+        _whose_upload(self);super().save(*args,**kwargs)
 
     @property
     def allow_ai_edit(self):return self.ai_edit!=AIEdit.NO
@@ -1073,8 +1315,11 @@ class PieceImage(models.Model):
         constraints=[models.UniqueConstraint(fields=['piece','position'],name='one_image_per_piece_position')]
 
 class OfficePreference(models.Model):
-    """Singleton of Gustavo's office preferences (Ajustes)."""
+    """One person's office preferences (Ajustes): which pushes she gets and her gallery's AI edit. Each user her own
+    (organizaciones, phase 5): row 1 is the first member's user's, the preferences of before organizations (and the only
+    row of an installation without members); anyone else gets hers with the defaults (OfficePreference.of)."""
     id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    user=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,null=True,blank=True,related_name='office_preference')
     gallery_ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
     # Ajustes › Notificaciones: event kinds whose push Gustavo turned off, and those he turned on although their default
     # is off (notificaciones.INBOX_KINDS and FEED_KINDS hold the defaults; off wins if a kind is in both).
@@ -1083,8 +1328,28 @@ class OfficePreference(models.Model):
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     updated_at=models.DateTimeField(null=True,blank=True)
     @classmethod
-    def current(cls):
-        return cls.objects.get_or_create(pk=1)[0]
+    def of(cls,user):
+        """Her preferences: her own row; row 1 for the first member's user (and everyone without members), else a new row
+        of hers with the defaults. Never another person's."""
+        from django.db import IntegrityError, transaction
+        from . import miembros
+        if user is not None and getattr(user,'pk',None):
+            row=cls.objects.filter(user_id=user.pk).first()
+            if row is not None:return row
+        first=Member.objects.filter(pk=miembros.first_member_id()).values_list('user_id',flat=True).first()
+        if first is None or (user is not None and user.pk==first):
+            return cls.objects.get_or_create(pk=1)[0]
+        if user is None or not getattr(user,'pk',None):
+            raise miembros.MiembroRequerido('Las preferencias son de una persona: hay que decir de quién.')
+        for _ in range(3):
+            try:
+                with transaction.atomic():
+                    top=cls.objects.aggregate(top=models.Max('id'))['top'] or 1
+                    return cls.objects.create(id=top+1,user=user)
+            except IntegrityError:
+                row=cls.objects.filter(user_id=user.pk).first()
+                if row is not None:return row
+        raise RuntimeError('No se pudieron crear tus preferencias; vuelve a intentarlo.')
 
     @property
     def gallery_ai_edit_default(self):return self.gallery_ai_edit!=AIEdit.NO
@@ -1094,8 +1359,11 @@ class OfficePreference(models.Model):
 
 class Notification(models.Model):
     """Notificaciones: what is coming or already happened and asks nothing of Gustavo (kept 7 days).
-    Anything only he can solve lives in Tu turno instead (notificaciones.INBOX_KINDS)."""
+    Anything only he can solve lives in Tu turno instead (notificaciones.INBOX_KINDS). Each one is a member's
+    (organizaciones, phase 5): an organization's notice is one row per member, each with its own read state. Empty: the
+    first member's (migration 0061 marks the rows of before)."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    member=models.ForeignKey(Member,on_delete=models.CASCADE,null=True,blank=True,related_name='notifications')
     kind=models.CharField(max_length=40)
     layer=models.CharField(max_length=20)
     title=models.CharField(max_length=300)
@@ -1107,8 +1375,9 @@ class Notification(models.Model):
     class Meta:ordering=['-created_at']
 
 class InboxSeen(models.Model):
-    """Tu turno: an item Gustavo already opened («Vista»), keyed by the card id the API returns."""
-    item_id=models.CharField(max_length=120,primary_key=True)
+    """Tu turno: an item she already opened («Vista»), keyed by the card id the API returns; per user (alcance.vista:
+    the first member's user keeps the bare ids of before organizations, anyone else's carry «u:<user id>:»)."""
+    item_id=models.CharField(max_length=200,primary_key=True)
     seen_at=models.DateTimeField(default=timezone.now)
 
 
@@ -1149,7 +1418,9 @@ class WeeklySummary(models.Model):
         APPLIED='aplicado','Usado como orientación'
         DISCARDED='descartado','Descartado'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    week_start=models.DateField(unique=True)
+    # Whose week (organizaciones, phase 4): one per member and week; without members, one per week.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='weekly_summaries')
+    week_start=models.DateField()
     # Deterministic figures of the week and the one before; null means no data, never zero.
     stats=models.JSONField(default=dict,blank=True)
     # {titular, lo_que_funciono, lo_que_no, recomendaciones, orientacion_propuesta, advertencias, validacion}.
@@ -1164,8 +1435,12 @@ class WeeklySummary(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-week_start']
+    class Meta:
+        ordering=['-week_start']
+        constraints=[models.UniqueConstraint(fields=['member','week_start'],name='one_summary_per_member_week',nulls_distinct=False)]
     def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class WeeklyPlan(models.Model):
@@ -1175,7 +1450,9 @@ class WeeklyPlan(models.Model):
         TEMPLATE='estructura','Solo la estructura'
         PLANNED='planeada','Planeada'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    week_start=models.DateField(unique=True)
+    # Whose week (organizaciones, phase 4): her own plan from the organization's template and pillars.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='weekly_plans')
+    week_start=models.DateField()
     state=models.CharField(max_length=12,choices=State.choices,default=State.TEMPLATE)
     # One per day, Monday first: {date, type, type_reason, idea, reason, pillar, modality, approach, format, reader,
     # reader_need, audience_evidence, evidence_ok, pain, state, owner_edited, piece_id}.
@@ -1192,8 +1469,12 @@ class WeeklyPlan(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-week_start']
+    class Meta:
+        ordering=['-week_start']
+        constraints=[models.UniqueConstraint(fields=['member','week_start'],name='one_plan_per_member_week',nulls_distinct=False)]
     def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class DeviceToken(models.Model):
@@ -1514,7 +1795,9 @@ class MonthlyReview(models.Model):
         NEW='nuevo','Nueva'
         SEEN='visto','Vista'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
-    month_start=models.DateField(unique=True)
+    # Whose month (organizaciones, phase 4): one per member and month; its changes go to her orientation.
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='monthly_reviews')
+    month_start=models.DateField()
     # The inputs, as the analyst read them: proof of where each figure of the report came from.
     stats=models.JSONField(default=dict,blank=True)
     # {titular, metodo, lo_que_paso, lo_que_funciono, lo_que_no, no_concluyente, cambios_previos, cambios, validacion, …}.
@@ -1527,8 +1810,12 @@ class MonthlyReview(models.Model):
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
-    class Meta:ordering=['-month_start']
+    class Meta:
+        ordering=['-month_start']
+        constraints=[models.UniqueConstraint(fields=['member','month_start'],name='one_review_per_member_month',nulls_distinct=False)]
     def __str__(self):return f'{self.month_start} · {self.get_state_display()}'
+    def save(self,*args,**kwargs):
+        _her_content(self);super().save(*args,**kwargs)
 
 
 class StrategyChange(models.Model):
@@ -1801,6 +2088,9 @@ class BuyerDraft(models.Model):
     citations=models.JSONField(default=list,blank=True)
     issues=models.JSONField(default=list,blank=True)  # the fixed rules it broke (after the single redraft)
     review=models.JSONField(default=dict,blank=True)  # the lead's verdict, with the course grounding it read
+    # Which voice wrote it (phase 3, voz.meta): {'tipo': 'provisional'|'confirmada'|'inicial', 'version': n}. A draft in the
+    # provisional voice of a member who has none yet is marked so (phase 5 shows it, phase 7 keeps her in approval).
+    voice=models.JSONField(default=dict,blank=True)
     model=models.CharField(max_length=100,blank=True)
     show_at=models.DateTimeField(null=True,blank=True)  # a message's card never shows the minute she accepted
     proposal=models.ForeignKey(ActionProposal,on_delete=models.SET_NULL,null=True,blank=True,related_name='buyer_drafts')

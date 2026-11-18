@@ -34,9 +34,9 @@ class SequenceConnector(FakeImageConnector):
         super().__init__()
         self.verdicts = iter(verdicts)
 
-    def check(self, images, context, original=None, instruction='', from_gustavo=False):
+    def check(self, images, context, original=None, instruction='', from_gustavo=False, author=None):
         self.ok = next(self.verdicts)
-        return super().check(images, context, original, instruction, from_gustavo)
+        return super().check(images, context, original, instruction, from_gustavo, author)
 
 
 class ReworkBase(EditorialBase):

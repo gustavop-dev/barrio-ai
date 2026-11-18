@@ -204,7 +204,7 @@ class ExpoPushTests(AppMovilBase):
 
     def test_send_is_batched_with_the_web_push_content(self):
         fake=self.use_expo(ExpoFake());self.tokens(150)
-        notificaciones.avisar('uncertain','Acción incierta en LinkedIn','Revisa si el comentario salió.')
+        notificaciones.avisar('uncertain','Acción incierta en LinkedIn','Revisa si el comentario salió.',member=None)
         self.assertEqual([len(batch) for batch in fake.sent],[100,50])
         first=fake.messages[0]
         self.assertEqual(first,{'to':'ExponentPushToken[t000]','title':'Acción incierta en LinkedIn','body':'Revisa si el comentario salió.',
@@ -214,7 +214,7 @@ class ExpoPushTests(AppMovilBase):
         self.assertTrue(all(t.last_success_at and len(t.tickets)==1 for t in ExpoPushToken.objects.all()))
         fake.sent.clear()
         with patch.dict(os.environ,{'EXPO_ACCESS_TOKEN':'expo-test-token'}):
-            notificaciones.avisar('piece_published','Publicaste «X»','Las impresiones llegan mañana.',link='/calendario/pieza/7',ref='piece_published:7')
+            notificaciones.avisar('piece_published','Publicaste «X»','Las impresiones llegan mañana.',link='/calendario/pieza/7',ref='piece_published:7',member=None)
         self.assertEqual(fake.headers[-1]['authorization'],'Bearer expo-test-token')
         self.assertEqual({(m['priority'],m['data']['url']) for m in fake.messages},{('default','/calendario/pieza/7')})
 
@@ -243,17 +243,17 @@ class ExpoPushTests(AppMovilBase):
     def test_per_kind_switch_applies_before_expo(self):
         fake=self.use_expo(ExpoFake());self.tokens(1)
         self.human.patch('/api/v1/ajustes/preferencias',{'push_disabled':['question']},format='json')
-        notificaciones.avisar('question','El director te pregunta: ¿qué stack usas?')
-        notificaciones.avisar('connection_fit','Ana aceptó tu invitación',ref='connection:1')  # no push by default
+        notificaciones.avisar('question','El director te pregunta: ¿qué stack usas?',member=None)
+        notificaciones.avisar('connection_fit','Ana aceptó tu invitación',ref='connection:1',member=None)  # no push by default
         self.assertEqual(fake.sent,[])
-        notificaciones.avisar('profile_task','Tarea de perfil nueva')
+        notificaciones.avisar('profile_task','Tarea de perfil nueva',member=None)
         self.assertEqual([m['title'] for m in fake.messages],['Tarea de perfil nueva'])
 
     def test_failures_never_break_the_work_that_pushes(self):
         self.tokens(1)
         def down(request):raise httpx.ConnectError('expo down')
         self.use_expo(down)
-        created=notificaciones.avisar('piece_published','Publicaste «Y»',link='/calendario/pieza/8',ref='piece_published:8')
+        created=notificaciones.avisar('piece_published','Publicaste «Y»',link='/calendario/pieza/8',ref='piece_published:8',member=None)
         self.assertIsNotNone(created)  # the Notification is still recorded
         self.use_expo(ExpoFake(status=503))
         self.assertEqual(expo.broadcast('a','b'),0)

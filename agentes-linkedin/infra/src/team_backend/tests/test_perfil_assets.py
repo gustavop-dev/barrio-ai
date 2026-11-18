@@ -106,10 +106,10 @@ class ProfileAssetsTests(ProfileBase):
         proposal.save();before=copy.deepcopy(proposal.sections)
         expected={'lines':['Software that','holds up.'],'highlight':'holds','label':'FOUNDER, PROJECTAPP'}
         real_fit=visual.banner_fit
-        def fit(copy):
+        def fit(copy,ident=None):  # a spy: the real fit gets the owner's identity (perfil.identity_of)
             saved=ProfileProposal.objects.get(pk=proposal.pk).context['banner']
             self.assertEqual({k:saved[k] for k in expected},expected)
-            return real_fit(copy)
+            return real_fit(copy,ident)
         with patch.object(visual,'banner_fit',side_effect=fit), \
              patch('team_backend.perfil_contenido.draft',side_effect=AssertionError('whole proposal forbidden')), \
              patch.object(providers,'claude',side_effect=AssertionError('unexpected paid call')):
@@ -168,7 +168,7 @@ class ProfileAssetsTests(ProfileBase):
     def test_completed_legacy_assets_job_does_not_swallow_corrected_request(self):
         from team_backend import perfil_galeria as gallery
         proposal=self.blocked_proposal();refs=gallery.references(self.gustavo)
-        old_signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.BRAND_VERSION})
+        old_signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.brand_version()})
         old_id=uuid.uuid5(perfil.NS,f'{proposal.id}:v{proposal.version}:assets:{old_signature}')
         Job.objects.create(id=old_id,owner=self.gustavo,kind='prepare_profile_assets',state='complete',
             params={'proposal':str(proposal.id),'version':proposal.version,'references':refs})
@@ -285,7 +285,7 @@ class ProfileAssetsTests(ProfileBase):
         proposal=self.blocked_proposal()
         proposal.context['banner'].update(lines=['Your workflow,','built to ship.'],highlight='')
         proposal.save();real_fit=visual.banner_fit;inputs=[]
-        def fit(banner):inputs.append(copy.deepcopy(banner));return real_fit(banner)
+        def fit(banner,ident=None):inputs.append(copy.deepcopy(banner));return real_fit(banner,ident)
         with patch.object(visual,'banner_fit',side_effect=fit):result=self.run_assets(proposal)
         self.assertEqual(result.state,'ready',result.findings)
         self.assertEqual(len(inputs),1)

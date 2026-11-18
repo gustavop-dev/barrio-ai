@@ -73,6 +73,9 @@ class Settings:
     deadline: float = DEADLINE
     reload_hours: float = 6.0  # the feed is loaded again after this long: fresh query ids, a page that looks used
     idle_minutes: float = 0.0  # close an account's browser after this long without calls (0 = never): ~1 GiB each
+    # Open an account's browser only with at least this many MiB free (memoria.available_mb); 0 = never checked (the
+    # default here, for a laptop; deploy/compose.prod.yaml sets 1100 on the server). README «Memoria».
+    min_memory_mb: int = 0
     headless: bool = False
     host: str = '127.0.0.1'
     port: int = 8790
@@ -156,6 +159,7 @@ def load(env=None, need_token=True):
         budgets=budgets,
         reload_hours=number(env, 'NAVEGADOR_RECARGA_HORAS', 6.0, float),
         idle_minutes=number(env, 'NAVEGADOR_CIERRE_INACTIVO_MIN', 0.0, float),
+        min_memory_mb=number(env, 'NAVEGADOR_MEMORIA_MINIMA_MB', 0),
         headless=(env.get('NAVEGADOR_HEADLESS') or 'false').lower() == 'true',
         host=env.get('NAVEGADOR_HOST') or '127.0.0.1',
         port=number(env, 'NAVEGADOR_PUERTO', 8790),

@@ -10,7 +10,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import imagenes, orquestacion, perfil, perfil_galeria, perfil_assets
+from . import imagenes, miembros, orquestacion, perfil, perfil_galeria, perfil_assets
 from .capturas_views import FileView, serve
 from .exceptions import Conflict
 from .jobs import audit
@@ -160,7 +160,8 @@ def verify(request,pid,data):
     try:
         runtime=orquestacion.Runtime.open('perfil_periodico',str(proposal.id),request.user)
         with runtime.session():
-            current=runtime.call('perfil_lectura',{},perfil.read_profile,key=f'verify:{section["id"]}:{proposal.revision}')
+            current=runtime.call('perfil_lectura',{},lambda:perfil.read_profile(miembros.member_for(request.user)),
+                                 key=f'verify:{section["id"]}:{proposal.revision}')
     except (orquestacion.CycleStopped,ValueError) as exc:
         raise Conflict('Comprobación no disponible: '+str(exc))
     observed=current['sections'].get(section['id'])
@@ -172,7 +173,7 @@ def verify(request,pid,data):
                 proposal.history.append({'action':'verify_mismatch','section':section['id'],'actor':request.user.pk,
                     'at':current['at'],'version':proposal.version,'observed':observed})
                 proposal.save()
-        raise Conflict('La relectura no coincide o no está disponible; sigue Aplicado por Gustavo.')
+        raise Conflict('La relectura no coincide o no está disponible; sigue «Aplicado por ti».')
     with transaction.atomic():
         proposal=get(request.user,pid,True)
         if proposal.revision!=data['revision']:raise Conflict('La propuesta cambió durante la comprobación.')

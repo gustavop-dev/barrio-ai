@@ -1,6 +1,9 @@
 """Conectar LinkedIn desde la app (team_backend/conexion.py): start, poll, open again and cancel a login into a
 `directo` account's browser (human session), plus the two plain views the remote view goes through: `enter` swaps the
-single-use ticket for the view's cookie, and `allow` answers Caddy's forward_auth with the view key."""
+single-use ticket for the view's cookie, and `allow` answers Caddy's forward_auth with the view key.
+
+Her own accounts only (organizaciones, phase 5; alcance): another member's account or login answers 404, as one that does
+not exist; not even the admin opens someone else's LinkedIn session (conexion.py checks the owner again)."""
 from django.conf import settings
 from django.http import HttpResponse, HttpResponseRedirect
 from django.utils import timezone
@@ -8,10 +11,9 @@ from django.views.decorators.http import require_GET
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from . import conexion
+from . import alcance, conexion
 from .models import BrowserLogin, ConnectorAccount
-from .operador_views import get_or_404, human_session
-from .permissions import require
+from .operador_views import human_session
 
 GONE = ('<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
         '<title>Conectar LinkedIn</title><body style="font-family:sans-serif;padding:24px">'
@@ -30,7 +32,7 @@ def _answer(request, login, raw=None, status=200):
 class AccountLogin(APIView):
     def post(self, request, aid):
         human_session(request)
-        account = get_or_404(ConnectorAccount, id=aid)
+        account = alcance.obtener(request, ConnectorAccount, id=aid)
         try:
             login, raw = conexion.start(request.user, account)
         except conexion.Unavailable as exc:
@@ -40,21 +42,20 @@ class AccountLogin(APIView):
 
 class LoginDetail(APIView):
     def get(self, request, lid):
-        require(request.user, 'operate_linkedin')
-        return _answer(request, conexion.refresh(get_or_404(BrowserLogin, id=lid)))
+        return _answer(request, conexion.poll(request.user, alcance.obtener(request, BrowserLogin, id=lid)))
 
 
 class LoginLink(APIView):
     def post(self, request, lid):
         human_session(request)
-        login = get_or_404(BrowserLogin, id=lid)
+        login = alcance.obtener(request, BrowserLogin, id=lid)
         return _answer(request, login, conexion.new_link(request.user, login))
 
 
 class LoginCancel(APIView):
     def post(self, request, lid):
         human_session(request)
-        return _answer(request, conexion.cancel(request.user, get_or_404(BrowserLogin, id=lid)))
+        return _answer(request, conexion.cancel(request.user, alcance.obtener(request, BrowserLogin, id=lid)))
 
 
 def _private(response):

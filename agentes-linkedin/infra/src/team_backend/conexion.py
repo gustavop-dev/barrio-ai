@@ -10,6 +10,9 @@ remote view (noVNC) that exists only while that login lasts. Who reaches what:
   key, which Caddy adds to the request it passes to the service (X-Pantalla-Clave). The key is an HMAC of the service
   token and the login's session id: never stored, never in a URL, never given to the person's browser.
 Ticket and cookie are kept only as SHA-256 hashes. Starts are limited per account and hour.
+Only the member who owns the account (miembros.is_owner) starts, polls, reopens or cancels its login, and a ticket or a
+cookie stops working the moment its user no longer owns it: the organization's admin does not open another member's live
+LinkedIn session either (organizaciones, phase 1: «cada uno con su cuenta»).
 
 When the service says it ended: conectada clears the account's pause if it came from the service stopping it or
 having no session (servicio.TO_DO) and the service no longer has it stopped; nothing else runs by itself."""
@@ -27,6 +30,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied, Throttled, Val
 
 from linkedin_directo.servicio import TO_DO
 
+from . import miembros
 from .models import BrowserLogin, ConnectorAccount
 from .operador import _audit
 from .permissions import require
@@ -103,13 +107,21 @@ def ticket(login):
     return raw
 
 
+def require_owner(user, account):
+    """403 unless `user` is the member who owns the account; the admin of the organization is not enough."""
+    if not miembros.is_owner(user, account, alta=True):  # also while she is being onboarded (phase 7)
+        raise PermissionDenied('Solo el miembro dueño de esta cuenta abre o maneja su sesión de LinkedIn.')
+
+
 def start(user, account):
-    """(login, ticket or None). Refuses another provider, too many starts, or a service that cannot."""
+    """(login, ticket or None). Refuses another provider, someone who does not own the account, too many starts, or a
+    service that cannot."""
     require(user, 'operate_linkedin')
     if not enabled():
         raise NotFound('Conectar LinkedIn desde la app está apagado en el servidor (LINKEDIN_CONEXION_APP).')
     if account.provider != ConnectorAccount.Provider.DIRECTO:
         raise ValidationError('Solo una cuenta de LinkedIn directo se conecta desde la app.')
+    require_owner(user, account)
     now = timezone.now()
     for open_login in account.browser_logins.filter(state__in=ACTIVE):
         refresh(open_login)
@@ -133,6 +145,13 @@ def start(user, account):
         finish(login)
         return login, None
     return login, ticket(login)
+
+
+def poll(user, login):
+    """The app polling its login: only the account's owner."""
+    require(user, 'operate_linkedin')
+    require_owner(user, login.account)
+    return refresh(login)
 
 
 def refresh(login):
@@ -182,6 +201,7 @@ def finish(login):
 
 def cancel(user, login):
     require(user, 'operate_linkedin')
+    require_owner(user, login.account)
     if login.state in ACTIVE:
         try:
             status, body = _service('DELETE', f'/v1/conexiones/{quote(login.session, safe="")}', 20.0)
@@ -202,6 +222,7 @@ def new_link(user, login):
     require(user, 'operate_linkedin')
     if login.user_id != user.id:
         raise PermissionDenied('Solo quien inició esta conexión puede abrirla.')
+    require_owner(user, login.account)
     refresh(login)
     if login.state != BrowserLogin.State.WAITING:
         raise ValidationError('Esta conexión ya terminó.')
@@ -209,10 +230,12 @@ def new_link(user, login):
 
 
 def _usable(login):
+    """A login whose remote view may be shown: waiting, not expired, and its user still active, allowed and the owner of
+    the account (a change of owner closes the view at once)."""
     user = login.user
     return (user is not None and user.is_active and user.has_perm('team_backend.operate_linkedin')
             and login.state == BrowserLogin.State.WAITING and login.finished_at is None
-            and login.expires_at > timezone.now())
+            and login.expires_at > timezone.now() and miembros.is_owner(user, login.account, alta=True))
 
 
 def redeem(raw):

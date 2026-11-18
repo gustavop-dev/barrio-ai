@@ -1,0 +1,251 @@
+# cubre: ORG-36, ORG-37, ORG-38
+# Ajustes for a member of the organization (organizaciones, phase 7). seed_qa (without --segundo-miembro): «qa» is
+# Gustavo, ProjectApp's first and only member, active and admin («Fundador»), with no profile, voice or revision of his
+# own yet: he reads the installation's initial ones, and the voice learning is off (this job sets no
+# VOICE_LEARNING_ENABLED). What only reads goes first, so a retry still finds the seed as it was: «Mi voz», the label of
+# his voice and his texts against the minimum for a proposal (nothing paid is offered); «Organización», only for the
+# admin: Gustavo, its only member, active admin with the initial voice and both accounts connected. Then «Mi perfil»: he
+# rewrites «Cómo te presentas» (the field rises above the keyboard: the app is drawn edge to edge and the screen does
+# not shrink for it), saves, reads «Guardado.» and the first revision of his history. At the end the original text goes
+# back (copied before the edit and pasted back).
+appId: co.projectapp.office
+name: Ajustes · mi perfil, mi voz y organización
+tags: [ajustes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "MÁQUINA"
+    timeout: 20000
+# An active member never sees the onboarding notice.
+- assertNotVisible:
+    id: ajustes-alta
+
+# ---------------------------------------------------------------- Mi voz: the installation's, and his texts against the minimum
+# cubre: ORG-37
+- openLink: "oficina0ff1ce://ajustes?ancla=voz"
+- extendedWaitUntil:
+    visible:
+      text: "MI VOZ"
+      childOf:
+        id: ajustes-mi-voz
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: voz-estado
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+# Badges are drawn in capitals (etiqueta): «Inicial de la instalación».
+- assertVisible:
+    text: "INICIAL DE LA INSTALACIÓN"
+    childOf:
+      id: voz-estado
+- assertVisible: "El equipo escribe con la voz inicial de la instalación\\."
+- scrollUntilVisible:
+    element:
+      text: "\\d+ de \\d+ textos aprobados o editados"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Muestra para una propuesta"
+# The learning is off on this server: no paid proposal is offered, and none is waiting.
+- scrollUntilVisible:
+    element:
+      id: voz-sin-propuesta
+      text: "El aprendizaje de la voz está apagado en el servidor\\."
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    id: voz-proponer
+- assertNotVisible:
+    id: voz-confirmar
+- assertNotVisible:
+    id: voz-descartar
+- takeScreenshot: 20-voz-01-inicial
+
+# ---------------------------------------------------------------- Organización: only the admin; Gustavo, its only member
+# cubre: ORG-38
+- openLink: "oficina0ff1ce://ajustes?ancla=organizacion"
+- extendedWaitUntil:
+    visible:
+      text: "ORGANIZACIÓN"
+      childOf:
+        id: ajustes-organizacion
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Miembros \\(1\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "ADMINISTRADOR"
+      childOf:
+        id: ajustes-organizacion
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "Gustavo"
+    childOf:
+      id: ajustes-organizacion
+- assertVisible:
+    text: "ACTIVO"
+    childOf:
+      id: ajustes-organizacion
+- assertVisible:
+    text: "VOZ INICIAL"
+    childOf:
+      id: ajustes-organizacion
+- assertVisible: "Fundador · desde \\d{4}-\\d{2}-\\d{2}"
+- assertVisible: "API oficial: conectada · Navegador: conectada"
+- takeScreenshot: 20-organizacion-01-miembros
+
+# ---------------------------------------------------------------- Mi perfil: rewrite «Cómo te presentas» and save
+# cubre: ORG-36
+# ?ancla=perfil scrolls to the section.
+- openLink: "oficina0ff1ce://ajustes?ancla=perfil"
+- extendedWaitUntil:
+    visible:
+      text: "MI PERFIL"
+      childOf:
+        id: ajustes-mi-perfil
+    timeout: 20000
+# Nothing of his saved yet: he reads the installation's values.
+- assertVisible: "Aún no guardaste tu perfil: lo que ves son los valores iniciales\\."
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Cómo te presentas"
+# Nothing changed yet: saving is off.
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: perfil-guardar
+    enabled: false
+- takeScreenshot: 20-perfil-01-inicial
+# Keep the seed's text to put it back at the end.
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- copyTextFrom:
+    id: perfil-identity
+# Focused, the field rises under the top bar, above the keyboard (QA 44402904432: it stayed under it).
+- tapOn:
+    id: perfil-identity
+- assertVisible:
+    id: perfil-identity
+# eraseText deletes what is before the cursor, and a tap leaves it under the finger, mid-text: tap and erase again
+# until the counter says 0. The keyboard goes down after each pass (Android's back, so only while it is up), so the
+# counter under the field is on screen to be read.
+- eraseText: 200
+- hideKeyboard
+- repeat:
+    times: 6
+    while:
+      notVisible: "cómo se presenta: una o dos frases · 0 / 600"
+    commands:
+      - tapOn:
+          id: perfil-identity
+      - eraseText: 200
+      - hideKeyboard
+- assertVisible: "cómo se presenta: una o dos frases · 0 / 600"
+- tapOn:
+    id: perfil-identity
+- inputText: Me presento en una frase corta, de prueba QA.
+- hideKeyboard
+- assertVisible: "cómo se presenta: una o dos frases · 45 / 600"
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: perfil-guardar
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: perfil-estado
+      text: "Guardado\\."
+    timeout: 15000
+- takeScreenshot: 20-perfil-02-guardado
+# His history gains its first revision: who, from where and what changed.
+- scrollUntilVisible:
+    element:
+      text: "Historial \\(1\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Historial \\(1\\)"
+- scrollUntilVisible:
+    element:
+      text: "#1 · .* · Gustavo · desde la app · cambió: Cómo te presentas"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 20-perfil-03-historial
+
+# ---------------------------------------------------------------- the seed's text back
+- scrollUntilVisible:
+    element:
+      id: perfil-identity
+    direction: UP
+    centerElement: true
+    timeout: 30000
+# Still focused (back only hid the keyboard): the tap brings the keyboard back, and the field rises again.
+- tapOn:
+    id: perfil-identity
+- assertVisible:
+    id: perfil-identity
+- eraseText: 200
+- hideKeyboard
+- repeat:
+    times: 6
+    while:
+      notVisible: "cómo se presenta: una o dos frases · 0 / 600"
+    commands:
+      - tapOn:
+          id: perfil-identity
+      - eraseText: 200
+      - hideKeyboard
+- assertVisible: "cómo se presenta: una o dos frases · 0 / 600"
+- tapOn:
+    id: perfil-identity
+- pasteText
+- hideKeyboard
+- assertVisible: "cómo se presenta: una o dos frases · [1-9]\\d* / 600"
+- scrollUntilVisible:
+    element:
+      id: perfil-guardar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: perfil-guardar
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible:
+      id: perfil-estado
+      text: "Guardado\\."
+    timeout: 15000
+- takeScreenshot: 20-perfil-04-restaurado

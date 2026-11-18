@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import patch
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.utils import timezone
 from team_backend import (analitica, autopiloto, compuertas, editorial, estrategia, lider, modelos_crecimiento, operador, research,
                           resumen_semanal, urgente)
@@ -18,7 +18,7 @@ from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answer
 MONDAY=date(2026,11,16)  # a normal week; the next one doubles S
 
 
-class StructureTests(SimpleTestCase):
+class StructureTests(TestCase):  # safe_question reads the members' names (identidad.private_names)
     def test_four_weeks_have_every_type_and_stay_near_40_30_20_10(self):
         weeks=[estrategia.allocate(MONDAY+timedelta(days=7*i)) for i in range(4)]
         for types in weeks:
@@ -272,8 +272,8 @@ class PersonalStoryTests(StrategyBase):
         self.assertTrue(any(u.get('reason')=='historia_p' for u in piece.usage))
         self.assertEqual([s['protagonist'] for s in estrategia.used_stories()],['Ana Ejemplo'])
         # The next P post cannot tell it again: the director sees it and a repeat travels as a risk.
-        self.assertEqual(estrategia.director_input(EditorialPiece(slot_date=self.today),[],None,timezone.now())['used_stories'][0]['protagonist'],
-                         'Ana Ejemplo')
+        following=EditorialPiece(account=self.official,slot_date=self.today)
+        self.assertEqual(estrategia.director_input(following,[],None,timezone.now())['used_stories'][0]['protagonist'],'Ana Ejemplo')
 
     def test_a_story_told_as_his_with_an_invented_quote_and_no_source_never_goes_out(self):
         final='I almost shut my company down before launch. As Ana said: "fear is the price of building something real".'
@@ -400,7 +400,7 @@ class GrowthModelSourceTests(StrategyBase):
         ref=next(q['id'] for q in signals['audience_question'] if q['kind']=='pregunta')
         self.assertEqual(ref,'tema:pregunta:costo')
         self.assertTrue(estrategia.valid_evidence({'kind':'audience_question','ref':ref,'note':'Preguntan cuánto cuesta.'},signals))
-        strategy=estrategia.director_input(EditorialPiece(slot_date=self.today),[],None,self.now)
+        strategy=estrategia.director_input(EditorialPiece(account=self.official,slot_date=self.today),[],None,self.now)
         self.assertEqual(strategy['growth_models'],signals['referent_outlier'])
         self.no_text(strategy)
 

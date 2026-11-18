@@ -747,6 +747,23 @@ class ServiceTransportTests(SimpleTestCase):
                 self.service(lambda r,s=status,a=answer:httpx.Response(s,json=a)).send(self.READ)
             self.assertEqual((e.exception.kind,e.exception.since),(kind,since))
 
+    def test_no_memory_on_the_server_to_open_a_browser_waits_and_never_pauses(self):
+        """Organizaciones, phase 7: the service does not open one more Chromium without memory (503 `memoria`). Nothing
+        left: a plain «not sent», so the action waits for the next round (connectors.deferred) and the account is never
+        paused; a write is not uncertain."""
+        body={'reason':'el servidor no tiene memoria para abrir otro navegador (900 MiB libres, hacen falta 1100); '
+                       'no salió nada','code':'memoria'}
+        handler=lambda r:httpx.Response(503,json=body)
+        for request in (self.READ,self.WRITE):
+            with self.subTest(write=request.write),self.assertRaises(LinkedInError) as e:self.service(handler).send(request)
+            exc=e.exception
+            self.assertEqual((exc.kind,exc.pause,exc.status,exc.retry_after,exc.since),('not_sent',False,503,None,None))
+            self.assertIn('no tiene memoria para abrir otro navegador',str(exc))
+        for call in (lambda c:c.account_status(),lambda c:c.send_invitation('ACoPersonaFicticia01')):
+            with self.assertRaises(ConnectorError) as e:call(DirectoConnector('cuenta-prueba',transport=self.service(handler)))
+            self.assertEqual((e.exception.kind,e.exception.pause),('not_sent',False))
+            self.assertTrue(connectors.deferred(e.exception))
+
     def test_network_failures(self):
         def down(request):raise httpx.ConnectError('sin conexión',request=request)
         def late(request):raise httpx.ReadTimeout('tarde',request=request)
@@ -886,7 +903,8 @@ class EgressNoticeTests(TestCase):
         self.assertEqual((self.notices().count(),self.push.call_count),(1,2))
 
     def test_other_refusals_and_providers_say_nothing(self):
-        for status,body in ((503,{'reason':'ocupado'}),(422,{'reason':'x','code':'budget','retry_after':60})):
+        for status,body in ((503,{'reason':'ocupado'}),(422,{'reason':'x','code':'budget','retry_after':60}),
+                            (503,{'reason':'sin memoria; no salió nada','code':'memoria'})):
             transport=ServiceTransport('http://navegador.interno:8080/','token-ficticio','cuenta-prueba',
                                        http_transport=httpx.MockTransport(lambda r,s=status,b=body:httpx.Response(s,json=b)))
             with self.subTest(status=status),self.assertRaises(ConnectorError):

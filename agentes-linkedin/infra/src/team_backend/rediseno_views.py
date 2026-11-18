@@ -11,7 +11,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from knowledge import db
-from . import autopiloto, editorial, imagenes, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
+from . import alcance, autopiloto, editorial, imagenes, lider, miembros, notificaciones, operador, oportunidades, orientacion, preguntas, red
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Opportunity,
                      OPEN_ACTION_STATES, OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
@@ -81,13 +81,27 @@ class OrientationInput(serializers.Serializer):
     text=serializers.CharField(allow_blank=True,max_length=orientacion.MAX_CHARS)
 
 class OpportunityOutput(serializers.ModelSerializer):
+    """An opportunity of the organization's funnel. Her own person comes with its card (`contact`); another member's
+    person only by name (`person`): her people are hers until phase 6's shared registry. With more than one member, each
+    says who registered it and whose person it came from (`registered_by`, `brought_by`); with one, nothing changes."""
     contact=serializers.SerializerMethodField()
     person=serializers.SerializerMethodField()
     days_in_stage=serializers.SerializerMethodField()
     def get_contact(self,obj):
         c=obj.contact
+        if c is None or not self._hers(c):return None
         return {'id':str(c.id),'display_name':c.display_name,'headline':c.headline,'profile_url':c.profile_url,'stage':c.stage,
-                'role':(c.classification or {}).get('role')} if c else None
+                'role':(c.classification or {}).get('role')}
+    def _hers(self,contact):
+        member=(self.context or {}).get('member')
+        return member is None or alcance.is_hers(contact,member)
+    def to_representation(self,obj):
+        data=super().to_representation(obj)
+        if (self.context or {}).get('several'):
+            def who(m):return {'id':str(m.pk),'display_name':m.display_name} if m else None
+            first=(self.context or {}).get('first')
+            data['registered_by']=who(obj.member or first);data['brought_by']=who(obj.origin_member or obj.member or first)
+        return data
     def get_person(self,obj):return obj.contact.display_name if obj.contact else obj.person_name
     def get_days_in_stage(self,obj):return (timezone.now()-obj.stage_changed_at).days
     class Meta:
@@ -128,12 +142,12 @@ def _card(id,kind,title,body,actions,critical=False,tone=None,agent='operador_cu
                  'agent_label':'Operador de cuenta' if agent=='operador_cuenta' else preguntas.agent_label(agent),
                  'title':title,'body':body,'deadline':deadline,'actions':actions,'created_at':created_at,'state':'nueva'},**extra)
 
-def alerts(now=None):
+def alerts(now=None,member=None):
     """Tu turno → Avisos: only what breaks without Gustavo, each with its action (DISENO-VISTAS, sección 2.A).
     Informative states (invitations limited, a blocked piece, the budget) live in Personas, Calendario and Ajustes."""
     from . import connectors_linkedin as li
     now=now or timezone.now();out=[]
-    status=li.status_payload()
+    status=li.status_payload(member=member)  # her own connection (organizaciones, phase 2)
     # status_payload reports `connected` only while the token is valid: an expired one has `expired` alone.
     if status.get('expired'):
         out.append(_card('linkedin_expired','aviso','Reconecta LinkedIn','El acceso caducó y la publicación diaria está en pausa.',
@@ -146,7 +160,7 @@ def alerts(now=None):
                          [{'label':'Reconectar LinkedIn','href':'/api/v1/linkedin/oauth/start','primary':True}],deadline=status.get('expires_at'),
                          priority='importante' if days is not None and days<=3 else 'cuando_puedas',
                          expires_at=status.get('expires_at'),days_left=days))
-    for p in ActionProposal.objects.select_related('post','contact','execution','comment__piece').filter(state='uncertain').order_by('created_at'):
+    for p in alcance.de(ActionProposal.objects.all(),member).select_related('post','contact','execution','comment__piece').filter(state='uncertain').order_by('created_at'):
         execution=getattr(p,'execution',None) if hasattr(p,'execution') else None
         target=_target(p)
         out.append(_card(f'uncertain:{p.id}','aviso','¿Salió o no?','El proveedor no confirmó si se aplicó. Comprueba en LinkedIn.',
@@ -163,7 +177,7 @@ def alerts(now=None):
             out.append(_card('machine_paused','aviso','Reanuda la máquina',control.reason or 'Sin motivo registrado.',
                 [{'label':'Reanudar','endpoint':'/api/v1/operador/control','body':{'paused':False},'note_required':False,'primary':True}],
                 critical=True,tone='bad',created_at=control.updated_at,stopped_by=control.updated_by.get_username() if control.updated_by else None))
-    for account in ConnectorAccount.objects.filter(paused=True):
+    for account in alcance.accounts(member).filter(paused=True):  # her accounts; the total stop above is everyone's
         # Paused only because the token expired: «Reconecta LinkedIn» above is the card; resuming would not help.
         if status.get('expired') and (account.paused_reason or '').startswith(li.TOKEN_PAUSE):continue
         out.append(_card(f'account_paused:{account.id}','aviso','Reanuda la cuenta de LinkedIn',f'{account.label}: {account.paused_reason or "sin motivo registrado"}',
@@ -214,11 +228,19 @@ def approval_key(p):
     """A reaction to a comment on his own post reads differently from a reaction to someone else's post."""
     return f'{p.capability}:comment' if p.comment_id and p.capability=='INT-02' else p.capability
 
-def awaiting_approval():
-    """Proposals that wait for Gustavo: still `proposed`, never executed, of a capability in `approval` mode (the policy
-    leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the calendar's «En cola»."""
-    rows=ActionProposal.objects.select_related('post','piece','contact','comment__piece').filter(state='proposed',execution__isnull=True).order_by('created_at')
-    return [p for p in rows if autopiloto.autonomy(p.capability)=='approval']
+def awaiting_approval(member):
+    """Her proposals that wait for her: still `proposed`, never executed, of a capability in `approval` mode for the member
+    who owns its account (the policy leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the
+    calendar's «En cola». A proposal of an account of nobody among several members waits for nobody here."""
+    rows=(alcance.de(ActionProposal.objects.all(),member).select_related('post','piece','contact','comment__piece','account__member')
+          .filter(state='proposed',execution__isnull=True).order_by('created_at'))
+    out=[]
+    for p in rows:
+        try:
+            # A provisional-voice text waits for her even when its capability is in «auto» (phase 7: it never goes out alone).
+            if autopiloto.autonomy_of(p)=='approval' or autopiloto.provisional_draft(p):out.append(p)
+        except miembros.MiembroRequerido:continue
+    return out
 
 def approval_expiry(p):
     """When it stops waiting: an own piece at its hour; anything else when the autopilot lets it expire (TTL)."""
@@ -228,6 +250,13 @@ def approval_expiry(p):
 def approval_sentence(p):
     if p.capability=='CONT-09':return f'La pieza del {p.piece.slot_date:%d/%m}' if p.piece_id else 'Una publicación'
     return APPROVAL_SENTENCE.get(approval_key(p),LABELS.get(p.capability,p.capability)+' · {name}').format(name=_target(p)['name'] or 'una persona')
+
+def _provisional(p):
+    """«Voz provisional» on a draft that autopiloto.provisional_draft holds (organizaciones, phase 7: the same rule that keeps
+    it from going out alone), with the invitation's note when that is the text she approves. Nothing for any other draft,
+    so a member with her own voice reads the card exactly as before."""
+    if not autopiloto.provisional_draft(p):return {}
+    return {'provisional_voice':True,**({'note':p.payload['note']} if p.capability=='RED-02' and p.payload.get('note') else {})}
 
 def _approval_card(p):
     """«¿Apruebas seguir a Laura Gómez?» (importante): Aprobar sends the exact version (`expected_hash`); Vetar asks for
@@ -242,7 +271,7 @@ def _approval_card(p):
     expires=approval_expiry(p)
     return _card(f'approval:{p.id}','aprobacion',title,p.rationale or 'El equipo lo propone y espera tu aprobación.',actions,
                  agent=ACTOR.get(p.capability,'operador_cuenta'),priority='importante',deadline=expires,created_at=p.created_at,
-                 approval={'proposal_id':str(p.id),'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
+                 approval={**_provisional(p),'proposal_id':str(p.id),'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
                            'reaction':p.payload.get('reaction'),'target':target,'piece_id':str(p.piece_id) if p.piece_id else None,
                            'network':p.capability.startswith('RED-'),'expires_at':expires})
 
@@ -261,12 +290,13 @@ def _question_card(q,now=None):
         tone=None if data['pending'] else 'muted',priority=_question_priority(q,now),agent=q.agent,deadline=q.deadline,created_at=q.created_at,
         question=data,state_override=state)
 
-def _today_summary(now):
+def _today_summary(now,member):
     day,_=operador.period_starts(now);done={}
+    proposals=alcance.de(ActionProposal.objects.all(),member)  # what her accounts did today
     for capability,key in list(COUNT_KEYS.items())+[('CONT-09','posts')]:
-        n=ActionProposal.objects.filter(capability=capability,state='confirmed',execution__finished_at__gte=day).count()
+        n=proposals.filter(capability=capability,state='confirmed',execution__finished_at__gte=day).count()
         if n:done[key]=n
-    upcoming=EditorialPiece.objects.filter(state='ready',scheduled_for__gt=now).order_by('scheduled_for').first()
+    upcoming=alcance.de(EditorialPiece.objects.all(),member).filter(state='ready',scheduled_for__gt=now).order_by('scheduled_for').first()
     return {'done_today':done,'next_piece':{'id':str(upcoming.id),'scheduled_for':upcoming.scheduled_for} if upcoming else None}
 
 def _with_state(cards,seen):
@@ -294,44 +324,49 @@ class TuTurno(APIView):
         require(request.user,'operate_linkedin')
         from . import notificaciones
         from .models import InboxSeen
-        preguntas.sync_memory_proposals()
-        now=timezone.now();warnings=alerts(now)
+        # Everything here is hers (organizaciones, phase 5: alcance): her questions, memory, summary, accounts, people,
+        # conversations, drafts and notices. The total stop, the referents she can decide and the cycles are shared.
+        member=alcance.miembro(request)
+        preguntas.sync_memory_proposals(member)
+        now=timezone.now();warnings=alerts(now,member)
         from .orquestacion import attention_cards
         warnings+=attention_cards(request.user,_card)
-        open_questions=list(TeamQuestion.objects.filter(state='open').order_by('deadline','created_at'))
+        open_questions=list(alcance.de(TeamQuestion.objects.filter(state='open'),member).order_by('deadline','created_at'))
         pending=[q for q in open_questions if preguntas.is_pending(q,now)]
         later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]
         from . import conversaciones
-        conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now)]
+        conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now,member)]
         from . import resumen_semanal
-        summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
+        summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal(member)] if s]
         from .perfil import cards as profile_cards
         from .referentes_views import cards as referent_cards
         profile=profile_cards(request.user,_card)
-        monthly_cards=referent_cards(request.user,_card,now)
+        monthly_cards=referent_cards(request.user,_card,now,mine=True)  # the referents' decisions that are hers to take
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
         from . import agenda_calcom, entrega_lead, mensajes_comprador, respuesta_comprador, respuestas, secuencia_comprador, urgente
         # RSP-07 first; one card per person; then the follow-ups 2–4 of the sequence (phase 4), each with its label; then the
         # replies to what a buyer wrote (phase 6), whose conversation does not show twice.
-        reply_cards=respuesta_comprador.cards(_card,now)
-        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)+secuencia_comprador.cards(_card,now)+reply_cards
+        reply_cards=respuesta_comprador.cards(_card,now,member)
+        message_cards=(respuestas.cards(_card,now,member)+mensajes_comprador.cards(_card,now,member)
+                       +secuencia_comprador.cards(_card,now,member)+reply_cards)
         covered=respuesta_comprador.covered(reply_cards)
         conversation_cards=[c for c in conversation_cards if ((c.get('conversation') or {}).get('contact_id') or '') not in covered]
         # Phase 6: the leads handed over and the Cal.com bookings nobody matched.
-        buyer_cards=entrega_lead.cards(_card,now)+agenda_calcom.cards(_card,now)
-        day_cards=urgente.cards(_card,now)
+        buyer_cards=entrega_lead.cards(_card,now,member)+agenda_calcom.cards(_card,now,member)
+        day_cards=urgente.cards(_card,now,member)
         tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'fechas':day_cards,'resumen':summary_cards,
                'referentes':monthly_cards}
         if buyer_cards:tasks['comprador']=buyer_cards
-        approval_cards=[_approval_card(p) for p in awaiting_approval()]
+        approval_cards=[_approval_card(p) for p in awaiting_approval(member)]
         question_cards=[_question_card(q,now) for q in pending]
         from . import revision_mensual
-        tasks['estrategia']=strategy_cards=revision_mensual.cards(_card)  # each change of the monthly review, decided apart
+        tasks['estrategia']=strategy_cards=revision_mensual.cards(_card,member)  # each change of her monthly review, decided apart
         later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
         cards=(warnings+question_cards+conversation_cards+message_cards+buyer_cards+day_cards+summary_cards+approval_cards+profile
                +monthly_cards+strategy_cards)
-        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
+        keys={alcance.vista(request.user,c['id']):c['id'] for c in cards}  # what she opened (InboxSeen is per user)
+        seen={keys[k] for k in InboxSeen.objects.filter(item_id__in=list(keys)).values_list('item_id',flat=True)}
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
         return Response({'count':len(active),'critical':any(c['priority']=='urgente' for c in active),
@@ -340,19 +375,21 @@ class TuTurno(APIView):
                                    'aprobaciones':len(approval_cards)},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
-                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
-                                   +mensajes_comprador.recently_resolved()+respuesta_comprador.recently_resolved()+urgente.recently_resolved(),
-                         'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
+                         'tasks':tasks,'recent':preguntas.recently_resolved(member=member)+_resolved_alerts(member)
+                                   +conversaciones.recently_resolved(member=member)+respuestas.recently_resolved(member=member)
+                                   +mensajes_comprador.recently_resolved(member=member)+respuesta_comprador.recently_resolved(member=member)
+                                   +urgente.recently_resolved(member=member),
+                         'notifications_unread':notificaciones.unread(member),'summary':_today_summary(now,member)})
 
 class TuTurnoSeen(APIView):
-    """POST /api/v1/tu-turno/vistos {ids}: cards Gustavo opened go from Nueva to Vista."""
+    """POST /api/v1/tu-turno/vistos {ids}: cards she opened go from Nueva to Vista (hers: alcance.vista)."""
     def post(self,request):
         human_session(request);require(request.user,'operate_linkedin')
         from .models import InboxSeen
         ids=request.data.get('ids') if isinstance(request.data,dict) else None
         if not isinstance(ids,list) or not all(isinstance(i,str) and 0<len(i)<=120 for i in ids) or len(ids)>200:
             raise ValidationError('ids debe ser una lista de identificadores de tarjetas')
-        for item in set(ids):InboxSeen.objects.get_or_create(item_id=item)
+        for item in set(ids):InboxSeen.objects.get_or_create(item_id=alcance.vista(request.user,item))
         return Response({'seen':len(set(ids))})
 
 class ConversationClose(APIView):
@@ -365,7 +402,7 @@ class ConversationClose(APIView):
         note=data.get('note') or ''
         if data.get('how') not in conversaciones.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
             raise ValidationError('how debe ser respondi o no_responder; note, un texto de hasta 1000 caracteres')
-        get_or_404(Conversation,id=cid)
+        alcance.obtener(request,Conversation,id=cid)  # hers, or 404
         conversation=conversaciones.close(request.user,cid,data['how'],note)
         return Response(conversaciones.payload(conversation))
 
@@ -383,16 +420,18 @@ class SuggestedMessageClose(APIView):
         note=data.get('note') or ''
         if data.get('how') not in respuestas.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
             raise ValidationError('how debe ser enviado o no; note, un texto de hasta 1000 caracteres')
-        if not PostComment.objects.filter(id=cid).exists() and BuyerDraft.objects.filter(id=cid,kind=BuyerDraft.Kind.REPLY).exists():
+        member=alcance.miembro(request)  # hers only: another member's comment or draft is a 404
+        comments=alcance.de(PostComment.objects.all(),member);drafts=alcance.de(BuyerDraft.objects.all(),member)
+        if not comments.filter(id=cid).exists() and drafts.filter(id=cid,kind=BuyerDraft.Kind.REPLY).exists():
             from . import respuesta_comprador  # phase 6: the reply to what she wrote; «no» never exits
             draft=respuesta_comprador.close(request.user,cid,data['how'],note)
             return Response({'id':str(draft.id),'closed':{'how':'enviado' if draft.state==BuyerDraft.State.SENT else 'no',
                                                           'at':draft.closed_at.isoformat() if draft.closed_at else None,'note':draft.closed_note}})
-        if not PostComment.objects.filter(id=cid).exists() and BuyerDraft.objects.filter(id=cid,kind=BuyerDraft.Kind.MESSAGE).exists():
+        if not comments.filter(id=cid).exists() and drafts.filter(id=cid,kind=BuyerDraft.Kind.MESSAGE).exists():
             draft=mensajes_comprador.close(request.user,cid,data['how'],note)
             return Response({'id':str(draft.id),'closed':{'how':'enviado' if draft.state==BuyerDraft.State.SENT else 'no',
                                                           'at':draft.closed_at.isoformat() if draft.closed_at else None,'note':draft.closed_note}})
-        get_or_404(PostComment,id=cid)
+        alcance.obtener(request,comments,id=cid)
         row=respuestas.close_dm(request.user,cid,data['how'],note)
         return Response({'id':str(row.id),'closed':row.decision.get('dm_closed')})
 
@@ -403,11 +442,12 @@ class Notifications(APIView):
         from . import notificaciones
         from .models import Notification
         notificaciones.purge()
-        qs=Notification.objects.filter(created_at__gte=timezone.now()-notificaciones.RETENTION)
+        member=alcance.miembro(request)  # hers only (each organization notice is one row per member)
+        qs=alcance.de(Notification.objects.filter(created_at__gte=timezone.now()-notificaciones.RETENTION),member)
         if request.query_params.get('filtro')=='sin_leer':qs=qs.filter(read_at__isnull=True)
         items=[{'id':str(n.id),'kind':n.kind,'layer':n.layer,'title':n.title,'detail':n.detail,'link':n.link,'at':n.created_at,
                 'read':n.read_at is not None} for n in qs.order_by('-created_at')[:200]]
-        return Response({'upcoming':notificaciones.upcoming(),'items':items,'unread':notificaciones.unread()})
+        return Response({'upcoming':notificaciones.upcoming(member=member),'items':items,'unread':notificaciones.unread(member)})
 
 class NotificationsRead(APIView):
     """POST /api/v1/notificaciones/leer {ids} or {todas: true}."""
@@ -416,17 +456,27 @@ class NotificationsRead(APIView):
         from . import notificaciones
         from .models import Notification
         data=request.data if isinstance(request.data,dict) else {}
-        qs=Notification.objects.filter(read_at__isnull=True)
+        member=alcance.miembro(request)
+        qs=alcance.de(Notification.objects.filter(read_at__isnull=True),member)  # she marks only hers
         if data.get('todas') is True:pass
         elif isinstance(data.get('ids'),list) and data['ids']:qs=qs.filter(id__in=[i for i in data['ids'] if isinstance(i,str)][:200])
         else:raise ValidationError('Envía ids o todas: true')
         qs.update(read_at=timezone.now())
-        return Response({'unread':notificaciones.unread()})
+        return Response({'unread':notificaciones.unread(member)})
 
-def _resolved_alerts(days=7):
+def _resolved_alerts(member,days=7):
+    """Hecho recientemente: her approvals and resolutions (of her proposals), her LinkedIn reconnections and the
+    organization's resumes of the total stop."""
     since=timezone.now()-timedelta(days=days);out=[]
-    for event in AuditEvent.objects.filter(created_at__gte=since,action__in=['operator.execution_confirmed','operator.execution_failed','linkedin.connected',
-                                                                        'operator.machine_resumed','operator.approved']).order_by('-created_at')[:50]:
+    events=list(AuditEvent.objects.filter(created_at__gte=since,action__in=['operator.execution_confirmed','operator.execution_failed','linkedin.connected',
+                                                                        'operator.machine_resumed','operator.approved']).order_by('-created_at'))
+    hers=alcance.suyos(ActionProposal,member,[e.target for e in events if e.action.startswith('operator.') and e.action!='operator.machine_resumed'])
+    accounts={str(pk) for pk in alcance.accounts(member).values_list('pk',flat=True)}
+    def shown(event):
+        if event.action=='operator.machine_resumed':return True
+        if event.action=='linkedin.connected':return (event.target in accounts) or (not event.target and miembros.is_first(member))
+        return event.target in hers
+    for event in [e for e in events if shown(e)][:50]:
         if event.action=='operator.approved':
             proposal=ActionProposal.objects.select_related('post','piece','contact','comment__piece').filter(id=event.target).first()
             if proposal:out.append({'kind':'alert','id':f'approval:{event.target}','title':approval_sentence(proposal),'at':event.created_at,'how':'Aprobada'})
@@ -446,19 +496,20 @@ class Questions(ListAPIView):
     serializer_class=QuestionOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=TeamQuestion.objects.all();state=self.request.query_params.get('state')
+        # Her questions (organizaciones, phase 4): the ones the team asked her, never another member's.
+        qs=alcance.de(TeamQuestion.objects.all(),alcance.miembro(self.request));state=self.request.query_params.get('state')
         return qs.filter(state=state) if state else qs
 
 def _question_action(func):
     class View(APIView):
         def post(self,request,qid):
-            human_session(request);get_or_404(TeamQuestion,id=qid)
+            human_session(request);alcance.obtener(request,TeamQuestion,id=qid)  # hers, or 404
             return Response(QuestionOutput(func(request)(qid)).data)
     return View
 
 class QuestionAnswer(APIView):
     def post(self,request,qid):
-        human_session(request);data=valid(AnswerInput,request);get_or_404(TeamQuestion,id=qid)
+        human_session(request);data=valid(AnswerInput,request);alcance.obtener(request,TeamQuestion,id=qid)
         item=preguntas.answer(request.user,qid,data.get('text',''),data.get('public_use'),data.get('accept',False),data.get('value'))
         return Response(QuestionOutput(item).data)
 
@@ -469,47 +520,59 @@ QuestionDecline=_question_action(lambda request:lambda qid:preguntas.decline(req
 class Facts(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(alcance.miembro(request)))  # what the team knows of her
     def post(self,request):
         human_session(request);data=valid(AddFactInput,request)
         preguntas.add_fact(request.user,data['text'],data['public_use'],data.get('topic',''))
-        return Response(preguntas.facts(),status=201)
+        return Response(preguntas.facts(alcance.miembro(request)),status=201)
 
+# A fact's key is relative to her own memory (hechos.py prefixes another member's): she cannot even name someone else's,
+# and a key she does not have answers 409 «no está en la memoria confirmada», the same as one that never existed.
 class FactCorrect(APIView):
     def post(self,request,key):
         human_session(request);data=valid(FactInput,request)
         preguntas.correct(request.user,key,data['text'],data['public_use'])
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(alcance.miembro(request)))
 
 class FactRetire(APIView):
     def post(self,request,key):
         human_session(request);data=valid(RetireInput,request)
         preguntas.retire(request.user,key,data.get('reason',''))
-        return Response(preguntas.facts())
+        return Response(preguntas.facts(alcance.miembro(request)))
 
 # --------------------------------------------------------------------------- orientation
 
-def _orientation_payload():
+def _orientation_payload(member):
+    """Her orientation (organizaciones, phase 4): the member's whose screen or decision it is."""
     from .models import Orientation
-    current=Orientation.current()
+    current=Orientation.current(member)
     return {'text':current.text,'updated_at':current.updated_at,'updated_by':current.updated_by.get_username() if current.updated_by else None}
 
 class OrientationView(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(_orientation_payload())
+        return Response(_orientation_payload(alcance.miembro(request)))
     def put(self,request):
         human_session(request);data=valid(OrientationInput,request)
         orientacion.update(request.user,data['text'])
-        return Response(_orientation_payload())
+        return Response(_orientation_payload(alcance.miembro(request)))
 
 # --------------------------------------------------------------------------- opportunities
 
+def _opportunity_context(request):
+    """Who reads (her own people come with their card) and whether to say who brought each one (several members)."""
+    from .models import Member
+    members=list(Member.objects.order_by('created_at','pk')[:2])
+    return {'member':alcance.miembro(request),'several':len(members)>1,'first':members[0] if members else None}
+
 class Opportunities(ListAPIView):
+    """The organization's funnel: every member sees every opportunity (alcance: ORGANIZACION)."""
     serializer_class=OpportunityOutput
+    def get_serializer_context(self):
+        return dict(super().get_serializer_context(),**_opportunity_context(self.request))
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=Opportunity.objects.select_related('contact')
+        qs=Opportunity.objects.select_related('contact','member','origin_member')
         for field in ('stage','modality'):
             value=self.request.query_params.get(field)
             if value:qs=qs.filter(**{field:value})
@@ -517,15 +580,15 @@ class Opportunities(ListAPIView):
         return qs.filter(contact_id=contact) if contact else qs
     def post(self,request):
         human_session(request);data=valid(OpportunityInput,request)
-        return Response(OpportunityOutput(oportunidades.create(request.user,data)).data,status=201)
+        return Response(OpportunityOutput(oportunidades.create(request.user,data),context=_opportunity_context(request)).data,status=201)
 
 class OpportunityDetail(APIView):
     def get(self,request,oid):
         require(request.user,'operate_linkedin')
-        return Response(OpportunityOutput(get_or_404(Opportunity,id=oid)).data)
+        return Response(OpportunityOutput(get_or_404(Opportunity,id=oid),context=_opportunity_context(request)).data)
     def patch(self,request,oid):
         human_session(request);data=valid(OpportunityPatch,request);get_or_404(Opportunity,id=oid)
-        return Response(OpportunityOutput(oportunidades.update(request.user,oid,data)).data)
+        return Response(OpportunityOutput(oportunidades.update(request.user,oid,data),context=_opportunity_context(request)).data)
     def delete(self,request,oid):
         human_session(request);get_or_404(Opportunity,id=oid)
         oportunidades.delete(request.user,oid)
@@ -565,13 +628,14 @@ def item(p):
             'review':{k:v for k,v in (p.review or {}).items() if k in ('decision','answers','reasons','model')},
             'piece_id':str(p.piece_id) if p.piece_id else None}
 
-def next_execution_time(now=None):
-    """When a queued action may leave: the window and the common spacing (an estimate; caps may delay it more)."""
+def next_execution_time(now=None,member=None):
+    """When a queued action of hers may leave: the window and the spacing after her last write (an estimate; caps may
+    delay it more). Each member's writes keep their own spacing (organizaciones, phase 2)."""
     now=now or timezone.now();tz=operador.local_tz()
     start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
     def at(day,value):
         h,_,m=value.strip().partition(':');return datetime.combine(day,time(int(h)%24,int(m or 0)),tzinfo=tz)
-    last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
+    last=alcance.de(ActionExecution.objects.all(),member).filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
     candidate=max(now,last+operador.min_spacing()) if last else now
     if not operador.within_window(candidate):
         local=candidate.astimezone(tz);opening=at(local.date(),start)
@@ -587,15 +651,16 @@ def _piece_card(piece):
             'vetoable':bool(action and action.state in ('proposed','approved')),'impressions':(piece.metrics or {}).get('impressions'),
             'skip_reason':brief.get('skip_reason') if piece.state=='skipped' else None,'note':piece.note}
 
-def upcoming(now=None):
+def upcoming(member,now=None):
+    """«Próximo»: her pieces, what waits for her approval and her queue."""
     now=now or timezone.now()
-    pieces=[_piece_card(p) for p in EditorialPiece.objects.filter(state__in=['preparing','ready'],scheduled_for__gt=now-timedelta(hours=1))
+    pieces=[_piece_card(p) for p in alcance.de(EditorialPiece.objects.all(),member).filter(state__in=['preparing','ready'],scheduled_for__gt=now-timedelta(hours=1))
             .order_by('scheduled_for')[:5] if not (p.state=='ready' and editorial.status(p,editorial.latest_action(p)) in ('published','failed','uncertain'))]
-    expected=next_execution_time(now)
+    expected=next_execution_time(now,member)
     # What waits for Gustavo's approval comes first, with the exact version to approve and when it stops waiting.
     waiting=[dict(item(p),expected_at=None,awaiting_approval=True,payload_hash=p.payload_hash,expires_at=approval_expiry(p))
-             for p in awaiting_approval() if not p.piece_id][:50]
-    queued=[dict(item(p),expected_at=expected,awaiting_approval=False) for p in ActionProposal.objects.select_related('post','piece','contact','comment__piece')
+             for p in awaiting_approval(member) if not p.piece_id][:50]
+    queued=[dict(item(p),expected_at=expected,awaiting_approval=False) for p in alcance.de(ActionProposal.objects.all(),member).select_related('post','piece','contact','comment__piece')
             .filter(state='approved',execution__isnull=True,piece__isnull=True).order_by('created_at')[:50]]
     return {'pieces':pieces,'queued':waiting+queued}
 
@@ -603,7 +668,8 @@ class Activity(APIView):
     """Calendario → vista Lista: «Próximo» and every day with everything that happened, newest first."""
     def get(self,request):
         require(request.user,'operate_linkedin')
-        qs=ActionProposal.objects.select_related('post','piece','contact','execution','comment__piece')
+        member=alcance.miembro(request)  # what her accounts did
+        qs=alcance.de(ActionProposal.objects.all(),member).select_related('post','piece','contact','execution','comment__piece')
         kind=request.query_params.get('tipo')
         if kind and kind!='todo':
             if kind not in TYPES:raise NotFound('Tipo desconocido')
@@ -622,13 +688,18 @@ class Activity(APIView):
             rows=[r for r in rows if r['date'] and start<=r['date']<=end]
         rows.sort(key=lambda r:r['at'] or timezone.now(),reverse=True)
         page=rows[offset:offset+limit]
-        return Response({'upcoming':upcoming(),'items':page,'next_offset':offset+limit if len(rows)>offset+limit else None})
+        return Response({'upcoming':upcoming(member),'items':page,'next_offset':offset+limit if len(rows)>offset+limit else None})
 
 class Calendar(APIView):
     """GET /api/v1/calendario?desde=&hasta=: per local day, the counts and the important events by layer."""
     def get(self,request):
         require(request.user,'operate_linkedin')
         start,end,today=parse_range(request.query_params)
+        # Her calendar (organizaciones, phase 5): her pieces, her accounts' actions, her people, her questions, her LinkedIn
+        # and the opportunities she brought or registered; the total stop is everyone's.
+        member=alcance.miembro(request)
+        proposals=alcance.de(ActionProposal.objects.all(),member);contacts=alcance.de(Contact.objects.all(),member)
+        opportunities=oportunidades.hers(Opportunity.objects.all(),member)
         days={start+timedelta(days=i):{'counts':{'comments':0,'replies':0,'reactions':0,'follows':0,'invites':0,'accepts':0,'connections_fit':0},'events':[]}
               for i in range((end-start).days+1)}
         lo,hi=day_bounds(start)[0],day_bounds(end)[1]
@@ -637,7 +708,7 @@ class Calendar(APIView):
                                                             'title':title,'state':state,'important':important,'link':link},**extra))
         # Publicaciones
         rows={}
-        for piece in EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lte=end).order_by('created_at'):
+        for piece in alcance.de(EditorialPiece.objects.all(),member).filter(slot_date__gte=start,slot_date__lte=end).order_by('created_at'):
             card=_piece_card(piece);rows.setdefault(piece.slot_date,[]).append((piece,card['status'],(piece,card)))
         for piece,card in [shown for day_rows in rows.values() for shown in editorial.calendar_rows(day_rows,today)]:
             status=card['status']
@@ -647,7 +718,7 @@ class Calendar(APIView):
             add(piece.slot_date,'publicaciones',kind,card['thesis'] or 'Publicación del día',at=piece.scheduled_for,state=status,
                 link=f'/calendario/pieza/{piece.id}',ref=str(piece.id),impressions=card['impressions'],skip_reason=card['skip_reason'])
         # Executed actions: counts, plus the important ones (accepts, uncertain or failed)
-        for p in ActionProposal.objects.select_related('post','contact','execution','comment__piece').filter(execution__started_at__gte=lo,execution__started_at__lt=hi):
+        for p in proposals.select_related('post','contact','execution','comment__piece').filter(execution__started_at__gte=lo,execution__started_at__lt=hi):
             day=local_day(p.execution.finished_at or p.execution.started_at)
             if p.state=='confirmed' and p.capability in COUNT_KEYS and day in days:days[day]['counts'][COUNT_KEYS[p.capability]]+=1
             if p.state in ('uncertain','failed'):
@@ -658,47 +729,49 @@ class Calendar(APIView):
                     link=f'/personas/{p.contact_id}',ref=str(p.id))
         # Red: new connections that fit (grouped), invitations received, invitations expected after the warm-up
         connections={}
-        for c in Contact.objects.filter(connected_at__gte=lo,connected_at__lt=hi,classification__fit=True):
+        for c in contacts.filter(connected_at__gte=lo,connected_at__lt=hi,classification__fit=True):
             connections.setdefault(local_day(c.connected_at),[]).append({'id':str(c.id),'name':c.display_name,'role':c.classification.get('role')})
         for day,people in connections.items():
             if day in days:days[day]['counts']['connections_fit']=len(people)
             add(day,'red','connection_fit',f'{len(people)} conexiones nuevas' if len(people)>1 else f'{people[0]["name"]} aceptó tu invitación',
                 people=people,link='/personas',ref='connections')  # Personas › Conexiones
-        for c in Contact.objects.filter(source='incoming',discovered_at__gte=lo,discovered_at__lt=hi):
+        for c in contacts.filter(source='incoming',discovered_at__gte=lo,discovered_at__lt=hi):
             add(local_day(c.discovered_at),'red','invitation_received',f'{c.display_name} te invitó',at=c.discovered_at,link=f'/personas/{c.id}',ref=str(c.id))
         expected={}
         # An invitation already proposed, approved or on its way is no longer a forecast (backlog #8).
-        invited=ActionProposal.objects.filter(capability='RED-02',state__in=OPEN_ACTION_STATES).values('contact_id')
-        for c in Contact.objects.filter(stage='followed',followed_at__isnull=False).exclude(id__in=invited):
+        invited=proposals.filter(capability='RED-02',state__in=OPEN_ACTION_STATES).values('contact_id')
+        for c in contacts.filter(stage='followed',followed_at__isnull=False).exclude(id__in=invited):
             due=max(local_day(c.followed_at+red.invite_after()),today)
             expected.setdefault(due,[]).append({'id':str(c.id),'name':c.display_name})
         for day,people in expected.items():
             add(day,'red','invite_expected',f'{len(people)} invitaciones previstas',important=False,estimate=True,people=people,ref='expected')
         # Tuyo: question deadlines, opportunity next actions, LinkedIn expiry, what Gustavo resolved
-        for q in TeamQuestion.objects.filter(state='open',deadline__gte=lo,deadline__lt=hi):
+        for q in alcance.de(TeamQuestion.objects.all(),member).filter(state='open',deadline__gte=lo,deadline__lt=hi):
             add(local_day(q.deadline),'tuyo','deadline',f'Responde: {q.question}',at=q.deadline,link='/tu-turno',ref=str(q.id),agent=q.agent)
-        for o in Opportunity.objects.select_related('contact').filter(next_action_at__gte=lo,next_action_at__lt=hi).exclude(stage__in=oportunidades.CLOSED):
+        for o in opportunities.select_related('contact').filter(next_action_at__gte=lo,next_action_at__lt=hi).exclude(stage__in=oportunidades.CLOSED):
             name=o.contact.display_name if o.contact else o.person_name
             add(local_day(o.next_action_at),'tuyo','meeting' if o.stage=='reunion' else 'opportunity_next',f'{o.next_action or "Siguiente paso"} · {name}',
                 at=o.next_action_at,link=f'/personas/{o.contact_id}' if o.contact_id else '/personas?pestana=oportunidades',ref=str(o.id))
-        for q in TeamQuestion.objects.filter(state__in=['answered','declined'],answered_at__gte=lo,answered_at__lt=hi):
+        for q in alcance.de(TeamQuestion.objects.all(),member).filter(state__in=['answered','declined'],answered_at__gte=lo,answered_at__lt=hi):
             add(local_day(q.answered_at),'tuyo','resolved',q.question,at=q.answered_at,state=q.state,important=False,link='/tu-turno/sabe',ref=str(q.id))
         from . import connectors_linkedin as li
-        status=li.status_payload()
+        status=li.status_payload(member=member)  # her own LinkedIn connection
         if status.get('expires_at'):
             expiry=datetime.fromisoformat(str(status['expires_at']))
             if lo<=expiry<hi:
                 add(local_day(expiry),'tuyo' if expiry>timezone.now() else 'sistema','linkedin_expiry' if expiry>timezone.now() else 'linkedin_expired',
                     'Caduca el permiso de LinkedIn' if expiry>timezone.now() else 'LinkedIn caducó',at=expiry,link='/tu-turno',ref='linkedin')
         # Conversaciones: opportunities created or moved (the inbox comes later)
-        for o in Opportunity.objects.select_related('contact').filter(updated_at__gte=lo):
+        for o in opportunities.select_related('contact').filter(updated_at__gte=lo):
             name=o.contact.display_name if o.contact else o.person_name
             for event in o.history:
                 at=datetime.fromisoformat(event['at'])
                 if lo<=at<hi:add(local_day(at),'conversaciones','opportunity',f'Oportunidad con {name}: {o.get_stage_display()}' if event['event']=='created'
                                  else f'Oportunidad con {name}: {event["detail"]}',at=at,link=f'/personas/{o.contact_id}' if o.contact_id else None,ref=f'{o.id}:{event["at"]}')
         # Sistema: total stop, resume and account pauses
+        her_accounts={str(pk) for pk in alcance.accounts(member).values_list('pk',flat=True)}
         for event in AuditEvent.objects.filter(created_at__gte=lo,created_at__lt=hi,action__in=['operator.machine_paused','operator.machine_resumed','operator.account_paused']):
+            if event.action=='operator.account_paused' and event.target not in her_accounts:continue  # another member's pause
             title={'operator.machine_paused':'Detuviste la máquina','operator.machine_resumed':'Se reanudó la máquina',
                    'operator.account_paused':'La cuenta de LinkedIn entró en pausa'}[event.action]
             add(local_day(event.created_at),'sistema',event.action.split('.')[1],title,at=event.created_at,
@@ -708,7 +781,7 @@ class Calendar(APIView):
             value['events'].sort(key=lambda e:(priority[e['layer']],str(e['at'] or '')))
         # The GASP type of each day (estrategia.py): the plan's, the structure's for coming days, or its post's.
         from . import estrategia
-        gasp=estrategia.calendar_days(start,end)
+        gasp=estrategia.calendar_days(start,end,member=member)  # her plan's types (phase 4)
         for day,value in days.items():value['gasp']=gasp.get(day)
         return Response({'timezone':str(operador.local_tz()),'today':today,'lead_hours':editorial.lead_time().total_seconds()/3600,
                          'days':[{'date':day,**value} for day,value in sorted(days.items())],
@@ -730,9 +803,11 @@ class Settings(APIView):
         now=timezone.now();day,_=operador.period_starts(now);budget=presupuesto.status(now)
         month=now.astimezone(operador.local_tz()).replace(day=1,hour=0,minute=0,second=0,microsecond=0)
         start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
-        return Response({'autonomy':{c:autopiloto.autonomy(c) for c in sorted(operador.limits())},
+        member=alcance.miembro(request)  # her autonomy, caps, facts, orientation and push preferences
+        caps=operador.limits(member=member)
+        return Response({'autonomy':{c:autopiloto.autonomy(c,member) for c in sorted(caps)},
                          'lead':{'enabled':lider.enabled(),'capabilities':lider.capabilities(),'model':os.environ.get('TYPESAFE_MODEL','jev-1.14.0')},
-                         'limits':{c:{'daily':d,'weekly':w} for c,(d,w) in operador.limits().items()},
+                         'limits':{c:{'daily':d,'weekly':w} for c,(d,w) in caps.items()},
                          'window':{'start':start,'end':end,'timezone':str(operador.local_tz()),'open_now':operador.within_window(now),
                                    'min_spacing_seconds':int(operador.min_spacing().total_seconds())},
                          # One budget for the whole team (knowledge.presupuesto): the month line carries the limit, the
@@ -746,7 +821,7 @@ class Settings(APIView):
                              'month_usd':float(budget['month_usd']),'total_usd':_spend('%'),'limit_usd':float(budget['monthly_limit_usd']),
                              'lead_month_usd':_spend('%',month,provider='typesafe'),
                              'transcription_month_usd':_spend('%',month,provider='assemblyai')},
-                         'facts_count':len(preguntas.facts()),'push_types':notificaciones.push_types(),
-                         'orientation':_orientation_payload(),
+                         'facts_count':len(preguntas.facts(member)),'push_types':notificaciones.push_types(request.user),
+                         'orientation':_orientation_payload(member),
                          # «Dispositivos con la app» (docs/app-movil-backend.md).
                          'devices':devices_payload(request),'expo_push':expo.status(request.user)})

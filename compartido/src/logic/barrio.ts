@@ -64,6 +64,17 @@ export function displayName(contact: Pick<Contact, 'display_name' | 'public_iden
   return contact.display_name || contact.public_identifier || 'Sin nombre';
 }
 
+/** Organizaciones, phase 6: «La atiende <nombre>» when another member attends her; null alone or when she is yours. */
+export function attendedBy(contact: Pick<Contact, 'registro'>): string | null {
+  const other = contact.registro?.attended_by;
+  return other ? `La atiende ${other.display_name}` : null;
+}
+
+/** Organizaciones, phase 6: the members you may pass her to (only when you attend her); [] alone. */
+export function passTargets(contact: Pick<Contact, 'registro'>): { id: string; display_name: string }[] {
+  return contact.registro?.mine ? contact.registro.pass_to : [];
+}
+
 // ================================================================ person card
 
 /** «Medellín, Colombia · 1.er grado · Lo sigues». */
@@ -205,6 +216,13 @@ export function nextActionText(opportunity: Pick<Opportunity, 'next_action' | 'n
   return [opportunity.next_action, relativeDay(opportunity.next_action_at)].filter(Boolean).join(' · ');
 }
 
+/** «Trajo: Laura» when the opportunity came from another member's contacts (organizations, phase 5); the API only
+ * sends `brought_by` when the organization has several members, so with one member nothing changes. */
+export function broughtByText(opportunity: Pick<Opportunity, 'brought_by'>): string {
+  const name = opportunity.brought_by?.display_name?.trim();
+  return name ? `Trajo: ${name}` : '';
+}
+
 /** «Faro Salud · ProjectApp · cerrada el 30 de octubre». */
 export function closedMeta(opportunity: Opportunity): string {
   return [opportunity.company, MODALITY_SHORT[opportunity.modality], opportunity.closed_at ? `cerrada el ${longDate(opportunity.closed_at)}` : ''].filter(Boolean).join(' · ');
@@ -242,7 +260,21 @@ export interface OpportunityPerson {
   modality?: string | null;
 }
 
-export type PersonMode = 'red' | 'fuera';
+/** 'ajena': the person of an opportunity another member brought (organizations, phase 5). Only her name comes (no card):
+ * the form shows it fixed and never sends it, so editing the opportunity keeps it. */
+export type PersonMode = 'red' | 'fuera' | 'ajena';
+
+/** How the form starts: her person (or a new one) from Personas, a name outside the network, or another member's. */
+export function personModeOf(opportunity: Opportunity | null | undefined): PersonMode {
+  if (!opportunity || opportunity.contact) return 'red';
+  return opportunity.person && !opportunity.person_name ? 'ajena' : 'fuera';
+}
+
+/** «Laura Prueba · de los contactos de Gustavo. Solo quien la trajo cambia la persona.» */
+export function othersPersonText(opportunity: Pick<Opportunity, 'person' | 'brought_by'>): string {
+  const owner = opportunity.brought_by?.display_name?.trim() || 'otro miembro';
+  return `${opportunity.person || 'Esta persona'} · de los contactos de ${owner}. Solo quien la trajo cambia la persona.`;
+}
 
 export function initialModality(opportunity: Opportunity | null | undefined, person: OpportunityPerson | null | undefined): OpportunityModality | '' {
   if (opportunity) return opportunity.modality;
@@ -271,7 +303,8 @@ export interface OpportunityDraft {
 /** The required fields that are missing (null when fine). */
 export function opportunityErrors(draft: OpportunityDraft): { person: string | null; modality: string | null; attribution: string | null } {
   return {
-    person: draft.mode === 'red' ? (draft.picked ? null : 'Elige a alguien de Personas.') : draft.personName.trim() ? null : 'Escribe el nombre de la persona.',
+    person:
+      draft.mode === 'ajena' ? null : draft.mode === 'red' ? (draft.picked ? null : 'Elige a alguien de Personas.') : draft.personName.trim() ? null : 'Escribe el nombre de la persona.',
     modality: draft.modality ? null : 'Elige la modalidad.',
     attribution: draft.attribution ? null : 'Elige cómo llegó.',
   };
@@ -280,8 +313,7 @@ export function opportunityErrors(draft: OpportunityDraft): { person: string | n
 /** The body of POST /oportunidades or PATCH /oportunidades/<id>. */
 export function opportunityInput(draft: OpportunityDraft): OpportunityInput {
   return {
-    contact: draft.mode === 'red' ? (draft.picked?.id ?? null) : null,
-    person_name: draft.mode === 'fuera' ? draft.personName.trim() : '',
+    ...(draft.mode === 'ajena' ? {} : { contact: draft.mode === 'red' ? (draft.picked?.id ?? null) : null, person_name: draft.mode === 'fuera' ? draft.personName.trim() : '' }),
     company: draft.company.trim(),
     modality: draft.modality as OpportunityModality,
     channel: draft.channel,

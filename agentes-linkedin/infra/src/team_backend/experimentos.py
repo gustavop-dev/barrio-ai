@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from django.db import transaction
 from django.utils import timezone
-from . import evidencia, operador, orientacion, orquestacion, posicionamiento
+from . import evidencia, identidad, miembros, operador, orientacion, orquestacion, posicionamiento
 from .jobs import Conflict, audit
 from .models import (ActionExecution, ActionProposal, Notification, Referent, ReferentExperiment,
                      ReferentReview, ReferentAttribution)
@@ -31,8 +31,9 @@ def propose(review, data):
     if not ref:
         return None
     plan = dict(DEFAULTS, hypothesis=data['hypothesis'], audience=data['audience'], comparison=data['comparison'],
-                fit_criterion=posicionamiento.network_criteria(), positioning_version=posicionamiento.VERSION,
-                orientation_version=orquestacion.digest(orientacion.text()))
+                fit_criterion=posicionamiento.network_criteria(identidad.of_account(review.account)),
+                positioning_version=posicionamiento.version(),
+                orientation_version=orquestacion.digest(_orientation(review.account)))
     if data.get('control_referent'):
         control = Referent.objects.filter(account=review.account, pk=data['control_referent'], active=True, archived_at__isnull=True).exclude(pk=ref.pk).first()
         if control:plan['control_referent']=str(control.pk)
@@ -68,9 +69,9 @@ def cancel_pending(experiment):
 
 @transaction.atomic
 def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
-    require_gustavo(user)
     experiment = ReferentExperiment.objects.select_related('account').get(pk=experiment_id)
-    operador.policy_lock()
+    require_gustavo(user, experiment.account)
+    operador.policy_lock(operador.member_of(account=experiment.account))
     lock(experiment.account)
     experiment = ReferentExperiment.objects.select_for_update().get(pk=experiment_id)
     now = timezone.now()
@@ -84,8 +85,9 @@ def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
               'starts_at': experiment.starts_at.isoformat(), 'actor': str(user.pk), 'at': now.isoformat(), 'decision': decision}
     if decision == 'edit':
         if isinstance(plan,dict):
-            plan=dict(plan,fit_criterion=posicionamiento.network_criteria(),positioning_version=posicionamiento.VERSION,
-                      orientation_version=orquestacion.digest(orientacion.text()))
+            plan=dict(plan,fit_criterion=posicionamiento.network_criteria(identidad.of_account(experiment.account)),
+                      positioning_version=posicionamiento.version(),
+                      orientation_version=orquestacion.digest(_orientation(experiment.account)))
         validate_plan(plan)
         start = datetime.fromisoformat(starts_at)
         if timezone.is_naive(start) or start <= now:
@@ -122,9 +124,14 @@ def decide(user, experiment_id, version, decision, plan=None, starts_at=None):
     return experiment
 
 
+def _orientation(account):
+    """The orientation of the account's member (organizaciones, phase 4: each member has her own)."""
+    return orientacion.text(miembros.member_for_account(account))
+
+
 def material_change(experiment):
-    return (experiment.plan['positioning_version'] != posicionamiento.VERSION
-            or experiment.plan['orientation_version'] != orquestacion.digest(orientacion.text()))
+    return (experiment.plan['positioning_version'] != posicionamiento.version()
+            or experiment.plan['orientation_version'] != orquestacion.digest(_orientation(experiment.account)))
 
 
 def active_focus(account, now=None):
@@ -262,7 +269,7 @@ def tick(now=None):
     now = now or timezone.now()
     for experiment in ReferentExperiment.objects.filter(state='approved').select_related('account', 'referent', 'approved_by'):
         with transaction.atomic():
-            operador.policy_lock()
+            operador.policy_lock(operador.member_of(account=experiment.account))
             lock(experiment.account)
             experiment.refresh_from_db()
             if experiment.state != 'approved':
@@ -288,6 +295,9 @@ def tick(now=None):
                 experiment.state = 'completed'
                 cancel_pending(experiment)
             experiment.save()
+            # Organizaciones, phase 7: the notice is the account's owner's (she or the admin decides, ORG-07), never
+            # left without a member (with several members only the first one would see it).
             Notification.objects.get_or_create(ref=f'experiment:{experiment.pk}:{key}', defaults={
+                'member': miembros.member_of_account(experiment.account),
                 'kind': 'referents_review', 'layer': 'conversaciones', 'title': 'Experimento de referentes: '+output['outcome'],
                 'detail': 'La decisión depende del encaje y la cobertura de personas observadas. '+experiment.plan['limitations'], 'link': '/personas?pestana=referentes'})

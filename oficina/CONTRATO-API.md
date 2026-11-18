@@ -6,6 +6,95 @@ Mismo origen en producción. Caddy sirve la PWA en `/` y reenvía `/api/*`, `/ad
 
 **Errores:** JSON `{ "detail": "mensaje en español" }`. Códigos: 400 entrada inválida, 403 sin permiso o decisión humana requerida, 404, 409 conflicto o salvaguarda, 429.
 
+**Organizaciones (fase 1, [plan](../docs/plan-organizaciones.md), [ORG](../docs/funcionalidades/organizaciones.md)):**
+cada usuario puede ser miembro de una organización, con sus propias cuentas de LinkedIn. Las rutas responden por el miembro
+del usuario donde se indica. Con un solo miembro (la instalación de hoy) nada cambia. Con varios miembros activos, una
+ruta que aún no dice de quién es responde 400 `{ detail: "Hay varios miembros activos y esta operación no dice de cuál:
+hay que indicarlo." }` en lugar de adivinar. Un miembro inactivo recibe 400 «Tu miembro está inactivo en la organización.».
+
+**Organizaciones (fase 3, [ORG-14 a ORG-17](../docs/funcionalidades/organizaciones.md#org-14)):** ninguna forma de
+respuesta cambia. Los textos que nombraban a Gustavo nombran al dueño de la cuenta (para él dicen lo mismo); el 403 de
+referentes y experimentos dice «Solo el dueño de la cuenta o el administrador decide cambios de referentes y
+experimentos.» y el 409 de la relectura del perfil «…; sigue «Aplicado por ti».». `next_step.owner: "gustavo"` (y `by:
+"gustavo"` donde aparece) se queda como sinónimo de «tú»: lo leen los clientes instalados. La fase 5 decidió no
+renombrarlo: cada miembro solo ve lo suyo, así que siempre significa «tú», y cambiar el valor rompería las apps instaladas.
+
+**Organizaciones (fase 4, [ORG-18 a ORG-22](../docs/funcionalidades/organizaciones.md#org-18)):** el contenido es de cada
+miembro. Ninguna forma de respuesta cambia y, con un solo miembro, ninguna respuesta cambia (comparado byte a byte en 32
+rutas). Con varios miembros, estas rutas responden lo del miembro del usuario:
+
+- `GET /api/v1/editorial/calendar` y `GET /api/v1/calendario` (sus piezas y su plan); `POST /api/v1/editorial/plan` prepara su
+  siguiente pieza (ya no responde 400 con varios miembros activos);
+- `GET /api/v1/estrategia/semana` y `POST /api/v1/estrategia/planear` (su plan de la semana);
+- `GET /api/v1/resultados/resumen-semanal` y `GET /api/v1/resultados/revision-mensual` (los suyos, y `generate` dice si el
+  suyo ya está); `POST …/generar` genera el suyo;
+- `GET /api/v1/preguntas`, `GET /api/v1/memoria/hechos` y sus correcciones y retiros, `GET`/`PUT /api/v1/orientacion`;
+- `GET /api/v1/capturas` y `GET /api/v1/galeria` (lo que ella grabó o subió);
+- `GET /api/v1/tu-turno`: sus preguntas (`questions`, `later`), su memoria pendiente, su tarjeta de resumen, sus
+  `recent` de preguntas y el aviso `linkedin_expired`/`linkedin_expiring` de su propia conexión; el resto de las tarjetas aún es de todos (fase 5).
+
+Responder, posponer, deshacer o declinar la pregunta de otro miembro responde 404 desde la fase 5 (antes, 403).
+
+**Organizaciones (fase 5, [ORG-23 a ORG-27](../docs/funcionalidades/organizaciones.md#org-23)):** cada miembro ve y maneja
+solo lo suyo. Con un solo miembro ninguna respuesta cambia (todas las rutas de lectura, comparadas byte a byte). Con varios:
+
+- **Cada ruta tiene una clase** (`team_backend/alcance.py`, tabla en el [plan](../docs/plan-organizaciones.md#fase-5-lo-construido)):
+  *del miembro* (lo suyo), *de la organización* (lo mismo para todos: oportunidades, referentes, biblioteca, parada total,
+  escena y mapa del equipo, clave VAPID), *del administrador* (`integrity`, `audit`, `equipo/ciclos/<id>/decision`, `GET
+  /app/errores` y, desde la fase 6, `red/contacts/<id>/reasignar`: 403 a quien no es el administrador activo) o *servicio* (login, token, OAuth, Cal.com, tickets). Una ruta sin
+  clase responde 403 `{ detail: "Esta ruta no dice de quién son sus datos (team_backend/alcance.py): se rechaza." }`.
+- **El id de otro miembro responde 404** en toda ruta del miembro y en todo método (antes de validar el cuerpo); lo mismo
+  un id mal formado. En las rutas del miembro ya no hay 403 de «es de otro miembro» (preguntas, sesiones del navegador, acciones).
+- Las listas y tableros del miembro traen solo lo suyo: Tu turno (todas sus tarjetas y `recent`), `notificaciones` (sus
+  avisos y los de la organización), `actividad`, `operador/feed`, `operador/overview` (sus cuentas; la parada y el gasto de IA
+  son de todos), `operador/actions`, `operador/posts`, `red/contacts`, `red/summary`, `red/invitaciones-pendientes`,
+  `resultados` (su audiencia, contenido y acciones; el embudo de oportunidades y el gasto, de la organización),
+  `resultados/analitica`, `resultados/embudo-comprador`, `comprador/entregas`, `comprador/lectura-semanal`, `comunidad`,
+  `runs`, `calendario`, `oficina/actividad` (el detalle de una pieza solo para su dueña) y `GET /api/v1/memory` (sus hechos y
+  los de la empresa).
+- `PUT /api/v1/ajustes/preferencias` y `POST /api/v1/tu-turno/vistos` son de cada usuario: lo que uno apaga o marca como visto
+  no cambia lo del otro. Las preferencias de antes son las de Gustavo.
+- Una credencial sin miembro (un servicio) recibe 400 en las rutas del miembro; un token de la app actúa como su usuario.
+- Los ids que llegan en el cuerpo también son suyos: `POST /api/v1/capturas` con `contexto_id` de una persona, una pieza o
+  una pregunta de otro miembro responde 400 «El elemento ligado a la captura no existe.», como un id inexistente.
+  `POST /api/v1/respuestas/<id>/mensaje` acepta el id de un comentario o de un borrador del comprador suyos (404 si es de
+  otro). `GET /api/v1/audit` (administrador) no trae las acciones propias de otro miembro.
+- **Oportunidades** (de la organización): todas para todos. Con varios miembros cada una trae `registered_by` y `brought_by`
+  (`{ id, display_name }`); con uno, no llegan. `contact` solo llega a la dueña de la persona (para otro miembro, `null`;
+  `person` sigue diciendo su nombre). `contact` en `POST`/`PATCH` solo acepta una persona suya (400 «Persona inexistente»);
+  en el `PATCH` de una oportunidad cuya persona es de otro miembro, `contact` y `person_name` se ignoran.
+- **Tu turno:** `approval.provisional_voice` y `message.provisional_voice` (`true` cuando el borrador se escribió con su voz
+  provisional); las apps lo marcan «Voz provisional».
+- **Avisos:** cada aviso es de un miembro o de la organización; el push va solo a los dispositivos de su dueño y Slack no
+  nombra lo privado de nadie (texto genérico con varios miembros).
+
+**Organizaciones (fase 2, [ORG-10 a ORG-12](../docs/funcionalidades/organizaciones.md#org-10)):** el ritmo de LinkedIn
+(topes, espaciado, rampa, notas, tier, lecturas de perfil y bloqueos de invitaciones) es de cada miembro. Ninguna forma de
+respuesta cambia; cambian de quién son los números:
+
+- `GET /api/v1/operador/overview`: `accounts[].capacity` son los topes del miembro dueño
+  de esa cuenta y lo que escribieron todas sus cuentas. Con varios miembros activos, una cuenta que no es de nadie trae
+  `capacity: null` (no le aplica ningún ritmo y el autopiloto no la usa); con uno o ninguno, nunca es null.
+- `GET /api/v1/red/summary`: con `account`, el ritmo del miembro dueño de esa cuenta; sin `account`, el del miembro del
+  usuario (`capacity`, `reads_today.profile`, `read_caps.profile`, `invites_blocked`). El gasto de IA (`llm`) sigue siendo
+  de toda la organización.
+- `GET /api/v1/ajustes` (`autonomy`, `limits`) y `GET /api/v1/notificaciones` (`upcoming`: «El equipo invitará…», «Sale la
+  pieza…»): los del miembro del usuario.
+- En las tres, un usuario sin miembro activo con varios miembros activos recibe el 400 de arriba.
+- `ContactOutput.next_step` de una persona seguida desde una cuenta que no es de nadie (con varios miembros activos):
+  `{ owner: "equipo", text: "Su cuenta no es de ningún miembro: nadie la invitará.", at }`.
+
+**Organizaciones (fase 7, [ORG-34 a ORG-40](../docs/funcionalidades/organizaciones.md#org-34)):** el alta de un miembro.
+- **Un miembro en alta** (inactivo) solo recibe respuesta en `GET yo`, `GET/PATCH yo/perfil`, `GET yo/voz`, `GET ajustes`,
+  `GET linkedin/oauth/start`, `GET linkedin/status`, `GET operador/overview`, `GET operador/accounts` y la conexión de su
+  navegador (`GET/POST operador/accounts/<id>/conexion`, `GET operador/conexiones/<id>`, `POST …/enlace`, `POST …/cancelar`),
+  siempre por sí misma (`alcance.DE_ALTA`). El resto: 400 «Tu miembro está inactivo en la organización.».
+- **Voz provisional:** una tarjeta de aprobación de Tu turno trae `approval.provisional_voice: true` cuando el texto se escribió
+  con la voz provisional de su dueña (también con su capacidad en «auto»), y para una invitación con nota `approval.note` con el
+  texto de la nota. `GET editorial/pieces/<id>` trae `provisional_voice: true` en una pieza escrita con voz provisional. Sin esas
+  claves, todo se ve como antes. Ejecutar un texto así aprobado por otra persona que su dueña responde 409 «Escrito con la voz
+  provisional: sale solo con la aprobación de su dueña.».
+
 **Listados:** los paginados devuelven `{ "count", "next", "previous", "results": [...] }` con 25 por página (`?page=`, `?page_size=` hasta 100).
 
 ## Sesión
@@ -15,6 +104,13 @@ Mismo origen en producción. Caddy sirve la PWA en `/` y reenvía `/api/*`, `/ad
 | GET `/api/v1/auth/session` | — | `{ authenticated, user: { username, is_superuser, permissions: [codename…] } \| null }`. Además fija la cookie CSRF. |
 | POST `/api/v1/auth/login` | `{ username, password }` | 200 `{ user }`; 400 si las credenciales son inválidas; 429 si hay demasiados intentos. |
 | POST `/api/v1/auth/logout` | — | 204 |
+| GET `/api/v1/yo` | — | «Quién soy» (fase 5 de organizaciones): `{ username, member: { id, display_name, role, active, is_admin, first } \| null, organization: { id, name, slug } \| null, is_admin, provisional_voice, members }`. `member` es null para un usuario que no es miembro y en una instalación sin miembros; `members` cuenta los activos de su organización. Las apps nombran a la persona con esto, nunca con un nombre fijo. |
+| GET `/api/v1/yo/perfil` | — | Su perfil (fase 7): `{ member: { id, display_name, role, active }, profile: { name, role, identity, company_relation, limits, personal_startups }, own, help: { campo: texto }, history: [{ number, created_at, source, changed: [campo…], by }] }` (historial más nuevo primero; `by` es el nombre de quien cambió o «el sistema»). También mientras está en alta. |
+| PATCH `/api/v1/yo/perfil` | `{ name?, role?, identity?, company_relation?, limits?, personal_startups? }` | Sesión humana. Solo ella cambia el suyo: valida todo el perfil, guarda una revisión auditada (y el rol, auditado aparte) y responde lo mismo que el GET más `saved` (false si nada cambió). 400 con el motivo (campo desconocido, nombre con números, llaves, rol de más de 120 caracteres); 403 a una credencial de servicio. |
+| GET `/api/v1/yo/voz` | — | Su voz: `{ state: "provisional" \| "confirmada" \| "inicial", version, label ("Provisional", "Confirmada vN"…), learning_enabled, signals: { texts, minimum, by_kind }, can_propose, proposal: { number, created_at, note, text } \| null, versions: [{ number, state, source, created_at, decided_at }] }`. |
+| POST `/api/v1/yo/voz/proponer` | `{}` | Sesión humana. Una llamada pagada que propone su documento de voz con sus señales: 201 con el GET. 400 si el aprendizaje está apagado o falta muestra; 409 si ya hay una propuesta esperando o se está preparando otra (una sola llamada pagada por decisión); nunca mientras está en alta. |
+| POST `/api/v1/yo/voz/decidir` | `{ number, decision: "confirmar" \| "descartar", note? }` | Sesión humana. Solo ella decide su propuesta (ni el administrador): responde el GET. Confirmarla no cambia su autonomía. 400 si el cuerpo es inválido; 403 a una credencial de servicio. |
+| GET `/api/v1/organizacion` | — | Solo el administrador (403 a los demás): `{ organization: { id, name, slug }, profile: { version, date, status, language, location, not_wanted, pillars, services, offer, cases, modalities }, members: [{ id, display_name, role, active, is_admin, first, voice, accounts: { official, reader }, since }] }`. Nada privado de ningún miembro. |
 
 ## Máquina autónoma
 
@@ -47,17 +143,23 @@ Una cuenta `directo` trae además `connect: { enabled: bool, last: login | null 
 permite entrar en LinkedIn desde la app (`LINKEDIN_CONEXION_APP`) y la última conexión. Cada conexión
 (`login`) es `{ id, state: "abriendo|esperando|conectada|vencida|cancelada|fallida", reason, still_stopped, started_at,
 expires_at, finished_at }` ([AJU-13](../docs/funcionalidades/ajustes.md#aju-13)):
+- Todas estas rutas son **solo del miembro dueño de la cuenta** ([ORG-05](../docs/funcionalidades/organizaciones.md#org-05)):
+  otro usuario, aunque sea el administrador de la organización, recibe 403 «Solo el miembro dueño de esta cuenta abre o
+  maneja su sesión de LinkedIn.» y no se llama al servicio. En una instalación sin miembros, solo el usuario de
+  `REFERENTS_GUSTAVO_USERNAME`.
 - `POST /api/v1/operador/accounts/<id>/conexion` (sesión humana): abre el navegador del servidor en la página de entrada
   de LinkedIn. 201 `{ login, url }`, con `url` un enlace de un solo uso (2 min) a la vista remota; si ya hay una
-  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 429 más de 4 por cuenta
-  y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
+  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 403 no es el dueño, 429
+  más de 4 por cuenta y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
 - `GET /api/v1/operador/conexiones/<id>`: `{ login, url: null }`, preguntando al servicio mientras dura; al terminar
   `conectada`, levanta la pausa de la cuenta si la puso el servicio (detenida o sin sesión) y ya no la tiene detenida.
-- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició (400
-  si ya terminó). `POST …/<id>/cancelar`: la cancela.
+  403 si no es el dueño.
+- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició y sigue
+  siendo el dueño (403; 400 si ya terminó). `POST …/<id>/cancelar`: la cancela (403 si no es el dueño).
 - `GET /api/v1/linkedin/pantalla/entrar?ticket=` (sin sesión: lo abre el navegador del sistema) canjea el enlace por la
   cookie de la vista y redirige a `/conectar/`; 410 si ya se usó o venció. `GET /api/v1/linkedin/pantalla/permitir` es
-  solo para Caddy (`forward_auth`).
+  solo para Caddy (`forward_auth`). Los dos dejan de valer en cuanto quien inició la conexión deja de ser el dueño de la
+  cuenta.
 
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
@@ -140,7 +242,7 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 
 Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
 
-POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco.
+POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco. La pieza se prepara para la cuenta oficial del miembro de quien la pide, nunca la de otro, en su calendario y a su hora (fase 4 del plan de organizaciones); un miembro inactivo recibe 400.
 
 **Vetar** una pieza es rechazar su acción antes de la hora: `POST /api/v1/operador/actions/<action.id>/reject` con `{ note }` (sesión humana y `approve_actions`). Solo vale con la acción en `proposed` o `approved`; si ya se está ejecutando, 409. El día queda sin publicación (`status: "vetoed"`).
 
@@ -150,7 +252,7 @@ Las notificaciones de piezas (lista, bloqueada, descartada, publicada) abren `/e
 
 Fuente: `agentes-linkedin/infra/src/team_backend/linkedin_views.py` y `connectors_linkedin.status_payload()`.
 
-GET `/api/v1/linkedin/status` (permiso `operate_linkedin`). Nunca incluye el token:
+GET `/api/v1/linkedin/status` (permiso `operate_linkedin`). Es la conexión del miembro de quien pregunta (su credencial más reciente; nunca la de otro miembro). Nunca incluye el token:
 ```json
 { "configured": true, "live": false, "api_version": "202610|null", "scopes_required": ["openid", "profile", "w_member_social"],
   "connected": true, "member_urn": "urn:li:person:…|null", "member_name": "…|null", "scopes": ["openid", "profile", "w_member_social"],
@@ -172,6 +274,7 @@ GET `/api/v1/linkedin/oauth/callback`: lo llama LinkedIn. Como la cookie de sesi
 | `code` | Falta el `code` o es inválido. |
 | `scope` | LinkedIn no concedió `w_member_social`; no se guarda nada. |
 | `canje` | Falló el canje del código o la lectura de `/v2/userinfo`. |
+| `dueno` | Esa cuenta de LinkedIn ya es de otro miembro (solo su dueño la reconecta) o el usuario no tiene un miembro activo al que darle una cuenta nueva; no se guarda nada. La PWA y la app aún no tienen texto propio: muestran el genérico con «motivo: dueno». |
 
 La PWA muestra un mensaje en español para cada motivo y quita `linkedin` y `motivo` de la URL.
 
@@ -244,7 +347,7 @@ En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, veta
 | `followed` | Seguido | Seguido; se espera al menos 48 h antes de invitar. |
 | `invited` | Invitado | Invitación sin nota enviada. |
 | `connected` | Conectado | Conexión de primer grado. |
-| `closed` | Cerrado | Invitación ignorada o retirada; no se reinvita sin Gustavo. |
+| `closed` | Cerrado | Invitación ignorada o retirada; no se reinvita sin ti. |
 | `incoming` | Te invitó | Te invitó; se aceptará si encaja. |
 
 Valores que muestra la PWA:
@@ -255,7 +358,23 @@ Valores que muestra la PWA:
 - `network_distance`: «1.er grado», «2.º grado», «3.er grado», «Fuera de tu red»; vacío no se muestra.
 - `confidence` (0 a 1) se muestra como porcentaje entero.
 
-POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`.
+POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`. Organizaciones, fase 6: `{ note, for_everyone: true }` además la excluye para toda la organización (ningún miembro la toca); solo puede hacerlo quien la atiende, o cualquiera mientras nadie la atiende: si la atiende otro miembro, 409 «La atiende <nombre>: …» y nada cambia. Sin `for_everyone` (o `false`) es lo de siempre.
+
+**El registro de personas (organizaciones, fase 6).** Solo con dos o más miembros activos; con uno, `ContactOutput` no trae la clave y nada cambia.
+
+```text
+"registro": { "attended_by": { "id": "uuid", "display_name": "…", "since": "ISO|null" } | null,
+              "mine": true|false,
+              "pass_to": [ { "id": "uuid", "display_name": "…" } ],
+              "excluded": "Rechazada por LinkedIn|No contactar|Descartada para todos" | null }
+```
+
+- `attended_by`: el otro miembro que la atiende (nunca nada privado suyo). Entonces `next_step` es `{ "owner": null, "text": "La atiende <nombre>", "at": null }` y las apps no ofrecen «Descartar».
+- `mine`: el miembro que lee la atiende; `pass_to` son los otros miembros activos a quienes puede pasarla (vacío si no la atiende).
+- POST `/api/v1/red/contacts/<id>/liberar` con `{ reason }` (obligatorio): quien la atiende deja de atenderla; 403 si no la atiende, 400 sin motivo. Devuelve `ContactOutput`.
+- POST `/api/v1/red/contacts/<id>/pasar` con `{ member, reason }`: la pasa a otro miembro activo con cuenta lectora; él empieza con la ficha básica y nada privado se mueve. 403 si no la atiende; 400 sin motivo o con un miembro que no existe, no está activo o no tiene cuenta.
+- POST `/api/v1/red/contacts/<id>/reasignar` con `{ member, reason }`: solo el administrador; da a un miembro una persona que nadie ha tocado (el id es el de cualquier contacto de la organización; fuera de ella, 404). 400 si ya la atiende alguien. Devuelve solo la ficha de la organización, `{ person, display_name, headline, assigned_to: { id, display_name } }`, nunca el contacto (el de otro miembro es suyo).
+- Cualquier propuesta para una persona que atiende otro miembro, excluida para todos o colega (`POST /api/v1/operador/actions`, un comentario en su post) responde 409 con el motivo («La atiende <nombre>.», «Este post ya lo comenta <nombre>.», «Es un colega de la organización: no es un prospecto.»). Todas con sesión humana, CSRF y `approve_actions`; auditadas (`people.released`, `people.passed`, `people.reassigned`).
 
 ### Resumen
 
@@ -467,7 +586,7 @@ Reglas para la PWA:
 
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
-**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
+**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo` del miembro de quien pregunta, servida desde lo importado: nunca llama a LinkedIn. Una `cuenta` de otro miembro responde 400, igual que una desconocida. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
 
 **Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, señal de compra con fuente, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
 

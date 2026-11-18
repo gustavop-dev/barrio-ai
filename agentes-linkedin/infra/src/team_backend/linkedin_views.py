@@ -1,4 +1,5 @@
-"""OAuth of the official LinkedIn API for Gustavo's member account, and its status for the PWA.
+"""OAuth of the official LinkedIn API for the member's own account, and its status for the PWA. Only its owner connects or
+reconnects a member's account (connectors_linkedin.connect_member: «motivo=dueno» otherwise).
 
 The session cookie is SameSite=Strict, so LinkedIn's cross-site redirect to the callback arrives
 without it. The callback then bounces once through a same-site page (meta refresh) and validates
@@ -11,7 +12,7 @@ from django.views.decorators.http import require_GET
 from urllib.parse import urlencode
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import connectors_linkedin as li
+from . import alcance, connectors_linkedin as li
 from .connectors import ConnectorError
 from .jobs import audit
 from .operador_views import human_session
@@ -66,10 +67,10 @@ def oauth_callback(request):
     except ConnectorError as exc:
         # Never log the code or token; only the failure kind.
         audit(user,'linkedin.oauth_failed','linkedin',getattr(request,'request_id',''),kind=exc.kind,http_status=exc.status)
-        return _done('error','scope' if exc.kind=='scope' else 'canje')
+        return _done('error',{'scope':'scope','owner':'dueno'}.get(exc.kind,'canje'))
     return _done('ok')
 
 class Status(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(li.status_payload())
+        return Response(li.status_payload(member=alcance.miembro(request)))  # her LinkedIn

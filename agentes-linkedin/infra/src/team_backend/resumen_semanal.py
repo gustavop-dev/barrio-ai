@@ -28,7 +28,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
-from . import analitica, desenlaces, editorial, metricas, operador, orientacion, posicionamiento, red, resultados
+from . import analitica, desenlaces, editorial, identidad, metricas, miembros, operador, orientacion, posicionamiento, red, resultados
 from .exceptions import Conflict
 from .jobs import audit, enqueue_operation
 from .models import (ActionExecution, ActionOutcome, ActionProposal, AuditEvent, Capture, ConnectorAccount, Contact,
@@ -89,8 +89,24 @@ def spent_this_week(now=None):
             AND created_at>=%s''',(PURPOSE,week)).fetchone()
     return Decimal(row['spent'])
 
-def _pending_job():
-    return Job.objects.filter(kind='weekly_summary',state__in=[Job.State.QUEUED,Job.State.RUNNING]).order_by('created_at').first()
+def _pending_job(member=None):
+    """A weekly_summary job queued or running: hers (job_params' encoding), or anyone's with `member=None`."""
+    rows=Job.objects.filter(kind='weekly_summary',state__in=[Job.State.QUEUED,Job.State.RUNNING])
+    return miembros.her_jobs(rows,member).order_by('created_at').first()
+
+# Each member has her own summary (organizaciones, phase 4): her posts, her pieces, her plan, her comments, her network
+# rhythm and her captures, her accounts' shared evidence, her orientation. What stays the organization's and is read
+# whole: the AI spend, the opportunities funnel, the buyer funnel, the gates, the inbox counts and the lead's reviews.
+
+def _summaries(member):
+    return WeeklySummary.objects.all() if member is None else miembros.own(WeeklySummary.objects.all(),member)
+
+def _her_posts(w,member):
+    """The week's published posts of her pieces (resultados._posts), every post without members."""
+    return resultados._posts(w,member)
+
+def _her_pieces(member):
+    return miembros.own(EditorialPiece.objects.all(),member) if member is not None else EditorialPiece.objects.all()
 
 # --------------------------------------------------------------------------- stats: small helpers
 
@@ -134,9 +150,9 @@ def _lifetime(posts):
     return {piece:{'impresiones':v.get('impressions'),'guardados':v.get('saves'),'envios':v.get('sends'),
                    'seguidores_ganados':v.get('followers_gained')} for piece,v in found.items() if v.get('source')=='vida'}
 
-def publications(w,now,machine):
-    posts=resultados._posts(w)
-    pieces=list(EditorialPiece.objects.filter(slot_date__gte=w.first,slot_date__lte=w.last).prefetch_related('proposals'))
+def publications(w,now,machine,member=None):
+    posts=_her_posts(w,member)
+    pieces=list(_her_pieces(member).filter(slot_date__gte=w.first,slot_date__lte=w.last).prefetch_related('proposals'))
     if not posts and not pieces and not machine:return unavailable(MACHINE_OFF)
     states=Counter(editorial.status(p,max(p.proposals.all(),key=lambda a:a.created_at,default=None)) for p in pieces)
     cuts={}
@@ -157,11 +173,11 @@ def publications(w,now,machine):
     return {'disponible':True,'publicados':len(posts),'piezas_por_estado':dict(sorted(states.items())),'cortes':cuts,
             'con_analitica_vida':sum(1 for r in rows if r['analitica_vida']),'posts':rows}
 
-def by_type(w,now,machine):
+def by_type(w,now,machine,member=None):
     """Per GASP type (estrategia.py): what went out, its 72 h cut and what the audience answered to most: the reader's
     need and the audience signal behind the post with the most comments."""
     from . import estrategia
-    posts=[p for p in resultados._posts(w) if (p.piece.brief or {}).get('gasp_type') in estrategia.TYPES]
+    posts=[p for p in _her_posts(w,member) if (p.piece.brief or {}).get('gasp_type') in estrategia.TYPES]
     if not posts:return unavailable('Ningún post de la semana tenía tipo GASP.' if machine else MACHINE_OFF)
     out={}
     for kind in estrategia.TYPES:
@@ -179,10 +195,11 @@ def by_type(w,now,machine):
                                        'senal':(brief.get('audience_evidence') or {}).get('kind')} if best else None}
     return {'disponible':True,'tipos':out}
 
-def next_plan(week_start):
-    """Which audience signals moved the plan of the week after `week_start` (made on that Sunday)."""
+def next_plan(week_start,member=None):
+    """Which audience signals moved her plan of the week after `week_start` (made on that Sunday)."""
     from .models import WeeklyPlan
-    plan=WeeklyPlan.objects.filter(week_start=week_start+timedelta(days=7),state=WeeklyPlan.State.PLANNED).first()
+    plans=WeeklyPlan.objects.all() if member is None else miembros.own(WeeklyPlan.objects.all(),member)
+    plan=plans.filter(week_start=week_start+timedelta(days=7),state=WeeklyPlan.State.PLANNED).first()
     if plan is None:return unavailable('La semana siguiente aún no tiene plan.')
     used=[{'fecha':u.get('date'),'tipo':u.get('type'),'senal':u.get('kind'),'nota':str(u.get('note') or '')[:200]}
           for u in (plan.signals or {}).get('used',[])]
@@ -225,18 +242,19 @@ def follow_outcomes(w,now):
     return {'seguidos':counts.pop('total'),**counts,'interactuaron':sum(1 for names in engaged if names),
             'por_senal':dict(sorted(Counter(name for names in engaged for name in names).items()))}
 
-def comments(w,now,machine):
+def comments(w,now,machine,member=None):
     if not machine:return unavailable(MACHINE_OFF)
-    drafts=list(ActionProposal.objects.filter(capability='INT-03',source='agent',**_between('created_at',w)))
+    drafts=list(miembros.mine(ActionProposal.objects.filter(capability='INT-03',source='agent',**_between('created_at',w)),member))
     lead=Counter((p.review or {}).get('decision') for p in drafts if (p.review or {}).get('decision') in ('approve','discard'))
     skipped=AuditEvent.objects.filter(action='operator.comment_prefilter',metadata__decision='skip',**_between('created_at',w)).count()
     return {'disponible':True,'redactados':len(drafts),
-            'publicados':ActionExecution.objects.filter(proposal__capability='INT-03',state='confirmed',**_between('started_at',w)).count(),
+            'publicados':miembros.mine(ActionExecution.objects.filter(proposal__capability='INT-03',state='confirmed',**_between('started_at',w)),
+                                       member,'proposal__account').count(),
             'destino_de_los_borradores':dict(sorted(Counter(_draft_fate(p) for p in drafts).items())),
             'lider':{'aprobados':lead['approve'],'descartados':lead['discard']},'posts_saltados_por_el_prefiltro':skipped,
             'desenlaces':comment_outcomes(w,now)}
 
-def network(w,now):
+def network(w,now,member=None):
     if not resultados.Coverage.network(w):return unavailable('La red no funcionó esta semana.')
     classified=AuditEvent.objects.filter(action='network.classified',**_between('created_at',w)).values_list('metadata',flat=True)
     invited=[resultados._resolution(c) for c in Contact.objects.filter(invited_at__isnull=False).only('history','invited_at','connected_at','stage')]
@@ -253,8 +271,8 @@ def network(w,now):
             'conectados':Contact.objects.filter(**_between('connected_at',w)).count(),
             'conectados_que_encajan':Contact.objects.filter(classification__fit=True,**_between('connected_at',w)).count(),
             'invitaciones_recibidas':Contact.objects.filter(source=Contact.Source.INCOMING,**_between('discovered_at',w)).count(),
-            'aceptacion':acceptance,'salud_cohortes':red.health_snapshot(w.end),
-            'ritmo':red.weekly_rhythm(w.end,start=w.start,end=w.end),'desenlaces':follow_outcomes(w,now)}
+            'aceptacion':acceptance,'salud_cohortes':red.health_snapshot(w.end,member),
+            'ritmo':red.weekly_rhythm(w.end,start=w.start,end=w.end,member=member),'desenlaces':follow_outcomes(w,now)}
 
 def opportunities(w):
     everything=list(Opportunity.objects.filter(created_at__lt=w.end))
@@ -282,14 +300,15 @@ def conversations(w):
             'cerradas_respondiste':closed['respondi'],'cerradas_sin_responder':closed['no_responder'],
             'respondidas_en_linkedin':AuditEvent.objects.filter(action='conversation.replied',**_between('created_at',w)).count()}
 
-def captures(w):
-    """What Gustavo sent with the capture button. Zero is a real zero: he sent nothing."""
-    rows=list(Capture.objects.filter(**_between('created_at',w)))
-    pieces=[str(i) for i in EditorialPiece.objects.filter(slot_date__gte=w.first,slot_date__lte=w.last).values_list('id',flat=True)]
+def captures(w,member=None):
+    """What she sent with the capture button. Zero is a real zero: she sent nothing."""
+    mine=Capture.objects.all() if member is None else miembros.own(Capture.objects.all(),member)
+    rows=list(mine.filter(**_between('created_at',w)))
+    pieces=[str(i) for i in _her_pieces(member).filter(slot_date__gte=w.first,slot_date__lte=w.last).values_list('id',flat=True)]
     return {'disponible':True,'enviadas':len(rows),'por_destino':dict(sorted(Counter(c.purpose or 'sin_indicar' for c in rows).items())),
             'por_estado':dict(sorted(Counter(c.state for c in rows).items())),
             'comentarios_sobre_piezas':sum(1 for c in rows if c.context_type=='pieza'),
-            'ideas_usadas_en_piezas_de_la_semana':Capture.objects.filter(state=Capture.State.USED,routed_to__used_in__in=pieces).count()}
+            'ideas_usadas_en_piezas_de_la_semana':mine.filter(state=Capture.State.USED,routed_to__used_in__in=pieces).count()}
 
 SPEND_BUCKETS=(('image-','imagenes'),('propose-comment','general'),('editorial-','editorial'),('network-','red'),(PURPOSE,'resumen_semanal'))
 
@@ -328,9 +347,9 @@ def lead(w):
 
 STOPS={'operator.machine_paused':'maquina_detenida','operator.machine_resumed':'maquina_reanudada','operator.account_paused':'cuenta_en_pausa'}
 
-def stops(w):
+def stops(w,member=None):
     events=AuditEvent.objects.filter(action__in=list(STOPS),**_between('created_at',w)).order_by('created_at')
-    pieces=EditorialPiece.objects.filter(slot_date__gte=w.first,slot_date__lte=w.last)
+    pieces=_her_pieces(member).filter(slot_date__gte=w.first,slot_date__lte=w.last)
     return {'disponible':True,'eventos':[{'tipo':STOPS[e.action],'fecha':_local(e.created_at).date().isoformat()} for e in events[:20]],
             'piezas_bloqueadas':pieces.filter(state=EditorialPiece.State.BLOCKED).count(),
             'piezas_fallidas':pieces.filter(state=EditorialPiece.State.FAILED).count(),
@@ -345,13 +364,13 @@ def gates(w):
     except Exception as exc:  # the audit is a reading aid: it never stops the weekly summary
         return unavailable(f'La auditoría de compuertas no se pudo leer ({type(exc).__name__}).')
 
-def week_stats(w,now):
+def week_stats(w,now,member=None):
     machine=resultados.Coverage.machine(w)
-    return {'desde':w.first.isoformat(),'hasta':w.last.isoformat(),'publicaciones':publications(w,now,machine),
-            'por_tipo':by_type(w,now,machine),
-            'comentarios':comments(w,now,machine),'red':network(w,now),'oportunidades':opportunities(w),'conversaciones':conversations(w),
-            'capturas':captures(w),'gasto_ia':spend(w),'lider':lead(w),'pausas_y_bloqueos':stops(w),'compuertas':gates(w),
-            'comprador':buyer(w)}
+    return {'desde':w.first.isoformat(),'hasta':w.last.isoformat(),'publicaciones':publications(w,now,machine,member),
+            'por_tipo':by_type(w,now,machine,member),
+            'comentarios':comments(w,now,machine,member),'red':network(w,now,member),'oportunidades':opportunities(w),
+            'conversaciones':conversations(w),'capturas':captures(w,member),'gasto_ia':spend(w),'lider':lead(w),
+            'pausas_y_bloqueos':stops(w,member),'compuertas':gates(w),'comprador':buyer(w)}
 
 def buyer(w):
     """Phase 6 (BUYER_REPLY_ENABLED): the buyer funnel's weekly reading (lectura_embudo), deterministic, as of the end of
@@ -405,12 +424,12 @@ def data_warnings(week):
         if not week[key].get('disponible'):out.append(f'Sin datos de {label}: {week[key]["motivo"]}')
     return out
 
-def stats(week_start,now=None):
-    """The deterministic figures the analysis may quote: the week, the one before and the comparison."""
+def stats(week_start,now=None,member=None):
+    """The deterministic figures the analysis may quote: her week, the one before and the comparison."""
     now=now or timezone.now()
-    week=week_stats(window(week_start),now);previous=week_stats(window(week_start-timedelta(days=7)),now)
+    week=week_stats(window(week_start),now,member);previous=week_stats(window(week_start-timedelta(days=7)),now,member)
     return {'zona_horaria':str(operador.local_tz()),'semana':week,'semana_anterior':previous,'comparacion':compare(week,previous),
-            'avisos_de_datos':data_warnings(week),'plan_siguiente':next_plan(week_start),
+            'avisos_de_datos':data_warnings(week),'plan_siguiente':next_plan(week_start,member),
             'al_generar':{'maquina_detenida':operador.globally_paused(),'cuentas_en_pausa':ConnectorAccount.objects.filter(paused=True).count()}}
 
 # --------------------------------------------------------------------------- the analysis (one Claude call)
@@ -423,7 +442,7 @@ ITEM=_obj(texto=_s(),cifra=_s(),course_citations=_arr(_s()))
 # No orientacion_propuesta since 2026-11-16 (the summary observes; validate() keeps the key, null, in what is stored).
 SCHEMA=_obj(titular=_s(),lo_que_funciono=_arr(ITEM),lo_que_no=_arr(ITEM),recomendaciones=_arr(ITEM),advertencias=_arr(_s()))
 
-SYSTEM='''Eres analista_barrio_resultados de 0ff1ce, el equipo de agentes que lleva el LinkedIn de Gustavo. Cada lunes le
+SYSTEM='''Eres analista_barrio_resultados de 0ff1ce, el equipo de agentes que lleva el LinkedIn de {nombre}. Cada lunes le
 escribes el resumen de la semana que terminó (de lunes a domingo): qué funcionó, qué no y qué cambiar.
 
 Reglas de los números:
@@ -455,13 +474,13 @@ Qué escribir (en español, frases cortas y concretas):
 
 Criterio:
 - Cada hallazgo/recomendación lleva course_citations con IDs recuperados que sustentan el criterio,
-  separados de cifra (evidencia observada). El curso no prueba resultados de Gustavo.
+  separados de cifra (evidencia observada). El curso no prueba resultados de {nombre}.
 - No compares likes de siete días con composición de público de noventa. Conserva ventanas comparables.
 - DM no equivale a venta; seguidores agregados no revelan identidades ni motivos. Pares y divulgadores tienen valor.
 - `posicionamiento` y `orientacion_actual` mandan sobre los números: las impresiones no son negocio. No propongas abandonar
   la dirección ni la mezcla de modalidades por perseguir alcance.
 - Con menos de tres posts medidos, cualquier patrón es una pista, no una conclusión: dilo en advertencias.
-- `comentarios_de_gustavo` son sus comentarios sobre piezas de la semana: tenlos en cuenta.
+- `comentarios_de_{alias}` son sus comentarios sobre piezas de la semana: tenlos en cuenta.
 - `semana.por_tipo` trae los resultados por tipo GASP (G crecimiento, A autoridad, S venta, P personal) y, en cada uno,
   a qué respondió la audiencia (lo_que_respondio). `plan_siguiente` dice qué señales de la audiencia movieron el plan de
   la semana que empieza. Cuando haya datos, cuenta por tipo qué respondió la audiencia y di qué señales movieron el plan;
@@ -480,15 +499,16 @@ def _week_label(week_start):
 
 UUID_RE=re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
 
-def gustavo_comments(week_start):
-    """His comments (capture button, context «pieza») on the week's pieces, or sent during the week, oldest first."""
+def gustavo_comments(week_start,member=None):
+    """Her comments (capture button, context «pieza») on her week's pieces, or sent during the week, oldest first."""
     w=window(week_start)
-    pieces={str(p.id):p for p in EditorialPiece.objects.filter(slot_date__gte=w.first,slot_date__lte=w.last)}
-    rows=(Capture.objects.filter(context_type='pieza',state=Capture.State.NOTED)
+    pieces={str(p.id):p for p in _her_pieces(member).filter(slot_date__gte=w.first,slot_date__lte=w.last)}
+    mine=Capture.objects.all() if member is None else miembros.own(Capture.objects.all(),member)
+    rows=(mine.filter(context_type='pieza',state=Capture.State.NOTED)
           .filter(Q(**_between('created_at',w))|Q(context_id__in=list(pieces))).order_by('created_at')[:10])
     out=[]
     for c in rows:
-        piece=pieces.get(c.context_id) or (EditorialPiece.objects.filter(id=c.context_id).first() if UUID_RE.fullmatch(c.context_id) else None)
+        piece=pieces.get(c.context_id) or (_her_pieces(member).filter(id=c.context_id).first() if UUID_RE.fullmatch(c.context_id) else None)
         out.append({'pieza':piece.slot_date.isoformat() if piece else None,'tesis':(piece.brief or {}).get('thesis') if piece else None,
                     'comentario':' '.join(c.text.split())[:800]})
     return out
@@ -507,12 +527,18 @@ def for_analyst(data):
     return dict(data,evidencia_compartida=[dict(_compact(e),referents=[_compact(r) for r in e.get('referents') or []])
                                            for e in data['evidencia_compartida']])
 
-def message(week_start,data):
-    return json.dumps({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
+def system(member=None):
+    """The analyst's instructions with the member's name and key token (each member has her own summary, phase 4): with
+    several active members and none named, MiembroRequerido."""
+    return identidad.of(member).render(SYSTEM)
+
+def message(week_start,data,member=None):
+    ident=identidad.of(member)
+    return json.dumps(ident.keyed({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
                        'estadisticas':for_analyst(data),
-                       'posicionamiento':{'version':posicionamiento.VERSION,'estado':posicionamiento.STATUS,
-                                          'direccion':posicionamiento.editorial_direction()},
-                       'orientacion_actual':orientacion.text(),'comentarios_de_gustavo':gustavo_comments(week_start)},
+                       'posicionamiento':{'version':posicionamiento.version(ident),'estado':posicionamiento.status(ident),
+                                          'direccion':posicionamiento.editorial_direction(ident)},
+                       'orientacion_actual':identidad.orientation(ident),'comentarios_de_gustavo':gustavo_comments(week_start,ident.member)},values=False),
                       ensure_ascii=False,default=str)
 
 # --------------------------------------------------------------------------- number validator
@@ -623,20 +649,22 @@ def _guard(now=None):
     if spent_this_week(now)>=budget():
         raise ValueError('Presupuesto del resumen semanal agotado esta semana (WEEKLY_SUMMARY_LLM_USD); no se gasta más.')
 
-def run(user,week_start,origin_job=''):
-    """weekly_summary job: stats, one paid call, validation, storage and the notice. Never repeated for a stored week."""
+def run(user,week_start,origin_job='',member=None):
+    """weekly_summary job: her stats, one paid call, validation, storage and the notice. Never repeated for a stored week
+    of hers. `member`: whose summary (the worker passes miembros.of_job(params)); None, the only active member."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
-    if WeeklySummary.objects.filter(week_start=week_start).exists():raise Conflict('Ya hay un resumen de esa semana.')
+    member=miembros.resolve(member)
+    if _summaries(member).filter(week_start=week_start).exists():raise Conflict('Ya hay un resumen de esa semana.')
     now=timezone.now()
     if week_start+timedelta(days=7)>_local(now).date():raise Conflict('Esa semana aún no terminó.')
-    data=stats(week_start,now)
+    data=stats(week_start,now,member)
     from dataclasses import asdict
     from . import evidencia
     w=window(week_start)
     data['evidencia_compartida']=[asdict(evidencia.consult(user,evidencia.EvidenceRequest(
         str(account.pk),w.start.isoformat(),w.end.isoformat(),now.isoformat())))
-        for account in ConnectorAccount.objects.filter(provider__in=metricas.PROVIDERS).order_by('id')]
-    context,grounding=operador.role_context('semanal',WEEKLY_UNITS,
+        for account in miembros.accounts(member,metricas.PROVIDERS).order_by('id')]  # her accounts' evidence
+    context,grounding=operador.role_context('semanal',WEEKLY_UNITS,member=member,criteria=
         {'interpretacion':WEEKLY_UNITS,'ventanas':['LI-06-V008-K01','LI-06-V008-K02']})
     if grounding['course_missing']:
         answer={}
@@ -645,7 +673,7 @@ def run(user,week_start,origin_job=''):
                       validacion={'ok':False,'descartado':[]},course_citations=[])
     else:
         _guard(now)
-        answer=providers.claude(SYSTEM,message(week_start,data),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE,context=context)
+        answer=providers.claude(system(member),message(week_start,data,member),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE,context=context)
         try:raw=json.loads(answer['text'])
         except (json.JSONDecodeError,TypeError):raise ValueError('El analista no devolvió JSON válido.') from None
         if not isinstance(raw,dict):raise ValueError('El analista no devolvió un objeto.')
@@ -653,7 +681,7 @@ def run(user,week_start,origin_job=''):
     cost=answer.get('estimated_usd')
     try:
         with transaction.atomic():
-            summary=WeeklySummary.objects.create(week_start=week_start,stats=data,analysis=analysis,origin_job=origin_job,
+            summary=WeeklySummary.objects.create(week_start=week_start,stats=data,analysis=analysis,origin_job=origin_job,member=member,
                 usage={'model':answer.get('model'),'request_id':answer.get('request_id'),**{k:v for k,v in (answer.get('usage') or {}).items()
                        if k in ('input_tokens','output_tokens','cache_creation_input_tokens','cache_read_input_tokens','stop_reason')}},
                 cost_usd=Decimal(str(cost)) if cost is not None else None)
@@ -662,22 +690,31 @@ def run(user,week_start,origin_job=''):
     oficina_eventos.emit('entrega',ROLE,'director_editorial',f'Resumen de la semana {_week_label(week_start)}')
     from .notificaciones import avisar
     avisar('weekly_summary',f'Resumen de la semana {_week_label(week_start)}',analysis['titular'],link='/resultados#resumen',
-           ref=f'weekly_summary:{week_start.isoformat()}')
+           ref=f'weekly_summary:{week_start.isoformat()}'+_ref_part(member),member=member)
     audit(user,'weekly_summary.created',summary.id,week=week_start.isoformat(),dropped=len(analysis['validacion']['descartado']))
     return summary
 
+def _ref_part(member):
+    """What a notice's ref adds for her: nothing for the first member (her refs are the ones of before)."""
+    return '' if miembros.is_first(member) else f':{member.pk}'
+
 def queue(user,now=None):
-    """Autopilot: once this week's Monday hour passed, queue the summary of the week that just ended, one attempt per week
-    (deterministic job id). Off with WEEKLY_SUMMARY_ENABLED=false. A week the machine never ran has nothing to summarize:
-    nothing is paid for it (Gustavo can still ask with «Generar ahora»)."""
+    """Autopilot: once this week's Monday hour passed, queue each active member's summary of the week that just ended,
+    one attempt per week and member (deterministic job id with her: miembros.job_parts; one member's failure never stops
+    another's). Off with WEEKLY_SUMMARY_ENABLED=false. A week the machine never ran has nothing to summarize: nothing is
+    paid for it (she can still ask with «Generar ahora»)."""
     if not enabled():return 0
     now=now or timezone.now();week=last_week(now)
-    if now<due_at(now) or WeeklySummary.objects.filter(week_start=week).exists() or _pending_job():return 0
+    if now<due_at(now):return 0
+    return miembros.each_member(lambda member:_queue(user,now,week,member),'weekly_summary')
+
+def _queue(user,now,week,member):
+    if _summaries(member).filter(week_start=week).exists() or _pending_job(member):return 0
     from .autopiloto import _job_id
-    job_id=_job_id('weekly_summary',week)
+    job_id=_job_id('weekly_summary',week,*miembros.job_parts(member))
     if Job.objects.filter(id=job_id).exists():return 0  # this week's automatic attempt already ran
     if not resultados.Coverage.machine(window(week)) or spent_this_week(now)>=budget():return 0
-    _,created=enqueue_operation(user,'weekly_summary',{'week':week.isoformat()},request_id=job_id)
+    _,created=enqueue_operation(user,'weekly_summary',miembros.job_params(member,{'week':week.isoformat()}),request_id=job_id)
     return int(created)
 
 def generate(user,request_id=None,audit_request_id=''):
@@ -686,11 +723,11 @@ def generate(user,request_id=None,audit_request_id=''):
     if request_id:
         previous=Job.objects.filter(id=request_id,owner=user,kind='weekly_summary').first()
         if previous:return previous,False,date.fromisoformat(previous.params['week'])
-    week=last_week()
-    if WeeklySummary.objects.filter(week_start=week).exists():raise Conflict('La semana pasada ya tiene su resumen.')
-    if _pending_job():raise Conflict('El resumen ya se está preparando.')
+    week=last_week();member=miembros.member_for(user)  # her own summary
+    if _summaries(member).filter(week_start=week).exists():raise Conflict('La semana pasada ya tiene su resumen.')
+    if _pending_job(member):raise Conflict('El resumen ya se está preparando.')
     if spent_this_week()>=budget():raise Conflict('Presupuesto del resumen semanal agotado esta semana (WEEKLY_SUMMARY_LLM_USD).')
-    job,created=enqueue_operation(user,'weekly_summary',{'week':week.isoformat()},request_id or uuid.uuid4(),audit_request_id)
+    job,created=enqueue_operation(user,'weekly_summary',miembros.job_params(member,{'week':week.isoformat()}),request_id or uuid.uuid4(),audit_request_id)
     return job,created,week
 
 # --------------------------------------------------------------------------- Gustavo decides
@@ -716,8 +753,8 @@ def apply(user,summary_id):
         proposal=(summary.analysis or {}).get('orientacion_propuesta')
         if summary.state not in (WeeklySummary.State.NEW,WeeklySummary.State.SEEN):raise Conflict('Este resumen ya está decidido.')
         if not proposal:raise Conflict('Este resumen no propone una orientación.')
-        previous=orientacion.text()
-        orientacion.update(user,proposal)
+        previous=orientacion.text(summary.member)  # the summary's member's orientation, never another's
+        orientacion.update(user,proposal,summary.member)
         summary.previous_orientation=previous;_decided(summary,user,WeeklySummary.State.APPLIED);summary.save()
     audit(user,'weekly_summary.applied',summary.id,chars=len(proposal))
     return summary,previous
@@ -738,9 +775,9 @@ def undo(user,summary_id):
     with transaction.atomic():
         summary=_locked(summary_id)
         if summary.state==WeeklySummary.State.APPLIED:
-            if orientacion.text()!=((summary.analysis or {}).get('orientacion_propuesta') or '').strip():
+            if orientacion.text(summary.member)!=((summary.analysis or {}).get('orientacion_propuesta') or '').strip():
                 raise Conflict('La orientación cambió después; edítala en Ajustes.')
-            orientacion.update(user,summary.previous_orientation)
+            orientacion.update(user,summary.previous_orientation,summary.member)
         elif summary.state!=WeeklySummary.State.DISCARDED:raise Conflict('No hay nada que deshacer en este resumen.')
         summary.previous_orientation='';summary.state=WeeklySummary.State.SEEN;summary.decided_by=None;summary.decided_at=None;summary.save()
     audit(user,'weekly_summary.undone',summary.id)
@@ -748,19 +785,19 @@ def undo(user,summary_id):
 
 # --------------------------------------------------------------------------- readers: office, Tu turno, director
 
-def pending_proposal():
-    """The latest summary while its proposed orientation waits for Gustavo's decision (Tu turno card), or None: always None
-    once the latest summary is one written after 2026-11-16 (orientacion_propuesta null)."""
-    latest=WeeklySummary.objects.first()
+def pending_proposal(member=None):
+    """Her latest summary while its proposed orientation waits for her decision (Tu turno card), or None: always None
+    once the latest summary is one written after 2026-11-16 (orientacion_propuesta null). `member=None`: every member's."""
+    latest=_summaries(member).first()
     if latest and latest.state in (WeeklySummary.State.NEW,WeeklySummary.State.SEEN) and (latest.analysis or {}).get('orientacion_propuesta'):
         return latest
     return None
 
-def for_director(now=None):
-    """`weekly_recommendations` of the director's brief: the latest recent summary's recommendations (input, not orientation).
-    A discarded summary is not passed on."""
+def for_director(now=None,member=None):
+    """`weekly_recommendations` of the director's brief: her latest recent summary's recommendations (input, not
+    orientation). A discarded summary is not passed on. `member=None`: the only active member."""
     since=_local(now or timezone.now()).date()-timedelta(days=7*(DIRECTOR_WEEKS+1))
-    latest=WeeklySummary.objects.filter(week_start__gte=since).exclude(state=WeeklySummary.State.DISCARDED).first()
+    latest=miembros.own(WeeklySummary.objects.all(),member).filter(week_start__gte=since).exclude(state=WeeklySummary.State.DISCARDED).first()
     items=[i.get('texto') for i in ((latest.analysis or {}).get('recomendaciones') or []) if isinstance(i,dict) and i.get('texto')] if latest else []
     if not items:return None
     return {'semana':{'desde':latest.week_start.isoformat(),'hasta':(latest.week_start+timedelta(days=6)).isoformat()},'recomendaciones':items}
@@ -785,11 +822,13 @@ def payload(summary,with_stats=False):
     if with_stats:out['stats']=summary.stats
     return out
 
-def generation(now=None):
-    """Whether «Generar ahora» is offered: the last week has no summary, none is being prepared and the budget allows it."""
+def generation(now=None,member=None):
+    """Whether «Generar ahora» is offered to her: her last week has no summary, none of hers is being prepared and the
+    budget (the organization's) allows it. `member=None`: anyone's, as before organizations."""
     now=now or timezone.now();week=last_week(now)
-    exists=WeeklySummary.objects.filter(week_start=week).exists();pending=_pending_job()
-    failed=(Job.objects.filter(kind='weekly_summary',params__week=week.isoformat(),state__in=[Job.State.FAILED,Job.State.INTERRUPTED])
+    exists=_summaries(member).filter(week_start=week).exists();pending=_pending_job(member)
+    failed=(miembros.her_jobs(Job.objects.filter(kind='weekly_summary',params__week=week.isoformat(),
+                                                 state__in=[Job.State.FAILED,Job.State.INTERRUPTED]),member)
             .order_by('-created_at').first())
     spent_out=spent_this_week(now)>=budget()
     reason=('La semana pasada ya tiene su resumen.' if exists else 'El resumen se está preparando.' if pending
@@ -800,7 +839,8 @@ def generation(now=None):
                  'reason':reason,'pending':pending is not None,'last_error':failed.error if failed and not exists else None,
                  'automatic':enabled(),'automatic_at':automatic},**estimate())
 
-def overview(now=None,limit=12):
-    """GET /resultados/resumen-semanal: the latest summary, the previous weeks and «Generar ahora»."""
-    rows=list(WeeklySummary.objects.select_related('decided_by')[:limit+1])
-    return {'latest':payload(rows[0]) if rows else None,'previous':[payload(s) for s in rows[1:]],'generate':generation(now)}
+def overview(now=None,limit=12,member=None):
+    """GET /resultados/resumen-semanal: her latest summary, her previous weeks and «Generar ahora» (`member=None`: every
+    member's, as before organizations)."""
+    rows=list(_summaries(member).select_related('decided_by')[:limit+1])
+    return {'latest':payload(rows[0]) if rows else None,'previous':[payload(s) for s in rows[1:]],'generate':generation(now,member)}

@@ -1,8 +1,14 @@
 """Business opportunities (Personas → Oportunidades; Resultados → «¿Genera negocio?»; Calendario → capa Tuyo).
 Gustavo registers and moves them by hand for now; the analyst will propose them once the inbox is read.
-«Cualificada» means an explicit need, a relevant modality and enough budget and dedication data."""
+«Cualificada» means an explicit need, a relevant modality and enough budget and dedication data.
+
+The organization's one funnel (organizaciones, phase 5): every member sees and moves every opportunity. Each says who
+registered it (`member`) and whose person it came from (`origin_member`, the owner of its person's account); a member
+can only link a person of her own (another member's is «Persona inexistente», as one that does not exist)."""
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
+from . import alcance, miembros
 from .exceptions import Conflict
 from .jobs import audit
 from .models import Contact, Opportunity
@@ -17,7 +23,21 @@ def _note(item,event,detail='',stage=None):
     if stage:entry['stage']=stage  # lets Resultados count when each stage was reached
     item.history=(list(item.history)+[entry])[-50:]
 
-def _apply(item,data):
+def hers(rows,member):
+    """The opportunities she brought or registered: the next steps of her calendar. Every one without members."""
+    if alcance._require(member) is None:return rows
+    own=Q(origin_member=member)|Q(member=member)
+    if miembros.is_first(member):own|=Q(origin_member__isnull=True,member__isnull=True)
+    return rows.filter(own)
+
+def _origin(item):
+    """Whose person it is: the owner of its contact's account; without a person, whoever registered it."""
+    if item.contact_id is not None and item.contact.account_id:
+        owner=miembros.member_of_account(item.contact.account)
+        if owner is not None:return owner
+    return item.member
+
+def _apply(item,data,user=None):
     for field,limit in TEXT_FIELDS.items():
         if field in data and data[field] is not None:setattr(item,field,str(data[field]).strip()[:limit])
     for field,values in CHOICES.items():
@@ -26,7 +46,8 @@ def _apply(item,data):
             setattr(item,field,data[field])
     if 'next_action_at' in data:item.next_action_at=data['next_action_at']
     if 'contact' in data:
-        contact=Contact.objects.filter(id=data['contact']).first() if data['contact'] else None
+        people=Contact.objects.all() if user is None else alcance.de(Contact.objects.all(),miembros.member_for(user))  # hers
+        contact=people.filter(id=data['contact']).first() if data['contact'] else None
         if data['contact'] and contact is None:raise ValueError('Persona inexistente')
         item.contact=contact
     if item.contact is None and not item.person_name:raise ValueError('Elige una persona del barrio o escribe el nombre de alguien fuera de la red')
@@ -42,8 +63,9 @@ def _set_stage(item,stage):
 def create(user,data):
     require(user,'approve_actions')
     if data.get('modality') not in Opportunity.Modality.values:raise ValueError('Elige la modalidad')
-    item=Opportunity(created_by=user,modality=data['modality'])
-    _apply(item,data);_set_stage(item,data.get('stage') or 'conversacion')
+    item=Opportunity(created_by=user,modality=data['modality'],member=miembros.member_of_user(user))
+    _apply(item,data,user);_set_stage(item,data.get('stage') or 'conversacion')
+    item.origin_member=_origin(item)
     item.save();audit(user,'opportunity.created',item.id,modality=item.modality,stage=item.stage)
     if item.contact_id:
         from . import comprador, entrega_lead
@@ -56,14 +78,21 @@ def _notify(item):
     from .notificaciones import avisar
     name=item.contact.display_name if item.contact else item.person_name
     detail=f'Siguiente paso: {item.next_action}' if item.next_action else item.get_modality_display()
+    # The funnel is everyone's; the notice goes to whoever brought the person (else who registered it).
     avisar('opportunity',f'Oportunidad con {name}: {item.get_stage_display().lower()}',detail,
-           link=f'/personas/{item.contact_id}' if item.contact_id else '/personas?pestana=oportunidades',ref=f'opportunity:{item.id}:{item.stage}')
+           link=f'/personas/{item.contact_id}' if item.contact_id else '/personas?pestana=oportunidades',ref=f'opportunity:{item.id}:{item.stage}',
+           member=item.origin_member or item.member)
 
 def update(user,opportunity_id,data):
     require(user,'approve_actions')
     with transaction.atomic():
         item=Opportunity.objects.select_for_update().get(id=opportunity_id)
-        _apply(item,data)
+        if item.contact_id is not None and not alcance.is_hers(item.contact,miembros.member_for(user)):
+            # Another member's person: she sees only its name (no card), so her form cannot name it again. She moves
+            # and edits the opportunity; its person stays as it is (organizaciones, phase 5).
+            data={key:value for key,value in data.items() if key not in ('contact','person_name')}
+        _apply(item,data,user)
+        if 'contact' in data:item.origin_member=_origin(item)
         if data.get('stage'):_set_stage(item,data['stage'])
         moved=bool(data.get('stage'))
         item.updated_at=timezone.now();item.save()

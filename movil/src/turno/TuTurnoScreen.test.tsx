@@ -109,6 +109,8 @@ describe('Tu turno', () => {
     expect(screen.getByText('Head of Product en un marketplace B2B')).toBeOnTheScreen();
     expect(screen.getByText('Lidera producto en un marketplace B2B.')).toBeOnTheScreen();
     expect(screen.getByText('Si no la apruebas, no sale.')).toBeOnTheScreen();
+    // Without `note` or `provisional_voice` (organizaciones, phase 7) it renders as before.
+    expect(screen.queryByTestId('approval-note')).toBeNull();
     await fireEvent.press(screen.getByText('Vetar'));
     const sheet = await screen.findByTestId('confirm-sheet');
     expect(within(sheet).getByText('Vetar la acción')).toBeOnTheScreen();
@@ -117,6 +119,30 @@ describe('Tu turno', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/operador/actions/a-1/approve')[0]?.body).toEqual({ expected_hash: 'a'.repeat(64) }));
     expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
     expect(server.find('POST', '/api/v1/operador/actions/a-1/reject')).toHaveLength(0);
+    expect(screen.queryByText('Voz provisional')).toBeNull();
+  });
+
+  it('marks a draft written in her provisional voice (organizations, phase 5)', async () => {
+    const provisional = { ...APPROVAL_CARD, approval: { ...APPROVAL_CARD.approval!, provisional_voice: true } };
+    await renderTurno(turno({ items: [provisional], count: 1, critical: false }));
+    expect(await screen.findByText('¿Apruebas seguir a Laura Prueba?')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('turno-card-approval:a-1')).getByText('Voz provisional')).toBeOnTheScreen();
+  });
+
+  it('an invitation in her provisional voice shows the note it sends (organizations, phase 7)', async () => {
+    const invitation = {
+      ...APPROVAL_CARD,
+      title: '¿Apruebas invitar a Laura Prueba?',
+      approval: { ...APPROVAL_CARD.approval!, capability: 'RED-02', label: 'Invitación', provisional_voice: true, note: 'Hola Laura, me gustó tu charla sobre marketplaces.' },
+    };
+    await renderTurno(turno({ items: [invitation], count: 1, critical: false }));
+    expect(await screen.findByText('¿Apruebas invitar a Laura Prueba?')).toBeOnTheScreen();
+    const card = screen.getByTestId('turno-card-approval:a-1');
+    expect(within(card).getByText('Voz provisional')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('turno-more-approval:a-1'));
+    const note = within(card).getByTestId('approval-note');
+    expect(within(note).getByText('Nota de la invitación')).toBeOnTheScreen();
+    expect(within(note).getByText('“Hola Laura, me gustó tu charla sobre marketplaces.”')).toBeOnTheScreen();
   });
 
   it('shows a conversation as its title and her message in two lines; «Ver más» opens why it matters', async () => {

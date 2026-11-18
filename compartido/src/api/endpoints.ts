@@ -20,6 +20,7 @@ import type {
   FeedEvent,
   Job,
   LinkedInStatus,
+  MemberProfilePatch,
   MemoryFact,
   MemoryItem,
   MonthlyReview,
@@ -29,6 +30,10 @@ import type {
   Opportunity,
   OpportunityFilters,
   OpportunityInput,
+  MiPerfil,
+  MiPerfilSaved,
+  MiVoz,
+  Organizacion,
   Orientation,
   Overview,
   Paginated,
@@ -38,6 +43,7 @@ import type {
   QuestionState,
   RedSummary,
   Referent,
+  VoiceDecision,
   ReferentPatch,
   Resultados,
   ResultadosDias,
@@ -51,6 +57,7 @@ import type {
   Unit,
   User,
   WeeklySummaries,
+  Yo,
   WeeklySummaryDecision,
   WeeklySummaryGenerateResponse,
 } from './types';
@@ -138,8 +145,23 @@ export const overridePiece = (pieceId: string, requestId?: string, note = '') =>
 
 // ---------------------------------------------------------------- official LinkedIn
 export const getLinkedInStatus = () => api.get<LinkedInStatus>('/api/v1/linkedin/status');
+/** «Quién soy» (organizaciones, phase 5): her member, role and organization. */
+export const getYo = () => api.get<Yo>('/api/v1/yo');
 /** Opened with a full navigation (never fetch): Django redirects to LinkedIn and back to /ajustes. */
 export const LINKEDIN_OAUTH_START = '/api/v1/linkedin/oauth/start';
+
+// ---------------------------------------------------------------- her profile and voice, the organization (phase 7)
+/** Her own profile; also while her member is inactive (in onboarding). */
+export const getMiPerfil = () => api.get<MiPerfil>('/api/v1/yo/perfil');
+/** Only the fields sent change; validated as a whole on the server (400 `{detail}` with the field first). */
+export const saveMiPerfil = (patch: MemberProfilePatch) => api.patch<MiPerfilSaved>('/api/v1/yo/perfil', patch);
+export const getMiVoz = () => api.get<MiVoz>('/api/v1/yo/voz');
+/** Paid (~0,17 USD): one proposal of her voice document from her own signals. */
+export const proposeMiVoz = () => api.post<MiVoz>('/api/v1/yo/voz/proponer', {});
+/** Only she confirms or discards a proposal of her voice. */
+export const decideMiVoz = (decision: VoiceDecision) => api.post<MiVoz>('/api/v1/yo/voz/decidir', decision);
+/** The organization's profile and its members (only its admin). */
+export const getOrganizacion = () => api.get<Organizacion>('/api/v1/organizacion');
 
 // ---------------------------------------------------------------- referents
 export const listReferents = (account: string) =>
@@ -183,6 +205,12 @@ export const getContact = (contactId: string) => api.get<Contact>(`${RED}/contac
 export const discardContact = (contactId: string, note: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/discard`, { note });
 /** «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits (BAR-17). */
 export const confirmContactFit = (contactId: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/encaja`, {});
+/** Organizaciones, phase 6: the member who attends her lets her go (the reason is mandatory; 403 if she does not). */
+export const releaseContact = (contactId: string, reason: string) =>
+  api.post<Contact>(`${RED}/contacts/${id(contactId)}/liberar`, { reason });
+/** …or passes her to another active member: nothing private moves (the reason is mandatory). */
+export const passContact = (contactId: string, member: string, reason: string) =>
+  api.post<Contact>(`${RED}/contacts/${id(contactId)}/pasar`, { member, reason });
 export const getRedSummary = () => api.get<RedSummary>(`${RED}/summary`);
 
 // ---------------------------------------------------------------- knowledge

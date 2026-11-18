@@ -1,8 +1,29 @@
-"""Gustavo's approved profile brand and render constraints, shared with evidence consumers."""
+"""The member's approved profile brand and render constraints, shared with evidence consumers."""
+import contextvars
 import unicodedata
 from collections import Counter
+from contextlib import contextmanager
 
-BRAND_VERSION='PerfilLinkedIn-gustavo-addenda-6-v1'
+_OWNER=contextvars.ContextVar('profile_owner',default=None)
+
+@contextmanager
+def owner(ident):
+    """While a profile job runs (perfil.run, perfil_assets.run): whose profile it is, for the readers below that have no
+    proposal at hand (the drafter's instructions, the brand evidence). Organizaciones, phase 4: the profile is hers."""
+    token=_OWNER.set(ident)
+    try:yield ident
+    finally:_OWNER.reset(token)
+
+def owner_identity(member=None):
+    """`member`'s identity, else the running profile job's owner, else the only active member's."""
+    from . import identidad
+    if member is not None:return identidad.of(member)
+    ident=_OWNER.get()
+    return ident if ident is not None else identidad.of()
+
+def brand_version(member=None):
+    """Her profile brand version (her profile's `brand_version`; the first member's is the approved addenda 6)."""
+    return owner_identity(member).me('brand_version')
 SOURCE='docs/funcionalidades/estrategia-perfil.md#marca'
 ACCENT='#0FF1CE';INK='#1E1E2B';PAPER='#F7F6F0';DEEP='#00715E'
 TOKENS={'aguamarina':ACCENT,'tinta':INK,'papel':PAPER,'0ff1ce-hondo':DEEP}
@@ -53,5 +74,5 @@ def evidence():
             'label_tracking_em':LABEL_TRACKING_EM,'line_count':2,'shrink_to_fit':False,
             'scope':'Restricciones de nuestro render; el ajuste de una frase exige render.banner_fit.'},
     }
-    return [dict(id=eid,kind='brand',version=BRAND_VERSION,source=SOURCE,scope='photo/banner',values=value)
+    return [dict(id=eid,kind='brand',version=brand_version(),source=SOURCE,scope='photo/banner',values=value)
             for eid,value in values.items()]

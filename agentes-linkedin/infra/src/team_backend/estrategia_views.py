@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import estrategia, operador
+from . import alcance, estrategia, operador
 from .operador_views import human_session, valid
 from .permissions import require
 from .serializers import JobOutput
@@ -36,7 +36,7 @@ class Week(APIView):
         require(request.user,'operate_linkedin')
         raw=request.query_params.get('dia')
         day=_day(raw) if raw else timezone.now().astimezone(operador.local_tz()).date()
-        return Response(estrategia.week(day))
+        return Response(estrategia.week(day,member=alcance.miembro(request)))  # her week (phase 4)
 
 
 class Day(APIView):

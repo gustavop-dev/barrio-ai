@@ -1,12 +1,17 @@
-"""Gustavo's positioning: the one versioned source the agents read (audit «Un solo artefacto de posicionamiento»).
+"""The positioning the agents read: the one source (audit «Un solo artefacto de posicionamiento»), now per member.
 
 Before, the direction was copied in three places with different modality vocabularies: editorial.DIRECTION, the
-classifier's red.CLASSIFY_SYSTEM and the lead agent's lider.CRITERIA_DEL_BARRIO. Those three constants now derive
-from this module, so a change of direction is one edit here and a new VERSION.
+classifier's red.CLASSIFY_SYSTEM and the lead agent's lider.CRITERIA_DEL_BARRIO. All three derive from this module, so a
+change of direction is one edit of the profile and a new version.
 
-Source: docs/brief-gustavo-posicionamiento.md and docs/propuesta-posicionamiento-gustavo-v1.md (an internal proposal
-Gustavo supervises; not confirmed by him as final). Private priorities (60/40, audience segment, conditions) are not
-here: they live in guardas.BASELINE_GUIDANCE as private guidance, never as positioning text.
+Phase 3 of organizations (docs/plan-organizaciones.md): the texts are no longer code. What the organization is and sells
+(version and status, language, pillars, services, offer, cases, modalities and their neighborhood, location, what it
+does not want) is the organization's profile; who the member is (her presentation, her relation to the company, her
+limits, whether the personal startup modality is hers) is her profile (identidad.py). Every function takes the member
+it writes for (or her Identity) and composes the block for her. For the installation's first member, and for an
+installation without members, the texts are exactly the ones of before (identidad.initial(), recursos/
+identidad-inicial.json, from docs/brief-gustavo-posicionamiento.md and docs/propuesta-posicionamiento-gustavo-v1.md).
+Private priorities (60/40, audience segment, conditions) are not here: they are private guidance (guardas).
 
 Modalities have one canonical id each. Stored values keep the vocabulary of their domain, because they are persisted
 and read by the PWA, and are never renamed:
@@ -16,85 +21,16 @@ and read by the PWA, and are never renamed:
 - oportunidades: Opportunity.modality (models.Opportunity.Modality, personas/labels.ts OPPORTUNITY_MODALITY_LABEL);
   only the two business modalities exist there, plus `por_clasificar` for an opportunity whose modality is unknown.
   An alliance or a community contact is not a business opportunity by itself, so it has no opportunity modality.
-VOCABULARIES is that explicit mapping; to_canonical / to_stored translate between domains."""
+VOCABULARIES is that explicit mapping; to_canonical / to_stored translate between domains. The keys of pillars,
+services, offer and cases are contracts of the stored data and the schemas too: a profile changes their texts only."""
+from . import identidad
 
-VERSION='posicionamiento-v2'
-DATE='2026-11-12'
-STATUS='propuesta interna v2; Gustavo la supervisa'
+PILLAR_KEYS=('business_to_product','applied_ai','architecture_delivery')
+# An «industry referent» (referentes_industria.py) must sell one of these; `terms` (in the profile) are the English words a
+# profile or a page uses for the same service, used to search and to match.
+SERVICE_KEYS=('software_a_la_medida','producto','ia_aplicada','liderazgo_tecnico')
 
-IDENTITY=('Gustavo es ingeniero de producto con criterio de negocio: convierte necesidades de negocio en software que '
-          'funciona, lo evoluciona e integra IA cuando resuelve un problema concreto.')
-PROJECTAPP='Fundó y lidera ProjectApp, un equipo de desarrollo de software a la medida.'
-LANGUAGE='Publica en LinkedIn, en inglés.'
-PILLARS={
-    'business_to_product':'traducir problemas de negocio en decisiones de producto y de software',
-    'applied_ai':'incorporar y evaluar IA en soluciones concretas',
-    'architecture_delivery':'decisiones de arquitectura y de entrega al construir productos reales',
-}
-LIMITS=('humo y promesas; temas que Gustavo no domina; experiencias, clientes, cifras o resultados inventados; pitch '
-        'agresivo; datos privados de cualquier persona')
-NOT_WANTED='No buscan vendedores ni reclutadores masivos.'
-# Gustavo, 12/11/2026: «la idea es que linkedin nos mande a posicionarnos allá»; 17/11/2026, de los compradores de
-# Latinoamérica: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una». Only who the
-# network goes after changes, not the editorial direction (identity, pillars, modalities): VERSION stays, so the reader
-# study and the experiments tied to it stay valid; the classifier's criterion_version hashes this text anyway.
-LOCATION=('el barrio se construye en EE. UU.: compradores (founders) y comunidad van primero si están allí; los de '
-          'Latinoamérica también entran, después.')
-
-# What Gustavo sells, restated from IDENTITY, PROJECTAPP, PILLARS and the two business modalities below; no new direction,
-# so VERSION stays. An «industry referent» (referentes_industria.py) must sell one of these. `terms` are the English words
-# a profile or a page uses for the same service (the barrio is built in the United States), used to search and to match.
-SERVICES={
-    'software_a_la_medida':{'label':'desarrollo de software a la medida (entrega externa, proyecto definido o equipo continuo)',
-        'source':'PROJECTAPP, modalidad projectapp','terms':('custom software development','software development agency')},
-    'producto':{'label':'convertir necesidades de negocio en un producto de software que funciona y evolucionarlo',
-        'source':'IDENTITY, pilar business_to_product','terms':('product development','mvp development')},
-    'ia_aplicada':{'label':'incorporar IA en soluciones concretas','source':'IDENTITY, pilar applied_ai',
-        'terms':('applied ai','ai development')},
-    'liderazgo_tecnico':{'label':'liderazgo técnico en startups: decisiones de arquitectura y de entrega',
-        'source':'modalidad personal_startups, pilar architecture_delivery','terms':('fractional cto','technical leadership')},
-}
-
-# BAR-25, Gustavo 17/11/2026: «no se verticaliza el contenido: se verticaliza a quién se le escribe y con qué prueba». The
-# editorial direction (identity, pillars, purposes) does not change, so VERSION stays; who the network goes after for
-# ProjectApp, the offer and the proof do (only with NETWORK_PROJECTAPP_BUYER_ENABLED: projectapp.py). Three audiences:
-# the ProjectApp buyer, the startup buyer (the one before) and the partner (a new role, not an `aliado`).
-PROJECTAPP_BUYER=('empresas tradicionales de 20 a 200 personas en EE. UU. que necesitan digitalizarse, o que ya tienen '
-                  'software y quieren ampliarlo: su dueño o CEO, o su líder de tecnología (CTO, VP, Head o Director de '
-                  'ingeniería o de TI, gerente de sistemas)')
-PARTNER=('agencias de marketing, diseño, consultoría o producto que subcontratan el desarrollo de software de sus clientes '
-         '(partners: traen contratos, no compran para sí)')
-# What ProjectApp offers, as Gustavo said it (17/11/2026). Approximate prices, never a quote: «desde unos».
-OFFER={'equipo_dedicado':'un equipo dedicado, desde unos 20 millones de pesos colombianos al mes (unos 5.000 USD)',
-       'proyecto':'un proyecto por requerimientos, desde unos 20 millones de pesos colombianos',
-       'argumento':'nearshore: buena calidad a menor costo'}
-# The only confirmed facts of ProjectApp's cases (17/11/2026). Nothing else is confirmed: no client names, figures,
-# durations or results until Gustavo answers the case questions (projectapp.ask_case_questions).
-CASES={'educacion_en_linea':'ProjectApp construyó una plataforma grande a la medida de educación en línea',
-       'retail_ecommerce':'ProjectApp construyó una plataforma grande a la medida de retail'}
-
-# Canonical modality -> what it is for Gustavo (editorial) and who belongs to it (neighborhood criteria).
-MODALITIES={
-    'personal_startups':{'purpose':'oportunidades de trabajo personal en startups',
-        # Gustavo, 12/11/2026: «Semilla por delante»; presemilla rarely has money to hire.
-        'neighborhood':'founders técnicos o de negocio de startups con ronda semilla o posterior, o con clientes que pagan, '
-                       'líderes técnicos y personas que recomiendan talento en startups'},
-    'projectapp':{'purpose':'contratos para ProjectApp, el equipo que Gustavo lidera',
-        'neighborhood':f'{PROJECTAPP_BUYER}; founders u operadores de startups que necesitan una entrega externa, un proyecto '
-                       f'definido o un equipo continuo; y {PARTNER}'},
-    'alianzas':{'purpose':'relaciones con quienes recomiendan talento o proveedores',
-        'neighborhood':'estudios o agencias complementarios, freelancers senior, aceleradoras, inversores o comunidades que '
-                       'recomiendan talento o proveedores'},
-    'comunidad':{'purpose':'comunidad y autoridad temática en el nicho',
-        'neighborhood':'pares, divulgadores y líderes temáticos (producto, software, IA aplicada, startups) que sostienen la '
-                       'conversación del nicho'},
-}
-
-# Domain -> {canonical id: stored value}. Order follows MODALITIES.
-# With NETWORK_PROJECTAPP_BUYER_ENABLED off the classifier and the lead read the neighborhood as before 17/11/2026, word
-# for word: off is exactly today's behavior (projectapp.enabled).
-NEIGHBORHOOD_BEFORE={'projectapp':'founders u operadores que necesitan una entrega externa, un proyecto definido o un equipo continuo'}
-
+# Domain -> {canonical id: stored value}. Order follows the profile's modalities.
 VOCABULARIES={
     'editorial':{'personal_startups':'personal_startups','projectapp':'projectapp','alianzas':'alianzas','comunidad':'comunidad'},
     'red':{'personal_startups':'personal_startups','projectapp':'projectapp','alianzas':'alianzas','comunidad':'comunidad_autoridad'},
@@ -114,35 +50,86 @@ def to_stored(domain,canonical):
     """Stored value of a canonical id in a domain; the domain's unknown value (or None) when it has no equivalent."""
     return VOCABULARIES[domain].get(canonical,UNKNOWN.get(domain))
 
+# --------------------------------------------------------------------------- the profile, for one member
+
+def identity(member=None):
+    """Her Identity (identidad.of): `member` may already be one."""
+    return identidad.of(member)
+
+def _organization(member=None):
+    """What belongs to the organization needs no member (identidad.organization_profile_of)."""
+    return identidad.organization_profile_of(member)
+
+def version(member=None):
+    """The positioning version of her organization (experiments, community studies and briefs record it)."""
+    return _organization(member)['version']
+
+def status(member=None):
+    """The positioning status, with her name where it names the member who supervises it."""
+    ident=identity(member)
+    return ident.render(ident.org('status'))
+
+def pillars(member=None):
+    return _organization(member)['pillars']
+
+def services(member=None):
+    """What her organization sells: {key: {label, source, terms}} (SERVICE_KEYS)."""
+    return _organization(member)['services']
+
+def offer(member=None):
+    return _organization(member)['offer']
+
+def cases(member=None):
+    """The only confirmed facts of the organization's cases (17/11/2026): {segment: text}. Nothing else is confirmed: no
+    client names, figures, durations or results until the owner answers the case questions (projectapp)."""
+    return _organization(member)['cases']
+
+def modality_purposes(member=None):
+    """Canonical modality -> what it is for her (editorial), only the modalities that apply to her."""
+    return {key:item['purpose'] for key,item in identity(member).modalities().items()}
+
 # --------------------------------------------------------------------------- texts for each agent
 
-def editorial_direction():
-    """Positioning block of the editorial system prompts (director, writers, selection, repair)."""
-    pillars=', '.join(f'{key} ({text})' for key,text in PILLARS.items())
-    modes=', '.join(f'{to_stored("editorial",key)} ({item["purpose"]})' for key,item in MODALITIES.items())
-    return '\n'.join([f'Dirección editorial vigente ({VERSION}, {STATUS}):',f'- {IDENTITY} {PROJECTAPP} {LANGUAGE}',
-                      f'- Pilares provisionales: {pillars}.',f'- Modalidades: {modes}. No conviertas cada pieza en una oferta.',
-                      f'- Prohibido: {LIMITS}.'])
+def _who(ident):
+    """How the blocks present her: her presentation and her relation to the organization."""
+    return ' '.join(part for part in (ident.me('identity'),ident.me('company_relation')) if part)
 
-def neighborhood(key,projectapp_buyer=False):
-    """Who belongs to a modality: the refined ProjectApp neighborhood only with the ProjectApp buyer on (BAR-25)."""
-    return MODALITIES[key]['neighborhood'] if projectapp_buyer else NEIGHBORHOOD_BEFORE.get(key,MODALITIES[key]['neighborhood'])
+def editorial_direction(member=None):
+    """Positioning block of the editorial system prompts (director, writers, selection, repair) for her."""
+    ident=identity(member)
+    pillars_text=', '.join(f'{key} ({text})' for key,text in ident.org('pillars').items())
+    modes=', '.join(f'{to_stored("editorial",key)} ({item["purpose"]})' for key,item in ident.modalities().items())
+    who=' '.join(part for part in (_who(ident),ident.org('language')) if part)
+    return '\n'.join([f'Dirección editorial vigente ({ident.org("version")}, {status(ident)}):',f'- {who}',
+                      f'- Pilares provisionales: {pillars_text}.',f'- Modalidades: {modes}. No conviertas cada pieza en una oferta.',
+                      f'- Prohibido: {ident.me("limits")}.'])
 
-def offer_text():
-    """What ProjectApp offers and the only confirmed facts of its cases, for the classifier and the lead."""
-    return (f'Oferta de ProjectApp: {OFFER["equipo_dedicado"]}, o {OFFER["proyecto"]}; {OFFER["argumento"]}. Casos reales '
-            f'confirmados: {CASES["educacion_en_linea"]}, y {CASES["retail_ecommerce"]}; ningún otro dato de esos casos está '
+def neighborhood(key,projectapp_buyer=False,member=None):
+    """Who belongs to a modality: the refined ProjectApp neighborhood only with the ProjectApp buyer on (BAR-25). With
+    NETWORK_PROJECTAPP_BUYER_ENABLED off the classifier and the lead read the neighborhood as before 17/11/2026, word for
+    word (the profile's `neighborhood_before`)."""
+    profile=identity(member).organization_profile
+    item=profile['modalities'][key]['neighborhood']
+    return item if projectapp_buyer else profile['neighborhood_before'].get(key,item)
+
+def offer_text(member=None):
+    """What the organization offers and the only confirmed facts of its cases, for the classifier and the lead."""
+    o,c=offer(member),cases(member)
+    return (f'Oferta de ProjectApp: {o["equipo_dedicado"]}, o {o["proyecto"]}; {o["argumento"]}. Casos reales '
+            f'confirmados: {c["educacion_en_linea"]}, y {c["retail_ecommerce"]}; ningún otro dato de esos casos está '
             'confirmado (ni nombres, ni cifras, ni plazos, ni resultados).')
 
-def network_criteria(projectapp_buyer=False):
-    """Who Gustavo is and the neighborhood criteria per modality, in the classifier's stored vocabulary. Without
+def network_criteria(member=None,projectapp_buyer=False):
+    """Who she is and the neighborhood criteria per modality (hers), in the classifier's stored vocabulary. Without
     `projectapp_buyer` the exact text of before 17/11/2026."""
-    lines=[f'- {to_stored("red",key)}: {neighborhood(key,projectapp_buyer)}.' for key in MODALITIES]
-    extra=['',offer_text()] if projectapp_buyer else []
-    return '\n'.join([f'{IDENTITY} {PROJECTAPP}','',f'Criterios de barrio por modalidad ({VERSION}):',*lines,*extra,'',
-                      f'Ubicación: {LOCATION}'])
+    ident=identity(member)
+    lines=[f'- {to_stored("red",key)}: {neighborhood(key,projectapp_buyer,ident)}.' for key in ident.modalities()]
+    extra=['',offer_text(ident)] if projectapp_buyer else []
+    return '\n'.join([_who(ident),'',f'Criterios de barrio por modalidad ({ident.org("version")}):',*lines,*extra,'',
+                      f'Ubicación: {ident.org("location")}'])
 
-def lead_criteria(projectapp_buyer=False):
-    """One paragraph for the lead agent's `criterios_del_barrio` (Jev reads it as state)."""
-    return (f'{IDENTITY} {PROJECTAPP} Su barrio en LinkedIn: '+'; '.join(neighborhood(key,projectapp_buyer) for key in MODALITIES)+
-            f'. Ubicación: {LOCATION} {NOT_WANTED}'+(f' {offer_text()}' if projectapp_buyer else ''))
+def lead_criteria(member=None,projectapp_buyer=False):
+    """One paragraph for the lead agent's `criterios_del_barrio` (Jev reads it as state), for her."""
+    ident=identity(member)
+    return (f'{_who(ident)} Su barrio en LinkedIn: '+'; '.join(neighborhood(key,projectapp_buyer,ident) for key in ident.modalities())+
+            f'. Ubicación: {ident.org("location")} {ident.org("not_wanted")}'+(f' {offer_text(ident)}' if projectapp_buyer else ''))

@@ -157,6 +157,30 @@ class StartTests(LoginCase):
         self.assertEqual(response.status, 404)
         self.assertEqual(self.procs, [])
 
+    async def test_without_memory_for_a_new_browser_it_does_not_open(self):
+        service = self.client.server.app[SERVICE]
+        service.settings = replace(service.settings, min_memory_mb=1100)  # before the account is first used
+        self.world.memory = 900
+        status, body = await self.start()
+        self.assertEqual((status, body['code']), (503, 'memoria'))
+        self.assertEqual((self.procs, self.browser.launches), ([], 0))
+        self.assertIsNone(service.accounts['prueba'].connecting)  # calls are not held back by a login that never was
+        self.world.memory = 1100
+        status, _ = await self.start()
+        self.assertEqual(status, 201)
+
+    async def test_with_the_account_browser_open_the_login_takes_its_place(self):
+        service = self.client.server.app[SERVICE]
+        service.settings = replace(service.settings, min_memory_mb=1100)
+        self.browser.landing = pagina.FEED
+        response = await self.client.post('/v1/cuentas/prueba/llamadas', json=call(), headers=AUTH)
+        self.assertEqual(response.status, 200)
+        self.browser.landing = LOGIN
+        self.world.memory = 300  # what is left with that browser open: the login closes it first
+        status, _ = await self.start()
+        self.assertEqual(status, 201)
+        self.assertTrue(self.browser.contexts[0].closed)
+
     async def test_another_internet_exit_does_not_open(self):
         self.store().set_egress('proxy-000000000000')
         status, body = await self.start()

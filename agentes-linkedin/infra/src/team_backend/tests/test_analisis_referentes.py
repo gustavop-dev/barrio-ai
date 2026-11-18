@@ -93,7 +93,7 @@ class DecompositionTests(SimpleTestCase):
         self.assertEqual(leaks({k: v for k, v in parts.items() if k != 'nombres'}), [])
 
     def test_every_topic_of_the_growth_models_maps_to_one_of_gustavos_pillars(self):
-        self.assertLessEqual(set(an.PILLAR_OF.values()), set(posicionamiento.PILLARS))
+        self.assertLessEqual(set(an.PILLAR_OF.values()), set(posicionamiento.PILLAR_KEYS))  # fixed in every profile
         self.assertEqual(set(an.PILLAR_OF), set(mc.THEMES))
 
     def test_news_dates_and_releases_are_topical_signals_and_a_title_case_line_is_no_name(self):

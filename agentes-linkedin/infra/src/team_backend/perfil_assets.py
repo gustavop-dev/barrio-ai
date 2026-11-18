@@ -46,7 +46,7 @@ def queue(user,pid,*,expected_revision=None):
     if pending(proposal):
         return Job.objects.filter(kind='prepare_profile_assets',params__proposal=str(pid),state__in=['queued','running']).first()
     refs=gallery.references(user)
-    signature=orquestacion.digest({'references':refs,'brand':content.BRAND_VERSION,
+    signature=orquestacion.digest({'references':refs,'brand':content.brand_version(perfil.identity_of(proposal)),
         'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION,'review':visual.REVIEW_VERSION,'model':connectors_images.EDIT_MODEL,
         'transparent':connectors_images.supports_transparency(),'assets':ASSETS_VERSION})
     jid=uuid.uuid5(perfil.NS,f'{pid}:v{proposal.version}:assets:{signature}')
@@ -169,7 +169,7 @@ def review_context(proposal,refs):
         if row['id']=='banner' and not data['banner'].get('lines'):
             data['banner']=recover_banner(source,latest.get('banner') or {})
         data['sections'].append({k:copy.deepcopy(source[k]) for k in content.SECTION['properties']})
-    ctx=perfil.facts('full')
+    ctx=perfil.facts('full',proposal.owner)  # her facts and her pieces
     ctx.update(section_ids=[s['id'] for s in data['sections']],references=refs,
         snapshot=copy.deepcopy(proposal.context.get('snapshot',{'sections':{},'evidence':[]})),web={'sources':[]},
         adjustment=proposal.context.get('adjustment',''),positioning=copy.deepcopy(proposal.context.get('positioning',{})))
@@ -183,7 +183,7 @@ def review_context(proposal,refs):
     data=content.prepare_draft(data,ctx)
     # Save the recovered layout before measuring/reviewing it, even if a later stage fails.
     perfil._persist(proposal,context=dict(proposal.context,banner=copy.deepcopy(data['banner'])))
-    fit=visual.banner_fit(data['banner'])
+    fit=visual.banner_fit(data['banner'],perfil.identity_of(proposal))
     ctx['render_evidence']=[fit]
     if 'banner' in ctx['section_ids']:
         data['banner']['evidence']=list(dict.fromkeys(data['banner']['evidence']+current_ids+[fit['id']]))
@@ -304,7 +304,13 @@ def repair_section(proposal,runtime,context,verdict,reviewer,writer):
     return context,verdict
 
 
-def run(job,*,reviewer=None,writer=None,image_client=None,image_checker=None):
+def run(job,**kwargs):
+    """prepare_profile_assets job: her profile's assets, with its owner's identity throughout (perfil_marca.owner)."""
+    proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
+    with content.brand.owner(perfil.identity_of(proposal)):
+        return _run(job,**kwargs)
+
+def _run(job,*,reviewer=None,writer=None,image_client=None,image_checker=None):
     proposal=ProfileProposal.objects.select_related('cycle').get(pk=job.params['proposal'],owner=job.owner)
     if proposal.state in ('cancelled','superseded') or proposal.version!=job.params['version']:return proposal
     runtime=None

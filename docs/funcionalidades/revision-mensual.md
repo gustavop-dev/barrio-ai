@@ -5,6 +5,7 @@ El primer lunes de cada mes, el analista de resultados revisa el mes que termin�
 - **Código:** `agentes-linkedin/infra/src/team_backend/revision_mensual.py` (`stats`, `validate`, `run`, `queue`, `generate`, `approve`, `reject`, `revert`, `mark_seen`, `cards`, `overview`, `history`), `revision_views.py`, `rediseno_views.TuTurno` (tarea `estrategia`), `autopiloto._monthly_review`, modelos `MonthlyReview` y `StrategyChange` (migración `0043_revision_mensual`). Interfaz en la app móvil: `movil/src/resultados/RevisionMensual.tsx` y `movil/src/turno/` (la PWA aún no la muestra).
 - **Documentación:** este documento; ciclo `revision_mensual` y arista `cambio_de_estrategia` en [`grafo.yaml`](../../agentes-linkedin/equipos/grafo.yaml).
 - **Entorno de prueba:** Claude parcheado, como en `tests/test_revision_mensual.py`.
+- **Por miembro (organizaciones, fase 4):** una revisión por miembro y mes, con sus posts y su audiencia; los cambios que aprueba van a su orientación. El embudo de oportunidades y la cobertura de la analítica siguen siendo de la organización. Ver [ORG-18](organizaciones.md#org-18).
 
 ## Resumen
 

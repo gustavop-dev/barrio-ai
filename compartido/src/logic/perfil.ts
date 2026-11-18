@@ -15,8 +15,8 @@ export const profileAvailability = (proposal: ProfileProposal) =>
 export function applicationLabel(section: ProfileSection): string {
   if (section.application === 'checked') return 'Comprobado';
   if (section.application === 'applied') return section.id === 'headline'
-    ? 'Aplicado por Gustavo, pendiente de comprobar'
-    : 'Aplicado por Gustavo; comprobación automática no disponible';
+    ? 'Aplicado por ti, pendiente de comprobar'
+    : 'Aplicado por ti; comprobación automática no disponible';
   if (section.decision === 'declined') return 'No lo haré';
   if (section.readiness === 'blocked') return 'Pendiente de información o fundamento';
   if (section.readiness === 'needs_input') return section.copy ? 'Copy preparado; faltan tus datos' : 'Faltan tus datos';

@@ -16,6 +16,7 @@ import { PieceImages } from './calendario/PieceImages';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
 import { RescueActions } from './calendario/Rescue';
+import { PROVISIONAL_VOICE_LABEL } from './turno/model';
 import { ApproveButton, VetoButton } from './calendario/Veto';
 import './calendario/calendario.css';
 
@@ -180,6 +181,7 @@ export function PiezaDetalle() {
       subtitle={
         <span className="pz-status">
           <Badge tone={status.tone}>{status.label}</Badge>
+          {piece.provisional_voice ? <Badge tone="info">{PROVISIONAL_VOICE_LABEL}</Badge> : null}
           {when && when !== 'Día sin pieza' ? <span className="t-detalle">{when}</span> : null}
         </span>
       }

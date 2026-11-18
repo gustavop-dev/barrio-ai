@@ -67,8 +67,13 @@ SIZE_LABELS={'menos_de_20':'menos de 20 personas','20_a_200':'20 a 200 personas'
 SIGNAL_KINDS=('contrata_desarrolladores','lanzamiento_digital','sistema_legado','crecimiento')
 TARGET_SIZE='20_a_200'
 OUT_SIZE='mas_de_1000'
-SIZE_RULE=('Empresa de más de 1000 personas: fuera del comprador de ProjectApp (empresas de 20 a 200 personas, Gustavo '
+SIZE_RULE=('Empresa de más de 1000 personas: fuera del comprador de ProjectApp (empresas de 20 a 200 personas, {decisor} '
            '17/11/2026).')
+
+def size_rule(member=None):
+    """SIZE_RULE with who decided it, for the member whose contact leaves."""
+    from . import identidad
+    return identidad.of(member).render(SIZE_RULE)
 
 def _plain(text):
     text=unicodedata.normalize('NFKD',(text or '').lower())
@@ -337,29 +342,32 @@ CASE_ORIGIN='projectapp:casos'
 def case_key(segment,what):
     return f'projectapp.caso.{segment}.{what}'
 
-def ask_case_questions():
-    """Queue the case questions to Gustavo (TeamQuestion, Tu turno): five per case. Idempotent: preguntas.ask never
-    asks a key that is open, answered, declined or withdrawn, so running it again creates nothing. Returns the
-    questions created now."""
+def ask_case_questions(member=None):
+    """Queue the case questions to a member (`member`, else the only active one; TeamQuestion, Tu turno): five per case.
+    Her answers are hers; the organization's admin shares them with the company (hechos.share) for every member to cite.
+    Idempotent: preguntas.ask never asks a key that is open, answered, declined or withdrawn, so running it again creates
+    nothing. Returns the questions created now."""
     from . import posicionamiento, preguntas
     created=[]
     for segment in CASE_SEGMENTS:
         for what,question,purpose,kind,options in CASE_QUESTIONS:
             item=preguntas.ask(CASE_AGENT,question.format(case=CASE_LABELS[segment]),
-                               f'Caso real de ProjectApp ({posicionamiento.CASES[segment]}). {purpose} Se usa solo con '
+                               f'Caso real de ProjectApp ({posicionamiento.cases()[segment]}). {purpose} Se usa solo con '
                                'compradores del mismo segmento y solo con lo que confirmes.',
-                               case_key(segment,what),suggested_public=True,origin=CASE_ORIGIN,answer_type=kind,options=options)
+                               case_key(segment,what),suggested_public=True,origin=CASE_ORIGIN,answer_type=kind,options=options,
+                               member=member)
             if item is not None:created.append(item)
     return created
 
-def case_facts(segment):
-    """{what: text} of the case answers Gustavo confirmed for public use (uso_publico), plus the base fact of
-    posicionamiento.CASES; a «no» to `cliente` keeps the client unnamed."""
+def case_facts(segment,member=None):
+    """{what: text} of the case answers confirmed for public use (uso_publico): hers (`member`, the one who writes to the
+    buyer) and her organization's company facts (hechos.with_company: a case is the company's once the admin shares it),
+    never another member's; plus the base fact of posicionamiento.CASES. A «no» to `cliente` keeps the client unnamed."""
     from knowledge import memory
-    from . import posicionamiento
-    facts={'caso':posicionamiento.CASES[segment]}
+    from . import hechos, posicionamiento
+    facts={'caso':posicionamiento.cases()[segment]}
     wanted={case_key(segment,what):(what,question.format(case=CASE_LABELS[segment])) for what,question,*_ in CASE_QUESTIONS}
-    for row in memory.latest(True):
+    for row in hechos.with_company(member):
         what,question=wanted.get(row['key'],(None,''));value=row['value']
         if what is None or memory.retired(value) or not memory.publishable(value):continue
         text=str(value.get('texto') or '').strip()
@@ -376,7 +384,9 @@ def case_for(contact):
     mine=[segment_of(contact),*buyer_of(contact).get('also_segments',[])]
     segment=next((s for s in mine if s in CASE_SEGMENTS),None)
     if segment is None:return None
-    return {'segmento':segment,'caso':CASE_LABELS[segment],'hechos':case_facts(segment)}
+    from . import miembros
+    member=miembros.member_for_account(contact.account) if getattr(contact,'account_id',None) else None
+    return {'segmento':segment,'caso':CASE_LABELS[segment],'hechos':case_facts(segment,member)}
 
 def cited_cases(text):
     """The case segments a text cites (says ProjectApp, we or I built it and names its industry)."""
@@ -396,11 +406,13 @@ def case_issues(text,contact):
     if other:
         issues.append('Cita un caso de ProjectApp de otro segmento ('+', '.join(SEGMENT_LABELS[s] for s in other)+
                       '): solo se cita a un comprador del mismo segmento')
-    from . import posicionamiento
-    # The offer's prices (posicionamiento.OFFER) are confirmed facts too; any other figure must come from the case.
-    confirmed=set(re.findall(r'\d+',' '.join([*(allowed or {}).get('hechos',{}).values(),*posicionamiento.OFFER.values()])))
+    from . import identidad, posicionamiento
+    # Who confirms the case's facts: the installation's first person by name, «la organización» for anyone else.
+    ident=identidad.of_account(contact.account) if getattr(contact,'account_id',None) else identidad.of()
+    # The offer's prices (posicionamiento.offer()) are confirmed facts too; any other figure must come from the case.
+    confirmed=set(re.findall(r'\d+',' '.join([*(allowed or {}).get('hechos',{}).values(),*posicionamiento.offer(ident).values()])))
     figures=[m.group(0) for m in FIGURE.finditer(text) if not set(re.findall(r'\d+',m.group(0)))<=confirmed]
-    if figures:issues.append('Cifra del caso que Gustavo no confirmó ('+', '.join(dict.fromkeys(figures))+')')
+    if figures:issues.append(ident.render('Cifra del caso que {decisor} no confirmó (')+', '.join(dict.fromkeys(figures))+')')
     return issues
 
 CASE_RULES='''
@@ -423,7 +435,7 @@ def test_week(now=None):
     if today>TEST_END:return TEST_WEEKS+1
     return min(TEST_WEEKS,(today-TEST_START).days//7+1)
 
-def test_progress(account=None,now=None):
+def test_progress(account=None,now=None,accounts=None):
     """The three-month test: week N of 13, invitations per segment of the ProjectApp buyers (by the segment they
     entered with) and of the other audiences, and whether each one has a sample yet (30 invitations). Read only."""
     from . import comprador, operador
@@ -432,6 +444,7 @@ def test_progress(account=None,now=None):
     start=timezone.make_aware(datetime.combine(TEST_START,time(0)),operador.local_tz())
     journeys=BuyerJourney.objects.filter(invited_at__gte=start,entry=BuyerJourney.Entry.OUTBOUND)
     if account is not None:journeys=journeys.filter(contact__account=account)
+    if accounts is not None:journeys=journeys.filter(contact__account__in=accounts)
     journeys=list(journeys.values('line','segment','accepted_at','replied_at','meeting_at'))
     def row(group):
         invited=len(group)

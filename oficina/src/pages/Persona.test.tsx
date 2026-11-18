@@ -199,6 +199,53 @@ describe('Persona', () => {
     expect(await screen.findByText('Descartada: no volverá a proponerse')).toBeInTheDocument();
   });
 
+  it('alone shows no register; with two members another member\'s person says who attends her and cannot be discarded', async () => {
+    server(contactFixture('c-1'));
+    const { unmount } = renderApp('/personas/c-1');
+    let view = await card();
+    expect(view.queryByTestId('persona-atiende')).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Liberar' })).not.toBeInTheDocument();
+    unmount();
+    server(
+      contactFixture('c-1', {
+        registro: { attended_by: { id: 'm-cto', display_name: 'CTO de prueba', since: '2026-11-17T15:00:00Z' }, mine: false, pass_to: [], excluded: null },
+        next_step: { owner: null, text: 'La atiende CTO de prueba', at: null },
+      }),
+    );
+    renderApp('/personas/c-1');
+    view = await card();
+    expect(view.getByTestId('persona-atiende')).toHaveTextContent('La atiende CTO de prueba');
+    expect(view.queryByRole('button', { name: 'Descartar' })).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: 'Liberar' })).not.toBeInTheDocument();
+    expect(view.queryByRole('button', { name: /Pasar a/ })).not.toBeInTheDocument();
+  });
+
+  it('releases or passes a person she attends, each with a mandatory reason', async () => {
+    const mine = { attended_by: null, mine: true, pass_to: [{ id: 'm-cto', display_name: 'CTO de prueba' }], excluded: null };
+    const api = server(contactFixture('c-1', { registro: mine }), {
+      'POST /api/v1/red/contacts/c-1/liberar': () => ({ body: contactFixture('c-1', { registro: { ...mine, mine: false, pass_to: [] } }) }),
+      'POST /api/v1/red/contacts/c-1/pasar': () => ({ body: contactFixture('c-1') }),
+    });
+    renderApp('/personas/c-1');
+    const view = await card();
+    await userEvent.click(view.getByRole('button', { name: 'Pasar a CTO de prueba' }));
+    let dialog = within(screen.getByRole('dialog', { name: 'Pasar a Lucía Ficticia a CTO de prueba' }));
+    expect(dialog.getByText(/tus notas, mensajes y borradores se quedan contigo/)).toBeInTheDocument();
+    expect(dialog.getByRole('button', { name: 'Pasar' })).toBeDisabled();
+    await userEvent.type(dialog.getByLabelText(/Motivo/), 'Ella habla con CTOs.');
+    await userEvent.click(dialog.getByRole('button', { name: 'Pasar' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/red/contacts/c-1/pasar')).toHaveLength(1));
+    expect(api.find('POST', '/api/v1/red/contacts/c-1/pasar')[0]!.body).toEqual({ member: 'm-cto', reason: 'Ella habla con CTOs.' });
+    expect(await screen.findByText('Ahora la atiende CTO de prueba')).toBeInTheDocument();
+    await userEvent.click(view.getByRole('button', { name: 'Liberar' }));
+    dialog = within(screen.getByRole('dialog', { name: 'Liberar a Lucía Ficticia' }));
+    await userEvent.type(dialog.getByLabelText(/Motivo/), 'No respondió.');
+    await userEvent.click(dialog.getByRole('button', { name: 'Liberar' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/red/contacts/c-1/liberar')).toHaveLength(1));
+    expect(api.find('POST', '/api/v1/red/contacts/c-1/liberar')[0]!.body).toEqual({ reason: 'No respondió.' });
+    expect(await screen.findByText('Liberada: el reparto decide quién la atiende')).toBeInTheDocument();
+  });
+
   it('marks the person as an opportunity with the form prefilled', async () => {
     const api = server(contactFixture('c-1'), {
       'POST /api/v1/oportunidades': ({ body }) => ({ status: 201, body: opportunityFixture('o-9', body as object) }),

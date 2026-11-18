@@ -1,8 +1,8 @@
 // Ajustes › Lo que el equipo sabe de ti (a link to the Sabe tab of Bandeja de entrada, with `facts_count`) and
 // Sesión y Acerca de: who is signed in, «Cerrar sesión» (unregisters the push and revokes this
 // device's token), and the app version (expo-constants).
-import { useAjustes } from '@compartido/api/hooks';
-import { factsLabel } from '@compartido/logic/ajustes';
+import { useAjustes, useYo } from '@compartido/api/hooks';
+import { factsLabel, sessionLabel } from '@compartido/logic/ajustes';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -41,11 +41,12 @@ export function SabeLink() {
 
 export function SesionSection() {
   const session = useSession();
+  const yo = useYo(); // her member and organization (GET /api/v1/yo), never a fixed name
   const [leaving, setLeaving] = useState(false);
   return (
     <Section label="Sesión y Acerca de">
       <Card>
-        <T>{session.user ? `Has entrado como ${session.user.username}.` : 'Sesión abierta.'}</T>
+        <T>{session.user ? sessionLabel(session.user.username, yo.data) : 'Sesión abierta.'}</T>
         <T variant="detalle" soft>
           Oficina: {API_URL.replace(/^https?:\/\//, '')}
         </T>

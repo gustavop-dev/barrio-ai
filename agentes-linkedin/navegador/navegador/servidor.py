@@ -20,7 +20,7 @@ from aiohttp import web
 
 from linkedin_directo.transporte import KINDS, Request
 
-from . import pagina
+from . import memoria, pagina
 from .ajustes import ACCOUNT
 from .conexion import Connections
 from .cuenta import Account, Refused
@@ -37,9 +37,13 @@ SWEEP_EVERY = 60  # seconds between two looks for idle browsers
 
 class Service:
     def __init__(self, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
-                 display=pagina.display_ready, connect=None):
+                 display=pagina.display_ready, memory=memoria.available_mb, connect=None):
         self.settings, self.opener, self.clock, self.sleep, self.display = settings, opener, clock, sleep, display
-        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand, 'display': display}
+        # `opening`: one browser opens at a time across accounts, so the memory guard (Account.room) reads what the
+        # previous one took.
+        self.opening = asyncio.Lock()
+        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand, 'display': display, 'memory': memory,
+                     'opening': self.opening}
         self.accounts = {}
         self.connections = Connections(self, **(connect or {}))
 
@@ -173,8 +177,8 @@ async def health(request):
 
 
 def build(settings, **deps):
-    """The aiohttp app. `deps` (opener, clock, sleep, rand, display, and `connect` for conexion.Connections) replace the
-    browser, time, the screen and the login's processes in the tests."""
+    """The aiohttp app. `deps` (opener, clock, sleep, rand, display, memory, and `connect` for conexion.Connections)
+    replace the browser, time, the screen, the free memory and the login's processes in the tests."""
     app = web.Application(middlewares=[token], client_max_size=1024 * 1024)
     service = Service(settings, **deps)
     app[SERVICE] = service

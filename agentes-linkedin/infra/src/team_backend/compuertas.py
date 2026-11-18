@@ -179,7 +179,8 @@ def attempt_number(piece):
 def retry_left(piece,now):
     """Whether a block of this piece (still being closed) leaves one more attempt for its day: only the autopilot retries."""
     from . import autopiloto
-    return (autopiloto.enabled() and autopiloto.autonomy('CONT-09')!='off' and not piece.second_of_day
+    from . import operador
+    return (autopiloto.enabled() and autopiloto.autonomy('CONT-09',operador.member_of(account=piece.account))!='off' and not piece.second_of_day
             and attempt_number(piece)<day_attempts() and piece.scheduled_for-now>=retry_margin())
 
 def gate_retry(pieces,now,when):

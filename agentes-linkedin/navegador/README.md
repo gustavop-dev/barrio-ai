@@ -25,13 +25,37 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
   que alguien la revise y la reanude. Nunca intenta saltarse nada.
 - **Sin sesión**, `423`: alguien tiene que entrar a mano.
 - **Memoria.** Con el navegador de una cuenta abierto, el contenedor ocupaba en el servidor cerca de **1 GiB** (medido
-  el 13/11/2026 tras un canario de 16 llamadas). El navegador queda abierto. Opcional y apagado:
-  `NAVEGADOR_CIERRE_INACTIVO_MIN` lo cierra tras esos minutos sin llamadas y la siguiente llamada lo abre otra vez. Solo
-  compensa con varias cuentas en un servidor pequeño: el backend llama al menos cada hora (bandeja, comentarios de
-  posts propios, referentes cada 3 h, acciones durante el día), así que casi siempre cerraría para volver a abrir, y
-  cada reapertura es una carga más del inicio que LinkedIn ve. Nunca se cierra con una llamada en curso o esperando. No
-  se usa ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn ve el
-  navegador.
+  el 13/11/2026 tras un canario de 16 llamadas); en 4 GB caben dos cuentas, justas
+  ([deploy/README.md «Memoria del servidor»](../../deploy/README.md#memoria-del-servidor)). Dos guardas:
+  - **No abre un navegador sin memoria.** Antes de lanzar el Chromium de una cuenta mira cuántos MiB quedan libres
+    (`navegador/memoria.py`: el menor entre `MemAvailable` del servidor y lo que queda bajo el tope `mem_limit` del
+    contenedor). Por debajo de `NAVEGADOR_MEMORIA_MINIMA_MB` (en el servidor 1100: ~900 MiB que toma un navegador más
+    ~200 que deben quedar para la base y los workers), la llamada recibe `503` con `code: memoria` y no sale nada; el
+    backend la trata como cualquier «no salió» (`not_sent`): la acción sigue aprobada y se reintenta más tarde, sin
+    pausar la cuenta. Con su navegador ya abierto, una cuenta no vuelve a preguntar. Lo mismo al conectar desde la app
+    una cuenta sin navegador abierto (con él abierto, la conexión lo cierra y ocupa su lugar). Si la memoria no se
+    puede leer, no bloquea. `0` la apaga (el valor por defecto fuera de compose, para la laptop).
+  - **Un navegador se abre a la vez** en todo el servicio, para que el siguiente lea la memoria que tomó el anterior;
+    quien espera su turno más allá del plazo de la llamada recibe `503` («otra cuenta está abriendo su navegador; no
+    salió nada»).
+
+  El navegador queda abierto. Opcional y **apagado** a propósito: `NAVEGADOR_CIERRE_INACTIVO_MIN` lo cierra tras esos
+  minutos sin llamadas y la siguiente llamada lo abre otra vez. Por qué sigue apagado (fase 7 de organizaciones):
+  - no baja el pico: con las dos cuentas trabajando a la vez hacen falta los dos navegadores, y ese pico ya lo cuidan
+    la guarda de arriba y los topes de compose. Solo libera memoria cuando una cuenta está quieta, y el backend llama
+    al menos cada hora (bandeja, comentarios de posts propios, referentes cada 3 h, acciones durante el día): con menos
+    de 60 minutos casi siempre cerraría para volver a abrir;
+  - cada reapertura es una carga más del inicio que LinkedIn ve, y en 1 vCPU el arranque de Chromium (segundos)
+    se come parte de los 35 s de la llamada; si no alcanza, esa llamada recibe `503` y se reintenta (no se pierde);
+  - la sesión sobrevive al cierre solo si Chromium escribe sus cookies al cerrarse limpio (lo mismo que supone la
+    conexión desde la app). Las pruebas (`IdleTests`, con el navegador falso) muestran que nunca se cierra con una
+    llamada en curso o esperando y que la siguiente lo vuelve a abrir; **no** pueden mostrar que Chromium guarde las
+    cookies: eso solo se ve en el servidor.
+
+  Encenderlo (p. ej. `30`) tiene sentido si llegan avisos de memoria baja con una de las cuentas casi siempre quieta;
+  antes, probarlo una semana en el servidor con una cuenta y comprobar que tras cada reapertura sigue la sesión (sin
+  `423`). No se usa ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn
+  ve el navegador.
 - **Sin pantalla**, `503`: el navegador va con ventana sobre una pantalla virtual (Xvfb). Si no responde, no se abre
   nada, la llamada recibe `503` («sin pantalla») y `/health` contesta `503` con `sin_pantalla`. Al arrancar, el
   contenedor borra el candado y el socket que deja la pantalla de la vez anterior (un `restart` conserva `/tmp`), espera
@@ -118,6 +142,7 @@ mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `li
 | `NAVEGADOR_ACEPTACIONES_DIA` | `15` | Aceptaciones por día (RED-04) |
 | `NAVEGADOR_RECARGA_HORAS` | `6` | Cada cuánto se recarga la página de inicio de una cuenta |
 | `NAVEGADOR_CIERRE_INACTIVO_MIN` | vacío (`0`, nunca) | Cerrar el navegador de una cuenta tras estos minutos sin llamadas; ver «Memoria» arriba |
+| `NAVEGADOR_MEMORIA_MINIMA_MB` | `0` (nunca se mira); `1100` en `deploy/compose.prod.yaml` | MiB libres que hacen falta para abrir el navegador de una cuenta; por debajo, `503` con `code: memoria`. Ver «Memoria» arriba |
 | `NAVEGADOR_PROXY` | vacío (`directo`) | Por dónde sale a internet el navegador de cada cuenta: `esquema://servidor:puerto` con `http`, `https` o `socks5`. Sin usuario ni clave en la dirección |
 | `NAVEGADOR_PROXY_CUENTAS` | vacío | Una salida propia por cuenta: `cuenta=esquema://servidor:puerto` o `cuenta=directo`, separadas por comas |
 | `NAVEGADOR_PROXY_USUARIO`, `NAVEGADOR_PROXY_CLAVE` | vacío | Credenciales del proxy, juntas. Solo con `http` o `https` (Chromium no las admite en `socks5`). Se leen del entorno y no se escriben en disco ni en el registro |
@@ -431,7 +456,9 @@ sesión o detenida, termina el día sin llamar a nada.
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
 reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos;
-que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad; la conexión desde la app
+que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad; la guarda de memoria
+(`503` con `code: memoria` sin que salga nada, un navegador abriéndose a la vez, la lectura de `/proc/meminfo` y del
+cgroup con archivos falsos); la conexión desde la app
 con procesos falsos (una a la vez, la vista solo con su clave y solo mientras dura, sus cuatro finales, qué parada
 quita y que la clave no va al registro);
 y el rodaje con un reloj falso (el plan del día, los topes, nada dos veces, las paradas y el resumen sin datos). Corren en CI (job

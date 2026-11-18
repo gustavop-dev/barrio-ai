@@ -118,9 +118,9 @@ tags: [perfil, ajustes, turno]
     id: profile-headline-applied
 - scrollUntilVisible:
     element:
-      text: 'Aplicado por Gustavo, pendiente de comprobar.*'
+      text: 'Aplicado por ti, pendiente de comprobar.*'
     direction: UP
     centerElement: true
-- assertVisible: 'Aplicado por Gustavo, pendiente de comprobar.*'
+- assertVisible: 'Aplicado por ti, pendiente de comprobar.*'
 - assertNotVisible: '^Comprobado$'
 - takeScreenshot: 18-perfil-02-aplicado-no-comprobado

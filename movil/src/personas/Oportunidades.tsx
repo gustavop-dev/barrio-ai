@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateOportunidad } from '@compartido/api/hooks';
 import { OPPORTUNITY_BOARD_KEY, useOpportunityBoard } from '@compartido/api/personas';
 import { OPPORTUNITY_STAGES, type Opportunity, type OpportunityStage } from '@compartido/api/types';
-import { closedMeta, movedToast, nextActionText, opportunityName, stageDays, stageGroups, undoFailedToast } from '@compartido/logic/barrio';
+import { broughtByText, closedMeta, movedToast, nextActionText, opportunityName, stageDays, stageGroups, undoFailedToast } from '@compartido/logic/barrio';
 import { MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from '@compartido/logic/personas';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
@@ -64,6 +64,7 @@ interface CardProps {
 
 function CardBody({ opportunity, onMove, onEdit, ghost = false }: CardProps) {
   const next = nextActionText(opportunity);
+  const brought = broughtByText(opportunity);
   const name = opportunityName(opportunity);
   const days = stageDays(opportunity);
   return (
@@ -75,6 +76,11 @@ function CardBody({ opportunity, onMove, onEdit, ghost = false }: CardProps) {
           {opportunity.company ? (
             <T variant="detalle" soft>
               {opportunity.company}
+            </T>
+          ) : null}
+          {brought ? (
+            <T variant="detalle" soft>
+              {brought}
             </T>
           ) : null}
         </View>

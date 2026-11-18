@@ -4,6 +4,8 @@ Propuestas que Gustavo aplica por su cuenta en LinkedIn. `perfil` coordina el ci
 
 El ciclo `perfil_periodico` está implementado en fase 8: dueño Perfil, especialistas como herramientas y presupuesto agregado de 10 USD mediante 3b. Las consultas manuales de biblioteca siguen disponibles. El equipo **no edita LinkedIn**; entrega un paquete privado versionado para aplicación manual. Se conservan los seis addenda y la marca del tablero. **CI, QA, despliegue y carga privada pendientes de Claude**; «funciona» describe la implementación, no una ejecución realizada en este worktree. Véase [verificación de fase 8](../arquitectura/fase8-verificacion.md).
 
+- **Por miembro (organizaciones, fase 4):** el ciclo del perfil corre para cada miembro activo (`perfil.schedule` con `miembros.each_member`), con sus hechos y su orientación. La plantilla de la estrategia y los pilares siguen siendo de la organización (`Organization.profile`); el plan semanal de cada miembro los usa. Ver [ORG-18](organizaciones.md#org-18).
+
 ## Resumen
 
 | ID | Función | Dónde | Estado |

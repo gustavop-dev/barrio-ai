@@ -202,7 +202,7 @@ def _reserve(account,contact,now):
     """Count a read before making it, under the operator's policy lock; a person known only by a public id also takes a
     read from the shared profile allowance (OPERATOR_PROFILE_READ_DAILY_LIMIT)."""
     with transaction.atomic():
-        operador.policy_lock()
+        operador.policy_lock(operador.member_of(account=account))
         if _reads_today(account,now)>=read_cap():raise ReadCapReached(f'Tope diario de lecturas de compradores alcanzado ({read_cap()}).')
         if not MEMBER_ID.fullmatch(contact.provider_user_id or ''):
             try:operador.reserve_profile_read(account,'buyer_posts',now)
@@ -333,7 +333,7 @@ def used(account,now):
 def rooms(account,now,available):
     """Slots left today per group. A group with nothing to comment now (not in `available`) passes its slots to the
     next group that has something, in order and wrapping around. The overall cap still rules (operador.capacity_left)."""
-    quota=quotas(operador.limits(now).get('INT-03',(0,0))[0]);spent=used(account,now)
+    quota=quotas(operador.limits(now,operador.member_of(account=account)).get('INT-03',(0,0))[0]);spent=used(account,now)
     room={g:max(0,quota[g]-spent[g]) for g in GROUPS}
     if not any(g in available for g in GROUPS):return room
     for i,group in enumerate(GROUPS):
@@ -382,8 +382,13 @@ def draft_inputs(post):
         if bridge is not None:return sin_posts.draft_inputs(post,bridge)  # phase 5: the bridge's own purpose
     return {'autor':{'nombre':post.author_name,'titular':(contact.headline if contact else '')[:300]},
             'comentarios_del_equipo_en_sus_posts':journey.warm_comments if journey else 0,
-            'para_que':'Posible cliente de Gustavo al que todavía no le escribió: el comentario es para que lo reconozca antes de '
-                       'la invitación, nunca para venderle.'}
+            'para_que':_of(post).render('Posible cliente de {nombre} al que todavía no le escribió: el comentario es para que '
+                                        'lo reconozca antes de la invitación, nunca para venderle.')}
+
+def _of(post):
+    """The Identity of the member whose account comments (her name in what the drafter reads, never another's)."""
+    from . import identidad
+    return identidad.of_account(post.account)
 
 # --------------------------------------------------------------------------- D. when the warm-up is done
 
@@ -509,14 +514,15 @@ def sweep(account,now=None):
             BuyerJourney.objects.filter(pk=journey.pk).update(next_at=at);out['proximo']+=1
     return out
 
-def old_invitations(days=21,account=None,now=None):
+def old_invitations(days=21,account=None,now=None,contacts=None):
     """Invitations still pending after `days` (1–365), oldest first, for Gustavo to withdraw by hand if he wants: the
-    team never withdraws nor sends one again (linkedin_directo/permitidas.py). Read-only."""
+    team never withdraws nor sends one again (linkedin_directo/permitidas.py). Read-only. `contacts`: the people to look
+    at (the view passes the member's own, alcance.de); every contact when omitted."""
     try:days=int(days)
     except (TypeError,ValueError):raise ValueError('dias debe ser un número entre 1 y 365.') from None
     if not 1<=days<=365:raise ValueError('dias debe ser un número entre 1 y 365.')
     now=now or timezone.now()
-    rows=Contact.objects.filter(stage='invited',invited_at__lte=now-timedelta(days=days)).select_related('buyer_journey').order_by('invited_at')
+    rows=(contacts if contacts is not None else Contact.objects.all()).filter(stage='invited',invited_at__lte=now-timedelta(days=days)).select_related('buyer_journey').order_by('invited_at')
     if account is not None:rows=rows.filter(account=account)
     out=[]
     for c in rows:

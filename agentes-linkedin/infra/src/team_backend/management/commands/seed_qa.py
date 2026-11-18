@@ -5,6 +5,11 @@ every state, pending proposals, people at every stage, opportunities, referents,
 notifications, captures, gallery photos, results history, a weekly summary and spend rows. With --analitica, also a
 «directo» account with LinkedIn's analytics (flow 08-resultados-linkedin).
 
+Organizations (docs/plan-organizaciones.md): the organization ProjectApp with `qa` as its only member (admin), who owns
+every account of the world. With --segundo-miembro, a second active member, `qa-cto` («CTO de prueba», same password),
+with her own simulated accounts (browser and official API) and nothing else yet: phases 2–7 build on it. Off by default,
+because with two active members every route that does not say whose yet stops (miembros.MiembroRequerido).
+
 Idempotent in the strong sense: every run first empties the QA world and builds it again, so each Maestro flow starts
 from the same state whatever the previous one changed. The `qa` user and its device logins survive, so the app stays
 signed in between flows. Fixed ids (uuid5) and texts; times are relative to now (T = today in OPERATOR_TIMEZONE).
@@ -31,11 +36,12 @@ from team_backend.analitica import utc_today
 from team_backend.authentication import digest
 from team_backend.models import (ActionExecution, ActionProposal, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
                                  AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
-                                 Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential,
-                                 Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Orientation, PostMetric,
+                                 Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential, Member,
+                                 Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Organization, Orientation, PostMetric,
                                  Referent, TeamQuestion, WeeklySummary, Worker, PieceImage, ProfileProposal, ProfileAsset, ProfileSchedule)
 
 QA_USERNAME='qa'
+QA_CTO_USERNAME='qa-cto'  # --segundo-miembro
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
 NS=uuid.UUID('0ff1ce00-9a5e-4d00-8e00-00000000c1a0')
 EXTRA_DEVICE='Pixel 7 de Gustavo (QA)'
@@ -121,6 +127,8 @@ class Command(BaseCommand):
         parser.add_argument('--referentes-mensual',action='store_true',help='Escenario OBS/TUR del flujo 19, con cinco main protegidos.')
         parser.add_argument('--perfil-capturas',action='store_true',help='Nota ambigua de perfil procesada como pregunta para el flujo 18-perfil.')
         parser.add_argument('--analitica',action='store_true',help='Cuenta «directo» con analítica de LinkedIn inventada para el flujo 08-resultados-linkedin.')
+        parser.add_argument('--segundo-miembro',action='store_true',help='Un segundo miembro activo (qa-cto, «CTO de prueba») con sus '
+                            'propias cuentas simuladas, para probar con dos personas (fases 2–7 de organizaciones).')
 
     def handle(self,**options):
         self.guard()
@@ -129,6 +137,7 @@ class Command(BaseCommand):
             self.user=self.qa_user()
             self.robot=User.objects.filter(username='barrio-autopiloto').first() or self.user
             self.wipe()
+            self.members(second=options.get('segundo_miembro'))
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
             self.image_examples();self.profile();self.spend();self.settings();self.devices();self.office()
@@ -140,6 +149,7 @@ class Command(BaseCommand):
                 from team_backend.models import ReferentControl
                 ReferentControl.objects.create(account=self.fake,issue='Identificar los cinco main iniciales.')
             self.community()
+            if self.cto is not None:Member.objects.filter(pk=self.cto.pk).update(active=True)  # the world is built: she joins
         if options.get('perfil_capturas'):
             # This flow has no worker. Exercise the real routing after committing
             # the seed (knowledge memory uses a separate connection), without push.
@@ -151,7 +161,8 @@ class Command(BaseCommand):
                 result=capturas.process(capture.pk)
             if result.state!=Capture.State.NOTED or result.routed_to.get('kind')!='perfil_aclaracion':
                 raise CommandError('La nota ambigua de perfil no produjo una pregunta en la Bandeja.')
-        self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
+        second=f' y «{QA_CTO_USERNAME}» (segundo miembro)' if options.get('segundo_miembro') else ''
+        self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}»{second} (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
 
@@ -180,7 +191,7 @@ class Command(BaseCommand):
         for photo in GalleryPhoto.objects.all():photo.image.delete(save=False)
         for capture in Capture.objects.exclude(audio=''):capture.audio.delete(save=False)
         models=[ProfileAsset,ProfileProposal,ProfileSchedule,ActionExecution,ActionProposal,PostMetric,PieceImage,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
-                ObservedPost,Referent,ConnectorAccount,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
+                ObservedPost,Referent,ConnectorAccount,Member,Organization,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
         tables=', '.join(connection.ops.quote_name(m._meta.db_table) for m in models)
         with connection.cursor() as cursor:
             # Deferred foreign keys with pending checks in this transaction would make TRUNCATE fail: check them now.
@@ -196,12 +207,36 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ accounts, referents, posts, people
 
+    def members(self,second=False):
+        """ProjectApp with `qa` as its admin member; with `second`, also qa-cto (active, «CTO»), her accounts made in accounts()."""
+        organization=Organization.objects.create(id=uid('organization:projectapp'),name='ProjectApp',slug='projectapp')
+        self.member=Member.objects.create(id=uid('member:qa'),organization=organization,user=self.user,display_name='Gustavo',
+                                          role='Fundador',is_admin=True,created_at=self.ago(days=90))
+        self.cto=None
+        if second:
+            user,_=User.objects.get_or_create(username=QA_CTO_USERNAME)
+            user.is_superuser=False;user.is_staff=False;user.is_active=True;user.email='qa-cto@example.invalid'
+            user.set_password(os.environ.get('QA_PASSWORD') or QA_PASSWORD_DEFAULT);user.save()
+            from django.contrib.auth.models import Group
+            user.groups.add(*Group.objects.filter(name='revision'))  # bootstrap_local's groups, when present
+            # Inactive while the world is built: every piece, question, capture and summary of the seed is qa's (phase 4:
+            # a content row says whose it is, never «the» member among two); handle() activates her at the end.
+            self.cto=Member.objects.create(id=uid('member:qa-cto'),organization=organization,user=user,display_name='CTO de prueba',
+                                           role='CTO',created_at=self.ago(days=1),active=False)
+
     def accounts(self):
         # «running» is the status of a working account: Ajustes shows it as «Conectada» (AJU-02).
         self.fake=ConnectorAccount.objects.create(id=uid('account:simulada'),provider='fake',external_account_id='qa-simulada-gustavo',
-                                                  label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1))
+                                                  label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1),
+                                                  member=self.member)
         self.official=ConnectorAccount.objects.create(id=uid('account:official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-gustavo',
-                                                      label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1))
+                                                      label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1),
+                                                      member=self.member)
+        if self.cto is not None:
+            ConnectorAccount.objects.create(id=uid('account:cto-simulada'),provider='fake',external_account_id='qa-simulada-cto',
+                                            label='LinkedIn del CTO (simulado)',status='running',last_checked_at=self.ago(hours=1),member=self.cto)
+            ConnectorAccount.objects.create(id=uid('account:cto-official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-cto',
+                                            label='API oficial del CTO (simulada)',status='OK',last_checked_at=self.ago(hours=1),member=self.cto)
 
     def community(self):
         """Synthetic public-only study for LEC; no connector/model call or paid job."""
@@ -211,7 +246,7 @@ class Command(BaseCommand):
         study=CommunityStudy.objects.create(id=uid('community:study'),account=self.fake,period=period,
             window_start=end-timedelta(days=90),window_end=end,created_at=self.now,
             completed_at=self.now,expires_at=self.now+timedelta(days=180),state='partial',
-            positioning_version=posicionamiento.VERSION,
+            positioning_version=posicionamiento.version(self.member),
             coverage={'sample_size':6,'potential':9,'since':(end-timedelta(days=3)).isoformat(),
                       'limitations':cm.LIMITATIONS})
         for i in range(6):
@@ -556,6 +591,7 @@ class Command(BaseCommand):
         """Add image examples to existing pieces; keep the old gallery and inbox fixtures intact."""
         from team_backend import imagenes, infografias
         from team_backend.connectors_images import FakeImageConnector
+        name=infografias.author(self.member)  # the QA pieces are qa's: never «whose?» with a second member
         for piece in self.piece.values():
             if piece.state=='ready':imagenes.fallback(piece,'Tarjeta de muestra QA, sin proveedores')
         piece=self.piece['manana'];photo=GalleryPhoto.objects.get(id=uid('photo:elegida'))
@@ -575,10 +611,10 @@ class Command(BaseCommand):
         photo.capture=capture;photo.save(update_fields=['capture'])
         piece=self.piece['aprobacion']
         for row in piece.images.all():row.image.delete(save=False);row.delete()
-        slide=dict(infografias.fallback(),template='pasos',highlight='',label='WORKFLOW',title='The decision comes first',
+        slide=dict(infografias.fallback(name),template='pasos',highlight='',label='WORKFLOW',title='The decision comes first',
             subtitle='',steps=['Name the decision','Compare the options','Record the reason'],
             alt='Three steps: name the decision, compare the options, and record the reason. Make the decision explicit.')
-        raw=infografias.render(slide);review=FakeImageConnector().check([raw],{'design':slide})
+        raw=infografias.render(slide,name=name);review=FakeImageConnector().check([raw],{'design':slide})
         row=PieceImage(id=uid('image:infografia'),piece=piece,kind='infografia',width=1080,height=1080,
             sha256=imagenes.sha(raw),alt=slide['alt'],template='pasos',data=slide,review=review)
         row.image.save('infografia-qa.png',ContentFile(raw),save=False);row.save()
@@ -587,19 +623,19 @@ class Command(BaseCommand):
         # gains four deterministic slides (cover, two interiors, close), with a tagged private PDF.
         piece=self.piece['publicada8']
         for row in piece.images.all():row.image.delete(save=False);row.delete()
-        slides=[dict(infografias.fallback(),template='portada',label='DECISIONS',title='Make the decision explicit',
+        slides=[dict(infografias.fallback(name),template='portada',label='DECISIONS',title='Make the decision explicit',
                      subtitle='A small guide to comparing options.',highlight='',
                      alt='Cover: Make the decision explicit. A small guide to comparing options.'),
-                dict(infografias.fallback(),template='pasos',label='WORKFLOW',title='Compare the options',
+                dict(infografias.fallback(name),template='pasos',label='WORKFLOW',title='Compare the options',
                      subtitle='',highlight='',steps=['Name the decision','Compare the options','Record the reason'],
                      alt='Three steps: name the decision, compare the options, and record the reason.'),
-                dict(infografias.fallback(),template='numero',label='WORKFLOW',title='Keep a reason with each decision',
+                dict(infografias.fallback(name),template='numero',label='WORKFLOW',title='Keep a reason with each decision',
                      subtitle='',highlight='',number='3',unit='steps',
                      alt='Three steps in this guide. Keep a reason with each decision.'),
-                dict(infografias.fallback(),template='cierre',label='YOUR TURN',title='Which decision needs a reason?',
+                dict(infografias.fallback(name),template='cierre',label='YOUR TURN',title='Which decision needs a reason?',
                      subtitle='Start with one question.',highlight='',
                      alt='Closing question: Which decision needs a reason? Start with one question.')]
-        pngs=[infografias.render(slide,i,len(slides),True) for i,slide in enumerate(slides,1)]
+        pngs=[infografias.render(slide,i,len(slides),True,name=name) for i,slide in enumerate(slides,1)]
         review=FakeImageConnector().check(pngs,{'design':{'slides':slides}})
         for i,(slide,raw) in enumerate(zip(slides,pngs),1):
             row=PieceImage(id=uid(f'image:carrusel:{i}'),piece=piece,kind='carrusel',position=i,width=1080,height=1350,
@@ -652,7 +688,8 @@ class Command(BaseCommand):
         range), 120 daily follower captures with today's audience, eight posts (two of them the published pieces) and
         the imports that brought them, the last about five hours ago. Invented figures only."""
         account=ConnectorAccount.objects.create(id=uid('account:directo'),provider='directo',external_account_id='qa-directo-gustavo',
-                                                label='LinkedIn directo (simulado)',status='running',last_checked_at=self.ago(hours=1))
+                                                label='LinkedIn directo (simulado)',status='running',last_checked_at=self.ago(hours=1),
+                                                member=self.member)
         today=utc_today(self.now);yesterday=today-timedelta(days=1);fetched=self.ago(hours=5)
         gap={yesterday-timedelta(days=back) for back in (57,58,59)}
         days=[]
@@ -742,7 +779,7 @@ class Command(BaseCommand):
         orientation.text='Habla a fundadores de startups latinoamericanas en etapa temprana. Evita el tono de vendedor.'
         orientation.updated_by=self.user;orientation.updated_at=self.ago(days=12);orientation.save()
         control=OperatorControl.current();control.paused=False;control.reason='';control.updated_by=None;control.updated_at=None;control.save()
-        preference=OfficePreference.current();preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
+        preference=OfficePreference.of(self.user);preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
         preference.updated_by=None;preference.updated_at=None;preference.save()
 
     def office(self):

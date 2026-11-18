@@ -3,7 +3,7 @@
 // Pure: shared by the PWA and the native app, each draws it with its own components.
 import type { AjustesConPush, PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
+import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary, Yo } from '../api/types';
 import { formatTime, formatUsd, timeAgo } from './format';
 import type { Tone } from './tone';
 
@@ -20,10 +20,29 @@ export const AJUSTES_SECTIONS = [
   { id: 'sesion', label: 'Sesión y Acerca de' },
 ] as const;
 
-export type AjustesSection = (typeof AJUSTES_SECTIONS)[number]['id'];
+/** Organizaciones, phase 7: her own profile and voice (every member), and the organization (only its admin). They go
+ *  after Notificaciones, before «Lo que el equipo sabe de ti». Without a member (an installation without members) none. */
+export const MEMBER_SECTIONS = [
+  { id: 'perfil', label: 'Mi perfil' },
+  { id: 'voz', label: 'Mi voz' },
+] as const;
+export const ADMIN_SECTIONS = [{ id: 'organizacion', label: 'Organización' }] as const;
+
+const ALL_SECTIONS = [...AJUSTES_SECTIONS, ...MEMBER_SECTIONS, ...ADMIN_SECTIONS] as const;
+
+export type AjustesSection = (typeof ALL_SECTIONS)[number]['id'];
 
 export function isAjustesSection(value: unknown): value is AjustesSection {
-  return AJUSTES_SECTIONS.some((section) => section.id === value);
+  return ALL_SECTIONS.some((section) => section.id === value);
+}
+
+/** The sections this person sees, in order: the member ones only for a member, Organización only for its admin. */
+export function ajustesSections(yo: Pick<Yo, 'member' | 'is_admin'> | null | undefined): { id: AjustesSection; label: string }[] {
+  const extra: { id: AjustesSection; label: string }[] = [];
+  if (yo?.member) extra.push(...MEMBER_SECTIONS);
+  if (yo?.member && yo.is_admin) extra.push(...ADMIN_SECTIONS);
+  const at = AJUSTES_SECTIONS.findIndex((section) => section.id === 'sabe');
+  return [...AJUSTES_SECTIONS.slice(0, at), ...extra, ...AJUSTES_SECTIONS.slice(at)];
 }
 
 /** The backend does not have this endpoint yet (404/501): DISENO-VISTAS «Aún no disponible», never an error. */
@@ -320,3 +339,17 @@ export function factsLabel(count: number | null | undefined): string {
 
 export const ART_CREDIT = 'Arte: LimeZu — Modern Interiors';
 export const ART_CREDIT_URL = 'https://limezu.itch.io/moderninteriors';
+
+// ---------------------------------------------------------------- Sesión: quién soy (organizaciones, phase 5)
+
+/**
+ * «Has entrado como Ana (CTO) · ProjectApp.»: the name, role and organization of GET /api/v1/yo. Without a member (a
+ * user who is not one, an installation without organizations) or before /yo answers, the username, as before.
+ */
+export function sessionLabel(username: string, yo: Yo | null | undefined): string {
+  const member = yo?.member;
+  if (!member) return `Has entrado como ${username}.`;
+  const role = member.role ? ` (${member.role})` : '';
+  const organization = yo?.organization ? ` · ${yo.organization.name}` : '';
+  return `Has entrado como ${member.display_name}${role}${organization}.`;
+}

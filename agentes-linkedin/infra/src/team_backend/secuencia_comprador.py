@@ -38,7 +38,7 @@ from datetime import timedelta
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import comprador, operador
+from . import alcance, comprador, identidad, operador, voz
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Conversation
 
 log=logging.getLogger(__name__)
@@ -209,18 +209,18 @@ def repeats(text,earlier):
         if any(' '.join(words[i:i+REPEAT_RUN]) in runs for i in range(len(words)-REPEAT_RUN+1)):return True
     return False
 
-def text_issues(number,text,previous=(),reference=''):
+def text_issues(number,text,previous=(),reference='',member=None):
     """The fixed rules of follow-up `number` (BIB-09-secuencia-mensajes), checked in code before the lead: the first
     message's (respuestas.dm_text_issues: three lines and 500 characters, no links, no selling, no asking for minutes or
     a meeting, no formulas, her language, no private leaks, no invented experience) and, per number: M2 does not say an
     earlier message again and does not apologise; M3 asks whether she is the right person or who handles it; M4 asks
-    for nothing and does not beg. `previous`: the texts already sent to her. Reads only Gustavo's public and private
-    blocks (guardas.blocks, through the first message's rules)."""
+    for nothing and does not beg. `previous`: the texts already sent to her. Reads only the public and private blocks of
+    `member`, the owner of the account (guardas.text_checks, through the first message's rules)."""
     text=(text or '').strip()
     if not text:return []
     from .respuestas import dm_text_issues
     label=f'Mensaje {number}'
-    issues=[i.replace('Primer mensaje',label) for i in dm_text_issues(text,reference)]
+    issues=[i.replace('Primer mensaje',label) for i in dm_text_issues(text,reference,member)]
     earlier=[previous] if isinstance(previous,str) else list(previous or ())
     if repeats(text,earlier):issues.append(f'{label} que repite un mensaje anterior (el mismo dolor va contado de otra forma)')
     if number==2 and APOLOGY.search(text):issues.append('Mensaje 2 que se disculpa por escribir de nuevo')
@@ -233,23 +233,24 @@ def text_issues(number,text,previous=(),reference=''):
 # --------------------------------------------------------------------------- the drafter's part
 
 JOBS={2:'Mensaje 2 de 4: nombra el mismo dolor del primero, contado de otra forma, con una historia corta (un caso típico, '
-        'sin atribuirle a Gustavo experiencias que no estén en public_facts). No repitas el primer mensaje ni te disculpes por '
+        'sin atribuirle a {nombre} experiencias que no estén en public_facts). No repitas el primer mensaje ni te disculpes por '
         'escribir de nuevo; puedes reconocer, sin reproche, que quizá no pudo responder.',
       3:'Mensaje 3 de 4: ya no repitas el dolor. Pregunta si quizá no es la persona indicada y quién se encarga de esto en su '
         'empresa (no «quién me puede ayudar»), para llegar a esa persona. Una sola pregunta.',
       4:'Mensaje 4 de 4, el último: cierra con elegancia. Agradece su tiempo, asume que quizá no es el momento o que ya lo '
         'tienen resuelto y deja la puerta abierta. No preguntes, no pidas nada y no ruegues.'}
 
-SYSTEM='''Eres el agente de Relaciones y comunidad de Barrio AI. Redactas un SEGUIMIENTO privado que Gustavo le enviaría a un
+SYSTEM='''Eres el agente de Relaciones y comunidad de Barrio AI. Redactas un SEGUIMIENTO privado que {nombre} le enviaría a un
 posible cliente (un founder) que aceptó su invitación en LinkedIn y no respondió a sus mensajes anteriores. El equipo nunca
-lo envía: Gustavo lo copia y lo envía él mismo desde LinkedIn. Cada mensaje de la secuencia tiene un trabajo distinto; el
-de este está en `seguimiento.trabajo`. `seguimiento.anteriores` son los mensajes que Gustavo ya le envió: no los repitas.
+lo envía: {nombre} lo copia y lo envía él mismo desde LinkedIn. Cada mensaje de la secuencia tiene un trabajo distinto; el
+de este está en `seguimiento.trabajo`. `seguimiento.anteriores` son los mensajes que {nombre} ya le envió: no los repitas.
 
 Como mucho tres líneas y 500 caracteres. Sin enlaces, correos, teléfonos ni hashtags; sin pedir minutos, llamadas ni
 reuniones; sin fórmulas como «gracias por conectar», «quedo atento» o «espero que estés bien»; sin vender ni decir a quién
-ayuda Gustavo.'''
+ayuda {nombre}.'''
 
 def system(number):
+    """The template of follow-up `number` ({nombre}: mensajes_comprador.system_for renders it for the member)."""
     from .mensajes_comprador import COMMON_RULES
     return SYSTEM+'\n'+JOBS[number]+COMMON_RULES
 
@@ -265,9 +266,9 @@ def inputs(contact,journey,facts,at,number):
     state=comprador._fold(comprador._touches(journey));messages=sent(state)
     earlier=previous(journey,state,messages)
     last=messages[-1].at if messages else None
-    data['momento']={'que_es':f'Mensaje {number} de 4. No respondió a los anteriores; Gustavo lo envía a mano.',
+    data['momento']={'que_es':identidad.of_account(contact.account).render(f'Mensaje {number} de 4. No respondió a los anteriores; {{nombre}} lo envía a mano.'),
                      'dias_desde_el_anterior':round((at-last).total_seconds()/86400,1) if last else None}
-    data['seguimiento']={'numero':number,'de':LAST,'trabajo':JOBS[number],'anteriores':earlier}
+    data['seguimiento']={'numero':number,'de':LAST,'trabajo':identidad.of_account(contact.account).render(JOBS[number]),'anteriores':earlier}
     # BAR-25: message 2 tells the pain with a short story; with the ProjectApp buyer on, the case of her segment (only
     # its confirmed facts) may be that story (projectapp.case_for: None for any other buyer).
     from . import projectapp
@@ -408,13 +409,13 @@ BODIES={2:'No ha respondido a tu primer mensaje. El equipo te dejó el mensaje 2
 def label(number):
     return f'Seguimiento {number} de {LAST}'
 
-def cards(card,now=None):
-    """Tu turno: the follow-ups ready for Gustavo, the same card as the first message's («Hecho, le escribí», «No
+def cards(card,now=None,member=None):
+    """Tu turno (hers only, alcance.de): the follow-ups ready for Gustavo, the same card as the first message's («Hecho, le escribí», «No
     escribirle», same endpoint) with its label «Seguimiento n de 4» and what he sent last. Never when she replied, when
     her journey moved on, or without an inbox read in the last CARD_INBOX_MAX_AGE (her reply could be there)."""
     if not enabled():return []
     now=now or timezone.now()
-    rows=(BuyerDraft.objects.select_related('contact__buyer_journey','contact__account')
+    rows=(alcance.de(BuyerDraft.objects.all(),member).select_related('contact__buyer_journey','contact__account')
           .filter(kind=MESSAGE,number__gt=1,state=State.READY).filter(Q(show_at__isnull=True)|Q(show_at__lte=now))
           .order_by('show_at','created_at'))
     out=[];inbox={}
@@ -436,7 +437,7 @@ def cards(card,now=None):
         sent_label=f'Tu mensaje {last.get("numero",row.number-1)}'+(f' (hace {ago} días)' if ago is not None else '')
         out.append(card(f'dm:{row.id}','mensaje',f'{label(row.number)} para {name}',body,actions,agent='relaciones_comunidad',
                         priority='importante',created_at=row.show_at or row.decided_at,
-                        message={'text':row.text,'text_label':label(row.number),'comment':(last.get('texto') or '')[:600],
+                        message={**voz.marca(row),'text':row.text,'text_label':label(row.number),'comment':(last.get('texto') or '')[:600],
                                  'comment_label':sent_label,'reply':'','reply_label':'','piece_id':'','topic':'','origin':'recorrido',
                                  'person':{'id':str(contact.id),'display_name':name,'headline':contact.headline,
                                            'profile_url':contact.profile_url,'role':(contact.classification or {}).get('role')}}))

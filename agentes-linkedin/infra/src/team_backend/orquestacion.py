@@ -313,9 +313,10 @@ class Runtime:
             row.save(update_fields=['state', 'stop_reason', 'needs_attention', 'updated_at'])
             self.audit('stopped', reason=reason)
             if business:
-                from .notificaciones import avisar
+                from .notificaciones import avisar, de_usuario
+                whose = de_usuario(row.owner)  # her cycle; the machine's own cycles are everyone's
                 transaction.on_commit(lambda: avisar('cycle_stopped', 'El ciclo se ha detenido',
-                    'Se conserva el progreso. Motivo: ' + reason, ref=f'cycle:{self.id}', link='/tu-turno'))
+                    'Se conserva el progreso. Motivo: ' + reason, ref=f'cycle:{self.id}', link='/tu-turno', member=whose))
 
     def audit(self, event, **metadata):
         from .jobs import audit
@@ -610,8 +611,9 @@ def recover_job(job):
     if pending:
         from .jobs import audit
         audit(None,'cycle.stopped',row.id,reason='uncertain',job_id=str(job.id))
-        from .notificaciones import avisar
-        transaction.on_commit(lambda:avisar('cycle_stopped','Ciclo interrumpido',REASONS['uncertain'],ref=f'cycle:{row.id}'))
+        from .notificaciones import avisar, de_usuario
+        whose=de_usuario(row.owner)
+        transaction.on_commit(lambda:avisar('cycle_stopped','Ciclo interrumpido',REASONS['uncertain'],ref=f'cycle:{row.id}',member=whose))
     return not pending and row.state != 'stopped'
 
 

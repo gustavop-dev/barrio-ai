@@ -266,3 +266,16 @@ export function normalize(text: string | null | undefined): string {
     .replace(/[̀-ͯ]/g, '')
     .toLocaleLowerCase(LOCALE);
 }
+
+/** The badge of a draft written in her provisional voice (organizaciones, phase 5). */
+export const PROVISIONAL_VOICE_LABEL = 'Voz provisional';
+
+/** Whether the card's draft (an approval or a suggested message) was written in her provisional voice. */
+export function provisionalVoice(card: TurnoCard): boolean {
+  return Boolean(card.approval?.provisional_voice || card.message?.provisional_voice);
+}
+
+/** The heading of an approval's note (organizaciones, phase 7): a RED-02 invitation carries the note it sends. */
+export function approvalNoteLabel(approval: Pick<NonNullable<TurnoCard['approval']>, 'capability'>): string {
+  return approval.capability === 'RED-02' ? 'Nota de la invitación' : 'Nota';
+}

@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, editorial, operador, rescate, respuestas, resultados, imagenes
+from . import alcance, capturas, editorial, operador, rescate, respuestas, resultados, imagenes, voz
 from .jobs import enqueue_operation
 from .models import EditorialPiece, PieceImage
 from .capturas_views import FileView, serve
@@ -14,9 +14,11 @@ from .permissions import require
 from .serializers import ActionOutput, JobOutput, OptionalRequestInput, OverrideInput
 from .exceptions import Conflict
 
+from .voz import marca as provisional  # «Voz provisional» on her drafts (organizaciones, phase 5)
+
 def summary(piece,action):
     brief=piece.brief or {};execution=getattr(action,'execution',None) if action is not None else None
-    return {'id':str(piece.id),'slot_date':piece.slot_date,'scheduled_for':piece.scheduled_for,'state':piece.state,
+    return {**provisional(piece),'id':str(piece.id),'slot_date':piece.slot_date,'scheduled_for':piece.scheduled_for,'state':piece.state,
             'status':editorial.status(piece,action),'stage':piece.stage,'note':piece.note,'modality':brief.get('modality'),
             'pillar':brief.get('pillar'),'primary_reader':brief.get('primary_reader'),'thesis':brief.get('thesis'),
             'approach':brief.get('approach'),'action':{'id':str(action.id),'state':action.state,'payload_hash':action.payload_hash}
@@ -33,11 +35,12 @@ class Calendar(APIView):
         except ValueError:raise ValueError('Parámetros inválidos: desde=AAAA-MM-DD y dias=1..60') from None
         end=start+timedelta(days=days)
         rows={}
-        for piece in EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lt=end).prefetch_related('proposals__execution').order_by('created_at'):
+        member=alcance.miembro(request)
+        for piece in alcance.de(EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lt=end),member).prefetch_related('proposals__execution').order_by('created_at'):
             action=max(piece.proposals.all(),key=lambda a:a.created_at,default=None)
             item=summary(piece,action);rows.setdefault(piece.slot_date,[]).append((piece,item['status'],item))
         pieces={day:editorial.calendar_rows(day_rows,today) for day,day_rows in rows.items()}
-        try:post_time=editorial.post_time().strftime('%H:%M');config_error=None
+        try:post_time=editorial.post_time(member).strftime('%H:%M');config_error=None
         except ValueError as exc:post_time=None;config_error=str(exc)
         return Response({'timezone':str(operador.local_tz()),'post_time':post_time,'lead_hours':editorial.lead_time().total_seconds()/3600,
             'config_error':config_error,'today':today,'days':[{'date':start+timedelta(days=i),'pieces':pieces.get(start+timedelta(days=i),[])}
@@ -46,8 +49,7 @@ class Calendar(APIView):
 class PieceDetail(APIView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        piece=EditorialPiece.objects.filter(id=pid).first()
-        if not piece:raise NotFound()
+        piece=alcance.obtener(request,EditorialPiece,id=pid)  # hers, else 404 (organizaciones, phase 5)
         action=editorial.latest_action(piece)
         return Response(dict(summary(piece,action),brief=piece.brief,variants=piece.variants,panel=piece.panel,
             selection=piece.selection,verification=piece.verification,final_text=piece.final_text,citations=piece.citations,
@@ -59,7 +61,9 @@ class PieceDetail(APIView):
             images=[imagenes.payload(row) for row in piece.images.all()],image_review=piece.image_review,
             image_document_url=f'/api/v1/editorial/pieces/{piece.id}/document' if piece.image_document else None,
             # EDI-23: what he can do about a block («Pedir un cambio», «Desestimar el bloqueo»), or null.
-            rescue=rescate.options(piece),override=(piece.verification or {}).get('override')))
+            rescue=rescate.options(piece),override=(piece.verification or {}).get('override'),
+            # Organizaciones, phase 7: «Voz provisional» on a piece written in her provisional voice (absent otherwise).
+            **voz.marca(piece)))
 
 
 class PieceOverride(APIView):
@@ -68,8 +72,7 @@ class PieceOverride(APIView):
     def post(self,request,pid):
         human_session(request);data=valid(OverrideInput,request)  # his decision: never a service credential
         require(request.user,'approve_actions')
-        piece=EditorialPiece.objects.filter(id=pid).first()
-        if not piece:raise NotFound()
+        piece=alcance.obtener(request,EditorialPiece,id=pid)
         current=rescate.options(piece)
         if current is None:raise Conflict('La pieza no está bloqueada.')
         if current['why_not']:raise Conflict(current['why_not'])
@@ -81,8 +84,7 @@ class PieceOverride(APIView):
 class PieceImageFile(FileView):
     def get(self,request,pid,iid):
         require(request.user,'operate_linkedin')
-        row=PieceImage.objects.filter(piece_id=pid,id=iid).first()
-        if row is None:raise NotFound()
+        row=alcance.obtener(request,PieceImage,piece_id=pid,id=iid)
         return serve(request,row.image,row.mime)
 
 
@@ -90,8 +92,8 @@ class PieceRejectedImageFile(FileView):
     """IMG-10: the AI edit the visual check rejected, so Gustavo can see it next to the original."""
     def get(self,request,pid,iid):
         require(request.user,'operate_linkedin')
-        row=PieceImage.objects.filter(piece_id=pid,id=iid,kind='foto').first()
-        kept=((row.data or {}).get(imagenes.REJECTED) or {}) if row else {}
+        row=alcance.obtener(request,PieceImage,piece_id=pid,id=iid,kind='foto')
+        kept=(row.data or {}).get(imagenes.REJECTED) or {}
         if not kept.get('path'):raise NotFound()
         return serve(request,FieldFile(row,PieceImage._meta.get_field('image'),kept['path']),'image/png')
 
@@ -99,8 +101,8 @@ class PieceRejectedImageFile(FileView):
 class PieceDocument(FileView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        piece=EditorialPiece.objects.filter(id=pid).first()
-        if piece is None or not piece.image_document:raise NotFound()
+        piece=alcance.obtener(request,EditorialPiece,id=pid)
+        if not piece.image_document:raise NotFound()
         return serve(request,piece.image_document,'application/pdf')
 
 class Plan(APIView):

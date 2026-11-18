@@ -16,7 +16,7 @@ import httpx
 from PIL import Image, ImageDraw
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase
+from django.test import TestCase
 from django.utils import timezone
 from knowledge import providers
 from team_backend import capturas, connectors_images, imagenes, orquestacion, perfil, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual
@@ -127,7 +127,7 @@ def vision(images,refs,ctx):
         'sha256':[imagenes.sha(raw) for raw in images.values()]}
 
 
-class ProfileContentTests(SimpleTestCase):
+class ProfileContentTests(TestCase):  # the brand version is the member's profile (phase 3)
     def test_edit_contract_uses_multiple_role_named_images_and_transparency_only_with_mock_transport(self):
         output=io.BytesIO()
         Image.open(io.BytesIO(synthetic())).resize((1024,1024)).save(output,format='PNG')
@@ -329,7 +329,7 @@ class ProfileBase(MediaMixin,OperatorBase):
             mock=patch(target,side_effect=AssertionError('No real provider or LinkedIn in profile tests'))
             mock.start();self.addCleanup(mock.stop)
         notices=patch('team_backend.notificaciones.avisar');self.notice=notices.start();self.addCleanup(notices.stop)
-        values=patch('team_backend.perfil.facts',side_effect=lambda mode:dict(context(list(content.MONTHLY) if mode=='monthly' else None),mode=mode,brand_version=content.BRAND_VERSION))
+        values=patch('team_backend.perfil.facts',side_effect=lambda mode,owner=None:dict(context(list(content.MONTHLY) if mode=='monthly' else None),mode=mode,brand_version=content.brand_version()))
         values.start();self.addCleanup(values.stop)
 
     def references(self):
@@ -436,11 +436,11 @@ class ProfileCycleTests(ProfileBase):
         at='2026-11-09T08:00:00Z';source='profile:synthetic:headline:'+at
         snapshot={'sections':{'headline':{'text':'Product engineer: useful software for teams','source':source,'at':at}},
                   'evidence':[source],'at':at,'limitations':['El conector no expone todas las secciones.']}
-        def production_facts(mode):
+        def production_facts(mode,owner=None):
             ctx=context();ctx['public_facts']=[{'key':'identidad.rol','fact':'Product engineer: useful software for teams','version':3}]
             ctx['recent_pieces']=[{'id':'piece:12345678-abcd','text':'Synthetic product engineering piece',
                 'url':'https://example.com/published','published_at':at,'metrics':{}}]
-            return dict(ctx,mode=mode,brand_version=content.BRAND_VERSION)
+            return dict(ctx,mode=mode,brand_version=content.brand_version())
         def production_draft(ctx):
             attempts.append(ctx);self.assertIn(source,{r['id'] for r in ctx['evidence_catalog']})
             self.assertTrue(any(r['kind']=='consent' for r in ctx['evidence_catalog']))

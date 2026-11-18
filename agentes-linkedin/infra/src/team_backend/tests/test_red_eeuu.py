@@ -152,7 +152,7 @@ class StageCheckTests(NetworkBase):
             red.check_stages(self.bot,self.account)
         ana.refresh_from_db();beto.refresh_from_db()
         self.assertEqual((ana.stage,ana.classification['fit'],ana.classification['stage_check']['state']),('discarded',False,'failed'))
-        self.assertEqual((ana.classification['rule'],ana.classification['buyer']['level']),(red.NO_FIT_RULE,'no_encaja'))
+        self.assertEqual((ana.classification['rule'],ana.classification['buyer']['level']),(red.no_fit_rule(),'no_encaja'))
         self.assertEqual((beto.classification['stage_check']['state'],beto.classification['stage_check']['attempts']),('pending',1))
         self.assertFalse(red.stage_pending(self.account))  # the retry is due at the next reading window
         when=timezone.now()

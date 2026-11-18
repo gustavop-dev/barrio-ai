@@ -15,7 +15,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 RESOURCE=Path(__file__).resolve().parent/'recursos'
 PAPER='#F7F6F0';INK='#1E1E2B';SOFT='#565972';LINE='#DEDFD4';DEEP='#00715E';ACCENT='#0FF1CE'
-AUTHOR='Gustavo'
+
+
+def author(member=None):
+    """The name drawn at the foot of every slide: the member's (identidad), never a fixed one."""
+    from . import identidad
+    return identidad.of(member).name
+
+
+def _signer(name):
+    """Who signs a slide: `name` (its caller's member, author(member)). Drawing never reads the database: without one,
+    the initial identity's name, the one of always."""
+    if name is not None:return name
+    from . import identidad
+    return identidad.initial_identity().name
 
 
 class _Text(HTMLParser):
@@ -26,14 +39,32 @@ class _Text(HTMLParser):
 
 
 @lru_cache(maxsize=1)
-def rule():
+def _document():
     raw=(RESOURCE/'infografias.html').read_text(encoding='utf-8')
     parser=_Text();parser.feed(raw)
     return '\n'.join(line.strip() for line in ''.join(parser.parts).splitlines() if line.strip())
 
 
-def version():return hashlib.sha256(rule().encode()).hexdigest()
-def with_rule(system):return system+'\n\n<regla_infografias version="'+version()+'">\n'+rule()+'\n</regla_infografias>'
+EXAMPLE_ROLE=' · Product Engineer'  # the foot of the document's example slides, after the first person's name
+
+
+def rule(name=None):
+    """The rule (recursos/infografias.html). Its examples name the installation's first person: for anyone else they
+    carry her `name` (only her name at the foot, which is what render() draws). None or his name: the document as is."""
+    text=_document()
+    from . import identidad
+    first=identidad.initial()['member']['name']
+    if name is None or name==first:return text
+    return text.replace(first+EXAMPLE_ROLE,name).replace(first,name)
+
+
+def version():
+    """The document's version (pieces and reviews record it): the same for every member."""
+    return hashlib.sha256(_document().encode()).hexdigest()
+
+
+def with_rule(system,name=None):
+    return system+'\n\n<regla_infografias version="'+version()+'">\n'+rule(name)+'\n</regla_infografias>'
 def obj(**fields):return {'type':'object','additionalProperties':False,'required':list(fields),'properties':fields}
 def string():return {'type':'string'}
 def array(items):return {'type':'array','items':items}
@@ -177,7 +208,9 @@ def contrast(a,b):
     x,y=sorted((lum(a),lum(b)));return (y+.05)/(x+.05)
 
 
-def render(slide,position=1,total=1,carousel=False):
+def render(slide,position=1,total=1,carousel=False,name=None):
+    """PNG bytes of one slide. `name`: who signs it (author(member)); None, the initial identity's (_signer)."""
+    name=_signer(name)
     height=1350 if carousel else 1080;template=slide['template']
     dark=template in ('portada','numero');bg=INK if dark else PAPER;fg=PAPER if dark else INK
     accent=ACCENT if dark else DEEP;muted='#B9BCCB' if dark else SOFT
@@ -243,7 +276,7 @@ def render(slide,position=1,total=1,carousel=False):
     if y>height-240:raise ValueError('El contenido invade la fuente y el pie')
     source_end=text(citation,96,height-224,28,36,color=muted)
     if source_end>height-152:raise ValueError('La fuente invade el pie')
-    text(AUTHOR,96,height-128,28,32)
+    text(name,96,height-128,28,32)
     number=f'{position}/{total}';text(number,984-draw.textlength(number,font=font(28)),height-128,28,32,width=128)
     if sum((x2-x1)*(y2-y1) for x1,y1,x2,y2 in occupied)>.6*1080*height:raise ValueError('Menos del 40 % de espacio vacío')
     buffer=io.BytesIO();image.save(buffer,format='PNG')
@@ -286,10 +319,12 @@ def document(pngs,alts):
     return out.getvalue()
 
 
-def fallback():
-    """Fixed, non-factual brand card; safe even when every optional image provider is unavailable."""
+def fallback(name=None):
+    """Fixed, non-factual brand card; safe even when every optional image provider is unavailable. `name`: who signs it
+    (_signer)."""
+    name=_signer(name)
     return {'template':'portada','label':'0ff1ce','title':'A question worth exploring','subtitle':'Ideas, tradeoffs and practical decisions.',
             'body':'','number':'','unit':'','steps':[],'bars':[],
             'source':{'ref':'','label':'','date':'','estimate':False},
-            'alt':'A question worth exploring. A card from Gustavo about ideas, tradeoffs and practical decisions.',
+            'alt':f'A question worth exploring. A card from {name} about ideas, tradeoffs and practical decisions.',
             'highlight':'question'}

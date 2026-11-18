@@ -9,7 +9,14 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 ## Resumen
 
 | ID | Función | Dónde | Estado |
-| --- | --- | --- | --- |
+| Organizaciones, fase 6 (18/11/2026, [ORG-28 a ORG-33](organizaciones.md#org-28)): con dos o más miembros activos el barrio
+es de la organización. Una persona es una ficha (`registro.py`): se descubre y se clasifica una vez, la atiende quien la
+toca primero (seguir, invitar, aceptar, comentar su post, responderle) y el otro miembro no la toca; dos o tres por empresa,
+nunca dos del mismo cargo; los referentes se leen una vez y cada post lo comenta un solo miembro; los candidatos sin dueño se
+reparten (afinidad, preferencia de rol opcional, hash estable); los perfiles de los colegas nunca son prospectos. Con un solo
+miembro todo lo de esta página sigue igual.
+
+--- | --- | --- | --- |
 | [BAR-01](#bar-01) | Descubrir personas en los comentarios de los referentes | backend | funciona |
 | [BAR-02](#bar-02) | Descubrir personas por búsqueda | backend | funciona |
 | [BAR-03](#bar-03) | Clasificar a cada persona | backend | funciona |
@@ -147,11 +154,14 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** la red trabaja dentro de límites conservadores para no arriesgar su cuenta.
-- **Código:** `red.read_caps`, `red._read`, `operador.limits`, `operador.capacity_left`, `operador.spacing_ok`.
+- **Código:** `red.read_caps`, `red._read`, `operador.limits`, `operador.capacity_left`, `operador.spacing_ok`. Desde la
+  fase 2 de organizaciones todos son **de cada miembro** ([ORG-10](organizaciones.md#org-10)): sus cuentas comparten sus
+  topes, su espaciado y su contador de lecturas de perfil; otro miembro tiene los suyos. El gasto de IA sigue siendo de
+  toda la organización.
 - **Criterios de aceptación:**
   1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 20/día y 100/semana, RED-02 según etapa (inicialmente 16 y 80, [BAR-17](#bar-17)), RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 80, `sync` 4. Fin de semana y reservas compartidas siguen BAR-15.
   2. **Dado** que se agotó el cupo de lecturas de perfil, **cuando** toca clasificar, **entonces** se detiene y lo dice en su error; el preflight usa además el contador global compartido y, si este se agota, la escritura espera sin saltarse la comprobación.
-  3. **Dado** una escritura de red, un comentario y una publicación, **cuando** se programan, **entonces** comparten el espaciado mínimo común.
+  3. **Dado** una escritura de red, un comentario y una publicación del mismo miembro, **cuando** se programan, **entonces** comparten su espaciado mínimo; las de otro miembro no lo esperan.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -160,7 +170,9 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** si LinkedIn rechaza una invitación por límite, el equipo deja de invitar siete días y se lo dice.
-- **Código:** `red.invites_blocked`, `red.network_issues`, `GET /api/v1/red/summary` (`invites_blocked`).
+- **Código:** `red.invites_blocked`, `red.network_issues`, `GET /api/v1/red/summary` (`invites_blocked`). Desde la fase 2
+  de organizaciones el bloqueo es **del miembro** a quien LinkedIn frenó ([ORG-11](organizaciones.md#org-11)); a la persona
+  rechazada no la vuelve a invitar nadie de la organización.
 - **Criterios de aceptación:**
   1. **Dado** un 429 o un error cuyo tipo o nota menciona *limit*, *quota*, *throttle* o *exceed* al invitar, **cuando** se registra, **entonces** `red/summary.invites_blocked` vale `{blocked: true, reason}` durante 7 días.
   2. **Dado** invitaciones bloqueadas, **cuando** la compuerta revisa una RED-02 en `auto`, **entonces** la descarta.
@@ -344,6 +356,14 @@ Ninguna.
 ## Participación: fase 2
 
 Implementación en archivos; CI pendiente. Se conservan los criterios copiados de la especificación como contrato de revisión. El alcance de esta rama es backend.
+
+Desde la fase 2 de organizaciones (17/11/2026) el ritmo de BAR-15 (topes, espaciado, agenda del día, rampa y su salud,
+lecturas de perfil, bloqueos del proveedor) y el tier y las notas de BAR-16 son **de cada miembro**: el primer miembro
+conserva el estado de antes (`target='member'`) y otro empieza el suyo (`target='member:<id>'`). Cada miembro puede tener
+sus propios valores de `OPERATOR_DAILY_LIMITS`, `OPERATOR_WEEKLY_LIMITS`, `OPERATOR_INVITE_RAMP_STAGES`, el nuevo
+`OPERATOR_INVITE_RAMP_START`, `OPERATOR_PROFILE_READ_DAILY_LIMIT`, `LINKEDIN_ACCOUNT_TIER`,
+`LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT`, `OPERATOR_AUTONOMY` y `EDITORIAL_POST_TIME` (`manage.py operador ajustes`); sin
+ellos vale el `.env`. Ver [ORG-10 a ORG-12](organizaciones.md#org-10).
 
 ### BAR-15 · Ritmo diario, rampa semanal y configuración del operador <a id="bar-15"></a>
 

@@ -159,7 +159,9 @@ def process_one(worker):
         else:
             require(user,'run_agents')
             if job.execute or job.mode=='hybrid':require(user,'use_paid_providers')
-            result=agents.run(job.agent,job.task,execute=job.execute,mode=job.mode,request_id=str(job.id))
+            from . import hechos, miembros
+            scope=hechos.scope(miembros.member_for(user))  # the owner's memory only (organizaciones, phase 4)
+            result=agents.run(job.agent,job.task,execute=job.execute,mode=job.mode,request_id=str(job.id),memory_scope=scope)
             result_status=result['status']
             state=Job.State.COMPLETE if result_status in ['preview','needs_review','validation_failed'] else Job.State.INTERRUPTED
             error='' if state==Job.State.COMPLETE else 'La ejecución ya existe sin resultado terminal; no se repitió.'

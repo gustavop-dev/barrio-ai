@@ -1,7 +1,7 @@
 import { useId, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { ApiError } from '../api/client';
-import { useAddContactNote, useContact, useDiscardContact, useOportunidades } from '../api/hooks';
+import { useAddContactNote, useContact, useDiscardContact, useOportunidades, usePassContact, useReleaseContact } from '../api/hooks';
 import type { Contact, ContactHistoryEntry, ContactNote, Opportunity } from '../api/types';
 import { useSession } from '../auth/session';
 import { useCapture } from '../capture/CaptureContext';
@@ -36,7 +36,7 @@ import {
   labelOf,
   networkDistanceLabel,
 } from '../lib/format';
-import { displayName, eventLabel, suggestedModality } from '../../../compartido/src/logic/barrio';
+import { attendedBy, displayName, eventLabel, passTargets, suggestedModality } from '../../../compartido/src/logic/barrio';
 import { agree, isFeminineName } from '../../../compartido/src/logic/genero';
 import { journey } from './personas/journey';
 import {
@@ -275,9 +275,13 @@ export function Persona() {
   useTopBarBack({ to: backTo, label: 'Personas' });
   const contact = useContact(contactId);
   const discard = useDiscardContact();
+  const release = useReleaseContact();
+  const pass = usePassContact();
   const toast = useToast();
   const [form, setForm] = useState<{ opportunity: Opportunity | null } | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  // Organizaciones, phase 6: «Liberar» (target null) or «Pasar a <nombre>».
+  const [handing, setHanding] = useState<{ id: string; display_name: string } | null | undefined>(undefined);
 
   const back = (
     <Link to={backTo} className="persona-back">
@@ -321,7 +325,10 @@ export function Persona() {
   const name = displayName(person);
   const stage = personStage(person.display_stage ?? person.stage);
   const meta = [person.location, networkDistanceLabel(person.network_distance), person.is_following ? 'Lo sigues' : ''].filter(Boolean);
-  const canDiscard = DISCARDABLE.includes(person.stage);
+  const attended = attendedBy(person);
+  const targets = passTargets(person);
+  const canDiscard = DISCARDABLE.includes(person.stage) && !attended;
+  const handOver = handing === null ? release : pass;
 
   return (
     <article className="persona" aria-labelledby="persona-nombre">
@@ -343,6 +350,11 @@ export function Persona() {
         </h2>
         {person.headline ? <p className="persona-headline">{person.headline}</p> : null}
         {meta.length ? <p className="persona-meta">{meta.join(' · ')}</p> : null}
+        {attended ? (
+          <p className="persona-meta" data-testid="persona-atiende">
+            {attended}
+          </p>
+        ) : null}
         <div className="persona-buttons">
           {isHttps(person.profile_url) ? (
             <ButtonLink
@@ -367,6 +379,16 @@ export function Persona() {
               Descartar
             </Button>
           ) : null}
+          {person.registro?.mine ? (
+            <Button block variant="secondary" onClick={() => setHanding(null)}>
+              Liberar
+            </Button>
+          ) : null}
+          {targets.map((member) => (
+            <Button key={member.id} block variant="secondary" onClick={() => setHanding(member)}>
+              {`Pasar a ${member.display_name}`}
+            </Button>
+          ))}
         </div>
       </header>
 
@@ -404,6 +426,36 @@ export function Persona() {
           person={{ id: person.id, display_name: name, headline: person.headline, modality: suggestedModality(person) }}
           onClose={() => setForm(null)}
         />
+      ) : null}
+      {handing !== undefined ? (
+        <ConfirmModal
+          title={handing ? `Pasar a ${name} a ${handing.display_name}` : `Liberar a ${name}`}
+          confirmLabel={handing ? 'Pasar' : 'Liberar'}
+          busyLabel={handing ? 'Pasando…' : 'Liberando…'}
+          note="required"
+          noteLabel="Motivo"
+          busy={handOver.isPending}
+          error={handOver.error}
+          onClose={() => {
+            release.reset();
+            pass.reset();
+            setHanding(undefined);
+          }}
+          onConfirm={(reason) => {
+            const done = {
+              onSuccess: () => {
+                setHanding(undefined);
+                toast.show(handing ? `Ahora la atiende ${handing.display_name}` : 'Liberada: el reparto decide quién la atiende');
+              },
+            };
+            if (handing) pass.mutate({ contactId: person.id, member: handing.id, reason }, done);
+            else release.mutate({ contactId: person.id, reason }, done);
+          }}
+        >
+          {handing
+            ? `${handing.display_name} empieza con la ficha básica: tus notas, mensajes y borradores se quedan contigo.`
+            : 'Deja de atenderla: otro miembro podrá tomarla según el reparto. Tus notas se quedan contigo.'}
+        </ConfirmModal>
       ) : null}
       {discarding ? (
         <ConfirmModal

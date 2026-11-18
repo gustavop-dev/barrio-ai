@@ -125,10 +125,21 @@ def connect_member(user,token,profile):
     granted=set(token['scope'].replace(',',' ').split())
     if 'w_member_social' not in granted:
         raise ConnectorError('LinkedIn no concedió w_member_social: revisa el producto Share on LinkedIn de la app.',kind='scope')
+    from . import miembros
     urn='urn:li:person:'+profile['sub'];now=timezone.now()
     with transaction.atomic():
-        account,_=ConnectorAccount.objects.get_or_create(provider='linkedin',external_account_id=urn,
-            defaults={'label':'LinkedIn · API oficial'+(f' ({profile["name"]})' if profile['name'] else '')})
+        # Only its owner connects (or reconnects) a member's LinkedIn; a new one belongs to whoever connects it
+        # (organizaciones, phase 1). Nothing is stored when either fails.
+        account=ConnectorAccount.objects.select_for_update().filter(provider='linkedin',external_account_id=urn).first()
+        if account is not None and not miembros.is_owner(user,account,alta=True):
+            raise ConnectorError('Esta cuenta de LinkedIn es de otro miembro: solo su dueño la conecta.',kind='owner')
+        if account is None:
+            # Her own member, also while she is being onboarded (organizaciones, phase 7); else the default one.
+            own=miembros.member_of_user(user)
+            try:member=own if own is not None else miembros.member_for(user)
+            except miembros.MiembroRequerido as exc:raise ConnectorError(str(exc),kind='owner') from None
+            account=ConnectorAccount.objects.create(provider='linkedin',external_account_id=urn,member=member,
+                label='LinkedIn · API oficial'+(f' ({profile["name"]})' if profile['name'] else ''))
         credential,created=LinkedInCredential.objects.update_or_create(account=account,defaults={
             'member_urn':urn,'member_name':profile['name'],'scopes':' '.join(sorted(granted)),'token_encrypted':encrypt(token['access_token']),
             'expires_at':now+timedelta(seconds=token['expires_in']),'connected_by':user,'connected_at':now,'expiry_alerted_at':None})
@@ -144,17 +155,24 @@ def connect_member(user,token,profile):
 
 # --------------------------------------------------------------------------- publishing
 
-def post_body(author,text,media=None):
+def post_body(author,text,media=None,title=''):
+    """`title`: a single media's title when it has none (the account's member name, as LinkedIn shows it)."""
     body={'author':author,'commentary':little_text(text),'visibility':'PUBLIC',
             'distribution':{'feedDistribution':'MAIN_FEED','targetEntities':[],'thirdPartyDistributionChannels':[]},
             'lifecycleState':'PUBLISHED','isReshareDisabledByAuthor':False}
     if media:
         if len(media)==1:
             item=media[0]
-            body['content']={'media':{'id':item['id'],'title':item.get('title') or 'Gustavo'}}
+            body['content']={'media':{'id':item['id'],'title':item.get('title') or title}}
             if not item['id'].startswith('urn:li:document:'):body['content']['media']['altText']=item['alt']
         else:body['content']={'multiImage':{'images':[{'id':item['id'],'altText':item['alt']} for item in media]}}
     return body
+
+def _owner(account):
+    """The name of the account's member: the fallback title of a single media (identidad)."""
+    from . import identidad
+    return identidad.owner_name(account)
+
 
 class LinkedInOfficialConnector:
     """Writes only. w_member_social cannot read posts back; confirmation comes from the 201 response
@@ -213,7 +231,7 @@ class LinkedInOfficialConnector:
         headers={'Authorization':'Bearer '+decrypt(self.credential.token_encrypted),'LinkedIn-Version':self.version,
                  'X-Restli-Protocol-Version':'2.0.0','Content-Type':'application/json'}
         try:
-            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text,media),headers=headers)
+            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text,media,_owner(self.account)),headers=headers)
         except (httpx.ConnectError,httpx.ConnectTimeout):
             raise ConnectorError('LinkedIn: no fue posible conectar; la publicación no se envió.',kind='not_sent') from None
         except httpx.HTTPError as exc:
@@ -263,7 +281,7 @@ class FakeLinkedInOfficial:
         if mode=='not_sent':raise ConnectorError('Simulado: sin conexión.',kind='not_sent')
         urn=f'urn:li:share:{7400000000000000000+len(self.state["posts"])+1}'
         if mode!='uncertain_not_applied':
-            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text,media)});self.state['writes']+=1
+            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text,media,_owner(self.account))});self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras publicar.')
         return {'id':urn,'url':post_url(urn)}
 
@@ -274,7 +292,10 @@ def connector_for(account):
 
 # --------------------------------------------------------------------------- supervision
 
-def status_payload(now=None):
+def status_payload(now=None,member=None):
+    """The official connection of `member` (miembros.default_member() without one): her latest credential only, never
+    another member's."""
+    from . import miembros
     from .models import LinkedInCredential
     now=now or timezone.now()
     try:version=api_version()
@@ -282,7 +303,8 @@ def status_payload(now=None):
     data={'configured':oauth_configured(),'live':live(),'api_version':version,'scopes_required':list(SCOPES),'connected':False,
           'member_urn':None,'member_name':None,'scopes':[],'expires_at':None,'days_left':None,'expired':False,
           'expiring_soon':False,'account':None}
-    credential=LinkedInCredential.objects.select_related('account').order_by('-connected_at').first()
+    credential=(LinkedInCredential.objects.select_related('account').filter(account__in=miembros.accounts(miembros.resolve(member)))
+                .order_by('-connected_at').first())
     if credential:
         left=credential.expires_at-now;account=credential.account
         data.update(connected=left>timedelta(0),member_urn=credential.member_urn,member_name=credential.member_name,
@@ -302,13 +324,14 @@ def check_tokens(now=None):
         if left<=timedelta(0):
             if not account.paused:
                 set_account_pause(account,TOKEN_PAUSE+': reconecta LinkedIn en Ajustes para reanudar la publicación diaria.',notify=False)
-                from .notificaciones import avisar
-                avisar('linkedin_expired','LinkedIn caducado','El acceso caducó y la publicación diaria está en pausa. Reconéctalo desde la Bandeja.')
+                from .notificaciones import avisar, de_cuenta
+                avisar('linkedin_expired','LinkedIn caducado','El acceso caducó y la publicación diaria está en pausa. Reconéctalo desde la Bandeja.',
+                       member=de_cuenta(account))  # her LinkedIn
                 events+=1
         elif left<=EXPIRY_ALERT and credential.expiry_alerted_at is None:
             when=credential.expires_at.astimezone(local_tz()).strftime('%d/%m %H:%M')
-            from .notificaciones import avisar
+            from .notificaciones import avisar, de_cuenta
             avisar('linkedin_expiring','LinkedIn caduca pronto',f'El permiso de publicación caduca el {when}. Reconéctalo desde la Bandeja '
-                   'para que la publicación diaria no se pause.')
+                   'para que la publicación diaria no se pause.',member=de_cuenta(account))
             type(credential).objects.filter(pk=credential.pk).update(expiry_alerted_at=now);events+=1
     return events

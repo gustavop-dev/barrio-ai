@@ -185,6 +185,22 @@ describe('Detalle de una pieza', () => {
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/personas/[id]', params: { id: 'c-9' } });
   });
 
+  it('marks a piece written in the member’s provisional voice (organizaciones, phase 7)', async () => {
+    useFakeNow('2026-11-07T15:00:00Z');
+    server({ ...SCHEDULED, provisional_voice: true });
+    await renderPieza('p8');
+    expect(await screen.findByText('Programada')).toBeOnTheScreen();
+    expect(screen.getByText('Voz provisional')).toBeOnTheScreen();
+  });
+
+  it('shows no voice mark when the piece does not carry provisional_voice', async () => {
+    useFakeNow('2026-11-07T15:00:00Z');
+    server(SCHEDULED);
+    await renderPieza('p8');
+    expect(await screen.findByText('Programada')).toBeOnTheScreen();
+    expect(screen.queryByText('Voz provisional')).toBeNull();
+  });
+
   it('copies the final text and counts its characters', async () => {
     server(PUBLISHED);
     await renderPieza();

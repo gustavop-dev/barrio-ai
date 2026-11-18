@@ -521,6 +521,12 @@ describe('Ajustes · Sabe y sesión', () => {
     await fireEvent.press(within(await screen.findByTestId('confirm-sheet')).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(api.find('POST', '/api/v1/auth/token/revocar')).toHaveLength(1));
   });
+
+  it('names the member, her role and her organization from «quién soy» (organizations, phase 5)', async () => {
+    server({ 'GET /api/v1/yo': { body: { username: 'ana', member: { id: 'm-2', display_name: 'Ana Pérez', role: 'CTO', active: true, is_admin: false, first: false }, organization: { id: 'o-1', name: 'ProjectApp', slug: 'projectapp' }, is_admin: false, provisional_voice: true, members: 2 } } });
+    await renderApp(<AjustesScreen />, { session: true, recorder: true });
+    expect(await screen.findByText('Has entrado como Ana Pérez (CTO) · ProjectApp.')).toBeOnTheScreen();
+  });
 });
 
 describe('Ajustes · anchors', () => {

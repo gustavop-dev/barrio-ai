@@ -6,6 +6,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 
 - **Código:** backend `rediseno_views.TuTurno`, `alerts`, `_question_card`, `_conversation_card`, `_summary_card`, `TuTurnoSeen`, `preguntas.py`; PWA `oficina/src/pages/TuTurno.tsx`, `pages/turno/*`; app `movil/src/app/(app)/(tabs)/tu-turno.tsx`, `movil/src/turno/*`; lógica común `compartido/src/logic/turno.ts`.
 - **Documentación:** secciones «Tu turno» y «Notificaciones y prioridades de Tu turno (rev 18)» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md).
+- **Por miembro (organizaciones, fase 4):** cada pregunta del equipo es de un miembro (el dueño de la pieza, el post o el perfil) y solo ella la responde (`403` a otro miembro); su respuesta es su memoria. «Lo que el equipo sabe de ti», sus correcciones, su orientación y, en la Bandeja, sus preguntas, su memoria pendiente, su tarjeta de resumen y el aviso «Reconecta LinkedIn» de su propia conexión son del usuario; las demás tarjetas, de la fase 5. Un hecho pasa a ser de la empresa solo si el administrador lo comparte (`operador hecho-empresa`). Ver [ORG-19](organizaciones.md#org-19) y [ORG-20](organizaciones.md#org-20).
 
 ## Resumen
 

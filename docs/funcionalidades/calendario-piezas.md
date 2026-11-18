@@ -4,6 +4,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 
 - **Código:** backend `rediseno_views.Calendar`, `Activity`, `upcoming`, `item`, `editorial_views.PieceDetail`, `Plan`, `operador.reject`; PWA `oficina/src/pages/Calendario.tsx`, `pages/calendario/*`, `pages/PiezaDetalle.tsx`; app `movil/src/calendario/*`, `movil/src/pieza/*`, `movil/src/app/(app)/calendario/pieza/[id].tsx`; común `compartido/src/logic/events.ts`, `editorial.ts`, `piece.ts`, `dates.ts`.
 - **Documentación:** secciones «Calendario» y «Publicación diaria (editorial)» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md).
+- **Por miembro (organizaciones, fase 4):** cada miembro tiene su calendario: una pieza del día y una segunda por miembro y día, en su cuenta y a su hora (la del segundo miembro, escalonada `EDITORIAL_POST_STAGGER_MINUTES` después). El Calendario y «Preparar la siguiente pieza» muestran y planean las del usuario; con un solo miembro, lo de siempre. Ver [ORG-18](organizaciones.md#org-18) y [ORG-21](organizaciones.md#org-21).
 
 ## Resumen
 

@@ -103,7 +103,7 @@ class OutlierAndShapeTests(SimpleTestCase):
             self.assertNotIn(leak, dumped)
 
 
-class CriteriaTests(SimpleTestCase):
+class CriteriaTests(TestCase):  # the criteria name the account's member (phase 3)
     sources = {OWN['id']: OWN, 'web-1': WEB}
 
     def test_a_candidate_passes_only_with_verified_claims(self):
@@ -175,7 +175,7 @@ class CriteriaTests(SimpleTestCase):
         self.assertEqual([row['key'] for row in failing], ['actividad'])
 
 
-class PrefilterTests(SimpleTestCase):
+class PrefilterTests(TestCase):  # the services are the organization's profile (phase 3)
     """The free first look at a headline: who clearly sells something else is out before any read."""
 
     def test_sellers_of_something_else_are_out(self):
@@ -396,7 +396,7 @@ class ReferentKindTests(IndustryMixin, TestCase):
     def test_a_main_referent_changes_kind_only_by_gustavo(self):
         operator = get_user_model().objects.create_user('operador-test', is_superuser=True)
         main = self.main[0]
-        with self.assertRaisesMessage(PermissionDenied, 'Solo Gustavo'):
+        with self.assertRaisesMessage(PermissionDenied, 'Solo el dueño de la cuenta o el administrador'):
             operador.set_referent_kind(operator, self.account, main.public_identifier, 'industria', 'Prueba', confirm=True)
         main.refresh_from_db()
         self.assertEqual(main.kind, 'nicho')

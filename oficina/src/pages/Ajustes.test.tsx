@@ -469,4 +469,11 @@ describe('Ajustes · lo demás', () => {
     expect(await screen.findByText('Pantalla de login')).toBeInTheDocument();
     expect(api.find('POST', '/api/v1/auth/logout')).toHaveLength(1);
   });
+
+  it('names the member, her role and her organization from «quién soy» (organizations, phase 5)', async () => {
+    server(undefined, { 'GET /api/v1/yo': { body: { username: 'ana', member: { id: 'm-2', display_name: 'Ana Pérez', role: 'CTO', active: true, is_admin: false, first: false }, organization: { id: 'o-1', name: 'ProjectApp', slug: 'projectapp' }, is_admin: false, provisional_voice: true, members: 2 } } });
+    renderAt('/ajustes', routes);
+    const section = region('Sesión y Acerca de');
+    expect(await within(section).findByText('Has entrado como Ana Pérez (CTO) · ProjectApp.')).toBeInTheDocument();
+  });
 });

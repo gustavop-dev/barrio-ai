@@ -487,7 +487,7 @@ class VoiceTests(EditorialBase):
         self.plan(answers(signals_used=['first']))
         systems={purpose.split('-',1)[1]:system for purpose,_,system in self.calls}
         for stage in ('redactor','seleccion'):
-            self.assertIn(voz.VOICE_GUIDE,systems[stage]);self.assertIn('# Tono de voz',systems[stage])
+            self.assertIn(voz.current().guide,systems[stage]);self.assertIn('# Tono de voz',systems[stage])
             self.assertIn('Una versión cuidada de esta voz',systems[stage])  # the whole document, not an excerpt
         for stage in ('director','lectores','verificador'):self.assertNotIn('<tono_de_voz',systems[stage])
         self.assertIn('voz informal de Gustavo',systems['verificador'])

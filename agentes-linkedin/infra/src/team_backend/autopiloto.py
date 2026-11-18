@@ -18,7 +18,7 @@ from django.db.models import Case, Count, Max, Q, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, idioma, lider, oficina_eventos, operador, red
+from . import guardas, idioma, lider, miembros, oficina_eventos, operador, red
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, CycleLedger, EditorialPiece, Job, ObservedPost
 
@@ -68,12 +68,75 @@ def daily_proposals():
 # is autonomous from the start by his decision (12/11/2026), with the lead as its gate.
 AUTO_BY_DEFAULT=('INT-03','INT-04','INT-02','CONT-09')
 
-def autonomy(capability):
-    """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off."""
-    for item in filter(None,setting('OPERATOR_AUTONOMY','').split(',')):
-        key,_,mode=item.partition('=')
-        if key.strip()==capability and mode.strip() in ('auto','approval','off'):return mode.strip()
+def autonomy(capability,member=None):
+    """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off. The member's own value for a
+    capability (miembros.setting) wins over the .env's (organizaciones, phase 2: the CTO starts in «approval» without
+    touching Gustavo's). Without a member, the only active one (MiembroRequerido among several).
+    While her voice is provisional (voz.current: a member without a confirmed voice, never the first member), her
+    editorial autonomy (CONT-09) is «approval» whatever is configured: her posts never go out on their own until she
+    confirms her voice (organizaciones, phase 4)."""
+    member=operador.member_of(member=member)
+    mode=_configured(capability,member)
+    if capability in PROVISIONAL_HOLDS and mode=='auto' and provisional_voice(member):return 'approval'
+    return mode
+
+# Organizaciones, phase 7: nothing written in a provisional voice goes out without a person, in ANY capability. The
+# capabilities that always write a text in her name are held in «approval» while her voice is provisional (phase 4 did it
+# for the post); an invitation writes a text only with its note, so RED-02 is held per proposal (provisional_draft).
+PROVISIONAL_HOLDS=('CONT-09','INT-03','INT-04')
+TEXT_CAPABILITIES=PROVISIONAL_HOLDS+('RED-02',)
+
+def _author(proposal):
+    """Whose text a proposal is: its account's member; None for a draft without an account (the evaluation harness), which
+    the text checks read as the default member, as always."""
+    return operador.member_of(account=proposal.account) if proposal.account_id else None
+
+def provisional_voice(member):
+    """Whether her voice is provisional (no confirmed voice and not the installation's first person)."""
+    if member is None:return False
+    from . import voz
+    return voz.current(member).provisional
+
+def writes_text(proposal):
+    """Whether the proposal puts a text in her name on LinkedIn: a post, a comment, a reply, or an invitation with a note."""
+    return proposal.capability in PROVISIONAL_HOLDS or (proposal.capability=='RED-02' and bool((proposal.payload or {}).get('note')))
+
+def provisional_draft(proposal):
+    """A text written in a provisional voice: its own `voice` mark (or its piece's) says provisional, or it carries no mark
+    at all (a path that did not record its voice) and its author's voice is provisional now. It never goes out on its own,
+    even after she confirms her voice: a person approves it (policy_review leaves it waiting; operador.execute refuses it
+    without her approval, voice_hold)."""
+    if not writes_text(proposal):return False
+    marks=[proposal.voice or {}]+([proposal.piece.voice or {}] if proposal.piece_id else [])
+    if any(m.get('tipo')=='provisional' for m in marks):return True
+    if any(m.get('tipo') for m in marks):return False  # written with a confirmed (or the initial) voice
+    return provisional_voice(_author(proposal))
+
+def approved_by_her(proposal):
+    """Whether a person approved this exact version: the user of the member who owns the account (her own approval; the
+    policy never sets decided_by). Without members, any human user (the installation's person)."""
+    if not proposal.decided_by_id or proposal.approved_hash!=proposal.payload_hash:return False
+    owner=_author(proposal)
+    if owner is not None:return proposal.decided_by_id==owner.user_id
+    return proposal.decided_by.get_username() not in miembros.ROBOTS
+
+def voice_hold(proposal):
+    """'' or why an approved proposal may not be written: a provisional-voice text that no person approved."""
+    if provisional_draft(proposal) and not approved_by_her(proposal):
+        return 'Escrito con la voz provisional: sale solo con la aprobación de su dueña.'
+    return ''
+
+def _configured(capability,member):
+    own=(member.settings or {}).get('OPERATOR_AUTONOMY','') if member is not None else ''
+    for source in (own,setting('OPERATOR_AUTONOMY','')):
+        for item in filter(None,source.split(',')):
+            key,_,mode=item.partition('=')
+            if key.strip()==capability and mode.strip() in ('auto','approval','off'):return mode.strip()
     return 'auto' if capability in AUTO_BY_DEFAULT else 'approval'
+
+def autonomy_of(proposal):
+    """The autonomy of a proposal's capability for the member who owns its account."""
+    return autonomy(proposal.capability,operador.member_of(account=proposal.account))
 
 def enabled():
     return setting('OPERATOR_AUTOPILOT','false').lower()=='true'
@@ -83,8 +146,7 @@ def post_issues(proposal):
     from . import compuertas
     text=proposal.payload.get('text','')
     issues=compuertas.form_rules(text,compuertas.gate_policy(proposal.piece if proposal.piece_id else None))
-    public,private=guardas.blocks()
-    issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    issues+=guardas.text_checks(text,_author(proposal))  # her memory only (phase 4)
     verification=proposal.piece.verification if proposal.piece_id else {}
     if (verification.get('override') or {}).get('text_sha256')==hashlib.sha256(text.encode()).hexdigest():
         # EDI-23: Gustavo dismissed the block of this exact text: only what LinkedIn needs remains (length, image).
@@ -124,8 +186,7 @@ def comment_text_issues(proposal):
     if proposal.post_id and calentamiento.warmup_post(proposal.post):
         from . import sin_posts
         issues+=warmup_text_issues(text)+sin_posts.repeat_issues(proposal)  # phase 5: never the same to two of a company
-    public,private=guardas.blocks()
-    return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    return issues+guardas.text_checks(text,_author(proposal))  # her memory only (phase 4)
 
 def warmup_text_issues(text):
     """The fixed rules of a warm-up comment (calentamiento.warmup_post): 25–40 words, ends with one question, no
@@ -157,8 +218,9 @@ def policy_review(proposal,lead_budget=None):
     from tick) caps the lead's reviews: once spent, a proposal that needs the lead stays pending for a later tick."""
     from .orquestacion import cycle_issues
     if cycle_issues(proposal):return proposal
-    mode=autonomy(proposal.capability)
+    mode=autonomy_of(proposal)
     if mode=='approval':return proposal
+    if mode=='auto' and provisional_draft(proposal):return proposal  # a provisional voice's post waits for a person
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
     if proposal.capability==ActionProposal.Capability.PUBLISH and issues and set(issues)<={'Imagen no disponible','Documento no disponible'}:
         logger.warning('Propuesta %s pendiente por archivos no disponibles: %s',proposal.id,'; '.join(issues))
@@ -190,9 +252,9 @@ def policy_review(proposal,lead_budget=None):
         if proposal.piece_id:
             from . import capturas
             capturas.release_ideas(proposal.piece,'la política no la aprobó')
-            from .notificaciones import avisar
+            from .notificaciones import avisar, de_contenido
             avisar('piece_discarded',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}','; '.join(issues)[:300],
-                   link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}')
+                   link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}',member=de_contenido(proposal.piece))
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
@@ -208,9 +270,9 @@ def policy_review(proposal,lead_budget=None):
     operador._audit(None,'operator.policy_approved',proposal.id,payload_hash=proposal.payload_hash)
     if proposal.piece_id:
         when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
-        from .notificaciones import avisar
+        from .notificaciones import avisar, de_contenido
         avisar('piece_scheduled',f'La pieza del {when:%d/%m} está lista',f'Sale a las {when:%H:%M}. Puedes vetarla en el detalle hasta esa hora.',
-               link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_scheduled:{proposal.id}')
+               link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_scheduled:{proposal.id}',member=de_contenido(proposal.piece))
     return proposal
 
 def llm_spent_today(now=None,purpose='propose-comment'):
@@ -250,11 +312,15 @@ def lead_silence(now=None):
     if not lider.enabled():return 0
     now=now or timezone.now();minimum=int(setting('LEAD_SILENCE_MIN_REVIEWS','5'));sent=0
     year,week,_=now.astimezone(operador.local_tz()).isocalendar()
-    from .notificaciones import avisar
+    from .notificaciones import ORGANIZACION, avisar
+    members=miembros.active_members()
     for capability in lider.capabilities():
-        if autonomy(capability)!='auto':continue
+        # The lead is the organization's; what it reviews in `auto` is the proposals of the members who have it in `auto`.
+        auto=[m for m in members if autonomy(capability,m)=='auto']
+        if not auto:continue
         reviewed=ActionProposal.objects.filter(capability=capability,decided_at__gte=now-timedelta(days=7),
                                                review__decision__in=['approve','discard'])
+        if None not in auto:reviewed=reviewed.filter(account__member__in=auto) if len(auto)<len(members) else reviewed
         total=reviewed.count()
         if total<max(minimum,1) or reviewed.filter(review__decision='approve').exists():continue
         top=', '.join(f'{qid} ({n})' for qid,n in _failing_checks(reviewed.values_list('review',flat=True)).most_common(3))
@@ -263,7 +329,7 @@ def lead_silence(now=None):
                        f'{label}: revisó {total} propuestas y descartó todas.'+(f' Lo que más falla: {top}.' if top else '')+
                        ' Revisa los umbrales del líder, la orientación o lo que proponen los agentes.',
                        link=f'/calendario?vista=lista&tipo={ACTIVITY_TYPE.get(capability,"red")}&no_salio=1',
-                       ref=f'lead_silent:{capability}:{year}-W{week:02d}')
+                       ref=f'lead_silent:{capability}:{year}-W{week:02d}',member=ORGANIZACION)  # the lead is the organization's
         sent+=int(created is not None)
     return sent
 
@@ -313,8 +379,13 @@ def tick(user,now=None):
     # The lead (Jev, up to 60 s per call) reviews at most LEAD_MAX_REVIEWS_PER_TICK proposals per tick, oldest first; after
     # a plan_network the rest wait for the next ticks instead of blocking this one for minutes.
     lead_budget={'left':lead_reviews_per_tick(),'deferred':0}
-    for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
-        policy_review(proposal,lead_budget);report['reviewed']+=1
+    for proposal in ActionProposal.objects.select_related('post','piece','contact','account__member').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
+        if inactive(proposal.account):  # organizaciones, phase 7: an inactive member's proposals wait, untouched
+            report['inactive']=report.get('inactive',0)+1;continue
+        try:policy_review(proposal,lead_budget)
+        except miembros.MiembroRequerido:  # an account of nobody among several members: no rhythm decides for it
+            report['unowned']=report.get('unowned',0)+1;continue
+        report['reviewed']+=1
     if lead_budget['deferred']:report['lead_deferred']=lead_budget['deferred']
     if _lead_silence_due(now):
         report['lead_silent']=lead_silence(now)
@@ -324,7 +395,12 @@ def tick(user,now=None):
         except Exception as exc:report['gate_alerts_error']=type(exc).__name__  # the audit never stops the tick
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
-    for account in ConnectorAccount.objects.filter(paused=False):
+    members=miembros.exist()
+    for account in ConnectorAccount.objects.select_related('member').filter(paused=False):
+        if members and miembros.member_of_account(account) is None:  # organizaciones, phase 2: an account of nobody among
+            report['unowned']=report.get('unowned',0)+1;continue  # several members has no rhythm: it neither reads nor writes
+        if inactive(account):  # phase 7: a member in onboarding or deactivated: her accounts neither read nor write
+            report['inactive']=report.get('inactive',0)+1;continue
         try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
         except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
@@ -368,29 +444,46 @@ def tick(user,now=None):
     except Exception as exc:report['monthly_review_error']=type(exc).__name__  # the monthly review never stops the rest
     return report
 
+def inactive(account):
+    """Whether `account` belongs to an inactive member (organizaciones, phase 7: one being onboarded, or deactivated). The
+    autopilot leaves it alone: nothing is read, proposed, reviewed or written for her until she is active."""
+    return bool(account is not None and account.member_id and not account.member.active)
+
 def _editorial(user,now):
-    """CONT-07: queue the preparation of the next slot (EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead), one at a time,
-    within the editorial daily budget and the CONT-09 caps. Each slot gets one automatic attempt at most."""
+    """CONT-07: queue the preparation of each member's next slot (her EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead),
+    one at a time per member, within the editorial daily budget and her CONT-09 caps. Each slot of hers gets one
+    automatic attempt at most. Each member apart (organizaciones, phase 4): her job carries her (miembros.job_params) and
+    its id her (miembros.job_parts), so one member's job never deduplicates another's, and her failure never stops the
+    next member's (miembros.each_member)."""
     from . import editorial, editor_visual
     editorial.recover_stuck()
-    editor_visual.upgrade_bindings()  # a still valid v1 visual package stops depending on his confirmed facts
-    if autonomy('CONT-09')=='off' or _pending('prepare_piece'):return 0
-    account=editorial.publishing_account()
+    editor_visual.upgrade_bindings()  # a still valid v1 visual package stops depending on her confirmed facts
+    return miembros.each_member(lambda member:_editorial_for(user,now,member),'editorial')
+
+def _pending_for(kind,member):
+    """Whether a job of hers of `kind` is queued or running (job_params' encoding; every job without members)."""
+    rows=Job.objects.filter(kind=kind,state__in=[Job.State.QUEUED,Job.State.RUNNING])
+    return miembros.her_jobs(rows,member).exists()
+
+def _editorial_for(user,now,member):
+    from . import editorial, urgente
+    if autonomy('CONT-09',member)=='off' or _pending_for('prepare_piece',member):return 0
+    account=editorial.publishing_account(member)
     if not editorial.can_publish(account):return 0
     if not editorial.can_afford_preparation(now):return 0
-    from . import urgente
-    extra=urgente.next_extra(now)
+    pieces=miembros.own(EditorialPiece.objects.all(),member);parts=miembros.job_parts(member)
+    extra=urgente.next_extra(now,member)
     if extra:
-        # The post he asked for at a day and hour is an order: prepared right away, outside the CONT-09 caps.
-        attempt=EditorialPiece.objects.filter(slot_date=extra,second_of_day=True).count()
-        _,created=enqueue_operation(user,'prepare_piece',{'slot':extra.isoformat(),'extra':True},
-                                    request_id=_job_id('extra',extra) if not attempt else _job_id('extra',extra,attempt))
+        # The post she asked for at a day and hour is an order: prepared right away, outside the CONT-09 caps.
+        attempt=pieces.filter(slot_date=extra,second_of_day=True).count()
+        _,created=enqueue_operation(user,'prepare_piece',miembros.job_params(member,{'slot':extra.isoformat(),'extra':True}),
+                                    request_id=_job_id('extra',extra,*parts) if not attempt else _job_id('extra',extra,attempt,*parts))
         return int(created)
-    slot=urgente.next_slot(now) or editorial.next_slot(now)
-    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot))<=0:return 0
-    attempt=EditorialPiece.objects.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
-    _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
-                                request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))
+    slot=urgente.next_slot(now,member=member) or editorial.next_slot(now,member=member)
+    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot,member) or editorial.scheduled_for(slot,member))<=0:return 0
+    attempt=pieces.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
+    _,created=enqueue_operation(user,'prepare_piece',miembros.job_params(member,{'slot':slot.isoformat()}),
+                                request_id=_job_id('piece',slot,*parts) if not attempt else _job_id('piece',slot,attempt,*parts))
     return int(created)
 
 def author_cooldown():
@@ -399,16 +492,19 @@ def author_cooldown():
 LIVE_COMMENT_STATES=['proposed','approved','executing','sent','confirmed','uncertain']
 
 def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
-    """Referents who already got (or are about to get) a comment within the cooldown: one person, one comment at a time."""
-    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+    """Referents who already got (or are about to get) a comment within the cooldown: one person, one comment at a time.
+    Among two or more members, any member's comment counts (registro.peers, phase 6)."""
+    from . import registro
+    qs=ActionProposal.objects.filter(account__in=registro.peers(account),capability=ActionProposal.Capability.COMMENT,state__in=states,
                                      created_at__gte=now-author_cooldown(),post__referent__isnull=False)
     if exclude:qs=qs.exclude(pk=exclude)
     return set(qs.values_list('post__referent_id',flat=True))
 
 def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=None):
     """Authors (author_provider_id) who already got (or are about to get) a comment within the cooldown: the wait of
-    phase 2 is per author of the post, referent or buyer."""
-    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+    phase 2 is per author of the post, referent or buyer. Among two or more members, any member's comment counts."""
+    from . import registro
+    qs=ActionProposal.objects.filter(account__in=registro.peers(account),capability=ActionProposal.Capability.COMMENT,state__in=states,
                                      created_at__gte=now-author_cooldown())
     if exclude:qs=qs.exclude(pk=exclude)
     return set(filter(None,qs.values_list('post__author_provider_id',flat=True)))
@@ -416,8 +512,10 @@ def recent_comment_author_ids(account,now,states=LIVE_COMMENT_STATES,exclude=Non
 def _observe(user,account,now):
     if not operador.within_read_window(now):return 0
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
-    last=account.referents.filter(active=True).order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
-    referents_due=account.referents.filter(active=True).exists() and not (last and last>now-every)
+    from . import referentes
+    mine=referentes.to_read(account)  # phase 6: alone her referents; among members, the ones this account reads
+    last=mine.order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
+    referents_due=mine.exists() and not (last and last>now-every)
     if _pending('observe',account=str(account.id)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     if not referents_due:
@@ -459,7 +557,7 @@ def _prefilter(post):
 
 def _propose(user,account,now):
     # A paid draft only when a write slot is left after the comments already waiting for one.
-    if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
+    if autonomy('INT-03',operador.member_of(account=account))=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
     from knowledge import presupuesto
     if presupuesto.left(now)<=0:return 0
     day,_=operador.period_starts(now)
@@ -473,8 +571,10 @@ def _propose(user,account,now):
     if calentamiento.enabled():return _propose_groups(user,account,now,max_age,prefilter)
     # A verdict is never older than its post, so verdicts from before the oldest candidate are irrelevant.
     verdicts=prefilter_verdicts(now-max_age-timedelta(days=1)) if prefilter else {}
+    from . import registro
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
                 .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                .exclude(provider_post_id__in=registro.claimed_by_others(account))  # phase 6: another member comments it
                 .exclude(id__in=[pid for pid,decision in verdicts.items() if decision=='skip']).order_by('-posted_at'))
     from . import experimentos
     focus=experimentos.active_focus(account,now)
@@ -500,9 +600,13 @@ def _propose_groups(user,account,now,max_age,prefilter):
     verdicts=prefilter_verdicts(now-max(max_age,calentamiento.post_max_age())-timedelta(days=1)) if prefilter else {}
     skips=[pid for pid,decision in verdicts.items() if decision=='skip']
     authors=recent_comment_author_ids(account,now)
+    from . import registro
     referents=list(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
                    .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                   .exclude(provider_post_id__in=registro.claimed_by_others(account))  # phase 6: another member comments it
                    .exclude(author_provider_id__in=list(authors)).exclude(id__in=skips).order_by('-posted_at')[:30])
+    # Phase 6: a buyer or partner another member attends (or excluded for everyone, or a colleague) is not commented.
+    authors=set(authors)|registro.foreign_uids(operador.member_of(account=account),registro.organization_id(account))
     focus=experimentos.active_focus(account,now)
     if focus:referents.sort(key=lambda post:post.referent_id!=focus.referent_id)
     # BAR-25: «comunidad» is the partners' posts with NETWORK_PROJECTAPP_BUYER_ENABLED; off it has none, as before.
@@ -528,7 +632,7 @@ def _lead_redraft(user,account,now):
     write slot, budget, daily room and one-draft-at-a-time as _propose. The redraft goes through the rules and the lead
     again; a post that already has two comment drafts is never redrafted."""
     from . import compuertas
-    if not compuertas.lead_redraft() or not lider.enabled() or autonomy('INT-03')!='auto':return 0
+    if not compuertas.lead_redraft() or not lider.enabled() or autonomy('INT-03',operador.member_of(account=account))!='auto':return 0
     if 'INT-03' not in lider.capabilities() or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
     from knowledge import presupuesto
     if presupuesto.left(now)<=0 or Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).exists():
@@ -537,7 +641,7 @@ def _lead_redraft(user,account,now):
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     if daily_proposals()-drafted<=0:return 0
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
-    from . import calentamiento
+    from . import calentamiento, registro
     warm=calentamiento.enabled()
     target=Q(post__posted_at__gte=now-max_age,post__referent__active=True)
     if warm:  # phase 2: a warming buyer's comment the lead discarded gets its one redraft too
@@ -550,6 +654,9 @@ def _lead_redraft(user,account,now):
                                              state=ActionProposal.State.DISCARDED,review__decision='discard',
                                              decided_at__gte=now-timedelta(hours=24)).filter(target)
                .exclude(post__referent_id__in=recent_comment_authors(account,now))
+               .exclude(post__provider_post_id__in=registro.claimed_by_others(account))  # phase 6: only one member comments
+               .exclude(post__author_provider_id__in=list(registro.foreign_uids(operador.member_of(account=account),
+                                                                              registro.organization_id(account))))
                .annotate(drafts=Count('post__proposals',filter=Q(post__proposals__capability='INT-03'))).filter(drafts=1)
                .select_related('post').order_by('-decided_at'))
     if warm:discarded=discarded.exclude(post__author_provider_id__in=list(recent_comment_author_ids(account,now)))
@@ -633,7 +740,7 @@ def _metrics(user,account,now):
     every=_every('METRICS_EVERY_MINUTES','180')
     if not operador.within_read_window(now):return 0
     if account.provider not in metricas.PROVIDERS or every<=timedelta(0) or _pending('collect_metrics',account=str(account.id)):return 0
-    if not metricas.due(now):return 0
+    if not metricas.due(now,miembros.member_for_account(account)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
     return int(created)
@@ -691,7 +798,7 @@ def _replies(user,account,now):
     leave a slot after the replies already waiting. Only inside READ_WINDOW: a draft reads the commenter's profile too."""
     from . import respuestas
     from knowledge import presupuesto
-    if not respuestas.enabled() or account.provider not in respuestas.PROVIDERS or not operador.within_read_window(now):return 0
+    if not respuestas.enabled(operador.member_of(account=account)) or account.provider not in respuestas.PROVIDERS or not operador.within_read_window(now):return 0
     queued=0
     due=respuestas.reading_due(account,now)
     if due and not _pending('read_own_comments',account=str(account.id)):
@@ -733,14 +840,24 @@ def _stopped_recently(proposal,now):
     last=stops.aggregate(at=Max(Coalesce('finished_at','created_at')))['at']
     return bool(last) and now-last<min(RETRY_BASE*2**min(count-1,10),RETRY_CAP)
 
+def _executing(member):
+    """Whether an execution of the member's is queued or running: one at a time per member (another member's never
+    holds hers back; organizaciones, phase 2). Without members, any execution, as before."""
+    pending=[pk for pk in Job.objects.filter(kind='execute_action',state__in=[Job.State.QUEUED,Job.State.RUNNING])
+             .values_list('params__proposal',flat=True)]
+    if not pending:return False
+    if member is None:return True
+    return miembros.mine(ActionProposal.objects.filter(pk__in=pending),member).exists()
+
 def _execute(user,account,now):
     from .orquestacion import cycle_issues
     if not operador.within_window(now):return 0
-    if _pending('execute_action'):return 0
+    member=operador.member_of(account=account)
+    if _executing(member):return 0
     rounds=bool(operador.network_batches())
-    # Without network rounds every write shares one spacing; with them a network write inside its round waits less.
-    # His own post does not wait for the day's opening (operador.spacing_ok).
-    due=operador.post_due(now)  # a network action or comment now could push his post past its hour
+    # Without network rounds every write of a member shares one spacing; with them a network write inside its round
+    # waits less. Her own post does not wait for the day's opening (operador.spacing_ok).
+    due=operador.post_due(now,member)  # a network action or comment of hers now could push her post past its hour
     # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
     first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
     for proposal in ActionProposal.objects.select_related('post','piece','contact','comment').filter(account=account,state='approved',execution__isnull=True).order_by(first,'created_at'):

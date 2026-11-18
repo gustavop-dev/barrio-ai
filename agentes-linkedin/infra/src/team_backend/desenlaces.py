@@ -43,19 +43,23 @@ def comment_history(author_provider_id,limit=5,now=None):
     return [{'commented_at':o.execution.started_at.isoformat(),'replies':o.replies,'reactions':o.reactions,
              'author_replied':o.author_replied,'kind':o.kind} for o in latest]
 
-def comment_rates(days=30,now=None):
+def comment_rates(days=30,now=None,accounts=None):
     """{'measured','with_reply','author_replied'} over the owner's comments (INT-03) whose outcome was captured in the
-    last `days`; each comment counts once, by its latest outcome. A reply count unread (null) is not a reply."""
-    latest=list(_latest(ActionOutcome.objects.filter(_window(days,now),execution__proposal__capability=COMMENT)).values())
+    last `days`; each comment counts once, by its latest outcome. A reply count unread (null) is not a reply. `accounts`:
+    only those accounts' comments (a member's, organizaciones phase 5)."""
+    rows=ActionOutcome.objects.filter(_window(days,now),execution__proposal__capability=COMMENT)
+    if accounts is not None:rows=rows.filter(execution__proposal__account__in=accounts)
+    latest=list(_latest(rows).values())
     return {'measured':len(latest),'with_reply':sum(1 for o in latest if o.replies),
             'author_replied':sum(1 for o in latest if o.author_replied)}
 
-def network_engaged(contact_ids=None,days=30,now=None):
+def network_engaged(contact_ids=None,days=30,now=None,accounts=None):
     """{contact_id: [signals]}: the people whose follow (RED-01) had an outcome captured in the last `days` with any
     true signal (accepted, commented_own_post, replied_to_comment, invited_us…). `contact_ids` narrows the lookup;
     membership (`id in result`) works as with a set."""
     rows=ActionOutcome.objects.filter(_window(days,now),execution__proposal__capability='RED-01')
     if contact_ids is not None:rows=rows.filter(execution__proposal__contact_id__in=list(contact_ids))
+    if accounts is not None:rows=rows.filter(execution__proposal__account__in=accounts)
     engaged={}
     for contact_id,signals in rows.values_list('execution__proposal__contact_id','signals'):
         true=[name for name,value in (signals or {}).items() if value]

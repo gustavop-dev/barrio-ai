@@ -12,7 +12,7 @@ Only Gustavo creates the opportunity (PRS-09): the handoff's Tu turno card «Cre
 that person. An opportunity he creates by hand from Personas links the handoff too (on_opportunity)."""
 from django.db import transaction
 from django.utils import timezone
-from . import comprador, operador
+from . import alcance, comprador, identidad, miembros, operador
 from .exceptions import Conflict
 from .models import BuyerDraft, BuyerTouch, Contact, LeadHandoff, Opportunity
 from .permissions import require
@@ -56,7 +56,7 @@ def _entry(journey,state):
     first=signals[0] if signals else None
     return {'entrada':journey.entry,'ruta':journey.route,'elegida':_iso(journey.chosen_at),
             'motivo':_short((contact.classification or {}).get('reason',''),300),
-            'senal':{'tipo':first.kind,'nombre':Kind(first.kind).label,'fecha':_iso(first.at)} if first else None}
+            'senal':{'tipo':first.kind,'nombre':comprador.signal_name(first.kind,contact.account),'fecha':_iso(first.at)} if first else None}
 
 def _touches(state,touches):
     counts={}
@@ -85,14 +85,15 @@ def _business(contact,journey):
         if f['hecho'] and f['hecho'] not in seen:seen.add(f['hecho']);unique.append(f)
     return unique[:8]
 
-def _lines(sent,reply,booking):
-    """The conversation in three lines, from what happened (no model): his first message, her reply, the booking."""
+def _lines(sent,reply,booking,owner):
+    """The conversation in three lines, from what happened (no model): the member's first message (`owner`: her name,
+    identidad.owner_name), her reply, the booking."""
     first=sent[0] if sent else None
-    one=(f'Gustavo le escribió el {_day(comprador._when(first["enviado"]))}: «{_short(first["texto"],140)}»' if first and first['texto']
-         else 'Gustavo le escribió por LinkedIn.')
+    one=(f'{owner} le escribió el {_day(comprador._when(first["enviado"]))}: «{_short(first["texto"],140)}»' if first and first['texto']
+         else f'{owner} le escribió por LinkedIn.')
     two=(f'Ella respondió el {_day(comprador._when(reply["fecha"]))} ({reply["tipo"] or "sin clasificar"}): «{_short(reply["texto"],140)}»'
          if reply and reply.get('texto') else 'Ella respondió en LinkedIn.')
-    how='la reunión por Cal.com' if booking.provider=='calcom' else 'la reunión (Gustavo marcó «Agendó»)'
+    how='la reunión por Cal.com' if booking.provider=='calcom' else f'la reunión ({owner} marcó «Agendó»)'
     three=f'Agendó {how} para el {_day(booking.start_at)}.' if booking.start_at else f'Agendó {how}.'
     return [_short(one),_short(two),_short(three)]
 
@@ -115,7 +116,7 @@ def data(journey,booking):
                          'puente':_bridge(journey),
                          'referido_por':{'contacto':str(referrer.contact_id),'nombre':referrer.contact.display_name} if referrer else None,
                          'intento':journey.attempt},
-            'conversacion':_lines(sent,reply,booking),
+            'conversacion':_lines(sent,reply,booking,identidad.owner_name(contact.account)),
             'reunion':{'inicio':_iso(booking.start_at),'fin':_iso(booking.end_at),'proveedor':booking.provider,'reserva':booking.uid,
                        'emparejada_por':booking.matched_by,'correo':booking.attendee_email,'nombre':booking.attendee_name},
             'negocio':_business(contact,journey)}
@@ -177,10 +178,14 @@ def confirm(user,handoff_id):
         item=_open(handoff.contact)
         if item is None:
             company=(handoff.data.get('empresa') or {}).get('nombre','')
+            # The funnel is the organization's (every member reads its notes): with several members the conversation
+            # stays in her lead (comprador/entregas), never in a note the others read (organizaciones, phase 5).
+            lines=' / '.join(handoff.data.get('conversacion') or []) if len(miembros.active_members())<=1 else \
+                'la conversación está en la entrega del lead, en Comprador.'
             item=oportunidades.create(user,{'contact':str(handoff.contact_id),'modality':_modality(handoff),'channel':'linkedin',
                                             'stage':Opportunity.Stage.MEETING,'company':company,'next_action':'Reunión agendada (Cal.com)',
                                             'next_action_at':handoff.meeting_at,
-                                            'notes':'Entrega de la máquina de LinkedIn: '+' / '.join(handoff.data.get('conversacion') or [])})
+                                            'notes':'Entrega de la máquina de LinkedIn: '+lines})
             handoff.refresh_from_db()
         if not handoff.opportunity_id:_link(handoff,item,now)
         if handoff.contact_id:comprador.on_contact(handoff.contact,'oportunidad')
@@ -208,8 +213,9 @@ def payload(handoff):
             'conversacion_id':str(handoff.conversation_id) if handoff.conversation_id else None,
             'creada':_iso(handoff.created_at),'actualizada':_iso(handoff.updated_at),'confirmada':_iso(handoff.confirmed_at)}
 
-def listing(state=None,source=None,limit=100):
-    rows=LeadHandoff.objects.select_related('opportunity').order_by('-created_at')
+def listing(state=None,source=None,limit=100,member=None):
+    """Her handoffs (alcance.de: those of her buyers; a handoff without a person is the first member's)."""
+    rows=alcance.de(LeadHandoff.objects.all(),member).select_related('opportunity').order_by('-created_at')
     if state:
         if state not in State.values:raise ValueError('estado debe ser lista, confirmada o cancelada')
         rows=rows.filter(state=state)
@@ -218,12 +224,12 @@ def listing(state=None,source=None,limit=100):
         rows=rows.filter(source=source)
     return [payload(h) for h in rows[:limit]]
 
-def cards(card,now=None):
-    """Tu turno: each lead ready to hand over, with «Crear la oportunidad» (or «Vincular la oportunidad») first."""
+def cards(card,now=None,member=None):
+    """Tu turno: each lead of hers ready to hand over, with «Crear la oportunidad» (or «Vincular la oportunidad») first."""
     from . import respuesta_comprador
     if not respuesta_comprador.enabled():return []
     out=[]
-    for handoff in LeadHandoff.objects.select_related('contact').filter(state=State.READY).order_by('created_at'):
+    for handoff in alcance.de(LeadHandoff.objects.all(),member).select_related('contact').filter(state=State.READY).order_by('created_at'):
         contact=handoff.contact
         if contact is None:continue
         name=contact.display_name or 'Alguien';existing=_open(contact)

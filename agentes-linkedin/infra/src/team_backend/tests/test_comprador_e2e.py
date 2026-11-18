@@ -1455,7 +1455,10 @@ class SequenceBuyerPathTests(SequencePathBase):
     def test_3_with_the_inbox_off_nothing_is_prepared_and_it_says_so(self):
         dani=self.messaged('seq-e2e-dani','Dani Sin');self.follow_ups(dani)
         with patch.dict(os.environ,{'INBOX_ENABLED':'false'}):
-            self.cycle(self.start+4*DAY+MINUTE);self.cycle(self.start+4*DAY+HOUR)
+            # Two cycles of the same local day (the notice is once a local day): the clock starts from the real hour, so
+            # an hour later may already be tomorrow (it failed when run at 21:xx in Bogotá).
+            first=self.start+4*DAY+MINUTE;midnight=operador.period_starts(first)[0]+DAY
+            self.cycle(first);self.cycle(min(first+HOUR,first+(midnight-first)/2))
             self.assertEqual(self.numbers(dani),[])
             self.assertEqual(Job.objects.filter(kind='prepare_buyer_draft',params__number=2).count(),0)  # nothing paid
             events=AuditEvent.objects.filter(action='buyer.sequence_waiting')

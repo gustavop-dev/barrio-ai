@@ -18,6 +18,7 @@ from . import revision_views as rm
 from . import referentes_views as refs
 from .comunidad_views import Community, WithdrawSource
 from . import estrategia_views as es
+from . import identidad_views as iv
 urlpatterns=[
  path('referentes/revisiones',refs.Reviews.as_view()),
  path('referentes/analisis',refs.Analysis.as_view()),
@@ -38,7 +39,10 @@ urlpatterns=[
  path('integrity',views.Integrity.as_view()),path('audit',views.Audit.as_view()),
  # Account operator (DESC-04, INT-02, INT-03, ADM-04/05).
  # Self-hosted office PWA (oficina/CONTRATO-API.md).
- path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
+ # Organizaciones, phase 7: her profile and her voice, and the organization for its admin.
+ path('yo/perfil',iv.Profile.as_view()),path('yo/voz',iv.Voice.as_view()),path('yo/voz/proponer',iv.VoicePropose.as_view()),
+ path('yo/voz/decidir',iv.VoiceDecide.as_view()),path('organizacion',iv.OrganizationView.as_view()),
+ path('yo',of.Yo.as_view()),path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
  path('operador/overview',of.Overview.as_view()),path('operador/control',of.Control.as_view()),
  path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),path('oficina/eventos',of.Eventos.as_view()),
  path('push/key',of.PushKey.as_view()),path('push/subscriptions',of.PushSubscriptions.as_view()),
@@ -79,6 +83,8 @@ urlpatterns=[
  path('estrategia/semana',es.Week.as_view()),path('estrategia/dias/<str:day>',es.Day.as_view()),
  path('estrategia/mover',es.Swap.as_view()),path('estrategia/planear',es.Plan.as_view()),
  path('red/contacts/<uuid:cid>/notas',rd.ContactNotes.as_view()),
+ path('red/contacts/<uuid:cid>/liberar',rd.ContactRelease.as_view()),path('red/contacts/<uuid:cid>/pasar',rd.ContactPass.as_view()),
+ path('red/contacts/<uuid:cid>/reasignar',rd.ContactReassign.as_view()),
  path('operador/referents/<uuid:rid>',op.ReferentDetail.as_view()),
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),

@@ -5,9 +5,9 @@ Every decision needs a human session (a service token gets 403) and approve_acti
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import revision_mensual
+from . import alcance, revision_mensual
 from .models import MonthlyReview, StrategyChange
-from .operador_views import get_or_404, human_session, valid
+from .operador_views import human_session, valid
 from .permissions import require
 from .rediseno_views import _orientation_payload
 from .serializers import JobOutput, OptionalRequestInput
@@ -21,13 +21,13 @@ class RejectInput(serializers.Serializer):
 class MonthlyReviews(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        return Response(revision_mensual.overview())
+        return Response(revision_mensual.overview(member=alcance.miembro(request)))  # hers (phase 4)
 
 class MonthlyReviewDetail(APIView):
     """GET …/<id>: one review with the figures it was written from."""
     def get(self,request,rid):
         require(request.user,'operate_linkedin')
-        return Response(revision_mensual.payload(get_or_404(MonthlyReview,id=rid),with_stats=True))
+        return Response(revision_mensual.payload(alcance.obtener(request,MonthlyReview,id=rid),with_stats=True))
 
 class MonthlyReviewGenerate(APIView):
     """POST …/generar {request_id?}: «Generar ahora» for the month that ended; paid, a human session only."""
@@ -38,21 +38,21 @@ class MonthlyReviewGenerate(APIView):
 
 class MonthlyReviewSeen(APIView):
     def post(self,request,rid):
-        human_session(request);get_or_404(MonthlyReview,id=rid)
+        human_session(request);alcance.obtener(request,MonthlyReview,id=rid)
         review,_=revision_mensual.mark_seen(request.user,rid)
         return Response({'review':revision_mensual.payload(review)})
 
 def _decided(change,**extra):
     """A decided change and the orientation as it is now, so the screen shows what changed."""
     change.refresh_from_db()
-    return Response(dict({'change':revision_mensual.change_payload(change),'orientation':_orientation_payload()},**extra))
+    return Response(dict({'change':revision_mensual.change_payload(change),'orientation':_orientation_payload(change.review.member)},**extra))
 
 class StrategyChangeApprove(APIView):
     """POST …/cambios/<id>/aprobar {text?}: «Aprobar». POST …/cambios/<id>/editar {text}: «Editar y aprobar», which
     refuses an empty text: a client that does not know the editable action must not approve the original by accident."""
     require_text=False
     def post(self,request,cid):
-        human_session(request);get_or_404(StrategyChange,id=cid);data=valid(ApproveInput,request)
+        human_session(request);alcance.obtener(request,StrategyChange,id=cid);data=valid(ApproveInput,request)
         if self.require_text and not (data.get('text') or '').strip():
             return Response({'detail':'Escribe el texto del cambio para aprobarlo editado.'},status=400)
         return _decided(revision_mensual.approve(request.user,cid,data.get('text')))
@@ -60,12 +60,12 @@ class StrategyChangeApprove(APIView):
 class StrategyChangeReject(APIView):
     """POST …/cambios/<id>/rechazar {note?}."""
     def post(self,request,cid):
-        human_session(request);get_or_404(StrategyChange,id=cid);data=valid(RejectInput,request)
+        human_session(request);alcance.obtener(request,StrategyChange,id=cid);data=valid(RejectInput,request)
         return _decided(revision_mensual.reject(request.user,cid,data.get('note','')))
 
 class StrategyChangeRevert(APIView):
     """POST …/cambios/<id>/revertir: removes exactly what «Aprobar» added to the orientation."""
     def post(self,request,cid):
-        human_session(request);get_or_404(StrategyChange,id=cid)
+        human_session(request);alcance.obtener(request,StrategyChange,id=cid)
         change,found=revision_mensual.revert(request.user,cid)
         return _decided(change,found=found,message=None if found else revision_mensual.NOT_FOUND)

@@ -102,7 +102,7 @@ class ReferentOutput(serializers.ModelSerializer):
     def get_can_manage_protected(self,obj):
         from .referentes import is_gustavo
         request=self.context.get('request')
-        return is_gustavo(request.user) if request else False
+        return is_gustavo(request.user,obj.account) if request else False
     def get_protection_history(self,obj):
         from .referentes import history
         return history(obj)
@@ -264,7 +264,9 @@ class ContactOutput(serializers.ModelSerializer):
         if stage=='followed' and not (obj.classification or {}).get('fit'):
             return {'owner':None,'text':'La sigues; no se invitará: '+((obj.classification or {}).get('rule') or 'ya no encaja'),'at':None}
         if stage=='followed' and obj.followed_at:
-            blocked,reason=red.invites_blocked()
+            from . import miembros, operador
+            try:blocked,reason=red.invites_blocked(member=operador.member_of(account=obj.account))  # her invitations (phase 2)
+            except miembros.MiembroRequerido:blocked,reason=True,'Su cuenta no es de ningún miembro: nadie la invitará.'
             when=obj.followed_at+red.invite_after()
             return {'owner':'equipo','text':reason if blocked else 'El equipo la invitará cuando termine la espera','at':when}
         if stage=='invited':
@@ -276,6 +278,21 @@ class ContactOutput(serializers.ModelSerializer):
         if stage=='connected':return {'owner':None,'text':'Conectados','at':None}
         if stage=='closed':return {'owner':None,'text':'Invitación ignorada o retirada; no se reinvita','at':None}
         return {'owner':None,'text':'Descartada; no se volverá a proponer','at':None}
+    def _registro(self,obj):
+        """Organizaciones, phase 6: who attends her and to whom she may be passed (registro.view); only while two or more
+        members work the organization (alone the answer is the one of before, without the key)."""
+        from . import registro
+        cache=self.context.setdefault('_registro_shared',{}) if isinstance(self.context,dict) else {}
+        if obj.account_id not in cache:cache[obj.account_id]=registro.shared(registro.organization_id(obj.account))
+        return registro.view(obj) if cache[obj.account_id] else None
+    def to_representation(self,obj):
+        data=super().to_representation(obj)
+        view=self._registro(obj)
+        if view is not None:
+            data['registro']=view
+            if view['attended_by']:  # her colleague's person: no step of this member's team, nothing private of the other
+                data['next_step']={'owner':None,'text':f"La atiende {view['attended_by']['display_name']}",'at':None}
+        return data
     class Meta:
         model=Contact
         fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
@@ -288,6 +305,14 @@ class NoteInput(serializers.Serializer):
 
 class DiscardInput(serializers.Serializer):
     note=serializers.CharField(max_length=1000)
+    for_everyone=serializers.BooleanField(required=False,default=False)  # phase 6: nobody in the organization touches her
+
+class ReleaseInput(serializers.Serializer):
+    reason=serializers.CharField(max_length=500)
+
+class PassInput(serializers.Serializer):
+    member=serializers.UUIDField()
+    reason=serializers.CharField(max_length=500)
 
 class ActionOutput(serializers.ModelSerializer):
     """`post` is null for own content (CONT-09), then `piece_id` and `scheduled_for` identify the target, and for

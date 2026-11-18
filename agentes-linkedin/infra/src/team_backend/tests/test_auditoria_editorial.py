@@ -15,7 +15,7 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from team_backend import analitica, autopiloto, editorial, guardas, lider, operador, orquestacion, posicionamiento, red
+from team_backend import analitica, autopiloto, editorial, guardas, identidad, lider, operador, orquestacion, posicionamiento, red
 from team_backend.models import (ActionExecution, ActionProposal, AnalyticsPost, CycleLedger, EditorialPiece, Opportunity,
                                  PostMetric)
 from team_backend.tests.test_publicacion import GOOD_POST, INVENTED, EditorialBase, answers
@@ -284,13 +284,15 @@ class PositioningTests(EditorialAuditBase):
     """One versioned positioning source; stored modality values keep their vocabularies."""
 
     def test_the_three_agents_derive_from_the_same_source(self):
-        self.assertIn(posicionamiento.editorial_direction(),editorial.DIRECTION)
-        self.assertIn(posicionamiento.network_criteria(),red.CLASSIFY_SYSTEM)
-        self.assertEqual(lider.CRITERIA_DEL_BARRIO,posicionamiento.lead_criteria())
-        for text in (editorial.DIRECTION,red.CLASSIFY_SYSTEM,lider.CRITERIA_DEL_BARRIO):
-            self.assertIn(posicionamiento.IDENTITY,text)
-        self.assertIn(posicionamiento.VERSION,editorial.DIRECTION);self.assertIn(posicionamiento.VERSION,red.CLASSIFY_SYSTEM)
-        for stage in ('director','redactor','seleccion','reparacion'):self.assertIn(posicionamiento.editorial_direction(),editorial.STAGES[stage][0])
+        # Phase 3 of organizations: the same source, now the member's profile (posicionamiento reads identidad).
+        direction,classify,lead=editorial.direction(),red.classify_system(),lider.criteria_del_barrio()
+        self.assertIn(posicionamiento.editorial_direction(),direction)
+        self.assertIn(posicionamiento.network_criteria(),classify)
+        self.assertEqual(lead,posicionamiento.lead_criteria())
+        for text in (direction,classify,lead):
+            self.assertIn(identidad.of().me('identity'),text)
+        self.assertIn(posicionamiento.version(),direction);self.assertIn(posicionamiento.version(),classify)
+        for stage in ('director','redactor','seleccion','reparacion'):self.assertIn(posicionamiento.editorial_direction(),editorial.stage_system(stage))
 
     def test_stored_vocabularies_are_unchanged_and_mapped(self):
         self.assertEqual(editorial.MODALITIES,['personal_startups','projectapp','alianzas','comunidad'])
@@ -305,7 +307,7 @@ class PositioningTests(EditorialAuditBase):
         self.assertEqual(posicionamiento.to_stored('oportunidades','alianzas'),'por_clasificar')
         self.assertIsNone(posicionamiento.to_canonical('oportunidades','por_clasificar'))
         for domain,mapping in posicionamiento.VOCABULARIES.items():
-            self.assertLessEqual(set(mapping),set(posicionamiento.MODALITIES),domain)
+            self.assertLessEqual(set(mapping),set(identidad.of().org('modalities')),domain)
 
     def test_the_pwa_has_a_label_for_every_stored_value(self):
         root=Path(__file__).resolve().parents[5]/'oficina'/'src'
@@ -328,7 +330,7 @@ class PositioningTests(EditorialAuditBase):
 
     def test_the_brief_records_the_positioning_version(self):
         piece=self.plan_with(answers(decision='skip'))
-        self.assertEqual(piece.brief['positioning_version'],posicionamiento.VERSION)
+        self.assertEqual(piece.brief['positioning_version'],posicionamiento.version())
 
 
 class InventedExperienceTests(SimpleTestCase):

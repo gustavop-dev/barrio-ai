@@ -166,7 +166,7 @@ class LevelTests(BuyerBase):
         self.assertEqual((buyer['score'],buyer['score_version']),(red.buyer_score(cora)['score'],'buyer_score_v1'))
         journey=comprador.journey(cora)  # the journey keeps the level and score she entered with
         self.assertEqual((journey.entry_level,journey.entry_score,journey.entry_score_version),('por_confirmar',buyer['score'],'buyer_score_v1'))
-        self.assertEqual((gabi.stage,gabi.classification['fit'],gabi.classification['rule']),('discarded',False,red.NO_FIT_RULE))
+        self.assertEqual((gabi.stage,gabi.classification['fit'],gabi.classification['rule']),('discarded',False,red.no_fit_rule()))
         self.assertIsNone(comprador.journey(gabi))
 
     def test_each_profile_asks_its_own_public_question(self):

@@ -5,6 +5,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Código:** backend `capturas.py` (`create`, `process`, `classify`, `undo`, `capture_payload`), `capturas_views.py`, `knowledge/providers.assemblyai_transcribe`; PWA `oficina/src/capture/*`; app `movil/src/capture/*`, `movil/src/api/transport.ts`; común `compartido/src/api/capturas.ts` (`captureForm`, `appendFile`, `useCreateCaptura`), `compartido/src/logic/capturas.ts`, `compartido/src/logic/audio.ts`.
 - **Documentación:** [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md), sección «Captura y Galería» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
 - **Entorno de prueba:** AssemblyAI y Claude parcheados, como en `tests/test_capturas.py`. En la app, las pruebas de Jest sustituyen `fetch` por un simulacro (`movil/src/test/server.ts`), así que no pueden detectar un fallo del transporte como el de [CAP-04](#cap-04) y [CAP-05](#cap-05): eso lo prueban los flujos de Maestro sobre la build release en el emulador (`movil/.maestro/05-captura*.yaml`), contra el backend de QA.
+- **Por miembro (organizaciones, fase 4):** cada captura es del miembro que la grabó: sus ideas, sus datos y sus fotos solo alimentan sus piezas y su memoria, y la lista de capturas muestra solo las del usuario. Ver [ORG-20](organizaciones.md#org-20).
 
 ## Resumen
 
