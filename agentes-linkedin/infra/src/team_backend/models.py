@@ -264,6 +264,9 @@ class ConnectorAccount(models.Model):
     # Whose LinkedIn this is (organizaciones, phase 1). Null only for an account created before any member existed or by a
     # test: it belongs to the only active member, and to nobody once there are several (miembros.member_of_account).
     member=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='accounts')
+    # The account's own LinkedIn profile ids ([fsd id, public id]), learned when the connector reads /me (check_account):
+    # a member's own profile is never a prospect of a colleague (registro.colleague_ids, organizaciones phase 6).
+    linkedin_ids=models.JSONField(default=list,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
@@ -406,6 +409,18 @@ class ObservedPost(models.Model):
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
     def __str__(self):return f'{self.author_name}: {self.text[:60]}'
 
+
+class PostClaim(models.Model):
+    """Organizaciones, phase 6: a referent's post admits the comment of ONE member of the organization, the first one
+    with a proposal on it (registro.claim_post); her colleagues' copies of the post are not commented."""
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='post_claims')
+    provider_post_id=models.CharField(max_length=200)
+    member=models.ForeignKey(Member,on_delete=models.PROTECT,related_name='post_claims')
+    proposal=models.UUIDField(null=True,blank=True)
+    claimed_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['organization','provider_post_id'],name='one_comment_claim_per_post')]
+
 class Contact(models.Model):
     """A person of Gustavo's neighborhood (RED-09 relationship memory): discovered, classified and moved
     through follow -> invitation without note -> connection. Only the operator writes to LinkedIn."""
@@ -456,9 +471,60 @@ class Contact(models.Model):
     # Phase 5 (sin_posts.py): this person is the bridge («puente») to the buyer of that journey, a colleague at the
     # same company who does post. Its own contact with its own role, never a second buyer. Null for everyone else.
     bridge_for=models.ForeignKey('BuyerJourney',on_delete=models.SET_NULL,null=True,blank=True,related_name='bridges')
+    # Organizaciones, phase 6: the organization's card of this person (registro.py), shared by every member's contact of
+    # her. The contact keeps what is private to its member (notes, history, conversations, drafts, journey).
+    person=models.ForeignKey('Person',on_delete=models.SET_NULL,null=True,blank=True,related_name='contacts')
     class Meta:
         ordering=['-updated_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_contact_per_account')]
+    def __str__(self):return self.display_name or self.provider_user_id
+
+
+class Person(models.Model):
+    """One LinkedIn person in an organization (organizaciones, phase 6; registro.py): the shared card every member sees
+    (name, headline, company, the classification's role, level and score, the general stage, whether she is excluded for
+    everyone) and which member attends her since when. The first real action of a member on her (follow, comment on her
+    post, invite, accept her invitation, reply to her) makes that member her `owner`; from then on no other member
+    follows, comments, invites, replies or drafts for her. Nothing private lives here: notes, conversations, drafts,
+    messages, the journey and the touches stay on each member's Contact."""
+    class Stage(models.TextChoices):
+        CANDIDATE='candidata','Candidata'
+        FOLLOWED='seguida','Seguida'
+        INVITED='invitada','Invitada'
+        CONNECTED='conectada','Conectada'
+        DISCARDED='descartada','Descartada'
+        RESTING='descanso','En descanso'
+    class Exclusion(models.TextChoices):
+        DO_NOT_CONTACT='no_contactar','Pidió no ser contactada'
+        REFUSED='rechazo_linkedin','LinkedIn rechazó la invitación'
+        DISCARDED='descarte','Descartada para toda la organización'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    organization=models.ForeignKey(Organization,on_delete=models.PROTECT,related_name='people')
+    provider_user_id=models.CharField(max_length=200)
+    public_identifier=models.CharField(max_length=100,blank=True)
+    display_name=models.CharField(max_length=200,blank=True)
+    headline=models.TextField(blank=True)
+    company=models.CharField(max_length=120,blank=True)
+    # The organization's criteria applied to her (registro.SHARED_KEYS: fit, role, modality, level, score…), the shared
+    # criterion it was made with and the contact it came from: another member reuses it instead of paying again.
+    classification=models.JSONField(default=dict,blank=True)
+    stage=models.CharField(max_length=12,choices=Stage.choices,default=Stage.CANDIDATE)
+    excluded=models.CharField(max_length=20,choices=Exclusion.choices,blank=True)
+    excluded_reason=models.TextField(blank=True)
+    excluded_at=models.DateTimeField(null=True,blank=True)
+    # The member whose history excluded her: she keeps today's rules for her own contact; nobody else touches her.
+    excluded_by=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    owner=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='people')
+    owned_since=models.DateTimeField(null=True,blank=True)
+    touch=models.CharField(max_length=10,blank=True)  # the capability of her owner's first touch
+    touch_proposal=models.UUIDField(null=True,blank=True)
+    # The admin's assignment of an untouched person (registro.reassign): who may take her; null follows the reparto.
+    assigned_to=models.ForeignKey(Member,on_delete=models.PROTECT,null=True,blank=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-updated_at']
+        constraints=[models.UniqueConstraint(fields=['organization','provider_user_id'],name='one_person_per_organization')]
     def __str__(self):return self.display_name or self.provider_user_id
 
 OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']

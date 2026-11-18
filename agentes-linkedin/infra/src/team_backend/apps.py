@@ -11,3 +11,5 @@ class TeamBackendConfig(AppConfig):
         from .respuesta_comprador import on_reply
         from .secuencia_comprador import REPLY_HANDLERS
         if on_reply not in REPLY_HANDLERS:REPLY_HANDLERS.append(on_reply)
+        # Organizaciones, phase 6: every save of a contact updates the organization's card of the person.
+        from . import registro  # noqa: F401 (connects registro._on_contact_saved)
