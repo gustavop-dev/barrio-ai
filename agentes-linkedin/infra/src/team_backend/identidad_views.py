@@ -7,15 +7,18 @@
   writes with, her signals against the minimum, the proposal waiting for her and her decision on it. Only she confirms
   or discards; proposing is one paid call (VOICE_LEARNING_ENABLED and the minimum sample).
 - GET /api/v1/organizacion: the admin's view of the organization (alcance.ADMINISTRADOR)."""
+from django.core.cache import cache
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import alcance, identidad, miembros, voz
+from .exceptions import Conflict
 from .operador_views import human_session
 
 PROFILE_FIELDS = ('name', 'role', 'identity', 'company_relation', 'limits', 'personal_startups')
 ROLE_MAX = 120
+PROPOSING_SECONDS = 600  # longer than one proposal call; a worker that dies mid-call frees it then
 HELP = {
     'name': identidad.MEMBER_FIELDS['name'],
     'role': 'su rol en la organización (p. ej. «CTO»): se muestra junto a su nombre',
@@ -125,10 +128,19 @@ class VoicePropose(APIView):
     def post(self, request):
         human_session(request)
         member = _member(request)
+        # One paid call per decision (phase 7 security pass): none while a proposal waits for her, and one at a time
+        # (two taps, two tabs), so repeating the request never spends the organization's AI budget again.
+        if voz.pending_proposal(member) is not None:
+            raise Conflict('Ya hay una propuesta de tu voz esperando: confírmala o descártala antes de pedir otra.')
+        lock = f'voz-proponer:{member.pk}'
+        if not cache.add(lock, 1, PROPOSING_SECONDS):
+            raise Conflict('Ya se está preparando una propuesta de tu voz.')
         try:
             voz.propose(request.user, member)
         except PermissionError as exc:
             _forbidden(exc)
+        finally:
+            cache.delete(lock)
         return Response(voice_payload(member, request.user), status=201)
 
 

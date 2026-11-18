@@ -622,9 +622,10 @@ def taker(card, members=None):
     preference = role_preference()
     if preference:
         wanted = preference.get(_papel(card.classification)) or preference.get((card.classification or {}).get('role') or '')
-        # Her role (CTO) or, more precise when two share a role, her username (phase 7: lider_tecnologia=<her user>).
-        match = next((m.pk for m in members if wanted and wanted in ((m.role or '').strip().lower(),
-                                                                     m.user.get_username().lower())), None)
+        # Her username first (phase 7: lider_tecnologia=<her user>; only the admin sets it), then her role (CTO), which
+        # each member edits in «Mi perfil»: a role never takes what the admin gave to a username.
+        match = next((m.pk for m in members if wanted and wanted == m.user.get_username().lower()), None) or next(
+            (m.pk for m in members if wanted and wanted == (m.role or '').strip().lower()), None)
         if match:
             return match
     return ids[_stable(card.organization_id, card.provider_user_id) % len(ids)]

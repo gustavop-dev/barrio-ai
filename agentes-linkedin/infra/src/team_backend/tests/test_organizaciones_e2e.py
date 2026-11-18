@@ -46,6 +46,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 from django.apps import apps
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db import OperationalError, close_old_connections, connection, transaction
@@ -3115,6 +3116,14 @@ class AjustesDelMiembroTests(IdentidadBase):
         self.assertEqual(proposed.status_code, 201, proposed.content)
         self.assertEqual((proposed.json()['proposal']['number'], proposed.json()['state']), (1, 'provisional'))
         self.assertIn('primero el dato', proposed.json()['proposal']['text'])
+        self.assertIsNone(cache.get(f'voz-proponer:{self.cto.member.pk}'))  # released
+        # One paid call per decision: none while hers waits, none while another request is preparing one (security pass).
+        with self.model({'documento': 'otra', 'notas': ''}) as paid:
+            again = office.post('/api/v1/yo/voz/proponer', {}, format='json')
+            self.assertEqual((again.status_code, again.json()['detail']), (409, 'Ya hay una propuesta de tu voz esperando: '
+                                                                                  'confírmala o descártala antes de pedir otra.'))
+            self.assertEqual(paid.call_count, 0)
+        self.assertEqual(VoiceDocument.objects.filter(member=self.cto.member).count(), 1)
         for data in ({'number': 'uno', 'decision': 'confirmar'}, {'number': 1, 'decision': 'quizá'}, {'number': 1, 'decision': 'descartar', 'note': 'x' * 1001}):
             with self.subTest(data=data):
                 self.assertEqual(office.post('/api/v1/yo/voz/decidir', data, format='json').status_code, 400)
@@ -3125,6 +3134,12 @@ class AjustesDelMiembroTests(IdentidadBase):
         cto = Member.objects.get(pk=self.cto.member.pk)
         self.assertEqual(cto.settings, settings_before)  # confirming her voice lifts no approval: the admin decides
         self.assertEqual(self.g.client().get('/api/v1/yo/voz').json()['label'], 'Confirmada v1')  # his own voice 1
+        cache.add(f'voz-proponer:{self.cto.member.pk}', 1, 60)  # another request of hers is preparing one right now
+        with self.model({'documento': 'otra', 'notas': ''}) as paid:
+            busy = office.post('/api/v1/yo/voz/proponer', {}, format='json')
+        self.assertEqual((busy.status_code, busy.json()['detail'], paid.call_count),
+                         (409, 'Ya se está preparando una propuesta de tu voz.', 0))
+        cache.delete(f'voz-proponer:{self.cto.member.pk}')
 
     def test_the_admin_sees_the_organization_with_each_members_state_and_nothing_private(self):
         shown = self.g.client().get('/api/v1/organizacion')
@@ -3388,6 +3403,11 @@ class PendientesDeFase6Tests(RegistroBase):
             with self.subTest(username=username), patch.dict(os.environ, {'PEOPLE_ROLE_PREFERENCE': f'lider_tecnologia={username}'}):
                 self.assertEqual(registro.taker(card, members), member.pk)
         self.assertEqual(registro.role_preference(), {})
+        # Each member edits her own role in «Mi perfil»: the older one writing the other's username as his role does not
+        # take what the admin gave to that username (security pass).
+        self.g.member.role = 'cto-test'
+        with patch.dict(os.environ, {'PEOPLE_ROLE_PREFERENCE': 'lider_tecnologia=cto-test'}):
+            self.assertEqual(registro.taker(card, members), self.cto.member.pk)
 
     def test_a_classification_shaped_by_the_payers_private_guidance_is_not_reused(self):
         """Catch the CTO taking a verdict Gustavo's private guidance (his brief) shaped: she pays for her own; between
