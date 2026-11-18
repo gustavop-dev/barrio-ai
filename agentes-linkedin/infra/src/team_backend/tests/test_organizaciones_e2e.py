@@ -43,16 +43,20 @@ from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 
-from team_backend import (alertas_slack, analitica, autopiloto, conexion, connectors_linkedin as li, editorial, imagenes,
-                          metricas, miembros, operador, perfil, red, referentes, respuestas)
+from knowledge import db
+from team_backend import (alertas_slack, analitica, autopiloto, conexion, connectors_linkedin as li, editorial, identidad,
+                          imagenes, metricas, miembros, operador, perfil, posicionamiento, red, referentes, respuestas, voz)
 from team_backend.connectors import ConnectorError, FakeConnector
-from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BrowserLogin, ConnectorAccount, Contact,
-                                 EditorialPiece, Job, LinkedInCredential, Member, OperatorControl, Organization, Referent)
+from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BrowserLogin, BuyerJourney, Capture,
+                                 ConnectorAccount, Contact, EditorialPiece, IdentityRevision, Job, LinkedInCredential, Member,
+                                 ObservedPost, OperatorControl, Organization, PostComment, Referent,
+                                 VoiceDocument)
 from team_backend.tests import test_conexion as cx
 from team_backend.tests import test_metricas as met
 from team_backend.tests import test_operador as op
 from team_backend.tests import test_publicacion as pub
 from team_backend.tests import test_respuestas as resp
+from team_backend.tests.test_identidad_prompts import PINNED
 from team_backend.tests.test_operador import ALL, OperatorBase
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
 
@@ -974,7 +978,9 @@ class EstadoDeGustavoTests(OperatorBase):
                 'follows_left': operador.capacity_left(self.account, 'RED-01', now)}
 
     def events(self):
-        return sorted(AuditEvent.objects.exclude(action='organization.member_saved').values_list('action', 'target', 'id'))
+        """Every audit row but the ones that create his member and seed his identity (phase 3)."""
+        bootstrap = ['organization.member_saved', 'organization.identity_saved']
+        return sorted(AuditEvent.objects.exclude(action__in=bootstrap).values_list('action', 'target', 'id'))
 
     def test_his_state_of_before_is_his_first_members_and_a_second_starts_her_own(self):
         """Catch a reset on deploy: the ramp at stage 1, this month's notes, today's schedule and today's profile reads
@@ -1116,3 +1122,330 @@ class VigilantesTests(OperatorBase):
         sent = set(AuditEvent.objects.filter(action='slack.alert').values_list('target', flat=True))
         self.assertTrue({key for _, key, text in both if text != '<lazy>'} <= sent)
         self.assertEqual(len(self.sent), len(sent))
+
+
+# ====================================================================== phase 3: the identity out of the code
+
+CTO_PROFILE = {
+    'name': 'Laura Gómez',
+    'identity': 'Laura Gómez es CTO: decide la arquitectura y la calidad técnica de lo que construye el equipo.',
+    'company_relation': 'Es la CTO de ProjectApp.',
+    'limits': 'precios y propuestas comerciales; diseño visual; experiencias o cifras inventadas; datos privados de cualquier persona',
+    'personal_startups': 'no',
+    'purposes.projectapp': 'contratos para ProjectApp, cuya tecnología ella dirige',
+}
+COMMENT = {'decision': 'comment', 'language': 'en', 'comment': 'Evals are where most of the work hides. Which failure mode do '
+           'you test first in production?', 'rationale': 'Aporta un ángulo concreto.', 'citations': ['LI-03-M006-K02'],
+           'claims_needing_evidence': [], 'risks': []}
+
+
+def gustavo_marks():
+    """What only Gustavo's identity and voice carry: his name and key token, his presentation, his relation to the
+    company, his limits and his voice (the guide and his own document)."""
+    seed = identidad.initial()
+    member = seed['member']
+    document = voz.resource(seed['voice']['resource'])
+    return ['Gustavo', 'gustavo', member['identity'], member['company_relation'], member['limits'],
+            seed['voice']['guide'].splitlines()[0], document.splitlines()[4][:80]]
+
+
+def sha(text):
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+class IdentidadBase(DosMiembrosBase):
+    """Gustavo as migration 0058 leaves him (his profile, ProjectApp's and his voice document 1) and the CTO with the
+    profile she set herself (`operador perfil`), still without a voice document."""
+
+    def setUp(self):
+        super().setUp()
+        identidad.seed_first(self.g.member)
+        args = [arg for field, value in CTO_PROFILE.items() for arg in ('--fijar', f'{field}={value}')]
+        self.assertIn('Perfil actualizado: revisión 1 (auditada).', self.command('cto-test', 'perfil', *args))
+        for persona in (self.g, self.cto):  # as a job reads them: fresh rows, not the ones cached before the profiles
+            for row in (persona.member, persona.user, persona.reader, persona.official):
+                row.refresh_from_db()
+        self.sent = []
+
+    def command(self, user, *args):
+        out = io.StringIO()
+        call_command('operador', '--usuario', user, *args, stdout=out)
+        return out.getvalue()
+
+    def model(self, *answers):
+        """providers.claude, recorded: each call's system, message, schema and purpose; the answers in order."""
+        queue = list(answers)
+
+        def fake(system, message, **kwargs):
+            self.sent.append({'system': system, 'message': message, 'schema': kwargs.get('output_schema'),
+                              'purpose': kwargs.get('purpose')})
+            return {'text': json.dumps(queue.pop(0)), 'model': 'claude-opus-5-5', 'estimated_usd': 0.01,
+                    'request_id': 'req_' + str(kwargs.get('purpose'))}
+        return patch('knowledge.providers.claude', side_effect=fake)
+
+    def assertHers(self, call, name='Laura Gómez'):
+        """The call carries her name and nothing that is only Gustavo's (instructions, message and schema alike)."""
+        everything = json.dumps(call, ensure_ascii=False, default=str)
+        for mark in gustavo_marks():
+            self.assertNotIn(mark, everything)
+        self.assertIn(name, call['system'])
+
+    def observed(self, persona, pid):
+        return ObservedPost.objects.create(account=persona.reader, provider_post_id=f'urn:li:activity:{pid}',
+                                           author_name='Ana Autora', share_url=f'https://www.linkedin.com/feed/update/urn:li:activity:{pid}/',
+                                           text='Most teams skip evals until the first incident. What do you test first?')
+
+
+class IdentidadPorMiembroTests(IdentidadBase):
+    """What the team writes in the CTO's name is hers: her name, presentation, limits and (provisional) voice, never
+    Gustavo's. Gustavo's own texts are the ones of before (test_identidad_prompts pins all 109)."""
+
+    def test_a_comment_is_drafted_with_her_identity_and_voice_and_his_with_his(self):
+        """operador.propose_comment on each one's observed post: hers carries her name and the provisional voice (and the
+        proposal says so); his system prompt is the pinned one and his proposal records his confirmed voice 1."""
+        with self.model(COMMENT, COMMENT):
+            hers = operador.propose_comment(self.cto.user, self.observed(self.cto, 7001).id)
+            his = operador.propose_comment(self.g.user, self.observed(self.g, 7002).id)
+        self.assertHers(self.sent[0])
+        self.assertIn('<tono_de_voz autor="Laura Gómez" estado="provisional">', self.sent[0]['system'])
+        self.assertIn(voz.resource('voz-provisional.md'), self.sent[0]['system'])
+        self.assertEqual((hers.account, hers.voice), (self.cto.reader, {'tipo': 'provisional'}))
+        self.assertEqual(sha(self.sent[1]['system']), PINNED['operador.comment'])
+        self.assertEqual((his.account, his.voice), (self.g.reader, {'tipo': 'confirmada', 'version': 1}))
+
+    def test_a_reply_reads_and_writes_her_key_names_and_stores_the_usual_ones(self):
+        """respuestas.propose on a comment to her post: her schema asks `question_for_laura_gomez` / `ask_laura_gomez`,
+        her answer is read back to the stored names, and the INT-04 proposal is hers, in the provisional voice."""
+        with db.connect() as c:
+            for uid in operador.REPLY_UNITS:
+                c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
+                    VALUES(%s,%s,%s,'{"title":"Synthetic course fixture","limits_errors":"Do not infer facts or authority"}',
+                    'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''', (uid, int(uid[3:5]), uid))
+        now = timezone.now()
+        piece = EditorialPiece.objects.create(account=self.cto.official, slot_date=now.date() - timedelta(days=400),
+                                              scheduled_for=now - timedelta(hours=5), state='ready', final_text=CTO_POST,
+                                              brief={'thesis': 'Nobody owns the evals', 'approach': 'opinion'})
+        row = PostComment.objects.create(account=self.cto.reader, piece=piece, provider_post_id='urn:li:share:cto1',
+                                         provider_comment_id='c-cto-1', author_name='María PM', text=resp.QUESTION,
+                                         commented_at=now - timedelta(hours=1))
+        answer = {'decision': 'reply', 'language': 'en', 'reply': resp.REPLY, 'rationale': 'Responde la pregunta.',
+                  'citations': [resp.UNIT], 'claims_needing_evidence': [], 'risks': [], 'dm_opener': '',
+                  'question_for_laura_gomez': {'question': '', 'purpose': '', 'memory_key': ''}}
+        with self.model(answer), patch.dict(os.environ, {'REPLIES_ENABLED': 'true', 'REPLIES_WINDOW_HOURS': '72'}):
+            result = respuestas.propose(self.cto.user, row.id)
+        self.assertEqual(result['decision'], 'reply')
+        call = self.sent[0]
+        self.assertHers(call)
+        self.assertIn('question_for_laura_gomez', call['schema']['properties'])
+        self.assertIn('ask_laura_gomez', call['schema']['properties']['decision']['enum'])
+        proposal = ActionProposal.objects.get(pk=result['proposal'])
+        self.assertEqual((proposal.account, proposal.payload, proposal.voice), (self.cto.reader, {'text': resp.REPLY},
+                                                                                {'tipo': 'provisional'}))
+
+    def test_a_first_message_is_hers(self):
+        """The steps of mensajes_comprador._draft for a buyer of her account (inputs_for, then _write): her name in the
+        moment it explains and in the instructions, her provisional voice, nothing of Gustavo's."""
+        from team_backend import mensajes_comprador as mc
+        contact = Contact.objects.create(account=self.cto.reader, provider_user_id='ACoTom', display_name='Tom Buyer',
+                                         headline='CEO at Lone Star Outfitters', location='Austin, Texas, United States',
+                                         classification={'role': 'comprador', 'fit': True}, stage='connected', source='search')
+        journey = BuyerJourney(contact=contact, accepted_at=timezone.now() - timedelta(days=2))
+        facts = [{'id': 'h1', 'tipo': 'post', 'texto': 'Publicó sobre el inventario de sus tiendas.', 'fuente': 'post'}]
+        ident = identidad.of_account(contact.account)
+        data = mc.inputs_for(contact, journey, mc.MESSAGE, facts, timezone.now())
+        units, _, _ = operador.course_context(operador.COMMENT_UNITS)
+        answer = {'decision': 'write', 'language': 'en', 'message': 'Hi Tom, your post on inventory stuck with me.',
+                  'anchor': 'h1', 'rationale': 'r', 'citations': [], 'claims_needing_evidence': [], 'risks': []}
+        with self.model(answer):
+            mc._write(mc.MESSAGE, data, units, 1, ident)
+        self.assertHers(self.sent[0])
+        self.assertIn('Aceptó la invitación de Laura Gómez', self.sent[0]['message'])
+        self.assertIn('estado="provisional"', self.sent[0]['system'])
+
+    def test_a_classification_reads_her_neighborhood_and_her_limits(self):
+        """red._classify_batch on her account: the classifier reads her presentation and only her modalities; its
+        criterion_version is hers, and his stays the pinned one."""
+        contact = Contact.objects.create(account=self.cto.reader, provider_user_id='ACoCand', display_name='Cand Idate',
+                                         headline='VP Engineering at Acme', location='Austin, Texas, United States',
+                                         classification={}, stage='candidate', source='search')
+        grounding = {'course_missing': [], 'course_version': 'bib-v2', 'criterion_sources': {}}
+        with self.model({'contacts': []}), patch('team_backend.operador.role_context', return_value=('ctx', grounding)), \
+                patch('team_backend.red._enrich', side_effect=lambda account, rows: rows):
+            red._classify_batch(self.cto.user, self.cto.reader, timezone.now(), 10)
+        call = self.sent[0]
+        self.assertHers(call)
+        self.assertIn(CTO_PROFILE['identity'], call['system'])
+        self.assertNotIn('personal_startups', call['system'])  # not her modality
+        self.assertIn(str(contact.id), call['message'])
+        his = red.criterion_version(red.classify_system(self.g.member), 0.6, 'bib-v2', '').rsplit(':', 1)[1]
+        hers = red.criterion_version(call['system'], 0.6, 'bib-v2', '').rsplit(':', 1)[1]
+        self.assertEqual(sha(his), PINNED['red.criterion_version'])
+        self.assertNotEqual(hers, his)
+
+    def test_an_editorial_piece_is_directed_and_written_as_hers(self):
+        """editorial._stage (director, then redactor) on her piece: her limits and key names reach the director, the
+        stored brief keeps `questions_for_gustavo`, and the writer uses her provisional voice, recorded on the piece."""
+        now = timezone.now()
+        piece = EditorialPiece.objects.create(account=self.cto.official, slot_date=now.date() + timedelta(days=30),
+                                              scheduled_for=now + timedelta(days=30), state='preparing')
+        brief = {'skip': False, 'questions_for_laura_gomez': [{'question': '¿Qué pasó?', 'purpose': 'p', 'memory_key': 'k',
+                                                              'public': True}]}
+        with self.model(brief, {'post': CTO_POST, 'citations': []}):
+            directed, _ = editorial._stage(piece, 'director', {'ideas_from_gustavo': [], 'feedback_from_gustavo': []})
+            editorial._stage(piece, 'redactor', {'brief': {'thesis': 'Evals first'}})
+        director, writer = self.sent
+        self.assertHers(director)
+        self.assertIn('ideas_from_laura_gomez', director['message'])
+        self.assertIn('questions_for_laura_gomez', director['schema']['properties'])
+        self.assertIn(CTO_PROFILE['limits'], director['system'])
+        self.assertEqual(directed['questions_for_gustavo'][0]['question'], '¿Qué pasó?')  # stored with the usual name
+        self.assertHers(writer)
+        self.assertIn('estado="provisional"', writer['system'])
+        piece.refresh_from_db()
+        self.assertEqual(piece.voice, {'tipo': 'provisional'})
+
+    def test_drawn_names_are_hers(self):
+        from team_backend import infografias
+        ident = identidad.of_account(self.cto.official)
+        self.assertEqual((infografias.author(ident), imagenes.document_title(EditorialPiece(account=self.cto.official))),
+                         ('Laura Gómez', 'Ideas · Laura Gómez'))
+        self.assertEqual(imagenes.document_title(EditorialPiece(account=self.g.official)), 'Ideas · Gustavo')
+        self.assertEqual(sha(infografias.author(identidad.of_account(self.g.official))), PINNED['infografias.author'])
+        # The designer's rule shows example slides signed by the first person: hers are signed with her name.
+        design = imagenes.design_system(EditorialPiece(account=self.cto.official))
+        for mark in gustavo_marks():
+            self.assertNotIn(mark, design)
+        self.assertIn('Laura Gómez', design)
+        self.assertIn(f'<regla_infografias version="{infografias.version()}">', design)  # the same rule version as his
+
+    def test_no_members_name_goes_to_a_public_web_question(self):
+        """research.safe_question drops a question that names any member (hers too), and keeps a public one."""
+        from team_backend import research
+        for question in ('Noticias de Laura Gómez en 2026', 'Entrevista a Gómez sobre evals', 'Noticias de Gustavo'):
+            with self.subTest(question=question):
+                self.assertEqual(research.safe_question(question), '')
+        self.assertEqual(research.safe_question('How do startups test LLM evals'), 'How do startups test LLM evals')
+
+    def test_without_saying_whose_identity_several_active_members_raise(self):
+        """No default member with two active: every identity read without one is MiembroRequerido, never Gustavo's."""
+        for read in (identidad.of, voz.current, posicionamiento.status, red.classify_system, operador.comment_system):
+            with self.subTest(read=read.__qualname__), self.assertRaises(miembros.MiembroRequerido):
+                read()
+        self.assertEqual(identidad.owner_name(ConnectorAccount.objects.create(provider='fake', external_account_id='nadie',
+                                                                              label='Sin miembro')), 'el dueño de la cuenta')
+        # A text a person reads names the owner of the account, never Gustavo by default (the «account paused» push).
+        with patch('team_backend.notificaciones.avisar') as pushed:
+            operador.set_account_pause(self.cto.reader, 'Prueba de pausa.')
+        kind, _, detail = pushed.call_args.args
+        self.assertEqual(kind, 'account_paused')
+        self.assertIn('Solo Laura Gómez puede reanudarla.', detail)
+        Member.objects.filter(pk=self.cto.member.pk).update(active=False)
+        self.assertEqual(identidad.of().name, 'Gustavo')
+
+
+class VozTests(IdentidadBase):
+    """Her voice: provisional until she confirms one learned from her own signals; never another member's."""
+
+    def setUp(self):
+        super().setUp()
+        env = patch.dict(os.environ, {'VOICE_LEARNING_ENABLED': 'true', 'VOICE_LEARNING_MIN_TEXTS': '2'})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def approved(self, persona, text, edited_from=None):
+        """A comment the team drafted on her account that she approved as it was (`text`), or rewrote with
+        operador.revise (`edited_from` is her version; the draft is superseded)."""
+        post = self.observed(persona, uuid.uuid4().int % 10**9)
+        draft = ActionProposal.objects.create(account=persona.reader, post=post, capability='INT-03', payload={'text': text},
+                                              payload_hash=uuid.uuid4().hex * 2, source='agent')
+        if edited_from is not None:
+            return operador.revise(persona.user, draft.id, {'text': edited_from})
+        ActionProposal.objects.filter(pk=draft.pk).update(state='confirmed', decided_by=persona.user, decided_at=timezone.now())
+        return draft
+
+    def test_the_provisional_voice_is_hers_neutral_and_marked(self):
+        voice = voz.current(self.cto.member)
+        self.assertEqual((voice.kind, voice.meta, voice.author), ('provisional', {'tipo': 'provisional'}, 'Laura Gómez'))
+        block = voice.block()
+        for mark in gustavo_marks():
+            self.assertNotIn(mark, block)
+        self.assertIn(voz.resource('voz-provisional.md'), block)
+        self.assertEqual(sha(voz.block(self.g.member)), PINNED['voz.block'])
+        self.assertIn('PROVISIONAL', self.command('cto-test', 'voz'))
+
+    def test_a_short_sample_proposes_nothing_and_pays_nothing(self):
+        self.approved(self.cto, 'Solo uno.')
+        with self.model() as claude, self.assertRaisesMessage(voz.MuestraInsuficiente, '1 de 2'):
+            voz.propose(self.cto.user, self.cto.member)
+        claude.assert_not_called()
+        self.assertFalse(VoiceDocument.objects.filter(member=self.cto.member).exists())
+        with patch.dict(os.environ, {'VOICE_LEARNING_ENABLED': 'false'}), self.assertRaisesMessage(ValueError, 'apagado'):
+            voz.propose(self.cto.user, self.cto.member)
+
+    def test_a_proposal_reads_only_her_signals_is_unused_until_she_confirms_and_is_versioned(self):
+        """voz.propose reads her approved and edited texts (never his, nor his captures); the proposal is not her voice
+        until she confirms it with `operador voz --confirmar 1` (the admin cannot); then it is version 1, audited."""
+        self.approved(self.cto, 'Medimos antes de opinar.')
+        self.approved(self.cto, 'Primero el dato, luego la decisión.', edited_from='Primero el dato y después decidimos.')
+        self.approved(self.g, 'Uy, qué pro, me dio curiosidad.')  # his: never in her sample
+        Capture.objects.create(created_by=self.g.user, note='Nota de Gustavo con su estilo', state='anotado')
+        document = '# Tono de voz de Laura Gómez\n\nFrases cortas y precisas; primero el dato.'
+        with self.model({'documento': document, 'notas': 'Muestra pequeña.'}):
+            proposal = voz.propose(self.cto.user, self.cto.member)
+        call = self.sent[0]
+        self.assertEqual(call['purpose'], 'voice-proposal')
+        self.assertHers(call)
+        texts = [item['texto'] for item in json.loads(call['message'])['senales']]
+        self.assertEqual(sorted(texts), sorted(['Medimos antes de opinar.', 'Primero el dato y después decidimos.']))
+        self.assertNotIn('qué pro', call['message'])
+        self.assertEqual((proposal.number, proposal.state, proposal.usage['texts']), (1, 'propuesta', 2))
+        self.assertEqual(voz.current(self.cto.member).kind, 'provisional')  # not used until she confirms
+        with self.assertRaises(PermissionError):
+            voz.confirm(self.g.user, self.cto.member, 1)  # only she, not even the admin
+        self.assertIn('Voz 1 confirmada', self.command('cto-test', 'voz', '--confirmar', '1'))
+        voice = voz.current(self.cto.member)
+        self.assertEqual((voice.kind, voice.number, voice.meta), ('confirmada', 1, {'tipo': 'confirmada', 'version': 1}))
+        self.assertIn(document, voice.block())
+        self.assertNotIn('estado="provisional"', voice.block())
+        self.assertEqual(sha(voz.block(self.g.member)), PINNED['voz.block'])  # his, untouched
+        self.assertEqual(AuditEvent.objects.filter(action__in=['organization.voice_proposed', 'organization.voice_confirmed'],
+                                                   target=str(self.cto.member.pk)).count(), 2)
+
+
+class PerfilComandoTests(IdentidadBase):
+    """`operador perfil` and `perfil-organizacion`: validated, audited with before and after, and only hers / the admin's."""
+
+    def test_her_profile_is_validated_audited_and_only_hers(self):
+        """`operador perfil`: her revision 1 records before and after; invalid values and another user's change are
+        refused without a revision; the same value again changes nothing; anyone may read it with its history."""
+        revision = IdentityRevision.objects.get(subject=f'member:{self.cto.member.pk}')
+        self.assertEqual((revision.number, revision.actor, revision.after['name'], revision.before['name']),
+                         (1, self.cto.user, 'Laura Gómez', 'CTO de prueba'))
+        self.assertEqual(self.cto.member.profile['personal_startups'], False)
+        for args, reason in ((('--fijar', 'name=L4ura'), 'solo letras'),
+                             (('--fijar', 'limits={nombre} no inventa'), 'llaves'),
+                             (('--fijar', 'purposes.alianzas_x=algo'), 'purposes'),
+                             (('--fijar', 'color=azul'), 'Campo desconocido')):
+            with self.subTest(args=args), self.assertRaisesMessage(CommandError, reason):
+                self.command('cto-test', 'perfil', *args)
+        with self.assertRaisesMessage(CommandError, 'Solo el propio miembro'):
+            self.command('gustavo-test', 'perfil', '--miembro', 'cto-test', '--fijar', 'limits=otra cosa')
+        self.assertIn('Sin cambios', self.command('cto-test', 'perfil', '--fijar', 'name=Laura Gómez'))
+        self.assertEqual(IdentityRevision.objects.filter(subject=f'member:{self.cto.member.pk}').count(), 1)
+        shown = self.command('gustavo-test', 'perfil', '--miembro', 'cto-test', '--historial')  # anyone may read it
+        self.assertIn('limits [propio]: ' + CTO_PROFILE['limits'], shown)
+        self.assertIn('#1 · ', shown)
+
+    def test_the_organizations_profile_is_the_admins(self):
+        out = self.command('gustavo-test', 'perfil-organizacion', '--fijar', 'version=posicionamiento-v3')
+        self.assertIn('revisión 2 (auditada)', out)  # 1 is migration 0058's (seed_first here)
+        self.assertEqual((posicionamiento.version(self.g.member), posicionamiento.version(self.cto.member)),
+                         ('posicionamiento-v3', 'posicionamiento-v3'))
+        last = IdentityRevision.objects.filter(subject='organization').last()
+        self.assertEqual((last.before['version'], last.after['version'], last.changed, last.actor),
+                         ('posicionamiento-v2', 'posicionamiento-v3', ['version'], self.g.user))
+        with self.assertRaisesMessage(CommandError, 'administrador'):
+            self.command('cto-test', 'perfil-organizacion', '--fijar', 'version=posicionamiento-v4')
+        with self.assertRaisesMessage(CommandError, 'claves'):
+            self.command('gustavo-test', 'perfil-organizacion', '--fijar', 'pillars={"otra": "x"}')
+        self.assertEqual(posicionamiento.version(self.g.member), 'posicionamiento-v3')
