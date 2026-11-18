@@ -1815,6 +1815,7 @@ def summary(account=None,now=None,member=None):
     from .autopiloto import autonomy
     now=now or timezone.now();contacts=Contact.objects.all();member=operador.member_of(account,member)
     if account:contacts=contacts.filter(account=account)
+    elif member is not None:contacts=miembros.mine(contacts,member)  # her people (organizaciones, phase 5)
     stages={s:contacts.filter(stage=s).count() for s in Contact.Stage.values}
     day,week=operador.period_starts(now);capacity={}
     for capability in NETWORK_CAPABILITIES:
@@ -1827,6 +1828,7 @@ def summary(account=None,now=None,member=None):
                               'left':max(0,min(daily-du,weekly-wu)),'mode':autonomy(capability,member)}
     reads=AuditEvent.objects.filter(action='network.read',created_at__gte=day)
     if account:reads=reads.filter(target=str(account.id))
+    elif member is not None:reads=reads.filter(target__in=[str(pk) for pk in miembros.accounts(member).values_list('pk',flat=True)])
     blocked,reason=invites_blocked(now,member)
     def last(action):
         return AuditEvent.objects.filter(action=action).order_by('-created_at').values_list('created_at',flat=True).first()

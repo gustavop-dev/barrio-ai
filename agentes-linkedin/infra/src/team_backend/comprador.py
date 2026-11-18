@@ -858,10 +858,11 @@ def _replies(journeys):
     from . import respuesta_comprador
     return respuesta_comprador.funnel(journeys)
 
-def funnel(weeks=8,now=None,account=None):
+def funnel(weeks=8,now=None,account=None,accounts=None):
     """The buyer's funnel (GET /api/v1/resultados/embudo-comprador): cumulative and by week (cohorts by the week they
     were chosen, plus that week's activity), the comparisons that matter and the drafts. Stages that do not exist yet
-    (messages 2–4, interested, meeting) come at zero with their final shape. Read-only."""
+    (messages 2–4, interested, meeting) come at zero with their final shape. Read-only. `accounts`: only the buyers of
+    those accounts (a member's, alcance.accounts; organizaciones phase 5)."""
     from . import operador
     try:weeks=int(weeks)
     except (TypeError,ValueError):raise ValueError('semanas debe ser un número entre 1 y 26.') from None
@@ -869,6 +870,7 @@ def funnel(weeks=8,now=None,account=None):
     now=now or timezone.now()
     rows=BuyerJourney.objects.select_related('contact')
     if account is not None:rows=rows.filter(contact__account=account)
+    if accounts is not None:rows=rows.filter(contact__account__in=accounts)
     rows=list(rows)
     outbound=[j for j in rows if j.entry==BuyerJourney.Entry.OUTBOUND]
     inbound=[j for j in rows if j.entry==BuyerJourney.Entry.INBOUND]
@@ -897,7 +899,7 @@ def funnel(weeks=8,now=None,account=None):
     if projectapp.enabled():
         test={'por_linea':{line:block(j for j in outbound if (j.line or 'startup')==line) for line in projectapp.LINES},
               'por_segmento':{s:block(j for j in outbound if j.line=='projectapp' and j.segment==s) for s in projectapp.SEGMENTS},
-              'prueba_projectapp':projectapp.test_progress(account,now)}
+              'prueba_projectapp':projectapp.test_progress(account,now,accounts=accounts)}
     return {**({'ruta_sin_posts':route} if route else {}),**test,
             'generado':now.isoformat(),'zona_horaria':str(operador.local_tz()),'definiciones':DEFINITIONS,
             'acumulado':block(outbound),'semanas':weekly,

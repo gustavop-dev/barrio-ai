@@ -5,7 +5,7 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import operador
+from . import alcance, operador
 from .connectors import ConnectorError
 from .jobs import enqueue_operation
 from .models import ActionProposal, ConnectorAccount, DeviceToken, ObservedPost, Referent
@@ -38,7 +38,7 @@ class Accounts(ListAPIView):
     serializer_class=AccountOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        return ConnectorAccount.objects.order_by('created_at')
+        return alcance.accounts(alcance.miembro(self.request)).order_by('created_at')  # hers (organizaciones, phase 5)
     def post(self,request):
         data=valid(AccountInput,request)
         return Response(AccountOutput(operador.register_account(request.user,**data)).data,status=201)
@@ -46,12 +46,12 @@ class Accounts(ListAPIView):
 class AccountCheck(APIView):
     def post(self,request,aid):
         require(request.user,'operate_linkedin')
-        return Response(AccountOutput(operador.check_account(get_or_404(ConnectorAccount,id=aid),request.user)).data)
+        return Response(AccountOutput(operador.check_account(alcance.obtener(request,ConnectorAccount,id=aid),request.user)).data)
 
 class AccountPause(APIView):
     def post(self,request,aid):
         human_session(request);data=valid(PauseInput,request)
-        account=operador.set_paused(request.user,get_or_404(ConnectorAccount,id=aid),data['paused'],data['reason'])
+        account=operador.set_paused(request.user,alcance.obtener(request,ConnectorAccount,id=aid),data['paused'],data['reason'])
         return Response(AccountOutput(account).data)
 
 class Referents(ListAPIView):
@@ -99,7 +99,7 @@ class ReferentDetail(APIView):
 class Observe(APIView):
     def post(self,request):
         data=valid(ObserveInput,request)
-        get_or_404(ConnectorAccount,id=data['account'])
+        alcance.obtener(request,ConnectorAccount,id=data['account'])  # one of her accounts reads
         params={'account':str(data['account']),'limit':data['limit'],'referents':[str(r) for r in data.get('referents',[])]}
         job,created=enqueue_operation(request.user,'observe',params,data.get('request_id'),request.request_id)
         return Response(JobOutput(job).data,status=202 if created else 200)
@@ -108,13 +108,13 @@ class Posts(ListAPIView):
     serializer_class=PostOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=ObservedPost.objects.all()
+        qs=alcance.de(ObservedPost.objects.all(),alcance.miembro(self.request))
         account=self.request.query_params.get('account')
         return qs.filter(account_id=account) if account else qs
 
 class ProposeComment(APIView):
     def post(self,request,pid):
-        data=valid(OptionalRequestInput,request);get_or_404(ObservedPost,id=pid)
+        data=valid(OptionalRequestInput,request);alcance.obtener(request,ObservedPost,id=pid)
         job,created=enqueue_operation(request.user,'propose_comment',{'post':str(pid)},data.get('request_id'),request.request_id)
         return Response(JobOutput(job).data,status=202 if created else 200)
 
@@ -122,55 +122,55 @@ class Actions(ListAPIView):
     serializer_class=ActionOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=ActionProposal.objects.select_related('post','piece','contact')
+        qs=alcance.de(ActionProposal.objects.select_related('post','piece','contact'),alcance.miembro(self.request))
         state=self.request.query_params.get('state');capability=self.request.query_params.get('capability')
         if state:qs=qs.filter(state=state)
         return qs.filter(capability=capability) if capability else qs
     def post(self,request):
         data=valid(ActionInput,request)
-        post=get_or_404(ObservedPost,id=data['post'])
+        post=alcance.obtener(request,ObservedPost,id=data['post'])
         proposal=operador.create_proposal(request.user,post,data['capability'],data['payload'],rationale=data['rationale'])
         return action_response(proposal,201)
 
 class ActionDetail(APIView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        return action_response(get_or_404(ActionProposal,id=pid))
+        return action_response(alcance.obtener(request,ActionProposal,id=pid))
 
 class ActionRevise(APIView):
     def post(self,request,pid):
-        data=valid(ReviseInput,request);get_or_404(ActionProposal,id=pid)
+        data=valid(ReviseInput,request);alcance.obtener(request,ActionProposal,id=pid)
         return action_response(operador.revise(request.user,pid,data['payload'],data['note']),201)
 
 class ActionApprove(APIView):
     def post(self,request,pid):
         human_session(request);data=valid(DecisionInput,request)
         if 'expected_hash' not in data:raise PermissionDenied('Aprobar requiere el hash de la versión revisada')
-        get_or_404(ActionProposal,id=pid)
+        alcance.obtener(request,ActionProposal,id=pid)
         job=operador.approve(request.user,pid,data['expected_hash'],data['note'])
         return Response({'action':ActionOutput(ActionProposal.objects.select_related('post','piece','contact').get(pk=pid)).data,
                          'job':JobOutput(job).data},status=202)
 
 class ActionReject(APIView):
     def post(self,request,pid):
-        human_session(request);data=valid(DecisionInput,request);get_or_404(ActionProposal,id=pid)
+        human_session(request);data=valid(DecisionInput,request);alcance.obtener(request,ActionProposal,id=pid)
         return action_response(operador.reject(request.user,pid,data['note']))
 
 class ActionExecute(APIView):
     """Re-request the execution job of an approved proposal (idempotent: same job id)."""
     def post(self,request,pid):
-        proposal=get_or_404(ActionProposal,id=pid)
+        proposal=alcance.obtener(request,ActionProposal,id=pid)
         if proposal.state!=ActionProposal.State.APPROVED:raise PermissionDenied('Solo propuestas aprobadas')
         return Response(JobOutput(operador.enqueue_execution(request.user,proposal)).data,status=202)
 
 class ActionReconcile(APIView):
     def post(self,request,pid):
-        data=valid(OptionalRequestInput,request);get_or_404(ActionProposal,id=pid)
+        data=valid(OptionalRequestInput,request);alcance.obtener(request,ActionProposal,id=pid)
         job,created=enqueue_operation(request.user,'reconcile_action',{'proposal':str(pid)},data.get('request_id'),request.request_id)
         return Response(JobOutput(job).data,status=202 if created else 200)
 
 class ActionResolve(APIView):
     def post(self,request,pid):
-        human_session(request);data=valid(ResolveInput,request);get_or_404(ActionProposal,id=pid)
+        human_session(request);data=valid(ResolveInput,request);alcance.obtener(request,ActionProposal,id=pid)
         operador.resolve_uncertain(request.user,pid,data['outcome'],data['note'])
-        return action_response(get_or_404(ActionProposal,id=pid))
+        return action_response(alcance.obtener(request,ActionProposal,id=pid))

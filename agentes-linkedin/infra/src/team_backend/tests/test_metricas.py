@@ -634,13 +634,13 @@ class BusinessSectionTests(OperatorBase):
     def test_opportunities_feed_the_business_section(self):
         from team_backend import oportunidades, resultados
         self.grant(self.gustavo,'approve_actions')
-        empty=resultados.build('28')['negocio']
+        empty=resultados.build('28',member=None)['negocio']
         self.assertFalse(empty['disponible'])
         a=oportunidades.create(self.gustavo,{'person_name':'Laura','modality':'projectapp'})
         oportunidades.update(self.gustavo,a.id,{'stage':'reunion'})
         oportunidades.create(self.gustavo,{'person_name':'Marta','modality':'personal_startups','stage':'acuerdo'})
         oportunidades.create(self.gustavo,{'person_name':'Pedro','modality':'por_clasificar'})
-        business=resultados.build('28')['negocio']
+        business=resultados.build('28',member=None)['negocio']
         self.assertTrue(business['disponible'])
         self.assertEqual((business['abiertas']['value'],business['reuniones']['value'],business['acuerdos']['value']),(2,1,1))
         self.assertIsNone(business['conversaciones']['value']);self.assertIn('inbox',business['conversaciones']['unavailable_reason'])
@@ -648,5 +648,5 @@ class BusinessSectionTests(OperatorBase):
         self.assertEqual((steps['conversacion'],steps['reunion'],steps['acuerdo']),(3,2,1))
         self.assertEqual(business['modalidades']['pct'],{'personal_startups':50.0,'projectapp':50.0})
         self.assertEqual({o['person'] for o in business['activas']},{'Laura','Pedro'})
-        only=resultados.build('28',modalidad='projectapp')['negocio']
+        only=resultados.build('28',modalidad='projectapp',member=None)['negocio']
         self.assertEqual(only['abiertas']['value'],1)

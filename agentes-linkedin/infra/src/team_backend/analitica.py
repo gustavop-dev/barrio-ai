@@ -464,13 +464,14 @@ def for_piece(piece):
     pid=getattr(piece,'pk',piece)
     return for_pieces([pid]).get(pid)
 
-def coverage(now=None):
+def coverage(now=None,accounts=None):
     """How many own publications have their LinkedIn analytics: the pieces of CONT-09 executions that wrote (confirmed
     or sent, wrote=True) and started by `now`, those linked to an AnalyticsPost, and the ids of the others in order of
     publication (the gap a results view or a diagnosis shows)."""
     now=now or timezone.now()
     rows=ActionExecution.objects.filter(proposal__capability='CONT-09',proposal__piece__isnull=False,wrote=True,started_at__lte=now,
                                         state__in=(ActionExecution.State.CONFIRMED,ActionExecution.State.SENT)).order_by('started_at')
+    if accounts is not None:rows=rows.filter(proposal__account__in=accounts)  # a member's (organizaciones, phase 5)
     pieces=list(dict.fromkeys(str(p) for p in rows.values_list('proposal__piece_id',flat=True)))
     linked={str(p) for p in AnalyticsPost.objects.filter(piece_id__in=pieces).values_list('piece_id',flat=True)}
     return {'published':len(pieces),'linked':len(linked),'unlinked_piece_ids':[p for p in pieces if p not in linked]}

@@ -103,10 +103,7 @@ def _summaries(member):
 
 def _her_posts(w,member):
     """The week's published posts of her pieces (resultados._posts), every post without members."""
-    posts=resultados._posts(w)
-    if member is None:return posts
-    first=miembros.is_first(member)
-    return [p for p in posts if p.piece.member_id==member.pk or (first and p.piece.member_id is None)]
+    return resultados._posts(w,member)
 
 def _her_pieces(member):
     return miembros.own(EditorialPiece.objects.all(),member) if member is not None else EditorialPiece.objects.all()

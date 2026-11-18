@@ -89,7 +89,8 @@ REST_FRAMEWORK={
  # Device tokens of the mobile app first: they only claim `Bearer 0ff1ce_dt_…`, so service credentials are never shadowed.
  'DEFAULT_AUTHENTICATION_CLASSES':['team_backend.authentication.DeviceTokenAuthentication','team_backend.authentication.CredentialAuthentication',
                                    'rest_framework.authentication.SessionAuthentication'],
- 'DEFAULT_PERMISSION_CLASSES':['team_backend.permissions.KnowledgeAccess'],
+ # Every route says whose data it is (team_backend/alcance.py, organizaciones phase 5): an unclassified one is refused.
+ 'DEFAULT_PERMISSION_CLASSES':['team_backend.permissions.KnowledgeAccess','team_backend.alcance.RutaClasificada'],
  'DEFAULT_RENDERER_CLASSES':['rest_framework.renderers.JSONRenderer'],
  'DEFAULT_PARSER_CLASSES':['rest_framework.parsers.JSONParser'],
  'DEFAULT_PAGINATION_CLASS':'team_backend.pagination.BoundedPagination','PAGE_SIZE':25,

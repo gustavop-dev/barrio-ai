@@ -514,14 +514,15 @@ def sweep(account,now=None):
             BuyerJourney.objects.filter(pk=journey.pk).update(next_at=at);out['proximo']+=1
     return out
 
-def old_invitations(days=21,account=None,now=None):
+def old_invitations(days=21,account=None,now=None,contacts=None):
     """Invitations still pending after `days` (1–365), oldest first, for Gustavo to withdraw by hand if he wants: the
-    team never withdraws nor sends one again (linkedin_directo/permitidas.py). Read-only."""
+    team never withdraws nor sends one again (linkedin_directo/permitidas.py). Read-only. `contacts`: the people to look
+    at (the view passes the member's own, alcance.de); every contact when omitted."""
     try:days=int(days)
     except (TypeError,ValueError):raise ValueError('dias debe ser un número entre 1 y 365.') from None
     if not 1<=days<=365:raise ValueError('dias debe ser un número entre 1 y 365.')
     now=now or timezone.now()
-    rows=Contact.objects.filter(stage='invited',invited_at__lte=now-timedelta(days=days)).select_related('buyer_journey').order_by('invited_at')
+    rows=(contacts if contacts is not None else Contact.objects.all()).filter(stage='invited',invited_at__lte=now-timedelta(days=days)).select_related('buyer_journey').order_by('invited_at')
     if account is not None:rows=rows.filter(account=account)
     out=[]
     for c in rows:

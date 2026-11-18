@@ -435,7 +435,7 @@ def test_week(now=None):
     if today>TEST_END:return TEST_WEEKS+1
     return min(TEST_WEEKS,(today-TEST_START).days//7+1)
 
-def test_progress(account=None,now=None):
+def test_progress(account=None,now=None,accounts=None):
     """The three-month test: week N of 13, invitations per segment of the ProjectApp buyers (by the segment they
     entered with) and of the other audiences, and whether each one has a sample yet (30 invitations). Read only."""
     from . import comprador, operador
@@ -444,6 +444,7 @@ def test_progress(account=None,now=None):
     start=timezone.make_aware(datetime.combine(TEST_START,time(0)),operador.local_tz())
     journeys=BuyerJourney.objects.filter(invited_at__gte=start,entry=BuyerJourney.Entry.OUTBOUND)
     if account is not None:journeys=journeys.filter(contact__account=account)
+    if accounts is not None:journeys=journeys.filter(contact__account__in=accounts)
     journeys=list(journeys.values('line','segment','accepted_at','replied_at','meeting_at'))
     def row(group):
         invited=len(group)

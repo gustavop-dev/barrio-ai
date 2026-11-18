@@ -12,10 +12,10 @@ from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, miembros
+from . import alcance, capturas
 from .jobs import audit
 from .models import AIEdit, Capture, GalleryPhoto, OfficePreference
-from .operador_views import get_or_404, human_session, valid
+from .operador_views import human_session, valid
 from .permissions import require
 
 RANGE=re.compile(r'bytes=(\d*)-(\d*)$')
@@ -112,7 +112,7 @@ class Captures(ListAPIView):
         require(self.request.user,'operate_linkedin')
         capturas.reconcile_stale();capturas.expire_ideas()
         # Her captures (organizaciones, phase 4): «Lo que enviaste» never lists another member's.
-        qs=miembros.own(Capture.objects.exclude(state=Capture.State.UNDONE),miembros.member_for(self.request.user)).prefetch_related('photos')
+        qs=alcance.de(Capture.objects.exclude(state=Capture.State.UNDONE),alcance.miembro(self.request)).prefetch_related('photos')
         state=self.request.query_params.get('estado')
         return qs.filter(state=state) if state else qs
     def post(self,request):
@@ -125,10 +125,10 @@ class Captures(ListAPIView):
 class CaptureDetail(APIView):
     def get(self,request,cid):
         require(request.user,'operate_linkedin');capturas.reconcile_stale()
-        return Response(CaptureOutput(get_or_404(Capture,id=cid)).data)
+        return Response(CaptureOutput(alcance.obtener(request,Capture,id=cid)).data)
     def delete(self,request,cid):
         """«Deshacer» within 2 minutes; 409 afterwards."""
-        human_session(request);require(request.user,'approve_actions');get_or_404(Capture,id=cid)
+        human_session(request);require(request.user,'approve_actions');alcance.obtener(request,Capture,id=cid)
         return Response(CaptureOutput(capturas.undo(request.user,cid)).data)
 
 class CaptureDay(APIView):
@@ -141,7 +141,7 @@ class CaptureDay(APIView):
         from . import urgente
         data=request.data if isinstance(request.data,dict) else {}
         if data.get('decision') not in ('siguiente','descartar'):raise ValidationError('decision debe ser siguiente o descartar')
-        get_or_404(Capture,id=cid)
+        alcance.obtener(request,Capture,id=cid)
         capture,_=urgente.confirm_day(request.user,cid,data['decision'])
         when=capture.publish_asap_expected_slot
         return Response({'id':str(capture.id),'day_request':capture.day_request,'state':capture.state,
@@ -150,7 +150,7 @@ class CaptureDay(APIView):
 class CaptureAudio(FileView):
     def get(self,request,cid):
         require(request.user,'operate_linkedin')
-        capture=get_or_404(Capture,id=cid)
+        capture=alcance.obtener(request,Capture,id=cid)
         if not capture.audio:raise NotFound('Esta captura no tiene audio.')
         return serve(request,capture.audio,capture.audio_mime or 'application/octet-stream',ranges=True)
 
@@ -164,7 +164,7 @@ class Gallery(ListAPIView):
         require(self.request.user,'operate_linkedin')
         key=self.request.query_params.get('filtro') or 'todas'
         if key not in GALLERY_FILTERS:raise ValidationError({'filtro':'Usa todas, sin_usar, elegidas, publicadas o perfil.'})
-        qs=miembros.own(GalleryPhoto.objects.select_related('chosen_piece'),miembros.member_for(self.request.user))  # her photos
+        qs=alcance.de(GalleryPhoto.objects.select_related('chosen_piece'),alcance.miembro(self.request))  # her photos
         if key=='perfil':return qs.filter(category='perfil')
         return qs.filter(state__in=GALLERY_FILTERS[key]) if GALLERY_FILTERS[key] else qs
     def post(self,request):
@@ -180,23 +180,23 @@ class Gallery(ListAPIView):
 class PhotoDetail(APIView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        return Response(PhotoOutput(get_or_404(GalleryPhoto,id=pid)).data)
+        return Response(PhotoOutput(alcance.obtener(request,GalleryPhoto,id=pid)).data)
     def patch(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
         serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
-        data=serializer.validated_data;photo=get_or_404(GalleryPhoto,id=pid)
+        data=serializer.validated_data;photo=alcance.obtener(request,GalleryPhoto,id=pid)
         from .perfil_galeria import update
         photo=update(request.user,photo,data)
         return Response(PhotoOutput(photo).data)
     def delete(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
-        capturas.delete_photo(request.user,get_or_404(GalleryPhoto,id=pid))
+        capturas.delete_photo(request.user,alcance.obtener(request,GalleryPhoto,id=pid))
         return Response(status=204)
 
 class PhotoImage(FileView):
     def get(self,request,pid):
         require(request.user,'operate_linkedin')
-        photo=get_or_404(GalleryPhoto,id=pid)
+        photo=alcance.obtener(request,GalleryPhoto,id=pid)
         return serve(request,photo.image,photo.mime)
 
 # --------------------------------------------------------------------------- preferences
