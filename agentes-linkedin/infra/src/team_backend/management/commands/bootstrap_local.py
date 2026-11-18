@@ -40,4 +40,11 @@ class Command(BaseCommand):
         password = os.environ.get('DJANGO_ADMIN_PASSWORD')
         if username and password and not User.objects.filter(username=username).exists():
             User.objects.create_superuser(username=username, password=password)
+        # Organizations, phase 1: an installation without members gets ProjectApp and its first member (miembros.first_owner:
+        # REFERENTS_GUSTAVO_USERNAME's user, else the first human superuser), who adopts the accounts without a member.
+        from team_backend import miembros
+        member, created = miembros.ensure_first_member()
+        if created:
+            self.stdout.write(f'Organización {member.organization.name}: primer miembro {member.display_name} '
+                              f'({member.user.get_username()}), administrador.')
         self.stdout.write('Roles y acceso local configurados; las cuentas existentes no fueron restablecidas.')

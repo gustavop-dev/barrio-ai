@@ -8,10 +8,10 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 from rest_framework.test import APIClient
-from team_backend import analitica, editorial, perfil_contenido
+from team_backend import analitica, editorial, miembros, perfil_contenido
 from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
 from team_backend.models import (ActionProposal, AnalyticsDay, Capture, CommunitySource, CommunityStudy, CommunityWithdrawal,
-                                 ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
+                                 ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Member, Notification, Opportunity,
                                  PostMetric, Referent, ReferentChange, ReferentControl, ReferentExperiment, ReferentNotice,
                                  ReferentReview, TeamQuestion, WeeklySummary, ProfileProposal, ProfileAsset, ProfileSchedule)
 from team_backend.tests.test_capturas import MediaMixin
@@ -94,6 +94,29 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(app.get('/api/v1/resultados/analitica').json(),{'disponible':False,'motivo':analitica.NO_ACCOUNT})
         ConnectorAccount.objects.create(provider='directo',external_account_id='real-directo',label='Cuenta real')
         with self.assertRaises(CommandError):self.seed(analitica=True)
+
+    def test_one_member_owns_the_world_and_a_second_one_only_on_request(self):
+        """Catch the QA world losing its owner or gaining a member nobody asked for (organizaciones): by default «qa» is
+        the only member, admin, and owns every account; --segundo-miembro adds qa-cto, active, with her own two simulated
+        accounts and her own login; the next seed without it leaves one member again."""
+        self.seed()
+        qa=Member.objects.select_related('organization','user').get()
+        self.assertEqual((qa.user.username,qa.is_admin,qa.active,qa.organization.slug),('qa',True,True,'projectapp'))
+        self.assertFalse(ConnectorAccount.objects.exclude(member=qa).exists())
+        self.assertEqual(miembros.default_member(),qa)
+        self.assertEqual(editorial.publishing_account().pk,uid('account:official'))
+        self.assertIn('«qa-cto» (segundo miembro)',self.seed(segundo_miembro=True))
+        qa,cto=Member.objects.get(user__username='qa'),Member.objects.get(user__username='qa-cto')
+        self.assertEqual((cto.role,cto.active,cto.is_admin,cto.organization_id),('CTO',True,False,qa.organization_id))
+        self.assertEqual(sorted(ConnectorAccount.objects.filter(member=cto).values_list('provider',flat=True)),['fake','linkedin_fake'])
+        self.assertEqual((editorial.publishing_account(qa).pk,editorial.publishing_account(cto).pk),
+                         (uid('account:official'),uid('account:cto-official')))
+        with self.assertRaises(miembros.MiembroRequerido):editorial.publishing_account()
+        response=APIClient().post('/api/v1/auth/token',{'username':'qa-cto','password':QA_PASSWORD_DEFAULT,'device_name':'Emulador QA (CTO)'},format='json')
+        self.assertEqual(response.status_code,201,response.content)
+        self.seed()
+        self.assertEqual(list(Member.objects.values_list('user__username',flat=True)),['qa'])
+        self.assertFalse(ConnectorAccount.objects.filter(external_account_id__contains='cto').exists())
 
     def test_builds_every_state_and_is_idempotent(self):
         """Catch a flow losing its data: every state the app shows exists, the API serves it, and reseeding repeats it."""

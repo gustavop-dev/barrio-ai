@@ -5,6 +5,11 @@ every state, pending proposals, people at every stage, opportunities, referents,
 notifications, captures, gallery photos, results history, a weekly summary and spend rows. With --analitica, also a
 «directo» account with LinkedIn's analytics (flow 08-resultados-linkedin).
 
+Organizations (docs/plan-organizaciones.md): the organization ProjectApp with `qa` as its only member (admin), who owns
+every account of the world. With --segundo-miembro, a second active member, `qa-cto` («CTO de prueba», same password),
+with her own simulated accounts (browser and official API) and nothing else yet: phases 2–7 build on it. Off by default,
+because with two active members every route that does not say whose yet stops (miembros.MiembroRequerido).
+
 Idempotent in the strong sense: every run first empties the QA world and builds it again, so each Maestro flow starts
 from the same state whatever the previous one changed. The `qa` user and its device logins survive, so the app stays
 signed in between flows. Fixed ids (uuid5) and texts; times are relative to now (T = today in OPERATOR_TIMEZONE).
@@ -31,11 +36,12 @@ from team_backend.analitica import utc_today
 from team_backend.authentication import digest
 from team_backend.models import (ActionExecution, ActionProposal, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
                                  AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
-                                 Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential,
-                                 Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Orientation, PostMetric,
+                                 Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential, Member,
+                                 Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Organization, Orientation, PostMetric,
                                  Referent, TeamQuestion, WeeklySummary, Worker, PieceImage, ProfileProposal, ProfileAsset, ProfileSchedule)
 
 QA_USERNAME='qa'
+QA_CTO_USERNAME='qa-cto'  # --segundo-miembro
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
 NS=uuid.UUID('0ff1ce00-9a5e-4d00-8e00-00000000c1a0')
 EXTRA_DEVICE='Pixel 7 de Gustavo (QA)'
@@ -121,6 +127,8 @@ class Command(BaseCommand):
         parser.add_argument('--referentes-mensual',action='store_true',help='Escenario OBS/TUR del flujo 19, con cinco main protegidos.')
         parser.add_argument('--perfil-capturas',action='store_true',help='Nota ambigua de perfil procesada como pregunta para el flujo 18-perfil.')
         parser.add_argument('--analitica',action='store_true',help='Cuenta «directo» con analítica de LinkedIn inventada para el flujo 08-resultados-linkedin.')
+        parser.add_argument('--segundo-miembro',action='store_true',help='Un segundo miembro activo (qa-cto, «CTO de prueba») con sus '
+                            'propias cuentas simuladas, para probar con dos personas (fases 2–7 de organizaciones).')
 
     def handle(self,**options):
         self.guard()
@@ -129,6 +137,7 @@ class Command(BaseCommand):
             self.user=self.qa_user()
             self.robot=User.objects.filter(username='barrio-autopiloto').first() or self.user
             self.wipe()
+            self.members(second=options.get('segundo_miembro'))
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
             self.image_examples();self.profile();self.spend();self.settings();self.devices();self.office()
@@ -151,7 +160,8 @@ class Command(BaseCommand):
                 result=capturas.process(capture.pk)
             if result.state!=Capture.State.NOTED or result.routed_to.get('kind')!='perfil_aclaracion':
                 raise CommandError('La nota ambigua de perfil no produjo una pregunta en la Bandeja.')
-        self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
+        second=f' y «{QA_CTO_USERNAME}» (segundo miembro)' if options.get('segundo_miembro') else ''
+        self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}»{second} (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
 
@@ -180,7 +190,7 @@ class Command(BaseCommand):
         for photo in GalleryPhoto.objects.all():photo.image.delete(save=False)
         for capture in Capture.objects.exclude(audio=''):capture.audio.delete(save=False)
         models=[ProfileAsset,ProfileProposal,ProfileSchedule,ActionExecution,ActionProposal,PostMetric,PieceImage,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
-                ObservedPost,Referent,ConnectorAccount,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
+                ObservedPost,Referent,ConnectorAccount,Member,Organization,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
         tables=', '.join(connection.ops.quote_name(m._meta.db_table) for m in models)
         with connection.cursor() as cursor:
             # Deferred foreign keys with pending checks in this transaction would make TRUNCATE fail: check them now.
@@ -196,12 +206,34 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ accounts, referents, posts, people
 
+    def members(self,second=False):
+        """ProjectApp with `qa` as its admin member; with `second`, also qa-cto (active, «CTO»), her accounts made in accounts()."""
+        organization=Organization.objects.create(id=uid('organization:projectapp'),name='ProjectApp',slug='projectapp')
+        self.member=Member.objects.create(id=uid('member:qa'),organization=organization,user=self.user,display_name='Gustavo',
+                                          role='Fundador',is_admin=True,created_at=self.ago(days=90))
+        self.cto=None
+        if second:
+            user,_=User.objects.get_or_create(username=QA_CTO_USERNAME)
+            user.is_superuser=False;user.is_staff=False;user.is_active=True;user.email='qa-cto@example.invalid'
+            user.set_password(os.environ.get('QA_PASSWORD') or QA_PASSWORD_DEFAULT);user.save()
+            from django.contrib.auth.models import Group
+            user.groups.add(*Group.objects.filter(name='revision'))  # bootstrap_local's groups, when present
+            self.cto=Member.objects.create(id=uid('member:qa-cto'),organization=organization,user=user,display_name='CTO de prueba',
+                                           role='CTO',created_at=self.ago(days=1))
+
     def accounts(self):
         # «running» is the status of a working account: Ajustes shows it as «Conectada» (AJU-02).
         self.fake=ConnectorAccount.objects.create(id=uid('account:simulada'),provider='fake',external_account_id='qa-simulada-gustavo',
-                                                  label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1))
+                                                  label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1),
+                                                  member=self.member)
         self.official=ConnectorAccount.objects.create(id=uid('account:official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-gustavo',
-                                                      label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1))
+                                                      label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1),
+                                                      member=self.member)
+        if self.cto is not None:
+            ConnectorAccount.objects.create(id=uid('account:cto-simulada'),provider='fake',external_account_id='qa-simulada-cto',
+                                            label='LinkedIn del CTO (simulado)',status='running',last_checked_at=self.ago(hours=1),member=self.cto)
+            ConnectorAccount.objects.create(id=uid('account:cto-official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-cto',
+                                            label='API oficial del CTO (simulada)',status='OK',last_checked_at=self.ago(hours=1),member=self.cto)
 
     def community(self):
         """Synthetic public-only study for LEC; no connector/model call or paid job."""
@@ -652,7 +684,8 @@ class Command(BaseCommand):
         range), 120 daily follower captures with today's audience, eight posts (two of them the published pieces) and
         the imports that brought them, the last about five hours ago. Invented figures only."""
         account=ConnectorAccount.objects.create(id=uid('account:directo'),provider='directo',external_account_id='qa-directo-gustavo',
-                                                label='LinkedIn directo (simulado)',status='running',last_checked_at=self.ago(hours=1))
+                                                label='LinkedIn directo (simulado)',status='running',last_checked_at=self.ago(hours=1),
+                                                member=self.member)
         today=utc_today(self.now);yesterday=today-timedelta(days=1);fetched=self.ago(hours=5)
         gap={yesterday-timedelta(days=back) for back in (57,58,59)}
         days=[]

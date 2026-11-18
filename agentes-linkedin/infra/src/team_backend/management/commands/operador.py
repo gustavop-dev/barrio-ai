@@ -1,8 +1,26 @@
+import argparse
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand, CommandError
 from team_backend import operador
 from team_backend.jobs import enqueue_operation
 from team_backend.models import ConnectorAccount
+
+def miembros_lines():
+    """Organizations, members and whose each account is: what to look at after migration 0055 (read only)."""
+    from team_backend.models import Member, Organization
+    lines=[]
+    for organization in Organization.objects.order_by('created_at'):
+        lines.append(f'{organization.name} ({organization.slug})')
+        for member in Member.objects.filter(organization=organization).select_related('user'):
+            flags=', '.join(filter(None,['activo' if member.active else 'inactivo','administrador' if member.is_admin else '']))
+            lines.append(f'  {member.display_name} · {member.role or "sin rol"} · usuario {member.user.get_username()} · {flags}')
+            for account in ConnectorAccount.objects.filter(member=member).order_by('created_at'):
+                lines.append(f'    {account.provider}: {account.label} ({account.id})')
+    orphans=ConnectorAccount.objects.filter(member__isnull=True).order_by('created_at')
+    if orphans.exists():
+        lines.append('Cuentas sin miembro (del único miembro activo mientras haya uno solo; de nadie con varios):')
+        lines+=[f'  {a.provider}: {a.label} ({a.id})' for a in orphans]
+    return lines or ['Sin organizaciones ni miembros: todo funciona como antes de las organizaciones.']
 
 class Command(BaseCommand):
     help='Primer uso del operador: registrar cuenta, comprobarla, añadir referentes y encolar observación.'
@@ -29,6 +47,16 @@ class Command(BaseCommand):
         reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
         sub.add_parser('preguntas-casos-projectapp',help='Encola en Tu turno las preguntas a Gustavo sobre los dos casos reales de '
                        'ProjectApp (educación en línea y retail); idempotente: repetirlo no crea preguntas nuevas')
+        mie=sub.add_parser('miembro',help='Da de alta (o actualiza) un miembro de tu organización con su propio usuario de Django; '
+                           'idempotente; nunca crea cuentas de LinkedIn. Solo el administrador de la organización')
+        mie.add_argument('--nombre',required=True,help='Nombre para mostrar (p. ej. «Ana Pérez»)')
+        mie.add_argument('--usuario-nuevo',required=True,dest='usuario_nuevo',help='Usuario de Django de la persona (se crea sin contraseña si no existe)')
+        mie.add_argument('--rol',default='',help='Rol en texto libre (p. ej. «CTO»)')
+        mie.add_argument('--activo',action=argparse.BooleanOptionalAction,default=None,
+                         help='Activo o no; un miembro nuevo empieza inactivo hasta la fase 7 del plan de organizaciones')
+        mie.add_argument('--admin',action=argparse.BooleanOptionalAction,default=None,help='Administrador de la organización o no')
+        mie.add_argument('--grupo',action='append',default=[],help='Grupo de permisos que se le añade (lectura, operacion, revision); repetible')
+        sub.add_parser('miembros',help='Lista las organizaciones, sus miembros y las cuentas de LinkedIn de cada uno (solo lectura)')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -45,6 +73,21 @@ class Command(BaseCommand):
             if o['accion']=='cuenta':
                 account=operador.register_account(user,o['proveedor'],o['account_id'],o['etiqueta'])
                 self.stdout.write(f'Cuenta {account.id} ({account.provider}). Ejecuta "comprobar" antes de operar.')
+                return
+            if o['accion']=='miembro':
+                from team_backend import miembros
+                member,user_created,created=miembros.save_member(user,o['usuario_nuevo'],o['nombre'],o['rol'],
+                    make_admin=o['admin'],active=o['activo'],groups=o['grupo'])
+                state='activo' if member.active else 'inactivo'
+                self.stdout.write(('Miembro creado: ' if created else 'Miembro actualizado: ')+
+                                  f'{member.display_name} ({member.user.get_username()}) · {member.role or "sin rol"} · {state}'+
+                                  (' · administrador' if member.is_admin else '')+f' · {member.organization.name}.')
+                if user_created:
+                    self.stdout.write(f'Usuario nuevo sin contraseña: defínela con «manage.py changepassword {member.user.get_username()}».')
+                self.stdout.write('No se creó ninguna cuenta de LinkedIn: cada miembro conecta las suyas.')
+                return
+            if o['accion']=='miembros':
+                for line in miembros_lines():self.stdout.write(line)
                 return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp
