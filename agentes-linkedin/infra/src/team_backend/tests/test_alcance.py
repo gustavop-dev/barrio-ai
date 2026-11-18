@@ -29,6 +29,7 @@ from rest_framework.test import APIClient
 from knowledge import memory
 from knowledge import db
 from team_backend import alcance, imagenes, notificaciones, operador, urls
+from team_backend.alerts import notify as REAL_NOTIFY  # EditorialBase mocks it; these tests push for real (fakes below)
 from team_backend.models import (ActionProposal, BrowserLogin, BuyerDraft, BuyerJourney, Capture, CommunitySource,
                                  CommunityStudy, Contact, Conversation, DeviceToken, EditorialPiece, EvidencePerson,
                                  GalleryPhoto, Job, LeadHandoff, MeetingBooking, MonthlyReview, ObservedPost, Opportunity,
@@ -402,3 +403,119 @@ class QuienSoyTests(DosMiembrosAlcanceBase):
         his = self.g.client().get('/api/v1/yo').json()
         self.assertEqual((his['member']['display_name'], his['is_admin'], his['members']), ('Gustavo', True, 2))
         self.assertIn(APIClient().get('/api/v1/yo').status_code, (401, 403))
+
+
+class AvisosTests(DosMiembrosAlcanceBase):
+    """Each notice is someone's: hers goes to her devices only, the organization's to everyone with each one's own
+    switches; preferences and «Vista» are each person's; Slack never names a member's private things."""
+
+    def setUp(self):
+        super().setUp()
+        import httpx
+        from unittest.mock import MagicMock
+        from team_backend import alerts, expo, push
+        from team_backend.models import ExpoPushToken, PushSubscription
+        from team_backend.tests.test_app_movil import ExpoFake
+        self.expo = ExpoFake()
+        channel = MagicMock(HTTPError=httpx.HTTPError)  # alerts' own httpx: the OPERATOR_ALERT_WEBHOOK posts
+        for patcher in (patch.object(expo, 'TRANSPORT', httpx.MockTransport(self.expo)),
+                        patch.object(push, 'configured', return_value=True),
+                        patch.object(push, 'send', side_effect=lambda s, *a, **k: self.web.append(s.user_id) or True),
+                        patch.dict('os.environ', {'OPERATOR_ALERT_WEBHOOK': 'https://ntfy.example/barrio'}),
+                        patch.object(alerts, 'httpx', channel)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.webhook = channel.Client
+        self.notify.side_effect = REAL_NOTIFY  # through push.broadcast and expo.broadcast, to the fakes
+        self.web = []
+        for persona, tag in ((self.g, 'g'), (self.cto, 'c')):
+            ExpoPushToken.objects.create(user=persona.user, token=f'ExponentPushToken[{tag}]', device_name=f'Teléfono {tag}')
+            PushSubscription.objects.create(user=persona.user, endpoint=f'https://push.example/{tag}', p256dh='k', auth='a')
+        self.phones = {self.g.user.pk: 'ExponentPushToken[g]', self.cto.user.pk: 'ExponentPushToken[c]'}
+        self.sent()  # the seed's own notices
+
+    def sent(self):
+        """(Expo tokens, web push users, webhook posts) since the last call."""
+        out = (sorted(m['to'] for m in self.expo.messages), sorted(self.web), self.webhook.return_value.__enter__.return_value.post.call_count)
+        self.expo.messages.clear()
+        self.expo.sent.clear()
+        self.web.clear()
+        self.webhook.return_value.__enter__.return_value.post.reset_mock()
+        return out
+
+    def listed(self, persona):
+        return [n['title'] for n in persona.client().get('/api/v1/notificaciones').json()['items']]
+
+    def test_her_notice_goes_to_her_devices_only_and_never_to_his_channel(self):
+        """Catch a push to every device: the CTO's question reaches her phone and her browser only, not Gustavo's nor
+        his channel (OPERATOR_ALERT_WEBHOOK); his reaches his, and his channel, as before."""
+        notificaciones.avisar('question', 'El director pregunta al CTO', member=self.cto.member)  # Tu turno's kind
+        self.assertEqual(self.sent(), (['ExponentPushToken[c]'], [self.cto.user.pk], 0))
+        notificaciones.avisar('piece_published', 'Publicaste «La del CTO»', member=self.cto.member)  # a Notificación
+        self.assertEqual(self.sent(), (['ExponentPushToken[c]'], [self.cto.user.pk], 0))
+        notificaciones.avisar('piece_published', 'Publicaste «La de Gustavo»', member=self.g.member)
+        self.assertEqual(self.sent(), (['ExponentPushToken[g]'], [self.g.user.pk], 1))
+        self.assertIn('Publicaste «La del CTO»', self.listed(self.cto))
+        self.assertNotIn('Publicaste «La del CTO»', self.listed(self.g))
+        self.assertNotIn('Publicaste «La de Gustavo»', self.listed(self.cto))
+
+    def test_the_organizations_notice_is_everyones_with_each_ones_switches(self):
+        """Catch global preferences: the total stop is everyone's (one row each, each read on her own), and Gustavo
+        turning its push off silences only his devices."""
+        off = self.g.client().patch('/api/v1/ajustes/preferencias', {'push_disabled': ['machine_paused']}, format='json')
+        self.assertEqual(off.status_code, 200, off.content)
+        operador.set_global_pause(self.cto.user, True, 'Prueba: parada total')  # Tu turno's card, pushed to everyone
+        self.assertEqual(self.sent()[:2], (['ExponentPushToken[c]'], [self.cto.user.pk]))
+        notificaciones.avisar('gate_alert', 'Una compuerta frena demasiado', member=notificaciones.ORGANIZACION)
+        self.assertEqual(self.sent(), (['ExponentPushToken[c]', 'ExponentPushToken[g]'], [self.g.user.pk, self.cto.user.pk], 1))
+        for persona in (self.g, self.cto):
+            self.assertIn('Una compuerta frena demasiado', self.listed(persona))
+        self.g.client().post('/api/v1/notificaciones/leer', {'todas': True}, format='json')
+        unread = {p.member.display_name: p.client().get('/api/v1/notificaciones').json()['unread'] for p in (self.g, self.cto)}
+        self.assertEqual(unread['Gustavo'], 0)
+        self.assertGreater(unread['CTO de prueba'], 0)
+
+    def test_preferences_are_each_ones_and_his_are_the_ones_of_before(self):
+        """Catch one preferences row for everyone: the CTO's switches are hers; Gustavo keeps row 1, the configuration he
+        had before organizations."""
+        from team_backend.models import OfficePreference
+        OfficePreference.objects.filter(pk=1).update(push_disabled=['connection_fit'])
+        self.cto.client().patch('/api/v1/ajustes/preferencias', {'push_disabled': ['question']}, format='json')
+        mine = {t['kind']: t['enabled'] for t in self.cto.client().get('/api/v1/ajustes').json()['push_types']}
+        his = {t['kind']: t['enabled'] for t in self.g.client().get('/api/v1/ajustes').json()['push_types']}
+        self.assertEqual((mine['question'], his['question']), (False, True))
+        self.assertEqual(OfficePreference.of(self.g.user).pk, 1)
+        self.assertEqual(OfficePreference.of(self.g.user).push_disabled, ['connection_fit'])
+        self.assertEqual(OfficePreference.of(self.cto.user).push_disabled, ['question'])
+
+    def test_vista_is_each_ones(self):
+        """Catch one «Vista» for everyone: the total stop's card is in both Tu turno; Gustavo opening it leaves hers new."""
+        from team_backend.models import InboxSeen
+        operador.set_global_pause(self.g.user, True, 'Prueba: parada total')
+        cards = lambda p: {c['id']: c['state'] for c in p.client().get('/api/v1/tu-turno').json()['alerts']}
+        self.assertEqual((cards(self.g)['machine_paused'], cards(self.cto)['machine_paused']), ('nueva', 'nueva'))
+        self.g.client().post('/api/v1/tu-turno/vistos', {'ids': ['machine_paused']}, format='json')
+        self.assertEqual((cards(self.g)['machine_paused'], cards(self.cto)['machine_paused']), ('vista', 'nueva'))
+        self.cto.client().post('/api/v1/tu-turno/vistos', {'ids': ['machine_paused']}, format='json')
+        self.assertEqual(sorted(InboxSeen.objects.values_list('item_id', flat=True)),
+                         sorted(['machine_paused', f'u:{self.cto.user.pk}:machine_paused']))
+
+    def test_a_notice_that_names_nobody_is_dropped_never_guessed(self):
+        with self.assertLogs('team_backend.notificaciones', 'WARNING'):
+            self.assertIsNone(notificaciones.avisar('question', 'Sin dueño', member=None))
+        self.assertEqual(self.sent(), ([], [], 0))
+        self.assertNotIn('Sin dueño', self.listed(self.g) + self.listed(self.cto))
+
+    def test_slack_never_names_a_members_private_things_with_two_members(self):
+        """Catch the organization's one Slack channel showing who writes to a member: with two members the
+        conversation alert only says that one waits, and where."""
+        from team_backend import alertas_slack
+        alerts = alertas_slack.conversacion_espera(FIXED)
+        self.assertEqual(len(alerts), 2)
+        for alert in alerts:
+            self.assertNotIn('SECRETO', alert.text)
+            self.assertTrue(alert.text.startswith('Barrio · Una conversación de LinkedIn espera respuesta.'))
+        self.cto.member.active = False
+        self.cto.member.save()
+        alone = alertas_slack.conversacion_espera(FIXED)  # one member: the alert of before, his channel
+        self.assertTrue(any('Ana SECRETO-GUSTAVO te escribió' in a.text for a in alone))
