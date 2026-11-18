@@ -64,6 +64,17 @@ export function displayName(contact: Pick<Contact, 'display_name' | 'public_iden
   return contact.display_name || contact.public_identifier || 'Sin nombre';
 }
 
+/** Organizaciones, phase 6: «La atiende <nombre>» when another member attends her; null alone or when she is yours. */
+export function attendedBy(contact: Pick<Contact, 'registro'>): string | null {
+  const other = contact.registro?.attended_by;
+  return other ? `La atiende ${other.display_name}` : null;
+}
+
+/** Organizaciones, phase 6: the members you may pass her to (only when you attend her); [] alone. */
+export function passTargets(contact: Pick<Contact, 'registro'>): { id: string; display_name: string }[] {
+  return contact.registro?.mine ? contact.registro.pass_to : [];
+}
+
 // ================================================================ person card
 
 /** «Medellín, Colombia · 1.er grado · Lo sigues». */

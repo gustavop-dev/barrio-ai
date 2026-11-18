@@ -2,13 +2,16 @@
 // journey with dates, why the person fits and where they came from, the conversation read from the inbox, the
 // opportunity, notes (written or by voice, through the capture sheet) and the whole history. Actions:
 // «Marcar como oportunidad» and «Descartar» (with a mandatory note, only in the stages the API allows); when the lead
-// stopped a person the classifier said fits, «Sí, encaja» answers its doubt (BAR-17).
+// stopped a person the classifier said fits, «Sí, encaja» answers its doubt (BAR-17). With two or more members
+// (organizaciones, phase 6): «La atiende <nombre>» for another member's person (no «Descartar»), and «Liberar» and
+// «Pasar a <nombre>» (each with a mandatory reason) for a person she attends.
 // The app is drawn edge to edge, so the window no longer shrinks for the keyboard: the card pads itself by it
 // (KeyboardAvoidingView) and scrolls the note being written above it.
 import { ApiError } from '@compartido/api/client';
-import { useAddContactNote, useConfirmFit, useContact, useDiscardContact, useOportunidades } from '@compartido/api/hooks';
+import { useAddContactNote, useConfirmFit, useContact, useDiscardContact, useOportunidades, usePassContact, useReleaseContact } from '@compartido/api/hooks';
 import type { Contact, ContactNote, Opportunity } from '@compartido/api/types';
 import {
+  attendedBy,
   confidencePct,
   displayName,
   eventLabel,
@@ -17,6 +20,7 @@ import {
   noteAuthor,
   opportunityFields,
   originQuote,
+  passTargets,
   personMeta,
   sortHistory,
   suggestedModality,
@@ -366,10 +370,14 @@ function History({ contact }: { contact: Contact }) {
 export function PersonaScreen({ contactId }: { contactId: string }) {
   const contact = useContact(contactId);
   const discard = useDiscardContact();
+  const release = useReleaseContact();
+  const pass = usePassContact();
   const toast = useToast();
   const { bottom } = useContentInsets();
   const [form, setForm] = useState<{ opportunity: Opportunity | null } | null>(null);
   const [discarding, setDiscarding] = useState(false);
+  // Organizaciones, phase 6: «Liberar» (target null) or «Pasar a <nombre>».
+  const [handing, setHanding] = useState<{ id: string; display_name: string } | null | undefined>(undefined);
   const [refreshing, setRefreshing] = useState(false);
   // Opened from a row: its name, so the header is there for the portrait and the name to land while the rest loads.
   const flightName = useFlightName(contactId);
@@ -455,7 +463,10 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
   const name = displayName(person);
   const stage = personStage(person.display_stage ?? person.stage);
   const meta = personMeta(person);
-  const canDiscard = DISCARDABLE.includes(person.stage);
+  const attended = attendedBy(person);
+  const targets = passTargets(person);
+  const canDiscard = DISCARDABLE.includes(person.stage) && !attended;
+  const handOver = handing === null ? release : pass;
   const profile = isHttps(person.profile_url) ? person.profile_url : null;
 
   return (
@@ -507,6 +518,11 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
                 ) : null}
               </BlockIn>
             ) : null}
+            {attended ? (
+              <T variant="detalle" soft testID="persona-atiende">
+                {attended}
+              </T>
+            ) : null}
             <BlockIn step={1} style={styles.actions}>
               {profile ? (
                 <Button variant="primary" block icon={<Icon name="external" size={20} color={colors.onBrand} />} accessibilityHint="Se abre en LinkedIn" onPress={() => void Linking.openURL(profile)}>
@@ -523,6 +539,16 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
                   Descartar
                 </Button>
               ) : null}
+              {person.registro?.mine ? (
+                <Button block variant="secondary" onPress={() => setHanding(null)}>
+                  Liberar
+                </Button>
+              ) : null}
+              {targets.map((member) => (
+                <Button key={member.id} block variant="secondary" onPress={() => setHanding(member)}>
+                  {`Pasar a ${member.display_name}`}
+                </Button>
+              ))}
             </BlockIn>
           </View>
 
@@ -574,6 +600,37 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
           person={{ id: person.id, display_name: name, headline: person.headline, modality: suggestedModality(person) }}
           onClose={() => setForm(null)}
         />
+      ) : null}
+      {handing !== undefined ? (
+        <ConfirmSheet
+          title={handing ? `Pasar a ${name} a ${handing.display_name}` : `Liberar a ${name}`}
+          confirmLabel={handing ? 'Pasar' : 'Liberar'}
+          note="required"
+          noteLabel="Motivo"
+          busy={handOver.isPending}
+          error={handOver.error}
+          onClose={() => {
+            release.reset();
+            pass.reset();
+            setHanding(undefined);
+          }}
+          onConfirm={(reason) => {
+            const done = {
+              onSuccess: () => {
+                haptic('actionSuccess');
+                setHanding(undefined);
+                toast.show(handing ? `Ahora la atiende ${handing.display_name}` : 'Liberada: el reparto decide quién la atiende');
+              },
+              onError: () => haptic('actionError'),
+            };
+            if (handing) pass.mutate({ contactId: person.id, member: handing.id, reason }, done);
+            else release.mutate({ contactId: person.id, reason }, done);
+          }}
+        >
+          {handing
+            ? `${handing.display_name} empieza con la ficha básica: tus notas, mensajes y borradores se quedan contigo.`
+            : 'Deja de atenderla: otro miembro podrá tomarla según el reparto. Tus notas se quedan contigo.'}
+        </ConfirmSheet>
       ) : null}
       {discarding ? (
         <ConfirmSheet

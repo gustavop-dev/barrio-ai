@@ -2,6 +2,7 @@
 // of a conversation, the opportunity form and the referents.
 import { contactFixture, conversationFixture, opportunityFixture, redSummaryFixture, referentFixture } from '../fixtures/personas';
 import {
+  attendedBy,
   broughtByText,
   leadDoubtText,
   nextActionText,
@@ -9,6 +10,7 @@ import {
   opportunityErrors,
   opportunityInput,
   othersPersonText,
+  passTargets,
   personMeta,
   personModeOf,
   referentMeta,
@@ -149,5 +151,18 @@ describe('Who brought the opportunity (organizations, phase 5)', () => {
     expect(body).not.toHaveProperty('contact');
     expect(body).not.toHaveProperty('person_name');
     expect(body).toMatchObject({ stage: 'reunion', modality: 'projectapp' });
+  });
+});
+
+describe('The register of people (organizations, phase 6)', () => {
+  it('says who attends another member\'s person and offers the pass only to whoever attends her', () => {
+    const cto = { id: 'm-cto', display_name: 'CTO de prueba' };
+    expect([attendedBy(contactFixture('c-1')), passTargets(contactFixture('c-1'))]).toEqual([null, []]);  // alone: nothing
+    const others = contactFixture('c-1', { registro: { attended_by: { ...cto, since: null }, mine: false, pass_to: [], excluded: null } });
+    expect([attendedBy(others), passTargets(others)]).toEqual(['La atiende CTO de prueba', []]);
+    const mine = contactFixture('c-1', { registro: { attended_by: null, mine: true, pass_to: [cto], excluded: null } });
+    expect([attendedBy(mine), passTargets(mine)]).toEqual([null, [cto]]);
+    const free = contactFixture('c-1', { registro: { attended_by: null, mine: false, pass_to: [cto], excluded: null } });
+    expect(passTargets(free)).toEqual([]);
   });
 });

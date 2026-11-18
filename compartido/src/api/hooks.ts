@@ -15,6 +15,8 @@ import {
   descartarResumen,
   deshacerResumen,
   discardContact,
+  passContact,
+  releaseContact,
   generarResumen,
   generarRevision,
   getAccounts,
@@ -327,6 +329,25 @@ export function useDiscardContact() {
   return useMutation({
     mutationFn: ({ contactId, note }: { contactId: string; note: string }) => discardContact(contactId, note),
     onSettled: () => invalidate(client, keys.redAll, keys.actionsAll, keys.calendarioAll),
+  });
+}
+
+/** Organizaciones, phase 6: «Liberar» a person she attends, with a reason. */
+export function useReleaseContact() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contactId, reason }: { contactId: string; reason: string }) => releaseContact(contactId, reason),
+    onSettled: () => invalidate(client, keys.redAll, keys.actionsAll),
+  });
+}
+
+/** Organizaciones, phase 6: «Pasar a <nombre>» a person she attends, with a reason. */
+export function usePassContact() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ contactId, member, reason }: { contactId: string; member: string; reason: string }) =>
+      passContact(contactId, member, reason),
+    onSettled: () => invalidate(client, keys.redAll, keys.actionsAll),
   });
 }
 

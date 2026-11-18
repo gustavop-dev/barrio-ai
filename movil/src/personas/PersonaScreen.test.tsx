@@ -215,6 +215,42 @@ describe('Persona', () => {
     expect(await screen.findByText('Descartada: no volverá a proponerse')).toBeOnTheScreen();
   });
 
+  it('shows who attends another member\'s person, without «Descartar» (organizaciones, phase 6)', async () => {
+    await renderCard(
+      contactFixture('c-1', {
+        registro: { attended_by: { id: 'm-cto', display_name: 'CTO de prueba', since: null }, mine: false, pass_to: [], excluded: null },
+        next_step: { owner: null, text: 'La atiende CTO de prueba', at: null },
+      }),
+    );
+    expect(await screen.findByTestId('persona-atiende')).toHaveTextContent('La atiende CTO de prueba');
+    expect(screen.queryByText('Descartar')).toBeNull();
+    expect(screen.queryByText('Liberar')).toBeNull();
+  });
+
+  it('alone shows no register, and the person she attends can be released or passed with a reason', async () => {
+    const mine = { attended_by: null, mine: true, pass_to: [{ id: 'm-cto', display_name: 'CTO de prueba' }], excluded: null };
+    const server = await renderCard(contactFixture('c-1', { registro: mine }), {
+      'POST /api/v1/red/contacts/c-1/pasar': () => ({ body: contactFixture('c-1') }),
+      'POST /api/v1/red/contacts/c-1/liberar': () => ({ body: contactFixture('c-1') }),
+    });
+    expect(screen.queryByTestId('persona-atiende')).toBeNull();
+    await fireEvent.press(await screen.findByText('Pasar a CTO de prueba'));
+    let sheet = within(await screen.findByTestId('confirm-sheet'));
+    expect(sheet.getByText('Pasar a Lucía Ficticia a CTO de prueba')).toBeOnTheScreen();
+    expect(sheet.getByRole('button', { name: 'Pasar' })).toBeDisabled();
+    await fireEvent.changeText(sheet.getByTestId('confirm-note'), 'Ella habla con CTOs.');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Pasar' }));
+    await waitFor(() => expect(server.find('POST', '/api/v1/red/contacts/c-1/pasar')).toHaveLength(1));
+    expect(server.find('POST', '/api/v1/red/contacts/c-1/pasar')[0]!.body).toEqual({ member: 'm-cto', reason: 'Ella habla con CTOs.' });
+    expect(await screen.findByText('Ahora la atiende CTO de prueba')).toBeOnTheScreen();
+    await fireEvent.press(await screen.findByText('Liberar'));
+    sheet = within(await screen.findByTestId('confirm-sheet'));
+    await fireEvent.changeText(sheet.getByTestId('confirm-note'), 'No respondió.');
+    await fireEvent.press(sheet.getByRole('button', { name: 'Liberar' }));
+    await waitFor(() => expect(server.find('POST', '/api/v1/red/contacts/c-1/liberar')).toHaveLength(1));
+    expect(server.find('POST', '/api/v1/red/contacts/c-1/liberar')[0]!.body).toEqual({ reason: 'No respondió.' });
+  });
+
   it('marks the person as an opportunity with the form prefilled', async () => {
     const server = await renderCard(contactFixture('c-1'), {
       'POST /api/v1/oportunidades': (request) => ({ status: 201, body: opportunityFixture('o-9', request.body as object) }),

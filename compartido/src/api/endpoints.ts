@@ -186,6 +186,12 @@ export const getContact = (contactId: string) => api.get<Contact>(`${RED}/contac
 export const discardContact = (contactId: string, note: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/discard`, { note });
 /** «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits (BAR-17). */
 export const confirmContactFit = (contactId: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/encaja`, {});
+/** Organizaciones, phase 6: the member who attends her lets her go (the reason is mandatory; 403 if she does not). */
+export const releaseContact = (contactId: string, reason: string) =>
+  api.post<Contact>(`${RED}/contacts/${id(contactId)}/liberar`, { reason });
+/** …or passes her to another active member: nothing private moves (the reason is mandatory). */
+export const passContact = (contactId: string, member: string, reason: string) =>
+  api.post<Contact>(`${RED}/contacts/${id(contactId)}/pasar`, { member, reason });
 export const getRedSummary = () => api.get<RedSummary>(`${RED}/summary`);
 
 // ---------------------------------------------------------------- knowledge

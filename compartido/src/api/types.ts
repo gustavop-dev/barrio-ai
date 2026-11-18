@@ -422,6 +422,19 @@ export interface Contact extends ContactBrief {
   lead_doubt?: ContactLeadDoubt | null;
   /** BAR-24 (absent on older backends). */
   buyer?: ContactBuyer | null;
+  /** Organizaciones, phase 6: only while two or more members work the organization (absent alone, as before). */
+  registro?: ContactRegistro;
+}
+
+/** The organization's register of people (phase 6): who attends her, and to whom her owner may pass her. Nothing
+ * private of another member ever comes here: only her name and since when. */
+export interface ContactRegistro {
+  attended_by: { id: string; display_name: string; since: string | null } | null;
+  /** True when the member who reads it attends her (then «Liberar» and «Pasar a…»). */
+  mine: boolean;
+  pass_to: { id: string; display_name: string }[];
+  /** Why nobody in the organization touches her, or null. */
+  excluded: string | null;
 }
 
 /** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */
