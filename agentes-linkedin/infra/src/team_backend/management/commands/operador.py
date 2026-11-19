@@ -158,6 +158,10 @@ class Command(BaseCommand):
         ind.add_argument('--empresas',default='',help='Empresas semilla separadas por comas (p. ej. "Imagine Apps,Northwind Labs"): se buscan sus fundadores y van primero')
         ind.add_argument('--perfiles',default='',help='Perfiles semilla separados por comas (URL linkedin.com/in/... o identificador): se miden primero con los mismos criterios')
         ind.add_argument('--informe',action='store_true',help='Solo imprime el embudo de las búsquedas de industria de este mes (no encola nada)')
+        pru=sub.add_parser('prueba-linkedin',help='Corre ahora la prueba de LinkedIn de cada cuenta directo (o de --cuenta) y '
+                           'la imprime: lecturas y lo que necesitan las escrituras, sin escribir nada (17 llamadas). Cuenta '
+                           'como la prueba del día; si pasa, lo que esperaba por un cambio de LinkedIn vuelve a salir')
+        pru.add_argument('--cuenta',default=None,help='Id de la cuenta (por defecto, todas las directo)')
         est=sub.add_parser('estado-flujos',help='El estado de cada flujo y sus etapas, como llega a Slack (solo lectura). Sin '
                            '--enviar solo lo imprime')
         est.add_argument('--enviar',action='store_true',help='Además lo envía al canal de resúmenes de Slack (una vez por minuto)')
@@ -190,6 +194,38 @@ class Command(BaseCommand):
                 self.stdout.write('Enviado al canal de resúmenes de Slack.')
             else:self.stdout.write('No se envió: ya salió en este minuto.')
         if not o['enviar']:self.stdout.write('Solo impreso: con --enviar también va a Slack.')
+
+    def canary_now(self,user,o):
+        """prueba-linkedin: the canary of each directo account (or --cuenta), now, printed row by row with the
+        episodes it closed or left open (cambios_linkedin). Never a write; it is the day's run for daily_due."""
+        from django.utils import timezone
+        from linkedin_directo.canario import WRITE
+        from team_backend import cambios_linkedin, canario
+        from team_backend.permissions import require
+        require(user,'operate_linkedin')
+        accounts=ConnectorAccount.objects.filter(provider='directo').order_by('created_at')
+        if o['cuenta']:accounts=accounts.filter(id=o['cuenta'])
+        if not accounts.exists():raise CommandError('No hay ninguna cuenta directo'+(' con ese id.' if o['cuenta'] else '.'))
+        for account in accounts:
+            now=timezone.now();before=set(cambios_linkedin.open_episodes(account,now))
+            log=canario.run(account,now=now)
+            if log is None:
+                self.stdout.write(f'{account.label}: no se probó (la máquina o la cuenta están en pausa).')
+                continue
+            self.stdout.write(f'{account.label}: prueba {log.state} · {log.calls} llamadas a LinkedIn · ninguna escritura enviada')
+            for row in log.operations:
+                kind='escritura' if row.get('tipo')==WRITE else 'lectura'
+                detail=f': {row["motivo"]}' if row.get('motivo') else ''
+                clue=cambios_linkedin.hint(row.get('diagnostico'))
+                self.stdout.write(f'  {row.get("estado",""):10} {kind:9} {row.get("operacion")}{detail}'+(f' ({clue})' if clue else ''))
+            if log.error:self.stdout.write(f'  Se detuvo: {log.error}')
+            after=cambios_linkedin.open_episodes(account,timezone.now())
+            back=sorted(before-set(after))
+            if back:self.stdout.write('Vuelve a funcionar: '+', '.join(back)+'. Lo que esperaba sale solo, a su ritmo.')
+            for op,episode in sorted(after.items()):
+                what,stops=cambios_linkedin.plain(op)
+                held=' (lo aprobado de esto espera)' if cambios_linkedin.USE in episode.fuentes and cambios_linkedin.capabilities(op) else ''
+                self.stdout.write(f'Sigue roto hoy: no se puede {what} ({op}): {stops}{held}.')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -252,6 +288,9 @@ class Command(BaseCommand):
                 for item in created:self.stdout.write(f'  · {item.memory_key}: {item.question}')
                 if len(created)<total:
                     self.stdout.write('Las demás ya estaban abiertas, respondidas, rechazadas o retiradas: no se repiten.')
+                return
+            if o['accion']=='prueba-linkedin':
+                self.canary_now(user,o)
                 return
             account=ConnectorAccount.objects.filter(id=o['cuenta']).first()
             if not account:raise CommandError('Cuenta no registrada')

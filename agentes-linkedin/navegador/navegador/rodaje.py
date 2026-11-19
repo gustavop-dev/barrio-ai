@@ -56,7 +56,7 @@ ROUTINES = {
     'metricas': 4,    # own posts, the newest one and its comments, audience and views (metricas.collect)
     'red': 3,         # received and sent invitations; accepting the received ones (red.sync, RED-04)
     'analitica': 1,   # one export, the last 28 days (analitica.run makes five)
-    'canario': 1,     # the daily canary: 14 reads, 16 calls
+    'canario': 1,     # the daily canary: 14 reads and what 4 writes depend on (never sent), 17 calls
 }
 DAILY = ('analitica', 'canario')  # weekends too
 FIRST = {'descubrir': (2, 10), 'referentes': (12, 25)}  # minutes into the day: the pool exists before any write
@@ -537,7 +537,7 @@ class Rodaje:
         report = canario.run(client.t)
         error = report.get('error') or {}
         self.summary['canario'] = {'resultado': report['resultado'], 'llamadas': report['llamadas'],
-                                   'fallan': [r['operacion'] for r in report['operaciones'] if r['estado'] != canario.OK],
+                                   'fallan': [r['operacion'] for r in report['operaciones'] if canario.broken(r)],
                                    'error': error.get('kind') or ''}
         if error.get('kind') in CANNOT_KINDS:
             raise Stop(CANNOT, error['kind'], None, error.get('motivo') or '')

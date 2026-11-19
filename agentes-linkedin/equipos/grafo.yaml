@@ -4589,7 +4589,7 @@
         },
         {
           "kind": "check_linkedin",
-          "cadence": "Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector (16 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.",
+          "cadence": "Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector y lo que necesitan 4 escrituras, sin enviarlas (17 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.",
           "binding": "team_backend.autopiloto._canary",
           "deduplication": "ID determinista por cuenta, día UTC e intento; _pending impide duplicar; ninguna corrida más ese día cuando una ya juzgó LinkedIn."
         }

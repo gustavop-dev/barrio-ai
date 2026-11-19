@@ -1,9 +1,11 @@
 """The daily canary of a `directo` account (docs/plan-linkedin-directo.md, «Prueba diaria»).
 
 LinkedIn renames fields without warning and an HTTP 200 with a field gone is a silent break. Once a day the connector's
-14 reads (16 calls, inside the navegador service's budgets and stops like any other) are checked against the fields
-Barrio's callers use; what to read and what each answer must carry stays with the rest of LinkedIn's knowledge in
-linkedin_directo/canario.py, reached through DirectoConnector.canary(). Each run is a CanaryRun; the last KEEP stay.
+14 reads are checked against the fields Barrio's callers use, and what the writes depend on is prepared without writing
+(the post page's comment templates, the member ids, the invitations' secrets): 17 calls, inside the navegador
+service's budgets and stops like any other, and never a write. What to read and what each answer must carry stays with
+the rest of LinkedIn's knowledge in linkedin_directo/canario.py, reached through DirectoConnector.canary(). Each run is a
+CanaryRun; the last KEEP stay. `manage.py operador prueba-linkedin` runs one now.
 
 - daily_due: cheap check for the autopilot (no reads): a directo account with its service configured, not paused,
   past LINKEDIN_CANARY_AFTER (UTC), without a run today that judged LinkedIn. A run that could not run (the service busy,
@@ -13,6 +15,9 @@ linkedin_directo/canario.py, reached through DirectoConnector.canary(). Each run
 - Notices (Notificaciones, kind linkedin_canary): once when the day's result turns broken or not run, and once when it
   is fine again. Days compare by their last run; a run that will be tried again says nothing yet. A run the service
   refused for another internet exit is also told at once, like any call (connectors_directo.egress_notice).
+- LinkedIn changed a page (cambios_linkedin.after_canary): each broken operation opens the day's episode, which Slack
+  tells at once (alertas_slack.linkedin_cambio), and an operation it checked and found fine closes one («recuperado»)
+  and lets the actions that waited for it go.
 - latest: the last finished run, as GET /api/v1/operador/overview and /api/v1/operador/accounts show it (`canary`)."""
 import os
 from datetime import datetime, time, timedelta, timezone as dt_timezone
@@ -56,7 +61,9 @@ def daily_due(account,now=None):
     return not today or max(at for _,at in today)+RETRY_AFTER<=now
 
 def failing(log):
-    return [row.get('operacion') for row in log.operations or [] if row.get('estado')!='ok']
+    """The operations the run found broken (linkedin_directo.canario.broken: a write only writing can test is not)."""
+    from linkedin_directo.canario import broken
+    return [row.get('operacion') for row in log.operations or [] if broken(row)]
 
 def latest(account):
     """The last finished run, or None (no run yet, or not a directo account)."""
@@ -100,6 +107,8 @@ def run(account,now=None,connector=None):
         operador.set_account_pause(account,f'La prueba diaria de LinkedIn se detuvo: {log.error or "el servicio paró la cuenta."}')
     else:
         _notify(account,log,now)
+    from . import cambios_linkedin
+    cambios_linkedin.after_canary(account,log,now)
     return log
 
 def _notify(account,log,now):
@@ -111,12 +120,15 @@ def _notify(account,log,now):
     if log.state==previous:return  # once per change
     ref=f'linkedin_canary:{log.id}'
     if log.state==CanaryRun.State.BROKEN:
-        avisar('linkedin_canary','La prueba diaria de LinkedIn encontró lecturas rotas',
-               f'{account.label}: {", ".join(failing(log))}. LinkedIn cambió algo; lo que dependa de esas lecturas puede '
-               'fallar o quedarse sin datos hasta que se ajuste el conector directo.',ref=ref,member=owner)
+        avisar('linkedin_canary','La prueba diaria de LinkedIn encontró algo roto',
+               f'{account.label}: {", ".join(failing(log))}. LinkedIn cambió algo; lo que dependa de eso puede fallar, '
+               'esperar o quedarse sin datos hasta que se ajuste el conector directo.',ref=ref,member=owner)
     elif log.state==CanaryRun.State.NOT_RUN:
         avisar('linkedin_canary','La prueba diaria de LinkedIn no pudo correr hoy',
                f'{account.label}: {log.error or "sin detalle"} Se intentó {today} veces; mañana vuelve a intentarlo.',ref=ref,member=owner)
     elif log.state==CanaryRun.State.OK:
+        from linkedin_directo.canario import WRITE
+        writes=sum(1 for row in log.operations if row.get('tipo')==WRITE and row.get('estado')=='ok')
         avisar('linkedin_canary','La prueba diaria de LinkedIn vuelve a pasar',
-               f'{account.label}: las {len(log.operations)} lecturas traen sus campos otra vez.',ref=ref,member=owner)
+               f'{account.label}: las {len(log.operations)-sum(1 for r in log.operations if r.get("tipo")==WRITE)} lecturas '
+               f'traen sus campos y {writes} escrituras se pueden preparar otra vez.',ref=ref,member=owner)

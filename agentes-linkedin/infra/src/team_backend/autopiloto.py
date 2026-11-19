@@ -872,6 +872,8 @@ def _execute(user,account,now):
     due=operador.post_due(now,member)  # a network action or comment of hers now could push her post past its hour
     # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
     first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
+    from . import cambios_linkedin
+    changed=cambios_linkedin.held_capabilities(account,now) if account.provider=='directo' else {}  # LinkedIn changed a page
     for proposal in ActionProposal.objects.select_related('post','piece','contact','comment').filter(account=account,state='approved',execution__isnull=True).order_by(first,'created_at'):
         if cycle_issues(proposal):continue
         if due and not proposal.piece_id:continue
@@ -880,6 +882,7 @@ def _execute(user,account,now):
         if not operador.spacing_ok(account,now,proposal.capability):continue
         if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
         if not proposal.piece_id and operador.deferred_until(account,proposal.capability,now):continue  # its last write left nothing
+        if not proposal.piece_id and proposal.capability in changed:continue  # waits for the canary (cambios_linkedin)
         if _stopped_recently(proposal,now):continue  # a gate keeps stopping it: it waits and the next one goes
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)

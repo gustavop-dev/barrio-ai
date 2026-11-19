@@ -9,11 +9,14 @@ class LinkedInError(Exception):
     `linkedin/<code>` so the network's limit rules can read it. kind='budget' is the navegador service's own budget
     per account, never LinkedIn's: nothing left, and `retry_after` says in how many seconds there is room again.
     kind='egress' is the service refusing to open the account by another internet exit: nothing left, and only an
-    operator on the server clears it; `since` is when that refusal began (one moment per episode)."""
+    operator on the server clears it; `since` is when that refusal began (one moment per episode). `detail` is what
+    helps find a shape LinkedIn changed (rutas.template_diagnostic, the box fields missing, which parser failed):
+    counts, offsets and field NAMES only, never a value of the page."""
 
-    def __init__(self, message, *, kind='error', status=None, pause=False, retry_after=None, since=None):
+    def __init__(self, message, *, kind='error', status=None, pause=False, retry_after=None, since=None, detail=None):
         super().__init__(message)
         self.kind, self.status, self.pause, self.retry_after, self.since = kind, status, pause, retry_after, since
+        self.detail = detail
 
 
 class Uncertain(Exception):

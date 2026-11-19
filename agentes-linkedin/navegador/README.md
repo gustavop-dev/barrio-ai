@@ -120,10 +120,12 @@ En el backend: `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL=http://127.0.0.1:879
 servicio usando esa cuenta, hay que detenerlo antes.
 
 El canario termina con 0 (todo bien), 2 (algo se rompió: LinkedIn cambió una respuesta), 3 (la cuenta se detuvo:
-no reintentar, revisar a mano) o 4 (no corrió). Son las mismas 14 lecturas (16 llamadas) que el backend corre solo
+no reintentar, revisar a mano) o 4 (no corrió). Son las mismas 17 llamadas que el backend corre solo
 una vez al día por cuenta `directo` (el trabajo `check_linkedin`, la «Prueba diaria» de
 `docs/plan-linkedin-directo.md`); las dos pasan por `/llamadas`, así que gastan los mismos topes y respetan las
-mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `linkedin_directo/canario.py`.
+mismas paradas: las 14 lecturas del conector y la página del post cuyos comentarios lee, de la que se preparan sin enviarlas las
+escrituras de comentario y respuesta (nunca se envía una escritura). Qué se lee y qué campos debe traer cada
+respuesta está en `linkedin_directo/canario.py`.
 
 ## Ajustes
 
@@ -211,7 +213,7 @@ llamadas de cada operación en `linkedin_directo/cliente.py`.
 | Métricas (APRE-01) | cada 3 h, si toca | posts propios, post, comentarios, audiencia, visitas | ~15; tope 66 | `metricas.collect` y sus topes |
 | Comentarios en posts propios | el más nuevo cada 2 h; otro de menos de 72 h cada 2 h si trae comentarios, hasta cada 4 h si no; luego cada 12 h hasta el día 7 | `/me`, comentarios e hilos | ~30 con 8 posts; tope 152 | `respuestas.read`, `respuestas.reading_room` y sus topes |
 | Analítica | una vez al día | 5 exportaciones: 14 días y 7, 28, 90 y 365 | 5 | `analitica.run` |
-| Prueba diaria | una vez al día; si no pudo correr, otra vez a la hora (hasta 3) | 16 | 16 (hasta 48) | `team_backend/canario.py`, `linkedin_directo/canario.py` |
+| Prueba diaria | una vez al día; si no pudo correr, otra vez a la hora (hasta 3) | 17 | 17 (hasta 51) | `team_backend/canario.py`, `linkedin_directo/canario.py` |
 | Conciliación | solo escrituras sin confirmar | 1 o 2 | ~10 | `operador.reconcile` |
 
 **Ventana de lecturas (16/11/2026).** Todos estos trabajos, salvo la conciliación, se encolan solo dentro de
@@ -270,7 +272,7 @@ datos, sin propuestas y sin IA.
 | Métricas | 4 | Posts propios, el último y sus comentarios, audiencia y visitas (`metricas.collect`) |
 | Red | 3 | Invitaciones recibidas y enviadas, y aceptar las recibidas (`red.sync`, RED-04) |
 | Analítica | 1 | Una exportación, los últimos 28 días |
-| Canario | 1 | La prueba diaria: 14 lecturas, 16 llamadas |
+| Canario | 1 | La prueba diaria: 17 llamadas (14 lecturas y lo que necesitan 4 escrituras, sin enviarlas) |
 
 Y unas pocas escrituras inofensivas, cada una leída antes y después como en producción:
 
@@ -441,7 +443,7 @@ alias dc='docker compose -f compose.prod.yaml --env-file .env --profile navegado
    `dc exec navegador python -m navegador reanudar <cuenta>`.
 8. **Verificar** [servidor] [local]: `dc exec navegador python -m navegador estado` dice `pantalla :99: lista` y
    `<cuenta>: sesión guardada sí; … activa; salida directo`. Con `exec` (no `run`) se ve la pantalla del propio
-   servicio. Opcional, la prueba diaria a mano: `dc exec navegador python -m navegador canario <cuenta>` (16 lecturas;
+   servicio. Opcional, la prueba diaria a mano: `dc exec navegador python -m navegador canario <cuenta>` (17 llamadas, ninguna escritura;
    sale con 0 si todo bien). Desde la IP del servidor pasó 14 de 14 [servidor].
 9. **Arrancar el rodaje** [local; contra LinkedIn, pendiente]: `dc up -d rodaje` (con `navegador` ya arriba).
    `dc logs -f rodaje` muestra cada paso; `dc run --rm rodaje estado`, la tabla de los últimos días. Pararlo:

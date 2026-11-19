@@ -106,6 +106,19 @@ Las reglas miran **las últimas 24 horas**, así un problema de anoche no desapa
 3. Las investigaciones que quedan «en curso» para siempre, y las verificaciones que fallan por presupuesto, ponen **Investigación en internet** en 🟡 y **Crecimiento de red** en 🔴.
 4. Compradores descartados con un nivel que los mantiene ponen **Crecimiento de red** en 🟡 y nombran el comando para recuperarlos.
 5. Piezas con una imagen de respaldo (la tarjeta genérica, la tarjeta con la frase del post o una foto de la galería) ponen **Post diario** en 🟡, con cuál fue, el motivo y la cuenta de la semana.
+6. La caja de comentarios que LinkedIn cambió el 19/11/2026 pone **Comentarios en referentes** y **Respuestas en tus posts** en 🔴: «LinkedIn cambió la página: no se puede comentar en un post (create_comment) desde las 16:00 (en la prueba de LinkedIn): no salen comentarios en posts de otros.». Su «qué hacer»: lo aprobado espera sin perderse; prueba ahora con `manage.py operador --usuario <tu usuario> prueba-linkedin`.
+
+**LinkedIn cambió la página.** Un cambio de LinkedIn en una página o una respuesta que usa un flujo lo pone en 🔴 mientras dure ese día, aunque nada haya fallado tres veces. Lo encuentra la prueba de LinkedIn o una acción en uso (`cambios_linkedin.py`; detalle en [operador-linkedin.md](../../agentes-linkedin/infra/docs/operador-linkedin.md)). El hallazgo dice qué no se puede hacer, la operación, desde qué hora, quién lo vio («en uso» o «en la prueba de LinkedIn») y qué se detiene. Cada operación va a su flujo:
+
+- comentar, a Comentarios en referentes;
+- leer los comentarios de un post, a ese flujo y a Respuestas en tus posts;
+- responder, leer hilos y reaccionar a un comentario, a Respuestas en tus posts;
+- perfiles, búsqueda, seguir, invitar y aceptar, a Crecimiento de red;
+- chats, a Mensajes privados;
+- posts propios y analítica, a Post diario;
+- lo demás, como reaccionar a un post o leer `/me`, a Salud de la máquina.
+
+Se quita solo cuando la prueba vuelve a pasar o una operación igual sale bien.
 
 ### FLU-03 · Envío a Slack <a id="flu-03"></a>
 
@@ -649,11 +662,10 @@ Este flujo nunca está ⚪: si algo de lo que vigila está apagado, sale en rojo
 **Se pone en 🟡 cuando:**
 
 - **El gasto de IA del mes pasó el 80 %** de su tope.
-- **La prueba diaria de LinkedIn encontró algo que cambió.**
 - **El navegador de LinkedIn no responde** y aplazó escrituras en la última hora.
 - **Hay escrituras sin confirmar en LinkedIn.** También salen en «Pendiente para hoy» como «¿Salió o no?».
 
-**Cifra clave:** «IA: 1,20 USD hoy, 38,40 de 100,00 en el mes». Debajo del flujo, cuando está abierto, salen los cupos de lectura agotados hoy y las escrituras del día con su tope, por ejemplo «posts 1/1, comentarios 8/15».
+**Cifra clave:** «IA: 1,20 USD hoy, 38,40 de 100,00 en el mes» y la línea de la prueba de LinkedIn de las últimas 24 horas. Por ejemplo, «Prueba de LinkedIn: ok a las 07:05 (21 comprobaciones, 17 llamadas, ninguna escritura enviada; 3 escrituras solo se saben al escribir)». Si no, «rota a las … (create_comment)», «no pudo correr a las … (motivo)» o «sin correr en 24 h». El «todo bien» diario de la prueba solo vive aquí: no hay un mensaje de Slack aparte. Lo que encontró roto pone en 🔴 su flujo (ver «LinkedIn cambió la página»). Debajo del flujo, cuando está abierto, salen los cupos de lectura agotados hoy y las escrituras del día con su tope, por ejemplo «posts 1/1, comentarios 8/15».
 
 ---
 

@@ -65,15 +65,23 @@ class DirectoConnector:
         if not ACCOUNT.fullmatch(account_id or ''):raise ConnectorError('Identificador de cuenta del navegador inválido.',kind='config')
         self.account_id=account_id
         self.client=Cliente(transport or TRANSPORT or service_transport(account_id))
+        from .cambios_linkedin import Seguimiento
+        self.changes=Seguimiento(account_id)  # LinkedIn changed a page: recorded once, cleared by a later success
 
     def _do(self,name,*args,**kwargs):
-        try:return getattr(self.client,name)(*args,**kwargs)
+        try:result=getattr(self.client,name)(*args,**kwargs)
         except NoteQuota as exc:raise InvitationNoteQuota(str(exc),exc.status) from None
         except LinkedInError as exc:
             if exc.kind=='egress':egress_notice(self.account_id,exc.since,str(exc))
+            # The account's own /me is read inside most calls: a change there is account_status's, whoever asked.
+            operation='account_status' if (exc.detail or {}).get('lectura')=='own' else name
+            self.changes.failed(operation,exc.kind,str(exc),exc.detail)
             raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause,retry_after=exc.retry_after,
-                                 deferrable=exc.kind in DEFERRED_KINDS and not exc.pause) from None
+                                 deferrable=exc.kind in DEFERRED_KINDS and not exc.pause,operation=operation,
+                                 detail=exc.detail) from None
         except Uncertain as exc:raise ConnectorUncertain(str(exc)) from None
+        self.changes.succeeded(name,own=bool(self.client.me.get('fsd')))
+        return result
 
     def account_status(self):return self._do('account_status')
     def get_user(self,identifier):return self._do('get_user',identifier)

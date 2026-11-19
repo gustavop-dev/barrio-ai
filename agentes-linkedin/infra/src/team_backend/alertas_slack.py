@@ -652,6 +652,72 @@ def navegador_no_disponible(now):
             once='ever'))
     return alerts
 
+# --------------------------------------------------------------------------- LinkedIn changed a page
+
+def _went(key,now):
+    """The alert `key` went out today (any channel)."""
+    from .operador import period_starts
+    day,_=period_starts(now)
+    return AuditEvent.objects.filter(action=ACTION,target=str(key)[:120],created_at__gte=day,created_at__lte=now).exists()
+
+def _change_text(account,episode,now,several):
+    from . import cambios_linkedin as cambios
+    op=episode.operacion;what,stops=cambios.plain(op);last=episode.ultimo
+    where=f' («{account.label}»)' if several else ''
+    clue=cambios.hint(last.metadata.get('diagnostico'))
+    clue=f' Pista para quien ajuste el conector: {clue}.' if clue else ''
+    if cambios.USE not in episode.fuentes:
+        return (f'Barrio · LinkedIn cambió la página{where}: la prueba de LinkedIn de las {hhmm(episode.desde)} encontró que no '
+                f'se puede {what} ({op}); si sigue así, {stops}. La prueba no envió nada. Si una acción falla por esto, '
+                f'ella y las de su tipo esperan aprobadas.{clue} Para repetir la prueba: {cambios.COMMAND}.')
+    if cambios.capabilities(op):
+        rows=cambios.waiting(account,op)
+        wait=(f'{cambios.waiting_text(rows)} {"espera" if sum(n for _,n in rows)==1 else "esperan"} sin perderse'
+              if rows else 'Lo que apruebes espera sin perderse')
+        wait+=': sale solo cuando la prueba de LinkedIn vuelva a pasar, o mañana con un primer intento.'
+    else:
+        wait='La próxima vez que toque se intenta de nuevo.'
+    return (f'Barrio · LinkedIn cambió la página{where}: desde las {hhmm(episode.desde)} no se puede {what} ({op}): '
+            f'{stops}. No se envió nada. {wait}{clue} Para probar ahora: {cambios.COMMAND}.')
+
+def _recovered_text(account,episode,now,several):
+    from . import cambios_linkedin as cambios
+    op=episode.operacion;what,_=cambios.plain(op)
+    where=f' («{account.label}»)' if several else ''
+    who='la prueba de LinkedIn' if episode.recuperado.metadata.get('fuente')==cambios.CANARY else 'una operación que salió bien'
+    after=' Lo aprobado que esperaba sale solo, a su ritmo.' if cambios.capabilities(op) else ''
+    return (f'Barrio · LinkedIn recuperado{where}: ya se puede {what} ({op}) otra vez; lo confirmó {who} a las '
+            f'{hhmm(episode.recuperado.created_at)}.{after}')
+
+def cambio_avisos(account,now,several=None):
+    """The alerts of one account's episodes today (cambios_linkedin). Per operation and local day at most three: the
+    change; «recuperado» once it closes (only if the change was told); and, if it breaks again after that, once more.
+    So a page that comes and goes never floods the channel and the last word is never a stale «recuperado»."""
+    from . import cambios_linkedin as cambios
+    from .models import ConnectorAccount
+    if several is None:several=ConnectorAccount.objects.filter(provider='directo').count()>1
+    alerts=[]
+    for op,found in cambios.episodes(account,now).items():
+        if not found:continue
+        last=found[-1];key=f'linkedin:forma:{account.id}:{op}'
+        if last.abierto:
+            again=_went(f'{key}:ok',now)
+            alerts.append(Aviso(f'{key}:otra_vez' if again else key,
+                                lambda last=last:_change_text(account,last,now,several)))
+        elif (_went(key,now) or _went(f'{key}:otra_vez',now)) and not _went(f'{key}:ok',now):
+            alerts.append(Aviso(f'{key}:ok',lambda last=last:_recovered_text(account,last,now,several)))
+    return alerts
+
+@vigilante
+def linkedin_cambio(now):
+    """LinkedIn changed a page or an answer the connector uses (cambios_linkedin, 19/11/2026): the daily canary found an
+    operation broken, or an action failed for it in use; at once (the record tells Slack itself, this watcher catches
+    what a closed transaction or a failed post left), with what stops and how many actions wait. One message per
+    operation a day, plus «recuperado»: states, counts and field names, never a person, a text or an id."""
+    from .models import ConnectorAccount
+    accounts=list(ConnectorAccount.objects.filter(provider='directo').order_by('created_at'))
+    return [alert for account in accounts for alert in cambio_avisos(account,now,len(accounts)>1)]
+
 # --------------------------------------------------------------------------- money and the invitation health
 
 def usd(value):

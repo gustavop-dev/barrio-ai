@@ -134,7 +134,8 @@ GET `/api/v1/operador/overview`:
 ```
 
 `canary` es la última prueba diaria terminada de una cuenta `directo` (null en las demás o antes de la primera):
-`ok` (las 14 lecturas traen sus campos), `roto` (LinkedIn cambió algo; `failing` dice qué lecturas), `alto` (el
+`ok` (las 14 lecturas traen sus campos y las escrituras que dependen de la página se pueden preparar), `roto`
+(LinkedIn cambió algo; `failing` dice qué lecturas o escrituras), `alto` (el
 servicio paró la cuenta o no tiene sesión: la cuenta queda en pausa y `paused_reason` dice qué hacer) o `no_corrio`
 (el servicio no estaba, estaba ocupado o sin cupo; `error` lo dice). `GET /api/v1/operador/accounts` trae el mismo
 campo.

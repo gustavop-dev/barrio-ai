@@ -126,10 +126,11 @@ detenida en disco. Desde ahí todo recibe 409 hasta que alguien la reanuda (`pyt
 La pausa avisa una sola vez: los trabajos que ya estaban en cola y chocan con la misma parada solo actualizan el
 motivo.
 
-**Prueba diaria.** El backend no tiene un endpoint aparte para ella: el trabajo `check_linkedin` hace las 14 lecturas
-del conector (16 llamadas) por `/llamadas`, como cualquier otra, así que gasta los topes y se detiene igual. Qué se
-lee y qué campos debe traer cada respuesta vive en `linkedin_directo/canario.py`; `python -m navegador canario
-<cuenta>` corre lo mismo a mano. Un 409 o 423 en la prueba pausa la cuenta como en cualquier lectura; un `budget`,
+**Prueba diaria.** El backend no tiene un endpoint aparte para ella. El trabajo `check_linkedin` hace sus 17 llamadas
+por `/llamadas`, como cualquier otra, así que gasta los topes y se detiene igual. Son las 14 lecturas del conector y
+la página del post cuyos comentarios lee, de la que se preparan, sin enviarlas, las escrituras de comentario y respuesta.
+Ninguna es una escritura: el backend nunca manda `write=true` en la prueba. Qué se lee y qué campos debe traer cada
+respuesta vive en `linkedin_directo/canario.py`. `python -m navegador canario <cuenta>` corre lo mismo a mano. Un 409 o 423 en la prueba pausa la cuenta como en cualquier lectura; un `budget`,
 `not_sent`, `egress` o `network` la deja «sin correr» y se reintenta a la hora (un `egress` además avisa en el acto,
 como en cualquier llamada).
 
