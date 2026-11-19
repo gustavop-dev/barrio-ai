@@ -371,16 +371,101 @@ def profile_reads_used(member,now=None,create_baseline=False):
     else:legacy=0
     return legacy+AuditEvent.objects.filter(action='operator.profile_read',target=key,**period).count()
 
-def reserve_profile_read(account,purpose,now=None):
-    """One profile read of the member who owns `account`, within her daily cap; atomic under her policy_lock."""
+# The daily profile reads split by purpose (18/11/2026). That day the shared cap (80) was spent at 13:04: research 41,
+# execution 17, preflight 16, reconciliation 5, metrics 1, and no follow or invitation went out after it (3 and 2 that day,
+# 9 and 15 the day before). The reads that guard or confirm a LinkedIn write (the pre-check before writing, the read-back
+# after it, the reconciliation of an unconfirmed one and of the invitations) keep their own part; every other read
+# (the research of candidates, referents, metrics, replies, the buyers' posts…) takes OPERATOR_PROFILE_READ_RESEARCH_SHARE
+# of the member's cap. Before OPERATOR_PROFILE_READ_POOL_CUTOFF (local time) neither part takes the other's; after it,
+# what one part left is the other's too. The total never grows.
+ACTION_READS=('preflight','execution','reconciliation')
+POOLS=('acciones','investigacion')
+RESEARCH_SHARE_DEFAULT='0.4'
+RESEARCH_SHARE_BOUNDS=(0.1,0.9)
+
+def read_pool(purpose):
+    return 'acciones' if purpose in ACTION_READS else 'investigacion'
+
+def research_share(member=None):
+    """OPERATOR_PROFILE_READ_RESEARCH_SHARE of the member (hers, else the .env's), within RESEARCH_SHARE_BOUNDS: with 80
+    reads and 0.4, 32 for research and 48 for actions. A bad value is the default, never fatal."""
+    try:value=float(miembros.setting(member,'OPERATOR_PROFILE_READ_RESEARCH_SHARE',RESEARCH_SHARE_DEFAULT))
+    except (TypeError,ValueError):value=float(RESEARCH_SHARE_DEFAULT)
+    if value!=value:value=float(RESEARCH_SHARE_DEFAULT)  # NaN
+    return min(max(value,RESEARCH_SHARE_BOUNDS[0]),RESEARCH_SHARE_BOUNDS[1])
+
+def pool_cutoff(now=None):
+    """The local moment of `now`'s day when the two parts merge: OPERATOR_PROFILE_READ_POOL_CUTOFF (HH:MM, default 17:00).
+    00:00 never splits the cap (every read takes from the total, as before 18/11/2026)."""
+    day,_=period_starts(now)
+    try:minutes=_minutes(os.environ.get('OPERATOR_PROFILE_READ_POOL_CUTOFF','17:00'))
+    except (TypeError,ValueError):minutes=17*60
+    return day+timedelta(minutes=min(max(minutes,0),24*60))
+
+def profile_read_pools(member,now=None):
+    """Read only: {'tope','usadas','corte','unidas', 'acciones': {'tope','usadas'}, 'investigacion': {'tope','usadas'}} of the
+    member's profile reads today. `unidas`: past the cutoff, either part may take what the other left."""
+    from .models import AuditEvent
+    now=now or timezone.now();cap=profile_read_cap(member);day,_=period_starts(now)
+    research=min(cap,int(cap*research_share(member)+0.5))
+    used=profile_reads_used(member,now)
+    actions=AuditEvent.objects.filter(action='operator.profile_read',target=miembros.policy_key(member),created_at__gte=day,
+                                      created_at__lt=day+timedelta(days=1),metadata__purpose__in=ACTION_READS).count()
+    cutoff=pool_cutoff(now)
+    return {'tope':cap,'usadas':used,'corte':cutoff,'unidas':now>=cutoff,
+            'acciones':{'tope':cap-research,'usadas':actions},'investigacion':{'tope':research,'usadas':used-actions}}
+
+def actions_ran_out_at(member,now=None):
+    """Read only: when the member's actions ran out of profile reads today before the cutoff (their part spent, or the
+    total), or None. From the reservations themselves: the moment the last read they could take was taken."""
+    from .models import AuditEvent
+    now=now or timezone.now();pools=profile_read_pools(member,now);day,_=period_starts(now)
+    reads=AuditEvent.objects.filter(action='operator.profile_read',target=miembros.policy_key(member),created_at__gte=day,
+                                    created_at__lt=min(now,pools['corte'])+timedelta(microseconds=1)).order_by('created_at','id')
+    moments=[]
+    actions=pools['acciones']['tope']
+    if actions>0:
+        last=reads.filter(metadata__purpose__in=ACTION_READS)[actions-1:actions].first()
+        if last is not None:moments.append(last.created_at)
+    total=pools['tope']-(pools['usadas']-AuditEvent.objects.filter(action='operator.profile_read',target=miembros.policy_key(member),
+                                                                   created_at__gte=day,created_at__lt=day+timedelta(days=1)).count())
+    if total>0:
+        last=reads[total-1:total].first()
+        if last is not None:moments.append(last.created_at)
+    elif pools['tope']>0 and total<=0:moments.append(day)  # the pre-BAR-15 baseline alone spent it
+    return min(moments) if moments else None
+
+def reserve_profile_read(account,purpose,now=None,**detail):
+    """One profile read of the member who owns `account`, within her daily cap and, before the cutoff, within the part of
+    its purpose (read_pool); atomic under her policy_lock. Returns its event; `detail` goes in its metadata (the step of an
+    execution read)."""
     from .models import AuditEvent
     now=now or timezone.now();member=member_of(account=account);cap=profile_read_cap(member)
     with transaction.atomic():
         policy_lock(member)
         used=profile_reads_used(member,now,create_baseline=True)
         if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
-        AuditEvent.objects.create(action='operator.profile_read',target=miembros.policy_key(member),created_at=now,
-                                  metadata={'account':str(account.id),'purpose':purpose})
+        pool=read_pool(purpose);pools=profile_read_pools(member,now)
+        if not pools['unidas'] and pools[pool]['usadas']>=pools[pool]['tope']:
+            other=POOLS[1-POOLS.index(pool)]
+            raise ProfileReadCapReached(
+                f'Parte de {"las acciones" if pool=="acciones" else "la investigación"} del cupo de lecturas de perfil agotada '
+                f'({pools[pool]["usadas"]}/{pools[pool]["tope"]}); la de {"las acciones" if other=="acciones" else "la investigación"} '
+                f'no se toca hasta las {pools["corte"].astimezone(local_tz()):%H:%M}. La operación espera.')
+        return AuditEvent.objects.create(action='operator.profile_read',target=miembros.policy_key(member),created_at=now,
+                                         metadata={'account':str(account.id),'purpose':purpose,'pool':pool,**detail})
+
+PROFILE_READ_UNUSED='operator.profile_read_unused'
+
+def release_unread_preflight(proposal):
+    """The preflight reserved for an execution that never read the profile (the account was not running, the provider
+    deferred before the pre-check, a gate stopped an acceptance first) goes back to the day: nothing was read. The event
+    stays, renamed PROFILE_READ_UNUSED, so the audit keeps it and the cap no longer counts it."""
+    from .models import AuditEvent
+    event=getattr(proposal,'_preflight_event',None)
+    if event is None or not getattr(proposal,'_preflight_reserved',False):return
+    proposal._preflight_event=None
+    AuditEvent.objects.filter(pk=event.pk,action='operator.profile_read').update(action=PROFILE_READ_UNUSED)
 
 def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
@@ -995,8 +1080,9 @@ def execute(user,proposal_id):
                 issues=red.execution_issues(proposal)
                 if issues:raise OperatorBlocked('; '.join(issues))
                 # Reserve the preflight before creating an execution. Exhaustion leaves approval retryable.
-                try:reserve_profile_read(account,'preflight')
+                try:proposal._preflight_event=reserve_profile_read(account,'preflight')
                 except ProfileReadCapReached as exc:raise OperatorBlocked(str(exc)) from exc
+                proposal._preflight_reserved=True  # red._look takes it for the pre-check; unread, it is given back
             if proposal.comment_id:
                 from . import respuestas
                 issues=respuestas.execution_issues(proposal)
@@ -1085,6 +1171,8 @@ def execute(user,proposal_id):
         return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc),wrote=False)
     except ProfileReadCapReached as exc:
         return _finish(execution,'sent' if execution.wrote else 'failed',user,error_kind='profile_read_cap',note=str(exc))
+    finally:
+        release_unread_preflight(proposal)
 
 def reconcile(user,proposal_id):
     """ADM-05: settle sent/uncertain/stale executions by reading LinkedIn. Never writes."""

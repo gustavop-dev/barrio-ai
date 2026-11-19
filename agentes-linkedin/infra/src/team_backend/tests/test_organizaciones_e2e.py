@@ -781,7 +781,8 @@ class RitmoPorMiembroTests(RitmoBase):
 
     def test_profile_reads_are_hers_and_shared_by_her_connectors(self):
         """Catch one profile-read ceiling for everybody: each member's connectors share her own ceiling."""
-        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '2'}):
+        # The total per member (00:00: no research/actions parts; those are tested in test_fase2_curso.ProfileReadPoolTests).
+        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '2', 'OPERATOR_PROFILE_READ_POOL_CUTOFF': '00:00'}):
             operador.reserve_profile_read(self.g.reader, 'prueba')
             operador.reserve_profile_read(self.g.official, 'prueba')
             with self.assertRaises(operador.ProfileReadCapReached):
@@ -893,7 +894,7 @@ class ConcurrenciaTests(RitmoBase):
     def test_her_connectors_wait_for_each_other_and_two_members_never_do(self):
         """Two reservations at once on Gustavo's two connectors with one read left: exactly one gets it. While his lock is
         held, the CTO reserves hers at once and his other connector waits (lock_timeout: it never got the lock)."""
-        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1'}):
+        with patch.dict(os.environ, {'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1', 'OPERATOR_PROFILE_READ_POOL_CUTOFF': '00:00'}):
             start = threading.Barrier(2)
 
             def race(account):
@@ -1060,7 +1061,8 @@ class VigilantesTests(OperatorBase):
         super().setUp()
         env = patch.dict(os.environ, {
             'SLACK_WEBHOOK_URL': 'https://hooks.slack.test/services/ALERTAS', 'SLACK_WEBHOOK_RESUMEN': '',
-            'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1', 'OPERATOR_DAILY_LIMITS': 'RED-01=1', 'OPERATOR_AUTONOMY': 'RED-01=approval',
+            'OPERATOR_PROFILE_READ_DAILY_LIMIT': '1', 'OPERATOR_PROFILE_READ_POOL_CUTOFF': '00:00',
+            'OPERATOR_DAILY_LIMITS': 'RED-01=1', 'OPERATOR_AUTONOMY': 'RED-01=approval',
             'OPERATOR_PROPOSAL_TTL_HOURS': '48', 'AI_MONTHLY_LIMIT_USD': '1', 'AI_DAILY_FUSE_USD': '1000',
             'BUYER_REPLY_ENABLED': 'true', 'BUYER_SEQUENCE_ENABLED': 'true', 'CALCOM_BOOKING_URL': ''})
         env.start()

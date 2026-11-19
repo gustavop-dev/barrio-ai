@@ -37,11 +37,22 @@ class NetworkBase(OperatorBase):
         while jobs.process_one(self.worker):pass
 
     def classifier(self,verdicts):
-        """verdicts: {display_name: (fit, confidence)}"""
+        """verdicts: {display_name: (fit, confidence[, fields])}. A buyer the model leaves out (fit false) comes with
+        no_encaja and its motive (no_decide), as the prompt of 18/11/2026 asks; since then the level, not fit, decides
+        a buyer (nivel_comprador.decide), and the incoherent answers the production model gave have their own tests
+        (test_compradores_niveles.RealShapeTests). `fields` overrides any field of the answer (another role, a level…)."""
         def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
             data=json.loads(message);self.classifier_calls.append({'purpose':purpose,'model':model,'data':data,'system':system,'context':context})
-            out=[{'id':p['id'],'fit':verdicts[p['name']][0],'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                  'reason':f'Razón para {p["name"]}','confidence':verdicts[p['name']][1],'course_citations':['LI-03-M005-K06'], 'invitation_note':'','note_reason':''} for p in data['people'] if p['name'] in verdicts]
+            out=[]
+            for p in data['people']:
+                if p['name'] not in verdicts:continue
+                fit,confidence,*fields=verdicts[p['name']]
+                row={'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida',
+                     'reason':f'Razón para {p["name"]}','confidence':confidence,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
+                if not fit:row.update(buyer_level='no_encaja',buyer_against='no_decide')
+                row.update(*fields)
+                if row['role']!='comprador':row.update(buyer_level='',buyer_against='')
+                out.append(row)
             return {'text':json.dumps({'contacts':out}),'model':model,'estimated_usd':0.002,'request_id':'req_net'}
         return patch('knowledge.providers.claude',side_effect=fake)
 
@@ -275,7 +286,8 @@ class DiscoveryAndFollowTests(NetworkBase):
         self.job('discover_network')  # posts are scanned once: no duplicates
         self.assertEqual(Contact.objects.count(),2)
 
-        with self.classifier({'Ana Founder':(True,0.9),'Carla CTO':(True,0.5)}):self.job('classify_contacts')
+        # Carla as a peer: below the minimum confidence a peer leaves; a buyer's confidence only orders (18/11/2026).
+        with self.classifier({'Ana Founder':(True,0.9),'Carla CTO':(True,0.5,{'role':'par'})}):self.job('classify_contacts')
         call=self.classifier_calls[0]
         self.assertEqual((call['purpose'],call['model']),('network-classify','claude-sonnet-5-5'))
         # Comment authors come without a headline: the profile is read first (1 read; the search result already had one).
@@ -500,11 +512,23 @@ class SignalsReadTests(NetworkBase):
         self.people('Ana Uno','Bea Dos')
         person=self.fake.seed_person('dan-sin','Dan Sin Titular',headline='Founder')
         Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name='Dan Sin Titular',source='commenter',stage='candidate')
-        signals=self.classify('Ana Uno','Bea Dos','Dan Sin Titular',OPERATOR_PROFILE_READ_DAILY_LIMIT='1')
+        # The total cap alone (00:00: no parts); the research and actions parts have their own tests (ProfileReadPoolTests).
+        signals=self.classify('Ana Uno','Bea Dos','Dan Sin Titular',OPERATOR_PROFILE_READ_DAILY_LIMIT='1',OPERATOR_PROFILE_READ_POOL_CUTOFF='00:00')
         self.assertEqual(signals,{'Ana Uno':{'followers':1500,'bio':'Ana Uno builds tools for founders.'},'Bea Dos':{}})
         self.assertEqual(AuditEvent.objects.filter(action='operator.profile_read').count(),1)
         self.assertEqual(AuditEvent.objects.filter(action='network.signals_read').count(),1)  # the refused read spent nothing
         self.assertEqual(Contact.objects.get(display_name='Dan Sin Titular').classification,{})  # waits for a readable profile
+
+    def test_a_headline_that_settles_it_spends_no_signals_read(self):
+        # 18/11/2026: a recruiter, a student or a job seeker is classified on the headline; a founder who also studies is read.
+        for slug,name,headline in (('rec','Rita Recruiter','Senior Technical Recruiter at Globex'),('stu','Sam Student','MBA Student at Wharton'),
+                                   ('job','Jon Busca','Open to Work · Product Manager'),('fou','Fede Founder','Founder at Lumora · MBA student')):
+            self.fake.seed_person(slug,name,headline=headline,signals={'bio':f'{name} bio.'})
+            Contact.objects.create(account=self.account,provider_user_id='ACo'+slug,display_name=name,headline=headline,source='search',stage='candidate')
+        signals=self.classify('Rita Recruiter','Sam Student','Jon Busca','Fede Founder')
+        self.assertEqual({name for name,value in signals.items() if value},{'Fede Founder'})
+        self.assertEqual((red.reads_today(self.account,'profile'),AuditEvent.objects.filter(action='network.signals_read').count()),(1,1))
+        self.assertEqual(Contact.objects.filter(classification={}).count(),0)  # nobody waits: all four were classified
 
     def test_an_unreadable_profile_is_noted_and_the_person_classified_without_retrying(self):
         Contact.objects.create(account=self.account,provider_user_id='ACogone-eva',display_name='Eva Gone',headline='Founder',source='search',

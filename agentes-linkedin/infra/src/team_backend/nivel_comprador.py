@@ -116,13 +116,85 @@ def stage_question(contact,public):
     headline=public(contact.headline)[:max(0,300-len(name)-len(tail)-5)].strip()
     return (f'{name} ({headline}). ' if headline else f'{name}. ')+tail
 
-def from_classifier(contact,result,fit):
-    """The buyer block the classifier leaves, before the web check: its profile, level and evidence (the profile)."""
-    level=result.get('buyer_level')
-    if level not in LEVELS:level='por_confirmar' if fit else 'no_encaja'  # an answer without a level
-    return {'profile':result.get('buyer_profile') if result.get('buyer_profile') in PROFILES else '','level':level,
-            'us_market':bool(result.get('us_market')),'evidence':(result.get('reason') or '')[:400],
-            'sources':[contact.profile_url] if contact.profile_url else [],'basis':'perfil'}
+# --------------------------------------------------------------------------- the level decides (18/11/2026)
+# Measured in production on 18/11/2026: of 16 buyers classified after BAR-24/BAR-25, 10 left the neighborhood with level
+# por_confirmar (9) or probable (1). The model answered fit=false next to a level that keeps the person («es una hipótesis
+# de comprador», «tamaño no consta»), its confidence for a hypothesis sat under NETWORK_MIN_CONFIDENCE, and red._classify_batch
+# took that fit. From now on a buyer's fit is derived from her level in code: only no_encaja leaves, and no_encaja needs
+# one of these motives (the classifier's `buyer_against`, the web check's `en_contra`); without one it is por_confirmar.
+# «Tamaño no consta», «sin datos públicos» or «es una hipótesis» are not motives: they are the absence of evidence.
+AGAINST={
+    'no_decide':'no es dueño, founder ni decide: vende, recluta o ejecuta para otros',
+    'vende_servicios':'vive de vender sus servicios profesionales (consultor, freelance, coach, agencia) en vez de dirigir una '
+                      'empresa con producto u operación propia',
+    'competidor_software':'su empresa vende desarrollo de software (competidor de ProjectApp)',
+    'demasiado_grande':'empresa de más de 1000 personas (línea ProjectApp)',
+    'idea_sin_empresa':'idea sin empresa, estudiante, o presemilla declarada sin ingresos',
+    'empresa_cerrada':'la empresa cerró o ya no opera',
+    'no_contactar':'pide no ser contactado',
+}
+# What a web source can show against (the web never sees a «do not contact» or a student better than the profile did).
+AGAINST_WEB=('no_decide','competidor_software','demasiado_grande','idea_sin_empresa','empresa_cerrada')
+# The one motive that wins over any level: whoever asks not to be contacted is never contacted.
+ALWAYS_OUT=('no_contactar',)
+OVERRIDDEN='network.buyer_fit_overridden'
+CORRECTIONS={'fit_del_modelo':'el fit del modelo contradecía su nivel: gana el nivel',
+             'no_encaja_sin_motivo':'no_encaja sin un motivo válido de evidencia en contra: queda por_confirmar',
+             'sin_nivel':'comprador sin nivel: por_confirmar (o no_encaja si dio un motivo válido)',
+             'motivo_sin_no_encaja':'un motivo de evidencia en contra con un nivel que no es no_encaja: gana el nivel',
+             'no_contactar':'pide no ser contactado: no_encaja aunque el nivel dijera otra cosa'}
+
+def decide(result):
+    """(level, against, corrections) of the classifier's answer about a buyer. The level decides; the model's `fit` and
+    its confidence never do. `against` is the motive of a no_encaja (AGAINST) or ''; `corrections` names each place the
+    answer contradicted itself (CORRECTIONS), for the audit."""
+    level=result.get('buyer_level');against=result.get('buyer_against') if result.get('buyer_against') in AGAINST else ''
+    corrections=[]
+    if level not in LEVELS:
+        level='no_encaja' if against else 'por_confirmar';corrections.append('sin_nivel')
+    if against in ALWAYS_OUT and level!='no_encaja':level='no_encaja';corrections.append('no_contactar')
+    if level=='no_encaja' and not against:level='por_confirmar';corrections.append('no_encaja_sin_motivo')
+    if level!='no_encaja' and against:against='';corrections.append('motivo_sin_no_encaja')
+    if 'fit' in result and bool(result.get('fit'))!=(level!='no_encaja'):corrections.append('fit_del_modelo')
+    return level,against,corrections
+
+def web_verdict(verdict,against):
+    """The web check's level: a no_encaja without a motive a web source can show (AGAINST_WEB) is por_confirmar."""
+    if verdict=='no_encaja' and against not in AGAINST_WEB:return 'por_confirmar',''
+    return verdict,(against if verdict=='no_encaja' else '')
+
+def record_correction(contact,result,level,against,corrections,source='clasificador',fit=None):
+    """One audit event per buyer whose answer contradicted itself (OVERRIDDEN): what the model said and what the code
+    kept. `fit`: what she ended with after every rule (an uncited verdict, a colleague…); by default, her level's.
+    corrections_count() reads them back."""
+    if not corrections:return
+    from . import operador
+    operador._audit(None,OVERRIDDEN,contact.pk,source=source,model_fit=result.get('fit'),model_level=result.get('buyer_level'),
+                    model_against=result.get('buyer_against',''),level=level,against=against,
+                    fit=level!='no_encaja' if fit is None else bool(fit),
+                    corrections=list(corrections),account=str(contact.account_id),reason=(result.get('reason') or '')[:200])
+
+def corrections_count(since,until=None,accounts=None):
+    """{total, por_correccion: {correction: n}, entraron: n}: the buyers whose fit the code derived against what the model
+    said, since `since` (read only; `accounts` narrows to those accounts)."""
+    from .models import AuditEvent
+    events=AuditEvent.objects.filter(action=OVERRIDDEN,created_at__gte=since)
+    if until is not None:events=events.filter(created_at__lt=until)
+    if accounts is not None:events=events.filter(metadata__account__in=[str(a) for a in accounts])
+    counts={};kept=0
+    for meta in events.values_list('metadata',flat=True):
+        for name in meta.get('corrections') or []:counts[name]=counts.get(name,0)+1
+        kept+=int(bool(meta.get('fit')) and meta.get('model_fit') is False)
+    return {'total':events.count(),'por_correccion':counts,'entraron':kept}
+
+def from_classifier(contact,result,level,against=''):
+    """The buyer block the classifier leaves, before the web check: its profile, level (decide) and evidence (the
+    profile); `against`, the motive of a no_encaja."""
+    buyer={'profile':result.get('buyer_profile') if result.get('buyer_profile') in PROFILES else '','level':level,
+           'us_market':bool(result.get('us_market')),'evidence':(result.get('reason') or '')[:400],
+           'sources':[contact.profile_url] if contact.profile_url else [],'basis':'perfil'}
+    if against:buyer['against']=against
+    return buyer
 
 def judge_question(contact):
     return QUESTIONS.get(_buyer(contact).get('profile'),DEFAULT_QUESTION)['juez']
@@ -354,8 +426,20 @@ ABSENCE=re.compile(r'sin evidencia|no hay evidencia|ninguna evidencia|hip[oó]te
                    r'no (?:est[aá] )?claro|insuficiente|sin (?:ronda|clientes|tracci[oó]n) visible',re.I)
 # What a person's memory keeps when Gustavo (a veto, a discard) or LinkedIn (a restricted profile) said no.
 SAID_NO=('rejected','discarded')
+# 18/11/2026: the buyers the classifier's fit took out with a level that keeps them (red.classifier_fit). They already
+# have level, line, segment and evidence: they come back as they were, with their score, without a paid call.
+LEFT_BY_FIT='descartado_con_nivel'
+KEPT_LEVELS=('confirmado','probable','por_confirmar')
 ACTIONS={'fuera_de_eeuu':'restaurar','sin_evidencia_web':'restaurar','sin_evidencia_clasificador':'reclasificar',
-         'sin_nivel':'completar'}
+         'sin_nivel':'completar',LEFT_BY_FIT:'restaurar'}
+
+def left_by_model_fit(contact):
+    """A buyer who left the neighborhood with a level that keeps her: stage discarded, not fit, a stored level other than
+    no_encaja, no rule of the code (a size, a missing citation, the organization) and no web check against. Before
+    18/11/2026 that was the model's fit=false (or its confidence) overriding her level; after it, it should not happen."""
+    c=contact.classification or {};buyer=c.get('buyer') or {}
+    return (c.get('role')=='comprador' and contact.stage=='discarded' and not c.get('fit') and buyer.get('level') in KEPT_LEVELS
+            and not c.get('rule') and (c.get('stage_check') or {}).get('state')!='failed')
 # BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the buyers of before get their line (and segment), whoever was not acted on
 # yet goes back to the classifier to be judged with both lines, and the agencies discarded for selling to «another
 # public» go back to it too, because they may be partners.
@@ -395,10 +479,14 @@ def reevaluation_group(contact):
     - sin_evidencia_web: three web checks without findings took them out (restaurar, por_confirmar, no new search);
     - sin_evidencia_clasificador: the classifier said no for lack of public evidence (reclasificar: back to the queue,
       the normal classify job judges them with the new prompt);
-    - sin_nivel: a buyer in course without level or score (completar, nothing else changes).
+    - sin_nivel: a buyer in course without level or score (completar, nothing else changes);
+    - descartado_con_nivel (18/11/2026): the classifier's fit took her out with a level that keeps her (restaurar, with
+      her level, line, segment, evidence and score; no paid call). It goes before sin_evidencia_clasificador, whose
+      «sin datos» reasons she often carries, so she is never sent to be classified (and paid) again.
     Nobody Gustavo or LinkedIn said no to, nobody he confirmed, nobody invited, connected or closed."""
     c=contact.classification or {}
     if any(event.get('event') in SAID_NO for event in contact.history or []):return None
+    if left_by_model_fit(contact):return LEFT_BY_FIT
     # BAR-25: a buyer without a level is completed first (with her line); then the line and the partners.
     if projectapp.enabled() and not (c.get('role')=='comprador' and c.get('fit') and contact.stage in ('fit','followed') and not c.get('buyer')):
         group=_projectapp_group(contact)
@@ -408,7 +496,10 @@ def reevaluation_group(contact):
     if c.get('fit'):return 'sin_nivel' if contact.stage!='discarded' and not c.get('buyer') else None
     if rule.startswith(REGION_RULE):return 'fuera_de_eeuu'
     if check.get('state')=='failed' and check.get('verdict')=='sin_evidencia':return 'sin_evidencia_web'
-    if not rule and contact.stage=='discarded' and ABSENCE.search(c.get('reason') or ''):return 'sin_evidencia_clasificador'
+    # A buyer already judged with levels has hers: a stored no_encaja is evidence against, even when its reason says
+    # «no consta» (until 18/11/2026 a fit=false no_encaja carried no rule), and it is never sent to be paid for again.
+    if (not rule and contact.stage=='discarded' and not (c.get('buyer') or {}).get('level')
+            and ABSENCE.search(c.get('reason') or '')):return 'sin_evidencia_clasificador'
     return None
 
 
@@ -440,17 +531,23 @@ def reevaluate(user,account,confirm=False,now=None):
     now=now or timezone.now()
     rows=[];groups=actions()
     roles=('comprador',*PARTNER_ROLES) if projectapp.enabled() else ('comprador',)
+    from . import registro
+    # Whoever another member attends, or the organization excluded, is not brought back (organizaciones, phase 6); with
+    # one member nobody is held here.
+    held=registro.gate(operador.member_of(account=account),account)
     for contact in Contact.objects.filter(account=account,classification__role__in=roles).order_by('discovered_at'):
         group=reevaluation_group(contact)
-        if group is None:continue
-        level='por_confirmar' if group not in ('sin_nivel',*ACTIONS_PROJECTAPP) else level_of(contact)
+        if group is None or (groups.get(group)=='restaurar' and held(contact)):continue
+        level='por_confirmar' if group not in ('sin_nivel',LEFT_BY_FIT,*ACTIONS_PROJECTAPP) else level_of(contact)
         line=''
         if group=='posible_partner':result={};line='partner?'
         elif group=='sin_nivel' and not projectapp.enabled():result=score(contact,level)
-        elif group in ('sin_nivel','linea','otra_linea'):
+        elif group in ('sin_nivel','linea','otra_linea',LEFT_BY_FIT):
             previous=contact.classification
-            buyer=projectapp.complete(contact,dict((previous or {}).get('buyer') or {}))
-            contact.classification=dict(previous,buyer=buyer);line=buyer.get('line') or ''
+            buyer=dict((previous or {}).get('buyer') or {})
+            if group!=LEFT_BY_FIT or (projectapp.enabled() and not buyer.get('line')):buyer=projectapp.complete(contact,buyer)
+            contact.classification=dict(previous,fit=True,buyer=buyer) if group==LEFT_BY_FIT else dict(previous,buyer=buyer)
+            line=buyer.get('line') or ''
             try:result=score(contact,level)
             finally:contact.classification=previous
         else:
@@ -473,7 +570,20 @@ def reevaluate(user,account,confirm=False,now=None):
                 contact=Contact.objects.select_for_update().get(pk=row['id'])
                 group=reevaluation_group(contact)
                 if group!=row['group'] or contact.proposals.filter(state__in=['executing','sent','uncertain']).exists():continue
-                if group=='sin_evidencia_clasificador':
+                if groups[group]=='restaurar' and held(contact):continue
+                if group==LEFT_BY_FIT:
+                    # Her own level, line, segment and evidence; only the fit, the stage, the score and (with the web check
+                    # on) a pending check change. Nothing is paid here.
+                    classification=dict(contact.classification,fit=True)
+                    if red.stage_check_enabled() and (classification.get('stage_check') or {}).get('state')!='ok':
+                        classification['stage_check']={'state':'pending'}
+                    buyer=dict(classification.get('buyer') or {})
+                    if projectapp.enabled() and not buyer.get('line'):buyer=projectapp.complete(contact,buyer)
+                    contact.classification=classification
+                    contact.classification['buyer']=with_score(contact,buyer)
+                    red._stage(contact,'fit','reevaluated',f"Vuelve al barrio con su nivel {buyer['level']} (18/11/2026): el fit del "
+                               'modelo la había sacado; solo no_encaja con evidencia en contra saca a un comprador.')
+                elif group=='sin_evidencia_clasificador':
                     contact.classification={}
                     red._stage(contact,'candidate','requeued','Vuelve al clasificador con los niveles del comprador (17/11/2026): '
                                'antes salió por falta de evidencia pública.')
