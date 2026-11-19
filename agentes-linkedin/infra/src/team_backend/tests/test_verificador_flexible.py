@@ -54,6 +54,31 @@ class SeverityTableTests(SimpleTestCase):
         self.assertIn('nunca un motivo para recortar el texto',repair)
 
 
+class RuleTallyTests(SimpleTestCase):
+    """C (19/11/2026): each verification keeps, per rule, how many notes and how many blocks it gave."""
+    def test_each_rule_counts_its_notes_and_its_blocks(self):
+        hard={'issue':'invented_experience','severity':'material','quote':'q','detail':'Not in public_facts.'}
+        soft={'issue':'unsourced_figure','severity':'material','quote':STAT,'detail':'McKinsey no está en la evidencia.'}
+        minor={'issue':'other','severity':'minor','quote':'','detail':'Could be shorter.'}
+        final=dict(review(hard,soft,minor,unsupported=[EXPLANATION]),source_notes=['Afirmación web sin contraste del verificador: x'],
+                   experience_flags=['Experiencia en primera persona: «Last month I rebuilt…»'])
+        reasons=['Hallazgo material (invented_experience): Not in public_facts.','Ronda de reparación: la descartó: sin motivo']
+        repair={'findings':[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces'}],
+                'resolution':[{'source':'reglas','issue':'regla','resolved':True}]}
+        self.assertEqual(compuertas.rule_tally(reasons,final,repair),{
+            'invented_experience':{'notas':0,'bloqueos':1},'unsourced_figure':{'notas':1,'bloqueos':0},
+            'unsupported_claim':{'notas':1,'bloqueos':0},'other':{'notas':1,'bloqueos':0},'fuente_web':{'notas':1,'bloqueos':0},
+            'experiencia_por_redaccion':{'notas':1,'bloqueos':0},'enlaces':{'notas':1,'bloqueos':0}})
+
+    def test_rules_that_stop_the_text_are_blocks_and_a_soft_strategy_line_is_a_note(self):
+        rules=['Contiene enlaces','cta_count: 2 llamadas a la acción; una venta lleva una sola',
+               'Cifra sobre el trabajo de Ana que no consta en sus hechos públicos («3» en «x»)']
+        self.assertEqual(compuertas.rule_tally(rules),{'enlaces':{'notas':0,'bloqueos':1},'cta_count':{'notas':1,'bloqueos':0},
+                                                       'invented_experience':{'notas':0,'bloqueos':1}})
+        self.assertEqual(compuertas.rule_tally([],review()),{'veredicto_sin_hallazgos':{'notas':1,'bloqueos':0}})
+        self.assertEqual(compuertas.rule_tally([],review(verdict='ready_for_execution')),{})
+
+
 class ExperienceRuleTests(SimpleTestCase):
     FACTS=[{'key':'trayectoria.projectapp','fact':'Gustavo founded ProjectApp, a software studio that builds products for startups.'}]
 
@@ -89,6 +114,7 @@ class FlexibleVerifierTests(tae.EditorialAuditBase):
         self.assertEqual((piece.state,v['verdict'],v['blocking_reasons']),('ready','ready_for_execution',[]))
         self.assertEqual(sorted(o['issue'] for o in v['observations']),['unsourced_figure','unsupported_claim'])
         self.assertEqual({f['severity'] for f in v['repair']['findings']},{'blanda'})
+        self.assertEqual(v['conteo_reglas'],{'unsourced_figure':{'notas':1,'bloqueos':0},'unsupported_claim':{'notas':1,'bloqueos':0}})
         self.assertIn('post de opinión de LinkedIn',' '.join([s for p,_,s in self.calls if p=='editorial-verificador'][0].split()))
         self.assertTrue(ActionProposal.objects.filter(piece=piece).exists())
 
@@ -101,12 +127,14 @@ class FlexibleVerifierTests(tae.EditorialAuditBase):
         self.assertEqual((piece.state,piece.verification['repair']['outcome']),('blocked','bloqueada'))
         self.assertEqual(piece.verification['blocking_reasons'],['Hallazgo material (invented_experience): Ni el cliente ni el resultado están en public_facts.'])
         self.assertEqual(piece.verification['repair']['findings'][0]['severity'],'dura')
+        self.assertEqual(piece.verification['conteo_reglas'],{'invented_experience':{'notas':0,'bloqueos':1}})
         self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
 
     def test_an_invented_figure_about_his_work_is_a_rule_and_blocks_if_the_repair_keeps_it(self):
         piece=self.plan_with(answers(final=INVENTED))  # the default repair returns the same text
         self.assertEqual(piece.state,'blocked')
         self.assertTrue(any(r.startswith('Cifra sobre el trabajo de Gustavo') for r in piece.verification['blocking_reasons']))
+        self.assertEqual(piece.verification['conteo_reglas'],{'invented_experience':{'notas':0,'bloqueos':1}})
         self.assertNotIn('verificador',self.purposes())
 
     def test_a_statistic_attributed_to_a_source_not_in_the_evidence_is_repaired_and_never_blocks(self):
@@ -116,11 +144,13 @@ class FlexibleVerifierTests(tae.EditorialAuditBase):
         piece=self.plan_with(plan,verificador=[review(figure),dict(answers()['verificador'])])
         self.assertEqual((piece.state,piece.final_text,piece.verification['repair']['outcome']),('ready',SOFTENED,'reparada'))
         self.assertEqual(piece.verification['repair']['resolution'],[{'source':'verificador','issue':'unsourced_figure','resolved':True}])
+        self.assertEqual(piece.verification['conteo_reglas'],{'unsourced_figure':{'notas':1,'bloqueos':0}})  # repaired: a note
         self.calls.clear()
         plan['reparacion']=dict(plan['reparacion'],decision='discard',final_text='',rationale='La cifra es el centro.')
         kept=self.plan_with(plan,verificador=[review(figure)])
         self.assertEqual((kept.state,kept.final_text),('ready',WITH_STAT))  # the repair did not happen: it still goes out
         self.assertIn('unsourced_figure',[o['issue'] for o in kept.verification['observations']])
+        self.assertEqual(kept.verification['conteo_reglas']['unsourced_figure'],{'notas':1,'bloqueos':0})
 
     def test_an_approximate_figure_with_its_source_passes_untouched(self):
         found=research.ResearchResult('agents','partial','2026-11-19T12:00:00+00:00',

@@ -918,7 +918,8 @@ def _run(piece,user,now,origin_job):
     piece.final_text=final
     piece.verification=dict(review or {},model_verdict=(review or {}).get('verdict'),verdict='blocked' if reasons else 'ready_for_execution',
                             blocking_reasons=reasons,rules=issues,text_sha256=_sha(final),observations=observations,
-                            day_attempt=attempt,context=context_hashes(memory),**({'repair':repair} if repair else {}))
+                            day_attempt=attempt,context=context_hashes(memory),**({'repair':repair} if repair else {}),
+                            conteo_reglas=compuertas.rule_tally(reasons,review,repair,compuertas.gate_policy(piece)))
     piece.save(update_fields=['final_text','verification','updated_at'])
     if reasons:
         from .notificaciones import avisar, de_contenido
@@ -1035,8 +1036,10 @@ def _check(piece,memory,frozen,text,claims,public,private,second=None):
     hard,soft=strategy_issues(piece,text,policy)
     issues=text_rules(text,public,private,policy)+hard
     if issues:return None,issues+soft,issues+soft
-    review,_=_call_stage(piece,'verificador',verifier_payload(piece,memory,frozen,text,claims,second))
+    payload=verifier_payload(piece,memory,frozen,text,claims,second)
+    review,_=_call_stage(piece,'verificador',payload)
     review=compuertas.with_code_findings(review,soft)
+    if payload.get('experience_flags'):review=dict(review,experience_flags=payload['experience_flags'])  # counted as notes
     # An incomplete web citation (a ref not saved, a claim the verifier did not contrast) is a note, never a block
     # (Gustavo, 19/11/2026: «lo importante es que la investigación no se pierda»).
     notes=research.source_issues(claims,piece.research,review)

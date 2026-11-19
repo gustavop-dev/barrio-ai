@@ -126,6 +126,30 @@ def with_code_findings(review,issues):
         extra.append({'issue':code,'severity':'material','quote':'','detail':str(line).split(':',1)[1].strip(),'by':BY_CODE})
     return dict(review,findings=list(review.get('findings',[]))+extra) if extra else review
 
+def rule_tally(reasons,review=None,repair=None,policy=None):
+    """{rule: {'notas': n, 'bloqueos': m}} of one verification, kept with it (Gustavo, 19/11/2026: which rule stops a
+    piece and which only notes). A block is a reason that stopped the piece; a note is whatever a rule or the verifier
+    flagged without stopping it: a soft or minor finding of the last review, a finding the repair round fixed, a web-source
+    note, a sentence the experience regex only pointed out to the verifier. The round's own notes («Ronda de reparación:
+    …») explain a block and are not a rule. Labels only (category, issue codes), never a quote."""
+    tally={}
+    def add(rule,kind):tally.setdefault(rule,{'notas':0,'bloqueos':0})[kind]+=1
+    def label(text):return strategy_code(text) or category(text)
+    for reason in reasons:
+        if str(reason).startswith('Ronda de reparación'):continue
+        code=strategy_code(reason)
+        add(label(reason),'notas' if code and severity(code,policy)=='blanda' else 'bloqueos')
+    if review:
+        for found in split(review,policy)[1]:
+            add('veredicto_sin_hallazgos' if found['detail'].startswith(BLOCKED_BARE) else found['issue'],'notas')
+        for found in review.get('findings',[]):
+            if found.get('severity')=='minor':add(found.get('issue') or 'other','notas')
+        for _ in review.get('source_notes') or []:add('fuente_web','notas')
+        for _ in review.get('experience_flags') or []:add('experiencia_por_redaccion','notas')
+    for found,result in zip((repair or {}).get('findings') or [],(repair or {}).get('resolution') or []):
+        if result.get('resolved'):add(label(found.get('detail')) if found.get('source')=='reglas' else found.get('issue') or 'other','notas')
+    return tally
+
 def observation_risks(observations):
     """What the proposal (and the detail) say about a soft finding that did not stop the piece."""
     return [f'Conservada como observación ({o.get("issue")}): {o.get("detail") or o.get("quote")}' for o in observations]
@@ -223,7 +247,7 @@ CATEGORIES=(('Afirmación sin respaldo','unsupported_claim'),(BLOCKED_BARE,'vere
             ('Longitud','longitud'),('Contiene un correo','correo'),('Contiene un número de teléfono','telefono'),
             ('Contiene enlaces','enlaces'),('Contiene pitch','pitch'),('Más de','hashtags'),
             ('Deja traslucir orientación privada','private_guidance_leak'),('Reproduce orientación privada','private_guidance_leak'),
-            ('Atribuye','invented_experience'),('Cifra sobre el trabajo de Gustavo','invented_experience'),
+            ('Atribuye','invented_experience'),('Cifra sobre el trabajo de','invented_experience'),
             ('Ronda de reparación: sin presupuesto','reparacion_sin_presupuesto'),
             ('Ronda de reparación: el texto reparado no se pudo verificar','reparacion_sin_presupuesto'),
             ('Ronda de reparación: la descartó','reparacion_descartada'),('Ronda de reparación: no cambió','reparacion_sin_cambios'),
