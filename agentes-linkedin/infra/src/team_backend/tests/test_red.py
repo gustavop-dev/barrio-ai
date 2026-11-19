@@ -37,11 +37,22 @@ class NetworkBase(OperatorBase):
         while jobs.process_one(self.worker):pass
 
     def classifier(self,verdicts):
-        """verdicts: {display_name: (fit, confidence)}"""
+        """verdicts: {display_name: (fit, confidence[, fields])}. A buyer the model leaves out (fit false) comes with
+        no_encaja and its motive (no_decide), as the prompt of 18/11/2026 asks; since then the level, not fit, decides
+        a buyer (nivel_comprador.decide), and the incoherent answers the production model gave have their own tests
+        (test_compradores_niveles.RealShapeTests). `fields` overrides any field of the answer (another role, a level…)."""
         def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
             data=json.loads(message);self.classifier_calls.append({'purpose':purpose,'model':model,'data':data,'system':system,'context':context})
-            out=[{'id':p['id'],'fit':verdicts[p['name']][0],'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                  'reason':f'Razón para {p["name"]}','confidence':verdicts[p['name']][1],'course_citations':['LI-03-M005-K06'], 'invitation_note':'','note_reason':''} for p in data['people'] if p['name'] in verdicts]
+            out=[]
+            for p in data['people']:
+                if p['name'] not in verdicts:continue
+                fit,confidence,*fields=verdicts[p['name']]
+                row={'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida',
+                     'reason':f'Razón para {p["name"]}','confidence':confidence,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
+                if not fit:row.update(buyer_level='no_encaja',buyer_against='no_decide')
+                row.update(*fields)
+                if row['role']!='comprador':row.update(buyer_level='',buyer_against='')
+                out.append(row)
             return {'text':json.dumps({'contacts':out}),'model':model,'estimated_usd':0.002,'request_id':'req_net'}
         return patch('knowledge.providers.claude',side_effect=fake)
 
@@ -275,7 +286,8 @@ class DiscoveryAndFollowTests(NetworkBase):
         self.job('discover_network')  # posts are scanned once: no duplicates
         self.assertEqual(Contact.objects.count(),2)
 
-        with self.classifier({'Ana Founder':(True,0.9),'Carla CTO':(True,0.5)}):self.job('classify_contacts')
+        # Carla as a peer: below the minimum confidence a peer leaves; a buyer's confidence only orders (18/11/2026).
+        with self.classifier({'Ana Founder':(True,0.9),'Carla CTO':(True,0.5,{'role':'par'})}):self.job('classify_contacts')
         call=self.classifier_calls[0]
         self.assertEqual((call['purpose'],call['model']),('network-classify','claude-sonnet-5-5'))
         # Comment authors come without a headline: the profile is read first (1 read; the search result already had one).

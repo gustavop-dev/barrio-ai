@@ -47,6 +47,8 @@ def outcome_of(contact,invited):
 
 
 class ProjectAppCaseBase(NetworkBase):
+    shape='despues'  # or 'real': the answers the production model gave (evaluaciones.PROJECTAPP_CASE)
+
     def setUp(self):
         super().setUp()
         env=patch.dict(os.environ,{'NETWORK_BUYER_REGION':'us','NETWORK_STAGE_CHECK':'true'})
@@ -78,7 +80,8 @@ class ProjectAppCaseBase(NetworkBase):
             new='buyer_segment' in system
             rows=[]
             for person in data['people']:
-                vid,variant=self.by_name[person['name']];answer=dict(variant['despues' if new else 'antes'])
+                vid,variant=self.by_name[person['name']]
+                answer=dict(variant.get(self.shape,variant['despues']) if new else variant['antes'])
                 if not new:
                     answer.pop('buyer_segment',None);answer.pop('company_size',None)
                 # With the ProjectApp prompt the classifier also cites the class 08 units (con_quien) behind each verdict.
@@ -169,6 +172,50 @@ class ProjectAppCaseTests(ProjectAppCaseBase):
         self.assertNotIn(p4.stage,('fit','followed'))
 
 
+class RealShapeProjectAppTests(ProjectAppCaseBase):
+    """The answers the production model gave with the ProjectApp prompt on 18/11/2026 (`real`): fit=false next to
+    por_confirmar or probable («es una hipótesis», «no consta») and confidences under the threshold. The level decides:
+    the case grades as with `despues`, and reading the model's fit again drops P2 and P3 and fails it."""
+    shape='real'
+
+    def test_real_with_the_switch_on_every_person_goes_where_gustavo_said(self):
+        with patch.dict(os.environ,{SWITCH:'true'}):
+            outcomes,order=self.run_case()
+            grade=evaluaciones.grade_projectapp_case(outcomes,order)
+        self.assertEqual((grade['errors'],grade['right']),([],'8/8'),(outcomes,order))
+        self.assertEqual(order,['P1','P2','P3'])
+        # P4 said probable with fit=false and no motive: her 20.000 people are the motive, in code (demasiado_grande).
+        p4=Contact.objects.get(display_name='Diana Global').classification
+        self.assertEqual((p4['rule'],p4['buyer']['level'],p4['buyer']['against']),(red.projectapp.size_rule(),'no_encaja','demasiado_grande'))
+        entered={e.target for e in AuditEvent.objects.filter(action=nivel_comprador.OVERRIDDEN) if e.metadata['fit'] and e.metadata['model_fit'] is False}
+        self.assertEqual(entered,{str(Contact.objects.get(display_name=name).pk) for name in ('Lucia Academia','Pablo Plomero')})
+
+    def test_the_buyer_of_18_11_with_fit_false_and_no_size_enters_with_her_score(self):
+        # The production answer of 18/11/2026 (anonymized): probable, score 68, «tamaño no consta», fit=false.
+        who=self.fake.seed_person('r-florida','Rafa Florida',headline='Founder & CEO at Sunrise Holdings · real estate and businesses',
+                                  location='Miami, Florida, United States')
+        Contact.objects.create(account=self.account,provider_user_id=who['id'],display_name='Rafa Florida',location='Miami, Florida, United States',
+                               headline='Founder & CEO at Sunrise Holdings · real estate and businesses',profile_url=who['profile_url'],
+                               source='search',stage='candidate')
+        answer={'fit':False,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional','buyer_level':'probable',
+                'us_market':True,'buyer_segment':'otro','company_size':'','buyer_against':'','confidence':0.5,
+                'reason':'Fundador y CEO de una empresa en Florida que adquiere y opera inmuebles y negocios; fundó y vendió un '
+                         'contratista del gobierno con tres apariciones en Inc. 5000. Dueño de empresas tradicionales en EE. UU., '
+                         'con trayectoria fuerte; tamaño no consta.'}
+        def fake(system,message,**kwargs):
+            rows=[dict(answer,id=p['id'],affinity='desconocida',course_citations=['LI-03-M005-K06'],invitation_note='',note_reason='')
+                  for p in json.loads(message)['people']]
+            return {'text':json.dumps({'contacts':rows}),'model':'claude-sonnet-5-5'}
+        with patch.dict(os.environ,{SWITCH:'true'}),patch('knowledge.providers.claude',side_effect=fake):
+            red.classify(self.bot,self.account,MONDAY)
+            rafa=Contact.objects.get(display_name='Rafa Florida');c=rafa.classification;buyer=c['buyer']
+            self.assertEqual((rafa.stage,c['fit'],c['stage_check'],'rule' in c),('fit',True,{'state':'pending'},False))
+            self.assertEqual((buyer['level'],buyer['line'],buyer['papel'] if 'papel' in buyer else nivel_comprador.papel_of(rafa),buyer['score_version']),
+                             ('probable','projectapp','dueno','buyer_score_v2'))
+            self.assertEqual(buyer['score'],red.buyer_score(rafa)['score']);self.assertIn('sin tamaño de empresa',buyer['warnings'])
+            self.assertEqual(comprador.journey(rafa).entry_level,'probable')
+
+
 # --------------------------------------------------------------------------- targeted tests (BAR-25)
 
 ON={SWITCH:'true','NETWORK_BUYER_REGION':'us'}
@@ -191,7 +238,10 @@ def buyer(profile,level='probable',**extra):
 
 class SwitchOffTests(TestCase):  # the prompts are read from the member's profile (phase 3)
     """K: NETWORK_PROJECTAPP_BUYER_ENABLED=false is the code of before 17/11/2026 (BAR-24). The hashes are those of
-    origin/main at 6508245, computed from its own modules: a change to the prompts or criteria with the switch off fails."""
+    origin/main at 6508245, computed from its own modules: a change to the prompts or criteria with the switch off fails.
+    18/11/2026: the classifier's and the judge's prompts and schemas of BAR-24 changed on purpose (the level decides a
+    buyer's fit; no_encaja needs a motive of a closed list: buyer_against, en_contra); the criteria, the lead and the
+    roles did not."""
 
     def test_prompts_schemas_criteria_and_shares_are_the_ones_of_before(self):
         with patch.dict(os.environ,OFF):
@@ -203,8 +253,8 @@ class SwitchOffTests(TestCase):  # the prompts are read from the member's profil
                   'STAGE_SYSTEM':_sha(red.stage_system()),'STAGE_SCHEMA':_sha(red.STAGE_SCHEMA),
                   'network_criteria':_sha(posicionamiento.network_criteria()),'lead':_sha(lider.criteria_del_barrio()),
                   'ROLE_MEANING':_sha({k:ident.render(v) for k,v in lider.ROLE_MEANING.items() if k!='partner'})}
-            self.assertEqual(pins,{'CLASSIFY_SYSTEM':'ede1f6aef1133af0','CLASSIFY_SCHEMA':'94b29b6babde1d63',
-                                   'STAGE_SYSTEM':'8f2e44fc186827b7','STAGE_SCHEMA':'092a6c1e12973eb0',
+            self.assertEqual(pins,{'CLASSIFY_SYSTEM':'314e442e5ea7280f','CLASSIFY_SCHEMA':'0f064ef571330a99',
+                                   'STAGE_SYSTEM':'05b0a5b3602aa601','STAGE_SCHEMA':'f24e5f54d523f018',
                                    'network_criteria':'cb8975fd47bfc36c','lead':'af5c3d752e71f24c',
                                    'ROLE_MEANING':'92a3ad803d08452d'})
             self.assertEqual(red.roles(),['par','recomendador','lider','comprador','divulgador','aliado'])
