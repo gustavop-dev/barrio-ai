@@ -17,7 +17,8 @@ def stage(name, required, **props):
 
 BRIEF_INPUT = stage('director', ('slot', 'public_facts', 'private_guidance'), slot=OBJECT,
                     public_facts=ARRAY, private_guidance=ARRAY)
-WRITER_INPUT = stage('redactor', ('brief', 'sources'), brief=OBJECT, sources=ARRAY)
+# molde_variante_a (moldes.for_writer, only with REFERENTES_MOLDE on): the referent's mold variant A is written on.
+WRITER_INPUT = stage('redactor', ('brief', 'sources'), brief=OBJECT, sources=ARRAY, molde_variante_a=OBJECT)
 PANEL_INPUT = stage('lectores', ('brief', 'drafts'), brief=OBJECT, drafts=obj(('A', 'B'), A=STRING, B=STRING),
                     community=obj(('status', 'study_id', 'version', 'findings'), status=STRING, study_id=STRING,
                                   version=INTEGER, findings={'type':'array','items':STRING}))

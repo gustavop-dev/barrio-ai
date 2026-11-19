@@ -110,7 +110,7 @@
         "effort": "medium",
         "max_tokens": 16000,
         "proposito_ledger": "editorial-redactor",
-        "difiere_del_contrato": "Una sola llamada escribe A y B: B se escribe viendo A, así que no son independientes. Sin rondas de revisión."
+        "difiere_del_contrato": "Una sola llamada escribe A y B: B se escribe viendo A, así que no son independientes. Sin rondas de revisión. Con REFERENTES_MOLDE y un molde en el brief, la A se escribe sobre él (molde_variante_a, solo etiquetas) y la B queda libre."
       }
     },
     {

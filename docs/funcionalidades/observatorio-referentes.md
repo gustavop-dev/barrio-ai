@@ -19,6 +19,7 @@ Hoy `operador.observe` lee los posts de `Referent.active=True`; los referentes l
 | [OBS-05](#obs-05) | Referentes de industria con criterios verificables | app · backend | funciona |
 | [OBS-06](#obs-06) | Modelos de crecimiento: lo que les funciona, sin copiar texto | backend | funciona |
 | [OBS-07](#obs-07) | Qué les funciona y qué no: posts por partes, contra su autor, duradero o pasajero | backend | funciona |
+| [OBS-08](#obs-08) | El molde: de su mejor post a la variante A del día | backend | implementado |
 
 ## Datos disponibles y límites de los conectores <a id="datos-conectores"></a>
 
@@ -187,6 +188,27 @@ Fuentes locales: [linkedin_directo/cliente.py](../../agentes-linkedin/infra/src/
   5. **Dado** `REFERENTES_ANALISIS=true`, **cuando** el editorial pide señales, **entonces** recibe aparte `estructura_sostenida` y `tema_en_tendencia`, sin ninguna frase de un referente; apagado, recibe exactamente lo de antes.
 - **Límites:** si una imagen es foto, gráfico, captura o infografía exigiría leer la imagen: no se hace. El reconocimiento del medio no se probó contra respuestas reales de LinkedIn. Temas de una taxonomía fija; la coyuntura se detecta por reglas.
 - **Cobertura QA:** `test_analisis_referentes.py` (descomposición, caché, contra su autor con muestra mínima, agregados, duradero y pasajero, señales con el interruptor, endpoint) y `test_e2e_referentes.py` (observar → descomponer → comparar → agregar → editorial → endpoint), con seis mutaciones el 17/11/2026; la suite completa, en CI.
+
+### OBS-08 · El molde: de su mejor post a la variante A del día <a id="obs-08"></a>
+
+- **Dónde:** backend (plan semanal, brief diario, redactor y resumen semanal); la vista de la semana trae el molde de cada día.
+- **Estado:** implementado (18/11/2026), detrás de `REFERENTES_MOLDE` (apagado por defecto).
+- **Qué hace para Gustavo:** «del post viral al post propio» (18/11/2026). El mejor post de cada referente frente a su propia norma, también de los competidores con números pequeños, se vuelve un molde: tipo de gancho, formato y esquema del cuerpo, cierre, rango de longitud y ángulo, con el autor, el enlace, cuántas veces su mediana y si está «sostenido» o es «hipótesis». El plan guarda el molde del día, la variante A se escribe sobre él y la B queda libre, y se mide cuál gana y cómo rinden los posts con molde frente a los que no. [Plan y reglas](../plan-referentes-industria.md#molde).
+- **Responsable:** ninguno nuevo: el código arma la oferta; `director_editorial` la usa en el plan y en el brief; los redactores escriben la A sobre el molde.
+- **Cadencia:** cada vez que se planea una semana o se prepara una pieza con el interruptor encendido.
+- **Tu turno:** ninguna tarjeta; un día que se pasa del tope de moldes por autor lo dice en los avisos de la semana.
+- **Datos necesarios y disponibilidad:** `ObservedPost` (contadores, `structure`, `analysis`) y las estructuras sostenidas del análisis ([OBS-07](#obs-07)). Sin lecturas nuevas ni llamadas pagadas: 0 USD.
+- **Código:** `moldes.py` (`Catalog`, `offer`, `build`, `for_writer`, `cap_week`, `week_taken`, `choose`, `outcome`, `comparison`); `estrategia._apply`, `_slot_mold`, `director_input`, `_with_molds`, `finalize_brief`, `payload`; `editorial._run` (`molde_variante_a`, `selection.molde`), `MOLD_RULES`, `BRIEF_WITH_MOLD`; `resumen_semanal.molds`.
+- **Criterios de aceptación:**
+  1. **Dado** un competidor con una norma de 4 interacciones y un post de 12 (tres veces su mediana, tres posts de base), **cuando** se arma la oferta, **entonces** ese post es un molde «hipótesis» que dice qué le falta («menos de 6 posts propios de base»).
+  2. **Dado** un autor con tres posts muy por encima de su norma, **cuando** se arma la oferta, **entonces** aporta dos (`MOLDES_POR_AUTOR`), y un autor que ya ocupa dos días de la semana no entra en la oferta de esa semana.
+  3. **Dado** un plan que basa un día en un atípico de referente o nombra un molde ofrecido, **cuando** se guarda, **entonces** el día guarda el molde con su enlace y `plan.signals.used` lo registra; un tercer día del mismo autor conserva su idea sin molde y la semana lo avisa.
+  4. **Dado** un día con molde, **cuando** se prepara, **entonces** el brief lo lleva, el redactor recibe `molde_variante_a` solo con etiquetas (sin texto, autor, enlace ni id del referente), el brief compartido con la B no lo lleva y la pieza guarda qué variante ganó.
+  5. **Dado** un día sin molde en el plan, **cuando** el director elige uno de los ofrecidos, **entonces** el brief lo lleva; uno que no se le ofreció no cuenta.
+  6. **Dado** `REFERENTES_MOLDE=false`, **cuando** se planea o se prepara un día, aunque el plan guarde un molde, **entonces** instrucciones, esquemas y pedidos son los de antes.
+  7. **Dado** posts publicados con y sin molde, **cuando** se calcula el resumen semanal con el interruptor encendido, **entonces** `moldes` cuenta con molde, libre le ganó al molde, fusión y sin molde con sus medianas a 72 h y los resultados de cada molde.
+- **Límites:** A y B salen de la misma llamada (como antes). Los redactores ya recibían el texto de los posts observados que cita el director en `sources`; el molde no añade texto, pero esa entrada sigue igual. La comparación con pocos posts es una pista (`muestra_pequena`).
+- **Cobertura QA:** `test_moldes.py` (oferta por autor, hipótesis, tope, sostenida, sin texto, brief que solo toma lo ofrecido, tope semanal, plan → día → redactor → selección, el molde que se mueve con su idea, el director elige en un día sin molde, interruptor apagado contra las huellas de `test_identidad_prompts.py`, comparación del resumen), con reloj fijo; la suite completa, en CI.
 
 ## Retiradas
 
