@@ -14,7 +14,7 @@ import uuid
 from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Case, Count, Max, Q, When
+from django.db.models import Case, Count, F, Max, Q, When
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from knowledge import db, memory
@@ -889,10 +889,20 @@ def reconcile_window():
     try:return timedelta(hours=max(1,int(os.environ.get('OPERATOR_RECONCILE_HOURS','24'))))
     except ValueError:return timedelta(hours=24)
 
+def reconcile_due(execution,now):
+    """An unconfirmed write is read back 10 minutes after it, then each time after as long as it has been waiting (at
+    least an hour): ~10 min, ~1.5 h, 3 h, 6 h, 12 h and 24 h after the write, 6 reads in OPERATOR_RECONCILE_HOURS (24)
+    instead of 24. Until
+    18/11/2026 it was every hour, out of the actions' profile reads (the day those ran out at 13:04 there were 17
+    execution reads for 5 writes)."""
+    if execution.reconciled_at is None:return True
+    return now-execution.reconciled_at>=max(timedelta(hours=1),execution.reconciled_at-execution.started_at)
+
 def _reconcile(user,now):
-    due=ActionExecution.objects.filter(state__in=['sent','uncertain'],started_at__lt=now-timedelta(minutes=10),
-                                       started_at__gte=now-reconcile_window()).filter(
-        Q(reconciled_at__isnull=True)|Q(reconciled_at__lt=now-timedelta(hours=1)))
+    candidates=ActionExecution.objects.filter(state__in=['sent','uncertain'],started_at__lt=now-timedelta(minutes=10),
+                                              started_at__gte=now-reconcile_window()).filter(
+        Q(reconciled_at__isnull=True)|Q(reconciled_at__lt=now-timedelta(hours=1))).order_by(F('reconciled_at').asc(nulls_first=True),'started_at')
+    due=[execution for execution in candidates if reconcile_due(execution,now)]
     count=0
     for execution in due[:3]:
         hour=int(now.timestamp()//3600)

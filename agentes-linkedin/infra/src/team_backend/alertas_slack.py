@@ -329,6 +329,49 @@ def cupos_de_lectura(now,member):
                 f'Si se agota, hasta mañana {stops}. Se sube con {_knob(scope,kind)}.'))
     return alerts
 
+@vigilante
+@por_miembro
+def acciones_sin_lecturas(now,member):
+    """18/11/2026: seguir, invitar and their confirmations ran out of profile reads before the cutoff
+    (OPERATOR_PROFILE_READ_POOL_CUTOFF, 17:00): their part of the day's reads (or the total) was spent. Once a day."""
+    from . import operador
+    member=operador.member_of(member=member)
+    at=operador.actions_ran_out_at(member,now)
+    if at is None:return []
+    pools=operador.profile_read_pools(member,now);actions,research=pools['acciones'],pools['investigacion']
+    return [Aviso('cupo:perfiles.acciones:agotado',
+                  f'Barrio · Las acciones se quedaron sin lecturas de perfil a las {hhmm(at)}, antes de las {hhmm(pools["corte"])}: '
+                  f'acciones {actions["usadas"]}/{actions["tope"]}, investigación {research["usadas"]}/{research["tope"]}, total '
+                  f'{pools["usadas"]}/{pools["tope"]}. Seguir, invitar y confirmar esperan a las {hhmm(pools["corte"])} (lo que la '
+                  'investigación dejó pasa a las acciones) o a mañana. Se ajusta con OPERATOR_PROFILE_READ_RESEARCH_SHARE '
+                  '(su parte para investigar) u OPERATOR_PROFILE_READ_DAILY_LIMIT (hasta 100).')]
+
+@vigilante
+@por_miembro
+def compradores_descartados_con_nivel(now,member):
+    """18/11/2026: buyers that left the neighborhood today with a level that keeps them (nivel_comprador.left_by_model_fit:
+    probable, por_confirmar…). Only no_encaja with a motive takes a buyer out, so after the fix this should never fire;
+    it counts them (no names) and says how to bring them back. Once a day."""
+    from . import miembros, nivel_comprador, operador
+    from .models import Contact
+    day,_=operador.period_starts(now)
+    people=Contact.objects.filter(stage='discarded',classification__role='comprador',updated_at__gte=day,updated_at__lte=now)
+    if member is not None:people=people.filter(account__in=miembros.accounts(member))
+    left=[c for c in people.only('id','stage','classification','account_id') if nivel_comprador.left_by_model_fit(c)]
+    if not left:return []
+    levels={}
+    for contact in left:
+        level=contact.classification['buyer']['level'];levels[level]=levels.get(level,0)+1
+    accounts=sorted({str(c.account_id) for c in left})
+    fixed=nivel_comprador.corrections_count(day,now,accounts=accounts)
+    detail=', '.join(f'{level}: {n}' for level,n in sorted(levels.items()))
+    return [Aviso('compradores:descartados_con_nivel',
+                  f'Barrio · {len(left)} {"compradores salieron" if len(left)>1 else "comprador salió"} hoy del barrio con un nivel '
+                  f'que no es no_encaja ({detail}). Solo no_encaja con un motivo de la lista saca a un comprador. Hoy el código '
+                  f'corrigió {fixed["total"]} respuestas del modelo. Se ven y se recuperan, sin pagar otra clasificación, con '
+                  f'`manage.py operador --usuario <tu usuario> reevaluar-compradores --cuenta {accounts[0]}` (grupo '
+                  'descartado_con_nivel; sin --confirmar no cambia nada).')]
+
 def write_caps(now,member=None):
     """[(capability, used, daily)] of the member's daily write caps that are not zero today (operador.limits, her ramp),
     with what every connector of hers wrote."""
@@ -969,6 +1012,11 @@ def _member_summary_lines(now,member):
     account=_reader(member);lines=[]
     if account is not None:
         for scope,kind,used,cap in read_caps(account,now,member):lines.append(f'• Lecturas {scope}.{kind}: {used}/{cap}')
+        from . import operador
+        pools=operador.profile_read_pools(operador.member_of(member=member),now)
+        lines.append(f'• Lecturas de perfil por parte: acciones {pools["acciones"]["usadas"]}/{pools["acciones"]["tope"]}, '
+                     f'investigación {pools["investigacion"]["usadas"]}/{pools["investigacion"]["tope"]} '
+                     f'(se juntan a las {hhmm(pools["corte"])})')
     for capability,used,daily in write_caps(now,member):lines.append(f'• Escrituras {capability} ({capability_label(capability)}): {used}/{daily}')
     if account is not None:
         from .operador import period_starts

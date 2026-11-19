@@ -31,8 +31,9 @@ class BuyerPathBase(RepliesBase):
         env.start();self.addCleanup(env.stop)
 
     # -- providers: the classifier says «comprador», the web finds a seed round (no paid call, no network)
-    def providers(self,fit=True,note=''):
-        """`note`: the classifier also proposes an invitation note (today's only source of notes, red.plan)."""
+    def providers(self,fit=True,note='',answer=None):
+        """`note`: the classifier also proposes an invitation note (today's only source of notes, red.plan). `answer`:
+        fields of the classifier's answer that replace the default ones (RealShapeBuyerPathTests: what production gave)."""
         from team_backend import research
         def claude(system,message,**kwargs):
             if kwargs['purpose']=='network-stage':
@@ -40,7 +41,8 @@ class BuyerPathBase(RepliesBase):
                                            'source_urls':['https://news.example/acme-seed']}),'model':'claude-sonnet-5-5'}
             cited=['LI-03-M005-K06']+(['LI-03-M006-K01'] if note else [])
             out=[{'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
-                  'confidence':0.9,'course_citations':cited,'invitation_note':note,'note_reason':'Conversamos en su post.' if note else ''}
+                  'confidence':0.9,'course_citations':cited,'invitation_note':note,'note_reason':'Conversamos en su post.' if note else '',
+                  **(answer or {})}
                  for p in json.loads(message)['people']]
             return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.001,'request_id':'req_net'}
         def web(request):
@@ -67,12 +69,12 @@ class BuyerPathBase(RepliesBase):
         return {s['etapa']:s['personas'] for s in block['etapas']}
 
     # -- steps (production code only)
-    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note='',headline='Founder & CEO at Acme'):
+    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note='',headline='Founder & CEO at Acme',answer=None):
         """discover_network finds the person in a search; classify_contacts classifies her and check_buyer_stages checks
         her stage on the web."""
         person=self.fake.seed_person(slug,name,headline=headline,search='founder pre-seed',location=location)
         self.job('discover_network')
-        stop=self.providers(note=note)
+        stop=self.providers(note=note,answer=answer) if answer else self.providers(note=note)
         try:
             job=self.job('classify_contacts')
             self.step_check()
@@ -126,6 +128,35 @@ class BuyerPathBase(RepliesBase):
         self.assertEqual(job.state,'complete',job.error)
         contact.refresh_from_db()
         return contact
+
+
+class RealShapeBuyerPathTests(BuyerPathBase):
+    """18/11/2026: the classifier's answer as production gave it after BAR-24 — fit=false next to por_confirmar, a
+    confidence under NETWORK_MIN_CONFIDENCE, «es una hipótesis». The level decides (red.classifier_fit): she is chosen,
+    followed and invited with her score. Reading the model's fit (or its confidence) for a buyer again fails here."""
+    REAL={'fit':False,'buyer_level':'por_confirmar','buyer_profile':'stealth','us_market':True,'buyer_against':'','confidence':0.5,
+          'reason':'Founder & CEO en EE. UU.; comprador es una hipótesis: no hay datos públicos de su empresa y el tamaño no consta.'}
+
+    def test_a_buyer_the_model_left_out_with_por_confirmar_is_followed_and_invited(self):
+        ana=self.step_choose(answer=self.REAL)
+        self.assertEqual((ana.stage,ana.classification['fit'],ana.classification['stage_check']['state']),('fit',True,'ok'))
+        self.assertNotIn('rule',ana.classification)
+        self.assertEqual(ana.classification['buyer']['score'],red.buyer_score(ana)['score'])
+        self.assertEqual(self.journey(ana).step,'elegido')
+        follow=self.step_follow(ana)
+        self.assertEqual((follow.state,ana.stage),('confirmed','followed'))
+        invite=self.step_invite(ana)
+        self.assertEqual((invite.state,ana.stage),('confirmed','invited'))
+        self.assertEqual([k for k,_ in self.kinds(ana)],['elegido','seguir','invitacion'])
+        event=AuditEvent.objects.get(action=nivel_comprador.OVERRIDDEN,target=str(ana.pk))
+        self.assertEqual((event.metadata['model_fit'],event.metadata['fit'],event.metadata['corrections']),(False,True,['fit_del_modelo']))
+
+    def test_a_no_encaja_with_its_motive_leaves_and_one_without_it_stays(self):
+        out=self.step_choose(answer=dict(self.REAL,buyer_level='no_encaja',buyer_against='vende_servicios'))
+        self.assertEqual((out.stage,out.classification['fit'],out.classification['buyer']['against']),('discarded',False,'vende_servicios'))
+        self.assertFalse(BuyerJourney.objects.filter(contact=out).exists())
+        kept=self.step_choose(slug='beto-sin',name='Beto Sinmotivo',answer=dict(self.REAL,buyer_level='no_encaja'))
+        self.assertEqual((kept.stage,kept.classification['fit'],kept.classification['buyer']['level']),('fit',True,'confirmado'))
 
 
 class TodayBuyerPathTests(BuyerPathBase):
