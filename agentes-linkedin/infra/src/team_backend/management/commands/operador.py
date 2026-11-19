@@ -74,7 +74,7 @@ class Command(BaseCommand):
         tar.add_argument('--cuenta',required=True);tar.add_argument('--confirmar',action='store_true')
         resp=sub.add_parser('respaldos-imagen',help='Cómo salieron las imágenes (diseño o qué respaldo) y por qué, en los últimos días')
         resp.add_argument('--cuenta',required=True);resp.add_argument('--dias',type=int,default=30)
-        reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
+        reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública, descartados con un nivel que no es no_encaja (el fit del modelo, 18/11/2026) o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
         reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
         sub.add_parser('preguntas-casos-projectapp',help='Encola en Tu turno las preguntas a Gustavo sobre los dos casos reales de '
                        'ProjectApp (educación en línea y retail); idempotente: repetirlo no crea preguntas nuevas')
@@ -292,6 +292,13 @@ class Command(BaseCommand):
                 if any(row['provisional'] for row in result['people']):
                     self.stdout.write('* Puntaje provisional: lo fija el clasificador al volver a juzgarlo.')
                 self.stdout.write(f"Aplicados: {result['applied']}." if o['confirmar'] else 'Sin --confirmar no se cambia nada.')
+                # 18/11/2026: how often the code kept a buyer's level against the model's own fit (nivel_comprador.OVERRIDDEN).
+                from datetime import timedelta
+                from django.utils import timezone
+                fixed=nivel_comprador.corrections_count(timezone.now()-timedelta(days=7),accounts=[account.id])
+                detail=', '.join(f'{name}: {n}' for name,n in sorted(fixed['por_correccion'].items())) or 'ninguna'
+                self.stdout.write(f"Encaje del modelo corregido por el nivel en 7 días: {fixed['total']} ({detail}); "
+                                  f"entraron pese a fit=false del modelo: {fixed['entraron']}.")
             elif o['accion']=='referentes-industria':
                 from decimal import Decimal, InvalidOperation
                 from team_backend import referentes_industria

@@ -443,13 +443,16 @@ MEMBER_SETTINGS = {
     'OPERATOR_INVITE_RAMP_STAGES': 'tres etapas día/semana, como mucho 8/40,16/80,20/100',
     'OPERATOR_INVITE_RAMP_START': 'etapa con la que empieza su rampa: 0, 1 o 2',
     'OPERATOR_PROFILE_READ_DAILY_LIMIT': 'lecturas de perfil al día (0 a 100)',
+    'OPERATOR_PROFILE_READ_RESEARCH_SHARE': 'parte de esas lecturas para investigar candidatos (0.1 a 0.9); el resto queda '
+                                            'para seguir, invitar y confirmar',
     'OPERATOR_AUTONOMY': 'CAP=auto|approval|off,… (las demás, las del .env)',
     'EDITORIAL_POST_TIME': 'hora del post del día, HH:MM dentro de OPERATOR_WINDOW',
 }
 # The .env's value when neither she nor the environment sets one (the defaults the modules already use).
 SETTING_DEFAULTS = {'LINKEDIN_ACCOUNT_TIER': 'free', 'LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT': '3', 'OPERATOR_DAILY_LIMITS': '',
                     'OPERATOR_WEEKLY_LIMITS': '', 'OPERATOR_INVITE_RAMP_STAGES': '8/40,16/80,20/100',
-                    'OPERATOR_INVITE_RAMP_START': '1', 'OPERATOR_PROFILE_READ_DAILY_LIMIT': '80', 'OPERATOR_AUTONOMY': '',
+                    'OPERATOR_INVITE_RAMP_START': '1', 'OPERATOR_PROFILE_READ_DAILY_LIMIT': '80',
+                    'OPERATOR_PROFILE_READ_RESEARCH_SHARE': '0.4', 'OPERATOR_AUTONOMY': '',
                     'EDITORIAL_POST_TIME': '08:30'}
 
 
@@ -517,6 +520,15 @@ def validate_setting(name, value):
                 raise ValueError('OPERATOR_INVITE_RAMP_STAGES: solo puede bajar cada etapa (como mucho 8/40,16/80,20/100).')
             out.append(f'{int(day)}/{int(week)}')
         return ','.join(out)
+    if name == 'OPERATOR_PROFILE_READ_RESEARCH_SHARE':
+        low, high = operador.RESEARCH_SHARE_BOUNDS
+        try:
+            share = float(value)
+        except ValueError:
+            share = None
+        if share is None or not low <= share <= high:
+            raise ValueError(f'OPERATOR_PROFILE_READ_RESEARCH_SHARE: un número de {low} a {high} (0.4: 32 de 80 para investigar).')
+        return f'{share:g}'
     if name == 'OPERATOR_INVITE_RAMP_START':
         if value not in ('0', '1', '2'):
             raise ValueError('OPERATOR_INVITE_RAMP_START: 0, 1 o 2.')

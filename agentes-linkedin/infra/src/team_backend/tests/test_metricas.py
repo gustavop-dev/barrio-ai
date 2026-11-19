@@ -172,7 +172,7 @@ class AudienceTests(MetricsBase):
         # A different wall clock must not charge either collection to another day. Revisit the earlier day
         # after recording the later one: neither future reads nor a recomputed baseline may charge it twice.
         with patch('django.utils.timezone.now',return_value=early+timedelta(days=7)), \
-                patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2'}):
+                patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2','OPERATOR_PROFILE_READ_POOL_CUTOFF':'00:00'}):
             metricas._read(self.account,'profile',early)
             metricas._read(self.account,'profile',late)
             self.assertEqual(metricas.reads_today(self.account,'profile',late),1)
@@ -194,7 +194,7 @@ class AudienceTests(MetricsBase):
     def test_read_caps_use_the_supplied_clock_and_preserve_each_local_day(self):
         before=datetime(2026,11,7,4,50,tzinfo=dt_timezone.utc)  # Nov 6 in Bogota
         after=datetime(2026,11,7,5,10,tzinfo=dt_timezone.utc)   # Nov 7 in Bogota
-        with patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2'}), \
+        with patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2','OPERATOR_PROFILE_READ_POOL_CUTOFF':'00:00'}), \
              patch('django.utils.timezone.now',return_value=after+timedelta(days=30)):
             metricas._read(self.account,'profile',now=before)
             metricas._read(self.account,'profile',now=after)

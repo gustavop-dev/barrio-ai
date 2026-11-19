@@ -31,6 +31,8 @@ BUYER_SWITCHES=('BUYER_RECORD_ENABLED','BUYER_WARMUP_ENABLED','BUYER_FIRST_MESSA
 
 
 class BuyersCase(NetworkBase):
+    shape='despues'  # or 'real': the answers the production model gave on 18/11/2026 (evaluaciones.BUYERS_CASE)
+
     def setUp(self):
         super().setUp()
         env=patch.dict(os.environ,{'NETWORK_BUYER_REGION':'us','NETWORK_STAGE_CHECK':'true'})
@@ -57,10 +59,11 @@ class BuyersCase(NetworkBase):
             new='buyer_level' in system
             rows=[]
             for person in data['people']:
-                _,variant=self.by_name[person['name']];answer=variant['despues' if new else 'antes']
+                _,variant=self.by_name[person['name']];answer=variant[self.shape if new else 'antes']
                 row={'id':person['id'],'fit':answer['fit'],'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                     'reason':answer['reason'],'confidence':0.8,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
-                if new:row.update({k:answer[k] for k in ('buyer_profile','buyer_level','us_market')})
+                     'reason':answer['reason'],'confidence':answer.get('confidence',0.8),'course_citations':['LI-03-M005-K06'],
+                     'invitation_note':'','note_reason':''}
+                if new:row.update({k:answer.get(k,'') for k in ('buyer_profile','buyer_level','us_market','buyer_against')})
                 rows.append(row)
             return {'text':json.dumps({'contacts':rows}),'model':'claude-sonnet-5-5','estimated_usd':0.002}
         return patch('knowledge.providers.claude',side_effect=fake)
@@ -111,6 +114,58 @@ class BuyersCase(NetworkBase):
         self.assertFalse(BuyerJourney.objects.exists())
 
 
+class RealShapeTests(BuyersCase):
+    """The case with the answers the production model gave on 18/11/2026 (`real`): fit=false next to probable or
+    por_confirmar («es una hipótesis», «no consta»), a confidence under NETWORK_MIN_CONFIDENCE, fit=true next to a
+    no_encaja and a «no contactar» with por_confirmar. Both inherited tests must pass as with `despues`: reading the
+    model's fit (or its confidence) for a buyer again drops C1, C2 and C4 and fails them."""
+    shape='real'
+
+    def test_the_level_decides_and_every_contradiction_is_counted(self):
+        outcomes,invited=self.run_case()
+        self.assertEqual({vid for vid,row in outcomes.items() if row['kept']},{'C1','C2','C3','C4'})
+        for vid in ('C1','C2','C4'):  # the model said fit=false: they enter, with a score, and are invited
+            with self.subTest(vid):
+                self.assertEqual(outcomes[vid]['stage'],'followed');self.assertIsInstance(outcomes[vid]['score'],int)
+                self.assertIn(vid,invited)
+        names={str(c.pk):c.display_name for c in Contact.objects.all()}
+        corrected={names[e.target]:e.metadata['corrections'] for e in AuditEvent.objects.filter(action=nivel_comprador.OVERRIDDEN)}
+        self.assertEqual(corrected,{'Cora Stealth':['fit_del_modelo'],'Beto Escueto':['fit_del_modelo'],'Dana Bogotá':['fit_del_modelo'],
+                                    'Eli Ventas':['fit_del_modelo'],'Fer Nocontact':['no_contactar']})
+        count=nivel_comprador.corrections_count(MONDAY-timedelta(days=1),accounts=[self.account.id])
+        self.assertEqual((count['total'],count['entraron'],count['por_correccion']),(5,3,{'fit_del_modelo':4,'no_contactar':1}))
+        self.assertEqual(AuditEvent.objects.get(action='network.classified').metadata['buyer_fit_corrected'],5)
+
+
+class DecideTests(NetworkBase):
+    def test_the_level_decides_and_no_encaja_needs_a_motive_of_the_list(self):
+        rows=[  # (model's answer, (level, against, corrections))
+            ({'fit':False,'buyer_level':'probable','buyer_against':''},('probable','',['fit_del_modelo'])),
+            ({'fit':False,'buyer_level':'por_confirmar'},('por_confirmar','',['fit_del_modelo'])),
+            ({'fit':True,'buyer_level':'confirmado','buyer_against':''},('confirmado','',[])),
+            ({'fit':False,'buyer_level':'no_encaja','buyer_against':'competidor_software'},('no_encaja','competidor_software',[])),
+            ({'fit':True,'buyer_level':'no_encaja','buyer_against':'demasiado_grande'},('no_encaja','demasiado_grande',['fit_del_modelo'])),
+            ({'fit':False,'buyer_level':'no_encaja','buyer_against':''},('por_confirmar','',['no_encaja_sin_motivo','fit_del_modelo'])),
+            # «tamaño no consta» or «es una hipótesis» are not motives of the closed list
+            ({'fit':False,'buyer_level':'no_encaja','buyer_against':'tamaño no consta'},('por_confirmar','',['no_encaja_sin_motivo','fit_del_modelo'])),
+            ({'fit':False,'buyer_level':'','buyer_against':'no_decide'},('no_encaja','no_decide',['sin_nivel'])),
+            ({'fit':False,'buyer_level':''},('por_confirmar','',['sin_nivel','fit_del_modelo'])),
+            ({'fit':True,'buyer_level':'probable','buyer_against':'vende_servicios'},('probable','',['motivo_sin_no_encaja'])),
+            ({'fit':True,'buyer_level':'confirmado','buyer_against':'no_contactar'},('no_encaja','no_contactar',['no_contactar','fit_del_modelo'])),
+        ]
+        for answer,expected in rows:
+            with self.subTest(answer):self.assertEqual(nivel_comprador.decide(answer),expected)
+        for confidence in (0.0,0.3,0.99):  # a buyer's confidence orders, never takes her out
+            with self.subTest(confidence):
+                self.assertTrue(red.classifier_fit({'role':'comprador','fit':False,'buyer_level':'por_confirmar'},confidence)[0])
+        # Every other role keeps the model's fit and the minimum confidence (no level, nothing to decide with).
+        self.assertEqual(red.classifier_fit({'role':'par','fit':True},0.9),(True,None))
+        self.assertEqual(red.classifier_fit({'role':'par','fit':True},0.1),(False,None))
+        self.assertEqual(red.classifier_fit({'role':'aliado','fit':False,'buyer_level':'probable'},0.9),(False,None))
+        self.assertTrue(set(nivel_comprador.AGAINST_WEB)<set(nivel_comprador.AGAINST))
+        self.assertNotIn('no_contactar',nivel_comprador.AGAINST_WEB)
+
+
 class BuyerBase(NetworkBase):
     def setUp(self):
         super().setUp()
@@ -124,9 +179,10 @@ class BuyerBase(NetworkBase):
                                     buyer={'profile':profile,'level':level,'us_market':us_market},**extra)
         contact.save();return contact
 
-    def judge(self,verdict,url='https://news.example/acme'):
+    def judge(self,verdict,url='https://news.example/acme',against=''):
         def fake(system,message,**kwargs):
-            return {'text':json.dumps({'verdict':verdict,'evidence':'La fuente lo dice.','source_urls':[url]}),'model':'claude-sonnet-5-5'}
+            return {'text':json.dumps({'verdict':verdict,'evidence':'La fuente lo dice.','source_urls':[url],'en_contra':against}),
+                    'model':'claude-sonnet-5-5'}
         return patch('knowledge.providers.claude',side_effect=fake)
 
     def found(self,url='https://news.example/acme'):
@@ -143,13 +199,15 @@ class LevelTests(BuyerBase):
             with self.subTest(current=current,found=found):self.assertEqual(nivel_comprador.combine(current,found),expected)
 
     def test_the_classifier_keeps_a_founder_without_public_data_and_drops_one_with_evidence_against(self):
-        for slug,name in (('cora','Cora Stealth'),('gabi','Gabi Idea')):
+        for slug,name in (('cora','Cora Stealth'),('gabi','Gabi Idea'),('hugo','Hugo Hipotesis')):
             person=self.fake.seed_person(slug,name,headline='Founder @Lumora')
             Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name=name,headline='Founder @Lumora',
                                    location='San Francisco Bay Area',profile_url=f'https://linkedin.example/in/{slug}',source='search',stage='candidate')
-        answers={'Cora Stealth':{'fit':True,'buyer_level':'por_confirmar','buyer_profile':'stealth','us_market':True},
-                 # an inconsistent answer: fit with evidence against still leaves
-                 'Gabi Idea':{'fit':True,'buyer_level':'no_encaja','buyer_profile':'stealth','us_market':True}}
+        answers={'Cora Stealth':{'fit':True,'buyer_level':'por_confirmar','buyer_profile':'stealth','us_market':True,'buyer_against':''},
+                 # an inconsistent answer: fit with evidence against (and its motive) still leaves
+                 'Gabi Idea':{'fit':True,'buyer_level':'no_encaja','buyer_profile':'stealth','us_market':True,'buyer_against':'idea_sin_empresa'},
+                 # a no_encaja whose only «motive» is what the profile does not say stays por_confirmar (18/11/2026)
+                 'Hugo Hipotesis':{'fit':False,'buyer_level':'no_encaja','buyer_profile':'stealth','us_market':True,'buyer_against':''}}
         def fake(system,message,**kwargs):
             rows=[dict(answers[p['name']],id=p['id'],role='comprador',modality='projectapp',affinity='desconocida',reason='Founder.',
                        confidence=0.8,course_citations=['LI-03-M005-K06'],invitation_note='',note_reason='')
@@ -167,7 +225,35 @@ class LevelTests(BuyerBase):
         journey=comprador.journey(cora)  # the journey keeps the level and score she entered with
         self.assertEqual((journey.entry_level,journey.entry_score,journey.entry_score_version),('por_confirmar',buyer['score'],'buyer_score_v1'))
         self.assertEqual((gabi.stage,gabi.classification['fit'],gabi.classification['rule']),('discarded',False,red.no_fit_rule()))
+        self.assertEqual(gabi.classification['buyer']['against'],'idea_sin_empresa')
         self.assertIsNone(comprador.journey(gabi))
+        hugo=Contact.objects.get(display_name='Hugo Hipotesis')
+        self.assertEqual((hugo.stage,hugo.classification['fit'],hugo.classification['buyer']['level']),('fit',True,'por_confirmar'))
+        self.assertNotIn('against',hugo.classification['buyer']);self.assertIsNotNone(comprador.journey(hugo))
+        corrected={e.metadata['level']:e.metadata['corrections'] for e in AuditEvent.objects.filter(action=nivel_comprador.OVERRIDDEN)}
+        self.assertEqual(corrected,{'no_encaja':['fit_del_modelo'],'por_confirmar':['no_encaja_sin_motivo','fit_del_modelo']})  # Gabi, Hugo
+
+    def test_the_web_check_takes_a_buyer_out_only_with_a_cited_motive(self):
+        # The judge's no_encaja without en_contra («tamaño no consta», «no hay datos») is no evidence against: she stays.
+        bare=self.buyer('w-sin','Ana Sinmotivo',level='probable')
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('no_encaja'):
+            red.check_stages(self.bot,self.account)
+        bare.refresh_from_db()
+        self.assertEqual((bare.stage,bare.classification['fit'],bare.classification['buyer']['level'],
+                          bare.classification['stage_check']['verdict']),('fit',True,'probable','por_confirmar'))
+        event=AuditEvent.objects.get(action=nivel_comprador.OVERRIDDEN)
+        self.assertEqual((event.metadata['source'],event.metadata['corrections'],event.metadata['level']),
+                         ('web',['no_encaja_sin_motivo'],'por_confirmar'))
+        # With a motive of the closed list and a source she received, she leaves and the motive is kept.
+        cited=self.buyer('w-con','Beto Vendedor',level='probable')
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('no_encaja',against='no_decide'):
+            red.check_stages(self.bot,self.account)
+        cited.refresh_from_db()
+        self.assertEqual((cited.stage,cited.classification['fit'],cited.classification['buyer']['level'],cited.classification['buyer']['against']),
+                         ('discarded',False,'no_encaja','no_decide'))
+        self.assertEqual(cited.classification['rule'],red.no_fit_rule())
+        # «no_contactar» is the classifier's (the profile says it), never a finding of the web check.
+        self.assertEqual(nivel_comprador.web_verdict('no_encaja','no_contactar'),('por_confirmar',''))
 
     def test_each_profile_asks_its_own_public_question(self):
         questions={}
@@ -374,7 +460,8 @@ class ReevaluationTests(BuyerBase):
     def test_the_dry_run_lists_by_score_and_changes_nothing(self):
         before={c.pk:(c.stage,c.classification) for c in Contact.objects.all()}
         result=nivel_comprador.reevaluate(self.bot,self.account)
-        self.assertEqual(result['found'],{'fuera_de_eeuu':1,'sin_evidencia_web':1,'sin_evidencia_clasificador':1,'sin_nivel':1})
+        self.assertEqual(result['found'],{'fuera_de_eeuu':1,'sin_evidencia_web':1,'sin_evidencia_clasificador':1,'sin_nivel':1,
+                                          'descartado_con_nivel':0})
         self.assertEqual((result['total'],result['applied']),(4,0))
         scores=[row['score'] for row in result['people']]
         self.assertEqual(scores,sorted(scores,reverse=True))
@@ -403,3 +490,90 @@ class ReevaluationTests(BuyerBase):
         self.assertEqual(AuditEvent.objects.filter(action=nivel_comprador.REEVALUATED).count(),4)
         again=nivel_comprador.reevaluate(self.bot,self.account,confirm=True)
         self.assertEqual((again['total'],again['applied']),(0,0))
+
+
+# The classification production kept on 18/11/2026 for a ProjectApp buyer the model's fit took out (anonymized): level
+# probable, score 68, «tamaño no consta» as the only doubt, fit=false.
+LEFT_BY_FIT={'fit':False,'role':'comprador','modality':'projectapp','affinity':'desconocida','confidence':0.5,
+             'reason':'Fundador y CEO de una empresa en Florida que adquiere y opera inmuebles y negocios; comprador de '
+                      'ProjectApp es una hipótesis: tamaño no consta.',
+             'criterion_version':'v-18-11','classified_at':'2026-11-18T14:00:00+00:00',
+             'buyer':{'line':'projectapp','basis':'perfil','level':'probable','papel':'dueno','score':68,
+                      'profile':'dueno_empresa_tradicional','segment':'otro','us_market':True,'score_version':'buyer_score_v2',
+                      'evidence':'Fundador y CEO de una empresa en Florida que adquiere y opera inmuebles y negocios; fundó y '
+                                 'vendió un contratista del gobierno con tres apariciones en Inc. 5000. Dueño de empresas '
+                                 'tradicionales en EE. UU., con trayectoria fuerte; tamaño no consta.',
+                      'warnings':['sin tamaño de empresa'],'sources':['https://linkedin.example/in/r-fit']}}
+
+
+class LeftByFitTests(BuyerBase):
+    """`operador reevaluar-compradores`, group descartado_con_nivel: the buyers the model's fit took out with a level
+    that keeps them come back with their level and score, without a paid call. Never someone Gustavo or LinkedIn said no
+    to, nor someone the code took out (a rule), nor someone another member attends."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'NETWORK_PROJECTAPP_BUYER_ENABLED':'true'});env.start();self.addCleanup(env.stop)
+        def left(slug,name,events=('classified',),**changes):
+            contact=self.contact(slug,name,stage='discarded')
+            contact.location='Miami, Florida';contact.headline='Founder & CEO at Sunrise Holdings · real estate and businesses'
+            contact.profile_url=f'https://linkedin.example/in/{slug}'
+            contact.classification=json.loads(json.dumps(dict(LEFT_BY_FIT,**changes)))
+            contact.history=[{'at':'2026-11-18T14:00:00+00:00','event':event,'detail':''} for event in events];contact.save()
+            return contact
+        self.left=left
+        self.fit=left('r-fit','Rafa Florida')
+        self.vetoed=left('r-veto','Vera Veto',events=('classified','rejected'))  # Gustavo said no
+        self.restricted=left('r-restringido','Rita Restringida',events=('classified','discarded'))  # LinkedIn said no
+        self.ruled=left('r-regla','Uri Sincita',rule=red.UNCITED_RULE)  # the code took her out
+        # no_encaja with fit=false carried no rule before 18/11/2026, and its reason says «no consta»: neither restored
+        # nor sent back to the (paid) classifier.
+        self.against=left('r-contra','Nora Encaja',buyer=dict(LEFT_BY_FIT['buyer'],level='no_encaja',against='no_decide'))
+
+    def test_the_dry_run_lists_them_with_their_score_and_pays_nothing(self):
+        before={c.pk:(c.stage,c.classification) for c in Contact.objects.all()}
+        with patch('knowledge.providers.claude') as claude,patch('team_backend.research.research') as web:
+            result=nivel_comprador.reevaluate(self.bot,self.account)
+        self.assertEqual((claude.call_count,web.call_count),(0,0))
+        self.assertEqual((result['found']['descartado_con_nivel'],result['total'],result['applied']),(1,1,0))
+        row=result['people'][0]
+        self.assertEqual((row['name'],row['action'],row['level'],row['line'],row['provisional']),
+                         ('Rafa Florida','restaurar','probable','projectapp',False))
+        self.assertIsInstance(row['score'],int)
+        self.assertEqual({c.pk:(c.stage,c.classification) for c in Contact.objects.all()},before)
+        out=StringIO()
+        call_command('operador','--usuario','gustavo-test','reevaluar-compradores','--cuenta',str(self.account.id),stdout=out)
+        self.assertIn('descartado_con_nivel (restaurar): 1',out.getvalue());self.assertIn('Rafa Florida',out.getvalue())
+        self.assertIn('Sin --confirmar no se cambia nada.',out.getvalue())
+
+    def test_confirming_restores_her_level_and_score_and_the_plan_follows_her(self):
+        with patch('knowledge.providers.claude') as claude:
+            result=nivel_comprador.reevaluate(self.bot,self.account,confirm=True)
+        self.assertEqual((claude.call_count,result['applied']),(0,1))
+        self.fit.refresh_from_db();c=self.fit.classification;buyer=c['buyer']
+        self.assertEqual((self.fit.stage,c['fit'],c['stage_check']),('fit',True,{'state':'pending'}))
+        self.assertEqual((buyer['level'],buyer['line'],buyer['segment'],buyer['papel'],buyer['evidence']),
+                         ('probable','projectapp','otro','dueno',LEFT_BY_FIT['buyer']['evidence']))
+        self.assertEqual((buyer['score'],buyer['score_version']),(red.buyer_score(self.fit)['score'],'buyer_score_v2'))
+        self.assertIn('sin tamaño de empresa',buyer['warnings'])
+        self.assertEqual((c['reason'],c['criterion_version']),(LEFT_BY_FIT['reason'],'v-18-11'))  # not classified again
+        self.assertEqual(self.fit.history[-1]['event'],'reevaluated')
+        self.assertEqual(comprador.journey(self.fit).entry_level,'probable')
+        for contact in (self.vetoed,self.restricted,self.ruled,self.against):
+            with self.subTest(contact.display_name):
+                stage,classification=contact.stage,contact.classification;contact.refresh_from_db()
+                self.assertEqual((contact.stage,contact.classification),(stage,classification))
+        event=AuditEvent.objects.get(action=nivel_comprador.REEVALUATED)
+        self.assertEqual((event.target,event.metadata['group'],event.metadata['step']),(str(self.fit.pk),'descartado_con_nivel','restaurar'))
+        # Idempotent: a second run finds nobody.
+        self.assertEqual(nivel_comprador.reevaluate(self.bot,self.account,confirm=True)['total'],0)
+        # Back in the neighborhood she is followed like any fit buyer (the web check is off here: nothing pending).
+        with patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'false'}):red.plan(self.bot,self.account)
+        self.assertEqual(ActionProposal.objects.get(contact=self.fit).capability,'RED-01')
+
+    def test_whoever_another_member_attends_is_not_brought_back(self):
+        held=lambda contact,capability='':'La atiende otro miembro.' if contact.pk==self.fit.pk else ''
+        with patch('team_backend.registro.gate',return_value=held):
+            dry=nivel_comprador.reevaluate(self.bot,self.account)
+            done=nivel_comprador.reevaluate(self.bot,self.account,confirm=True)
+        self.assertEqual((dry['total'],done['applied']),(0,0))
+        self.fit.refresh_from_db();self.assertEqual((self.fit.stage,self.fit.classification['fit']),('discarded',False))

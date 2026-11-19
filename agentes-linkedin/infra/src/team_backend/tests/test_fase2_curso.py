@@ -170,6 +170,23 @@ class ParticipationTests(NetworkBase):
         ActionExecution.objects.filter(pk=execution.pk).update(started_at=self.now-timedelta(hours=30))
         self.assertEqual(autopiloto._reconcile(self.gustavo,self.now+timedelta(hours=1)),0)  # it waits for Gustavo, unread
 
+    def test_an_unconfirmed_write_is_read_back_less_often_the_longer_it_waits(self):
+        from team_backend import autopiloto
+        proposal=self.approved();proposal.state='sent';proposal.save()
+        execution=ActionExecution.objects.create(proposal=proposal,provider='fake',executed_by=self.gustavo,state='sent',idempotency_key=str(proposal.id))
+        start=self.now-timedelta(minutes=11)
+        ActionExecution.objects.filter(pk=execution.pk).update(started_at=start)
+        reads=[]
+        for minutes in range(0,24*60,10):  # the autopilot ticks every 10 minutes for a day
+            at=self.now+timedelta(minutes=minutes)
+            if autopiloto._reconcile(self.gustavo,at):
+                reads.append(at);ActionExecution.objects.filter(pk=execution.pk).update(reconciled_at=at)  # read back, still unseen
+        gaps=[round((b-a).total_seconds()/3600,1) for a,b in zip(reads,reads[1:])]
+        self.assertEqual(gaps,[1.2,1.5,3.0,6.0,12.0])  # 6 reads in its 24 h; every hour (24) before 18/11/2026
+        execution.started_at=self.now;execution.reconciled_at=self.now+timedelta(hours=3)  # it waited 3 h: the next, 3 h later
+        self.assertFalse(autopiloto.reconcile_due(execution,self.now+timedelta(hours=5,minutes=59)))
+        self.assertTrue(autopiloto.reconcile_due(execution,self.now+timedelta(hours=6)))
+
     def test_health_excludes_immature_unknown_and_deduplicates_recipients(self):
         people=self.cohort();self.cohort(count=15,accepted=0,age=2);self.cohort(count=2,accepted=0,unknown=2)
         c=people[0];p=self.approved(c);p.state='confirmed';p.save()
@@ -241,6 +258,7 @@ class ParticipationTests(NetworkBase):
         self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
         self.assertEqual(self.fake.state['writes'],0)
 
+    @patch.dict(os.environ,{'OPERATOR_PROFILE_READ_POOL_CUTOFF':'00:00'})  # the total; its parts: ProfileReadPoolTests
     def test_profile_reads_share_atomic_ceiling_across_her_connectors_and_paths(self):
         other=ConnectorAccount.objects.create(provider='fake',external_account_id='acc_other',label='Other connector',
                                               member=self.first_member())
@@ -263,6 +281,7 @@ class ParticipationTests(NetworkBase):
             with self.assertRaises(operador.ProfileReadCapReached):operador.reserve_profile_read(self.account,'test')
         operador.reserve_profile_read(self.another_members_account(),'test')  # another member reads under her own ceiling
 
+    @patch.dict(os.environ,{'OPERATOR_PROFILE_READ_POOL_CUTOFF':'00:00'})  # the total; its parts: ProfileReadPoolTests
     def test_deployment_preserves_legacy_profile_usage_without_double_charging_new_reads(self):
         AuditEvent.objects.bulk_create([AuditEvent(action='network.read',target=str(self.account.id),metadata={'kind':'profile'}) for _ in range(79)])
         red._read(self.account,'profile')
@@ -588,3 +607,98 @@ class CourseGroundingTests(NetworkBase):
         self.assertEqual([d.get('sin_cita_del_curso') for d in result['validacion']['descartado']],[True])
         self.assertFalse(result['validacion']['ok'])
         self.assertIs(resumen_semanal.WEEKLY_UNITS,metricas.ANALYSIS_UNITS)
+
+
+class ProfileReadPoolTests(NetworkBase):
+    """18/11/2026: the day's profile reads of a member split in two parts. The actions' (the pre-check before a write, its
+    read-back, the reconciliation of an unconfirmed one and of the invitations) and the rest (the research of candidates,
+    referents, metrics…), OPERATOR_PROFILE_READ_RESEARCH_SHARE of the cap (0.4: 32 of 80). Before
+    OPERATOR_PROFILE_READ_POOL_CUTOFF (17:00) neither takes the other's; after it, what one left is the other's. The
+    total never grows. Explicit clocks: Wednesday 18/11/2026 in Bogotá."""
+    MORNING=datetime(2026,11,18,15,tzinfo=utc.utc)  # 10:00 in Bogotá
+    EVENING=datetime(2026,11,18,22,tzinfo=utc.utc)  # 17:00 in Bogotá
+
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'OPERATOR_PROFILE_READ_DAILY_LIMIT':'80','OPERATOR_PROFILE_READ_POOL_CUTOFF':'17:00'})
+        env.start();self.addCleanup(env.stop)
+        os.environ.pop('OPERATOR_PROFILE_READ_RESEARCH_SHARE',None)
+        self.now=self.MORNING
+        self.member=ParticipationTests.first_member(self)
+
+    def reads(self,purpose,n,at):
+        for i in range(n):operador.reserve_profile_read(self.account,purpose,at+timedelta(seconds=i))
+
+    def test_research_cannot_take_what_the_actions_need_before_the_cutoff(self):
+        self.reads('research',20,self.MORNING);self.reads('referent',12,self.MORNING)  # 32 = 0.4 of 80
+        with self.assertRaisesRegex(operador.ProfileReadCapReached,'investigación.*32/32.*17:00'):
+            operador.reserve_profile_read(self.account,'research',self.MORNING+timedelta(minutes=5))
+        with patch('django.utils.timezone.now',return_value=self.MORNING+timedelta(minutes=6)), \
+                self.assertRaises(red.ReadCapReached):red._read(self.account,'profile')  # the classifier's path waits too
+        # The actions still have their 48: the pre-check, the read-back and the reconciliation.
+        self.reads('preflight',16,self.MORNING+timedelta(hours=1));self.reads('execution',17,self.MORNING+timedelta(hours=1))
+        self.reads('reconciliation',15,self.MORNING+timedelta(hours=2))
+        with self.assertRaisesRegex(operador.ProfileReadCapReached,'Tope compartido'):  # both parts spent: the total
+            operador.reserve_profile_read(self.account,'preflight',self.MORNING+timedelta(hours=3))
+        pools=operador.profile_read_pools(self.member,self.MORNING+timedelta(hours=3))
+        self.assertEqual((pools['tope'],pools['usadas'],pools['unidas'],pools['acciones'],pools['investigacion']),
+                         (80,80,False,{'tope':48,'usadas':48},{'tope':32,'usadas':32}))
+        self.assertEqual(AuditEvent.objects.filter(action='operator.profile_read',metadata__pool='acciones').count(),48)
+
+    def test_after_the_cutoff_what_research_left_goes_to_the_actions_and_the_total_never_grows(self):
+        self.reads('research',10,self.MORNING)
+        self.reads('preflight',48,self.MORNING+timedelta(hours=1))
+        with self.assertRaisesRegex(operador.ProfileReadCapReached,'acciones.*48/48.*17:00'):  # 22 of research unused, not yet
+            operador.reserve_profile_read(self.account,'execution',self.EVENING-timedelta(minutes=1))
+        self.reads('execution',22,self.EVENING)  # 17:00: the 22 research left are the actions' now
+        with self.assertRaisesRegex(operador.ProfileReadCapReached,'Tope compartido'):
+            operador.reserve_profile_read(self.account,'execution',self.EVENING+timedelta(hours=1))
+        self.assertEqual(operador.profile_reads_used(self.member,self.EVENING),80)
+
+    def test_the_actions_never_lend_to_research_before_the_cutoff(self):
+        self.reads('research',32,self.MORNING)
+        with self.assertRaises(operador.ProfileReadCapReached):
+            operador.reserve_profile_read(self.account,'metrics',self.EVENING-timedelta(minutes=1))  # 48 actions left untouched
+        operador.reserve_profile_read(self.account,'metrics',self.EVENING)  # after it, what the actions left is research's too
+        self.assertEqual(operador.profile_read_pools(self.member,self.EVENING)['investigacion'],{'tope':32,'usadas':33})
+
+    def test_the_share_is_each_members_and_validated(self):
+        self.assertEqual((operador.research_share(self.member),operador.profile_read_pools(self.member,self.MORNING)['investigacion']['tope']),(0.4,32))
+        self.member.settings={'OPERATOR_PROFILE_READ_RESEARCH_SHARE':'0.25'};self.member.save()
+        self.assertEqual(operador.profile_read_pools(self.member,self.MORNING)['investigacion']['tope'],20)
+        other=ParticipationTests.another_members_account(self)
+        self.assertEqual(operador.profile_read_pools(other.member,self.MORNING)['investigacion']['tope'],32)  # hers: the .env's
+        self.assertEqual(miembros.validate_setting('OPERATOR_PROFILE_READ_RESEARCH_SHARE',' 0.30 '),'0.3')
+        for bad in ('0.95','0','abc','-1'):
+            with self.subTest(bad),self.assertRaises(ValueError):miembros.validate_setting('OPERATOR_PROFILE_READ_RESEARCH_SHARE',bad)
+        for raw,share in (('abc',0.4),('nan',0.4),('0.99',0.9),('0.01',0.1)):  # a bad .env value never stops the reads
+            with self.subTest(raw),patch.dict(os.environ,{'OPERATOR_PROFILE_READ_RESEARCH_SHARE':raw}):
+                self.assertEqual(operador.research_share(None),share)
+        with patch.dict(os.environ,{'OPERATOR_PROFILE_READ_POOL_CUTOFF':'00:00'}):  # 00:00: one total, as before
+            self.assertTrue(operador.profile_read_pools(self.member,self.MORNING)['unidas'])
+
+    def test_an_execution_that_never_read_gives_its_preflight_back_and_each_read_says_its_step(self):
+        person=self.contact('pool-eva','Eva Pool',stage='followed',followed_hours=72)
+        Contact.objects.filter(pk=person.pk).update(followed_at=self.MORNING-timedelta(hours=72))
+        proposal=operador.create_proposal(self.gustavo,None,'RED-02',{'user_id':person.provider_user_id},contact=person,citations=red.NETWORK_UNITS)
+        proposal.state='approved';proposal.approved_hash=proposal.payload_hash;proposal.review={'decision':'approve'};proposal.save()
+        self.fake.state['status']='disconnected'
+        with patch('django.utils.timezone.now',return_value=self.MORNING):execution=operador.execute(self.gustavo,proposal.id)
+        self.assertEqual((execution.state,execution.error_kind),('failed','account_not_running'))
+        self.assertFalse(AuditEvent.objects.filter(action='operator.profile_read').exists())  # nothing was read
+        self.assertEqual(AuditEvent.objects.get(action=operador.PROFILE_READ_UNUSED).metadata['purpose'],'preflight')
+        # A write that went out: the pre-check takes the preflight, the read-back and a reconciliation say their step.
+        self.fake.state['status']='running';self.account.paused=False;self.account.save()
+        other=self.contact('pool-ivo','Ivo Pool',stage='fit')
+        follow=operador.create_proposal(self.gustavo,None,'RED-01',{'user_id':other.provider_user_id},contact=other,citations=red.NETWORK_UNITS)
+        follow.state='approved';follow.approved_hash=follow.payload_hash;follow.review={'decision':'approve'};follow.save()
+        with patch('django.utils.timezone.now',return_value=self.MORNING):operador.execute(self.gustavo,follow.id)
+        with patch('django.utils.timezone.now',return_value=self.MORNING+timedelta(hours=1)):
+            red._look(follow,self.fake_connector(),step='conciliacion')
+        steps=[(e.metadata['purpose'],e.metadata.get('step'),e.metadata['pool'])
+               for e in AuditEvent.objects.filter(action='operator.profile_read').order_by('created_at','id')]
+        self.assertEqual(steps,[('preflight',None,'acciones'),('execution','confirmacion','acciones'),('execution','conciliacion','acciones')])
+
+    def fake_connector(self):
+        from team_backend.connectors import get_connector
+        return get_connector(self.account)
