@@ -44,6 +44,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: uv sync --frozen --extra test
+      # WeasyPrint (the free canvas, lienzo.py) needs Pango: the canvas' real render runs in CI, like in the image.
+      - name: Pango para el lienzo
+        run: ldconfig -p | grep -q libpangoft2-1.0 || (sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0)
       - run: uv run python manage.py check
       - run: uv run python manage.py makemigrations --check --dry-run
       - name: Grafo y diagrama sin deriva

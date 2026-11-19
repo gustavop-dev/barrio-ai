@@ -375,9 +375,10 @@ def _edit_photos(piece, instruction, client, public, capture):
     return attempts + ['ok']
 
 
-def _redesign(piece, public, private, client, findings, kind=None):
+def _redesign(piece, public, private, client, findings, kind=None, reason=None):
     """A new infographic (or carousel) from the current text, with his comment as the designer's finding. `kind`:
-    the format he asked for; otherwise an infographic or carousel keeps its own, and anything else becomes one."""
+    the format he asked for; otherwise an infographic or carousel keeps its own, and anything else becomes one.
+    `reason`: the image's reason (by default, his comment's)."""
     if not (isinstance(client, imagenes.connector.FakeImageConnector) or imagenes.connector.available('anthropic')):
         raise ValueError('Sin proveedor visual para rehacer la imagen')
     binding = piece.image_review.get('visual_binding', {})
@@ -387,7 +388,7 @@ def _redesign(piece, public, private, client, findings, kind=None):
         target = kind or (piece.image_kind if piece.image_kind in ('infografia', 'carrusel') else 'infografia')
         if piece.image_kind != target:
             piece.image_kind, piece.image_spec = target, {}
-        piece.image_reason = _clip(f'Rehecha por un comentario de {identidad.owner_name(piece.account)}', 500)
+        piece.image_reason = reason or _clip(f'Rehecha por un comentario de {identidad.owner_name(piece.account)}', 500)
         piece.image_review = {'started': True, 'visual_binding': binding}
         piece.save(update_fields=['image_kind', 'image_spec', 'image_reason', 'image_review', 'updated_at'])
     result = imagenes.design(piece, public, private, client, findings=findings, previous=piece.image_spec or None)
@@ -466,3 +467,148 @@ def _propose(capture, piece, old, record):
         text = f'El director lo tuvo en cuenta sin cambiar la pieza: {record["reason"]} Sale el {hour}.'
     return _record(capture, 'rehecha' if changed else 'sin_cambios', text, decision=record['decision'],
                    proposal=str(new.id), scheduled_for=when.isoformat(), moved=moved)
+
+
+# --------------------------------------------------------------------------- redo the generic brand card (operator)
+# 19/11/2026: «ayúdame a corregir las piezas que ya tienen esa infografía genérica». `operador rehacer-tarjetas` lists the
+# pieces whose image is the fixed brand card and, with --confirmar, redoes each image through the rework's own path
+# (cycle retoque_pieza: the old version is superseded, a new design with the same checks and fallbacks, the package
+# bound again and a new proposal for the leader at the same hour). A published post cannot change its image on
+# LinkedIn: it is listed and left alone.
+
+REDO_FINDING = ('La imagen salió con la tarjeta genérica de marca: la nueva amplía el post (un dato con fuente, un caso, '
+                'una comparación, los pasos o preguntas que llevan su tesis más lejos), nunca relleno.')
+
+
+def brand_card(piece):
+    return piece.image_kind == 'tarjeta' or (piece.image_review or {}).get('mode') == imagenes.FALLBACKS['marca']
+
+
+def went_out(piece):
+    """Some version of the piece was sent to LinkedIn (or is being sent): its image cannot change any more."""
+    return ActionExecution.objects.filter(proposal__piece=piece).exclude(state=ActionExecution.State.FAILED).exists()
+
+
+def redo_plan(account, now=None):
+    """Every piece of `account` whose image is the fixed brand card, with what a redo would do: {piece, action, why,
+    estimate_usd}. action: 'rehacer', 'omitir' (with why) or 'publicada' (it cannot change)."""
+    now = now or timezone.now()
+    margin = urgente.veto_window()
+    rows = []
+    for piece in EditorialPiece.objects.filter(account=account).order_by('scheduled_for'):
+        if not brand_card(piece):
+            continue
+        kind = (piece.brief.get('image') or {}).get('kind')
+        kind = kind if kind in ('infografia', 'carrusel') else 'infografia'
+        row = {'piece': piece, 'action': 'rehacer', 'why': '', 'estimate_usd': imagenes.stage_estimate(kind)}
+        proposal = open_proposal(piece)
+        if went_out(piece):
+            row.update(action='publicada', why='Ya salió en LinkedIn: no se puede cambiar su imagen', estimate_usd=Decimal(0))
+        elif piece.state != EditorialPiece.State.READY:
+            row.update(action='omitir', why=f'No está lista ({piece.get_state_display().lower()})')
+        elif piece.scheduled_for <= now + margin:
+            row.update(action='omitir', why='Demasiado cerca de su hora: no queda el plazo de veto para revisar la nueva imagen')
+        elif proposal is None:
+            row.update(action='omitir', why='No tiene una versión pendiente de publicar')
+        elif gate_left(piece) < 1:
+            row.update(action='omitir', why='Ya no le quedan revisiones del líder en su ciclo')
+        if row['action'] != 'rehacer':
+            row['estimate_usd'] = Decimal(0)
+        rows.append(row)
+    return rows
+
+
+def redo_images(user, account, confirm=False, now=None):
+    """The plan, and with `confirm` each image redone in turn while the AI budget covers its estimate."""
+    plan = redo_plan(account, now)
+    if not confirm:
+        return plan
+    for row in plan:
+        if row['action'] != 'rehacer':
+            continue
+        if editorial.budget_left() < row['estimate_usd']:
+            row.update(action='omitir', why='No queda presupuesto de IA para rehacerla hoy')
+            continue
+        try:
+            row.update(redo_image(user, row['piece'], now))
+        except (ValueError, orquestacion.CycleStopped) as exc:
+            row.update(action='fallida', why=_clip(str(exc), 300))
+    return plan
+
+
+def _supersede(old, note):
+    with transaction.atomic():
+        proposal = ActionProposal.objects.select_for_update().get(pk=old.pk)
+        if ActionExecution.objects.filter(proposal=proposal).exists() or proposal.state not in OPEN:
+            return False
+        proposal.state = ActionProposal.State.SUPERSEDED
+        proposal.decided_at = timezone.now()
+        proposal.decision_note = note
+        proposal.save(update_fields=['state', 'decided_at', 'decision_note'])
+        operador._audit(None, 'operator.superseded', proposal.id, reason='image_redo')
+    return True
+
+
+def redo_image(user, piece, now=None):
+    """One brand card redone: the open version is superseded, the image designed again (with its fallbacks: the post's
+    key line before the brand card), bound and proposed again at its hour. A failure after the supersede blocks the
+    piece (nothing publishes a version whose image changed), like a failed rework; the lead can dismiss the block."""
+    old = open_proposal(piece)
+    if old is None or not _supersede(old, 'Se rehace su imagen genérica antes de publicarla'):
+        return {'action': 'omitir', 'why': 'La versión ya se estaba publicando o ya no está pendiente'}
+    member = miembros.member_for_account(piece.account)
+    public, private = guardas.blocks(member)
+    reason = _clip('Rehecha: salía con la tarjeta genérica de marca', 500)
+    runtime = orquestacion.Runtime.open(CYCLE, f'imagen:{piece.id}:{old.id}', user, None,
+        facts={'piece': str(piece.id), 'proposal': str(old.id), 'reason': 'image_redo'},
+        plan=['imagen', 'reamarrar', 'propuesta'])
+    kind = 'carrusel' if (piece.brief.get('image') or {}).get('kind') == 'carrusel' else None
+    try:
+        with runtime.session():
+            try:
+                client = imagenes.connector.ImageConnector()
+                try:
+                    _redesign(piece, public, private, client, [REDO_FINDING], kind=kind, reason=reason)
+                except ValueError as exc:  # no design passed (or no provider): the fallbacks, the post's line first
+                    piece.images.all().delete()
+                    imagenes.fallback(piece, str(exc), public, private, client)
+                editor_visual.bind(piece, public, private, rework=f'imagen:{old.id}')
+                problems = imagenes.issues(piece, imagenes.manifest(piece))
+                if problems:
+                    raise ValueError('; '.join(problems))
+            except ValueError as exc:
+                runtime.finish({'state': 'failed', 'reason': str(exc)[:500]})
+                raise
+            record = {'media': imagenes.manifest(piece), 'image_kind': piece.image_kind,
+                      'mode': (piece.image_review or {}).get('mode') or 'diseño'}
+            runtime.finish(record)
+    except (ValueError, orquestacion.CycleStopped) as exc:
+        with transaction.atomic():
+            locked = EditorialPiece.objects.select_for_update().get(pk=piece.pk)
+            locked.state = EditorialPiece.State.BLOCKED
+            locked.note = ('No se pudo rehacer su imagen genérica: ' + str(exc))[:2000]
+            locked.save(update_fields=['state', 'note', 'updated_at'])
+            operador._audit(None, 'editorial.image_redo_failed', piece.id, reason=str(exc)[:500])
+        raise
+    now = now or timezone.now()
+    with transaction.atomic():
+        ConnectorAccount.objects.select_for_update().get(pk=piece.account_id)  # same lock as the slot assignment
+        piece = EditorialPiece.objects.select_for_update().get(pk=piece.pk)
+        when, moved = _when(piece, True, now)
+        if moved:
+            piece.scheduled_for, piece.slot_date, piece.second_of_day = when, urgente._local(when).date(), False
+            piece.save(update_fields=['scheduled_for', 'slot_date', 'second_of_day', 'updated_at'])
+        risks = [r for r in old.risks if not str(r).startswith(('Imagen rehecha', 'Líder:'))]
+        risks.append('Imagen rehecha: salía con la tarjeta genérica de marca')
+        new = operador.create_proposal(old.created_by, None, 'CONT-09',
+            {'text': piece.final_text, 'media': imagenes.manifest(piece)}, rationale=old.rationale,
+            citations=piece.citations or old.citations, risks=risks, source='agent', origin_job=old.origin_job,
+            model=old.model, previous=old, piece=piece)
+        operador._audit(None, 'editorial.image_redone', piece.id, proposal=str(new.id), previous=str(old.id),
+                        image_kind=piece.image_kind, moved=moved)
+    local = when.astimezone(operador.local_tz())
+    _notice('piece_scheduled', f'Rehicimos la imagen de la pieza del {local:%d/%m}',
+            f'Ya no lleva la tarjeta genérica. Sale el {local:%d/%m} a las {local:%H:%M} si el líder la aprueba.',
+            piece, f'image_redo:{old.id}')
+    return {'action': 'rehecha', 'why': record['mode'], 'proposal': new, 'scheduled_for': when, 'moved': moved}
+

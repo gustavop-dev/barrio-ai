@@ -44,6 +44,13 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 | [IMG-INF-06](#img-inf-06) | Revisión con la lista de 10 puntos | backend | funciona |
 | [IMG-INF-07](#img-inf-07) | Texto alternativo siempre | PWA · app · backend | parcial |
 | [IMG-INF-08](#img-inf-08) | Ningún modelo de imagen dibuja infografías ni texto | backend | funciona |
+| [IMG-INF-09](#img-inf-09) | La imagen amplía el post; el estilo se corrige, no descarta | backend | funciona |
+| [IMG-INF-10](#img-inf-10) | Plantillas tabla, comparación, línea y lista | backend | funciona |
+| [IMG-INF-11](#img-inf-11) | El editor visual elige el layout y no repite el anterior | backend | funciona |
+| [IMG-INF-12](#img-inf-12) | Lienzo libre en HTML y CSS (`INFOGRAFIA_LIENZO`, apagado) | backend | funciona |
+| [IMG-INF-13](#img-inf-13) | Respaldo con la frase del post antes que la tarjeta genérica | backend | funciona |
+| [IMG-INF-14](#img-inf-14) | Una investigación propia para la imagen (`INFOGRAFIA_INVESTIGACION`, apagado) | backend | funciona |
+| [IMG-INF-15](#img-inf-15) | Rehacer las piezas que salieron con la tarjeta genérica | backend | funciona |
 
 `IMG-15` va arriba en la tabla porque es la primera decisión del flujo; conserva su número para no cambiar los enlaces de otras fichas.
 
@@ -52,8 +59,8 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - No quedan decisiones de producto sin confirmar. Las ediciones que decide el equipo quedan resueltas con la opción de edición de [IMG-16](#img-16) (decisión de Gustavo, 2026-11-08): con «Que decida el equipo» o «Editar», el equipo aplica la edición y la muestra para veto, sin preguntar antes.
 - Por confirmar con Gustavo (recorte sin IA, 2026-11-14): «No editar» impide hoy también el recorte, así que esa foto sale en su formato original ([IMG-14](#img-14), criterio 5). Si el recorte sin IA debe aplicarse también con «No editar», basta con quitar esa excepción.
 
-- Valores técnicos elegidos: `ai_edit=auto`; `IMAGE_DAILY_USD=1` (retirado desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`); `EDITORIAL_VETO_MINUTES=60`; urgencias en orden de llegada y sin desplazar piezas preparadas; búsqueda de hueco hasta 14 días; carrusel de 3–8 láminas. Se conserva la hora y cadencia configuradas.
-- Sin claves, presupuesto de IA o revisión visual: foto original si es válida; si no, tarjeta de marca fija sin datos variables. Solo se bloquea si tampoco puede prepararse/servirse esa imagen.
+- Valores técnicos elegidos: `ai_edit=auto`; `IMAGE_DAILY_USD=1` (retirado desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`); `EDITORIAL_VETO_MINUTES=60`; urgencias en orden de llegada y sin desplazar piezas preparadas; búsqueda de hueco hasta 14 días; carrusel de 2–8 láminas (3–8 hasta el 19/11/2026). Se conserva la hora y cadencia configuradas.
+- Sin claves, presupuesto de IA o revisión visual: foto original si es válida; si no, la frase clave del post en una tarjeta sin cifras ([IMG-INF-13](#img-inf-13)) y, solo si el post no tiene una frase que sirva, la tarjeta de marca fija sin datos variables. Solo se bloquea si tampoco puede prepararse/servirse esa imagen.
 - Documento LinkedIn: no tiene campo de alt por página; el PDF lleva `/Alt` por lámina, y la API de la pieza conserva cada alt.
 
 ---
@@ -366,16 +373,16 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** para una infografía, el agente decide qué plantilla usar y qué dice cada parte; no dibuja nada.
-- **Implementación backend:** `DESIGN_SCHEMA`, validación local estricta y una corrección; cuatro plantillas del tablero más cierre y `preguntas`.
+- **Implementación backend:** `TEMPLATE_DESIGN_SCHEMA` (o `CANVAS_DESIGN_SCHEMA` con el lienzo), `infografias.fix` (corrige el estilo con código) y `infografias.validate` (solo verdad y legibilidad), y una corrección pagada; cuatro plantillas del tablero más cierre, `preguntas`, `tabla`, `comparacion`, `linea` y `lista` ([IMG-INF-10](#img-inf-10)). Desde el 19/11/2026 el estilo ya no descarta: ver [IMG-INF-09](#img-inf-09).
 - **Criterios de aceptación:**
   1. **Dado** una pieza con tipo `infografia` o `carrusel`, **cuando** corre el agente, **entonces** devuelve datos estructurados validados con un esquema: la plantilla (portada de carrusel, pasos, barras o número protagonista), el formato, los textos de cada elemento (etiqueta, titular, bajada, cuerpo, cifra con su unidad, pasos, barras con su valor), la fuente de los datos, el texto alternativo y, en un carrusel, las láminas en orden.
-  2. **Dado** un titular de más de 8 palabras, una lámina de más de 30 palabras o una imagen única de más de 40, **cuando** se valida, **entonces** se rechaza y el agente lo corrige antes de dibujar.
+  2. **Dado** un titular de más de 8 palabras o una lámina con más palabras que la guía (30; 40 en imagen única; tabla 70, comparación y lista 60, pasos y preguntas 55), **cuando** se valida, **entonces** el código quita primero el texto secundario (cuerpo, bajada, detalles, respuestas cortas) y lo anota; solo un titular de más de 14 palabras (24 en `cita`) o un texto que no cabe en la rejilla tras acortarlo se rechaza.
   3. **Dado** un tipo de gráfico que no está permitido (torta de más de 3 partes, 3D, doble eje, medidores, nubes de palabras), **cuando** se valida, **entonces** se rechaza; solo pasan número protagonista, barras horizontales (hasta 5), línea simple (una serie, dos como máximo), antes y después, pasos (3 a 5) y lista numerada.
-  4. **Dado** unos pasos con 2 o con 6 elementos, o unas barras con 6 categorías, **cuando** se valida, **entonces** se rechaza.
-  5. **Dado** el texto público, **cuando** se valida, **entonces** está en inglés, sin emojis, sin hashtags, sin dobles exclamaciones y con mayúsculas solo en las etiquetas. Las siglas conocidas (AI, MVP, CTO, API, US…, `infografias.ACRONYMS`) son palabras, no gritos; los plurales y formas mixtas (APIs, B2B, SaaS) nunca chocaron con la regla.
-  6. **Dado** un titular de portada, **cuando** se valida, **entonces** va en minúsculas salvo la primera letra y las siglas conocidas («Ship AI agents safely»).
-  7. **Dado** una respuesta que no cumple el esquema tras la corrección, **cuando** termina, **entonces** no se dibuja nada y el equipo elige otra imagen o la pieza queda bloqueada con el motivo ([IMG-15](#img-15)).
-  8. **Dado** que Gustavo pide preguntas (o «preguntas y respuestas rápidas») o el post remite a las preguntas de la imagen, **cuando** diseña, **entonces** usa la plantilla `preguntas`: de 2 a 4 preguntas en viñetas, sin numerar, cada una con una respuesta corta opcional después del «?»; sin cifras no necesita fuente. Origen: 12/11/2026, el diseñador puso tres preguntas en la plantilla `numero` («3 questions»), que siempre es un dato, y la pieza salió con la tarjeta de marca.
+  4. **Dado** unos pasos con 7 elementos o unas barras con 6 categorías, **cuando** se valida, **entonces** el código deja los primeros 6 pasos o las 5 barras mayores (con el foco); por debajo del mínimo (un solo paso) la plantilla no tiene qué dibujar y se rechaza.
+  5. **Dado** el texto público, **cuando** se valida, **entonces** está en inglés y sin emojis (la fuente no los dibuja: se quitan y, si queda alguno, se rechaza); los hashtags, las dobles exclamaciones y las palabras en mayúsculas se corrigen con código. Las siglas conocidas (AI, MVP, CTO, API, US…, `infografias.ACRONYMS`) son palabras, no gritos; los plurales y formas mixtas (APIs, B2B, SaaS) nunca chocaron con la regla.
+  6. **Dado** un titular de portada, **cuando** se valida, **entonces** la guía pide minúsculas salvo la primera letra y las siglas conocidas («Ship AI agents safely»); si no, queda anotado, no se rechaza.
+  7. **Dado** una respuesta que no cumple el esquema tras la corrección, **cuando** termina, **entonces** no se dibuja ese diseño y sale el respaldo ([IMG-INF-13](#img-inf-13)).
+  8. **Dado** que Gustavo pide preguntas (o «preguntas y respuestas rápidas») o el post remite a las preguntas de la imagen, **cuando** diseña, **entonces** usa la plantilla `preguntas`: de 1 a 4 preguntas en viñetas (el código quita la numeración y lo que no es pregunta), sin numerar, cada una con una respuesta corta opcional después del «?»; sin cifras no necesita fuente. Origen: 12/11/2026, el diseñador puso tres preguntas en la plantilla `numero` («3 questions»), que siempre es un dato, y la pieza salió con la tarjeta de marca.
   9. **Dado** un rechazo por «Dato sin fuente», **cuando** se pide la corrección, **entonces** el motivo dice qué lo volvió un dato (la plantilla o las cifras del texto) y cómo corregirlo, para que el segundo intento no repita el diseño.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
 - **Cobertura QA:** criterios 5 y 6 con siglas en `test_imagenes.RendererTests.test_known_acronyms_are_words_and_shouting_is_still_rejected`. Escrita; ejecución pendiente del CI.
@@ -420,16 +427,16 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** cuando un post avanza por partes (pasos, errores, lecciones, antes y después) o él lo pide, sale como carrusel con su portada, una idea por lámina y una pregunta al final.
-- **Implementación backend:** Carrusel de 3–8 láminas: portada, interiores y cierre con pregunta; PDF etiquetado con alt por lámina. `imagenes.DESIGN_SYSTEM` le dice al diseñador cómo repartir el post en láminas y que no numere; su respuesta tiene hasta 8.000 tokens (5.000 una infografía). Un comentario puede pedirlo (`image_route="carrusel"`, [EDI-22](motor-editorial.md#edi-22)).
+- **Implementación backend:** Carrusel de 2–8 láminas: portada, interiores y cierre (con pregunta como guía, no como requisito); PDF etiquetado con alt por lámina. `imagenes.DESIGN_SYSTEM` le dice al diseñador cómo repartir el post en láminas y que no numere; su respuesta tiene hasta 8.000 tokens (5.000 una infografía). Un comentario puede pedirlo (`image_route="carrusel"`, [EDI-22](motor-editorial.md#edi-22)).
 - **Criterios de aceptación:**
   1. **Dado** un carrusel, **cuando** se valida, **entonces** tiene como mucho 8 láminas de 1080×1350.
   2. **Dado** la primera lámina, **cuando** se dibuja, **entonces** es la portada: fondo tinta, una sola palabra en 0ff1ce, titular de 8 palabras como máximo y bajada; las interiores van en papel.
   3. **Dado** cada lámina, **cuando** se valida, **entonces** responde una sola idea; si hacen falta dos, son dos láminas.
-  4. **Dado** la última lámina, **cuando** se valida, **entonces** cierra con una pregunta para la conversación, nunca con un «sígueme».
+  4. **Dado** la última lámina, **cuando** se valida, **entonces** lo natural es que devuelva la pregunta del post; si no lo hace queda anotado y el carrusel sale igual (era uno de los motivos reales de la tarjeta genérica, 19/11/2026). Un «sígueme» se quita.
   5. **Dado** el carrusel, **cuando** se numeran las láminas, **entonces** cada pie dice «n/N».
   6. **Dado** el diseño de un carrusel, **cuando** se escribe, **entonces** ni las láminas ni sus títulos llevan cifras para numerarse («1.», «Step 2», «3 mistakes»): el pie ya dice «n/N» y la plantilla `pasos` numera sus pasos; una cifra sin fuente sigue rechazándose ([IMG-INF-04](#img-inf-04)).
   7. **Dado** un comentario de Gustavo que pide un carrusel sobre una pieza lista con foto o infografía, **cuando** se rehace, **entonces** la imagen pasa a ser un carrusel diseñado con su comentario y la foto vuelve a la Galería.
-  8. **Dado** un carrusel que no pasa el diseño ni la revisión tras la corrección, **cuando** termina, **entonces** sale la tarjeta de marca, como con una infografía (la pieza no se retrasa por intentarlo).
+  8. **Dado** un carrusel que no pasa el diseño ni la revisión tras la corrección, **cuando** termina, **entonces** sale el respaldo, como con una infografía: la frase clave del post y, como último recurso, la tarjeta de marca (la pieza no se retrasa por intentarlo). Una lámina cuya cifra no tiene fuente sale del carrusel mientras queden dos.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales. El criterio 8 no prueba antes una infografía: el ciclo diario permite dos llamadas de diseño y las gasta el carrusel.
 - **Cobertura QA:** `test_imagenes.ImageWorkflowTests.test_infographic_and_carousel_use_code_and_one_bounded_repair`; `test_imagenes.CarouselTests` (del brief del director al documento en LinkedIn con el título de su portada; título ligado a la aprobación); `test_retoque.ReworkTests.test_a_comment_asking_for_a_carousel_turns_the_image_into_one`. Escritas; ejecución pendiente del CI.
 
@@ -438,11 +445,11 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** antes de publicar, el verificador revisa cada infografía con su lista de 10 puntos; si falla uno, vuelve a Mesa editorial.
-- **Implementación backend:** Comprobaciones medibles y lista visual de 10 puntos, una reparación y veredicto ligado a cada SHA-256. La tarjeta fija tiene revisión de plantilla, identificada como fixed_brand_card.
+- **Implementación backend:** Comprobaciones medibles y lista visual de 10 puntos, una reparación y veredicto ligado a cada SHA-256. Desde el 19/11/2026 solo los puntos 1 (tema y que amplíe el post), 4 (28 px), 5 (fuentes), 8 (contraste) y 9 (inglés) descartan una infografía (`connectors_images.BLOCKING`); un fallo en los demás queda como observación (`observations`) y la imagen sale. Las fotos editadas siguen igual: cualquier fallo la descarta. La tarjeta fija tiene revisión de plantilla, identificada como fixed_brand_card; la tarjeta con la frase del post, como tarjeta_contenido.
 - **La lista del tablero:**
-  1. Responde una sola pregunta y se entiende en 3 segundos.
+  1. Trata la tesis del post y la amplía: aporta algo que el texto no dice ya; nada genérico ni de relleno. Responde una sola pregunta y se entiende en 3 segundos.
   2. Tiene un único punto focal y un único color de acento.
-  3. El titular tiene 8 palabras o menos; ninguna lámina pasa de 30.
+  3. El titular busca 8 palabras o menos y cada lámina unas 30 (guía de estilo: anota, no descarta).
   4. Nada está por debajo de 28 px en el lienzo de 1080.
   5. Todo dato tiene fuente, y si es estimación lo dice.
   6. Las barras empiezan en cero y se etiquetan directamente, sin leyenda.
@@ -453,8 +460,8 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 - **Criterios de aceptación:**
   1. **Dado** una infografía dibujada, **cuando** se revisa, **entonces** el código comprueba lo medible sin modelo: número de palabras (3), tamaño mínimo de 28 px (4), fuente presente en cada dato y «estimate» en las estimaciones (5), barras desde cero y sin leyenda (6), ausencia de degradados, sombras y elementos prohibidos en los datos de la plantilla (7), contraste de 4,5:1 para el texto y 3:1 para los elementos gráficos (8), un solo color de acento (2) y texto alternativo presente (10).
   2. **Dado** la misma infografía, **cuando** pasa lo medible, **entonces** un modelo con visión revisa lo visual: que responda una sola pregunta y se entienda en 3 segundos (1), que tenga un único punto focal (2) y que el texto en inglés no tenga errores (9), y que no haya nada decorativo (7).
-  3. **Dado** que falla cualquier punto, **cuando** termina la revisión, **entonces** la infografía vuelve a Mesa editorial con los puntos fallidos para una corrección, y se vuelve a revisar.
-  4. **Dado** que sigue fallando tras la corrección, **cuando** termina, **entonces** no se publica: el equipo elige otra imagen o la pieza queda bloqueada con los motivos ([IMG-15](#img-15)).
+  3. **Dado** que falla un punto que descarta (1, 4, 5, 8 o 9), **cuando** termina la revisión, **entonces** la infografía vuelve al diseñador con esos puntos para una corrección, y se vuelve a revisar; un punto de estilo que falla queda como observación.
+  4. **Dado** que sigue fallando tras la corrección, **cuando** termina, **entonces** ese diseño no se publica y sale el respaldo ([IMG-INF-13](#img-inf-13)).
   5. **Dado** una infografía que pasa los 10 puntos, **cuando** se guarda el veredicto, **entonces** va ligado al SHA-256 de cada lámina exacta y el detalle de la pieza muestra el resultado ([IMG-11](#img-11)).
   6. **Dado** que la revisión visual falla por un error del proveedor, **cuando** termina, **entonces** la infografía no se da por buena.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
@@ -487,6 +494,143 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
   3. **Dado** el texto que aparece en una infografía, **cuando** se dibuja, **entonces** sale tal cual de los datos estructurados, dibujado con la fuente Ubuntu.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
 - **Cobertura QA:**
+
+### IMG-INF-09 · La imagen amplía el post; el estilo se corrige, no descarta <a id="img-inf-09"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** la infografía aporta algo que el post no dice ya, siempre sobre su tesis: un gráfico con datos reales y su fuente, un caso real (una empresa, un producto, un informe, el blog de una compañía de IA), una comparación, los pasos que el post solo menciona o preguntas que llevan la idea más lejos. Y el verificador deja de bloquear por estilo (Gustavo, 19/11/2026: «que no bloquee todo»).
+- **Origen:** de las últimas 14 piezas listas, 4 salieron con la tarjeta genérica «A question worth exploring». Motivos reales: «El cierre es una pregunta» (dos veces), «Demasiadas palabras» y «Dato sin fuente pública identificable y fecha».
+- **Implementación backend:** `imagenes.DESIGN_SYSTEM` (propósito «amplía el post») y el punto 1 de la revisión; `infografias.fix` corrige el estilo con código antes de `infografias.validate`, que solo comprueba verdad y legibilidad; `connectors_images.soften` aplica la misma división al veredicto visual. Las correcciones pagadas siguen siendo dos (el arco `disenar` admite 2 llamadas por ciclo y `grafo.py` no admite bucles de más de 2 rondas); las rondas extra son gratis: `fix` entre una y otra, acortar el texto secundario si no cabe en la rejilla, y en el lienzo la plantilla de la misma respuesta.
+- **Reglas, antes y después:**
+
+| Regla | Antes | Ahora |
+| --- | --- | --- |
+| Toda cifra con fuente pública identificable y fecha | descarta | **dura**; la cifra sin fuente se quita del texto secundario (bajada, cuerpo, pasos, filas) y solo descarta si la cifra es la lámina (número, barras, línea, titular, encabezados) |
+| Fuente que no está en `public_facts` ni `sources` | descarta | se retira la cita (y la cifra que dependía de ella) |
+| Estimación sin la palabra «estimate» | descarta | se añade «(estimate)» |
+| Sin experiencias inventadas ni hechos privados del dueño (`guardas`) | descarta | **dura** |
+| Texto alternativo presente (8–1.500 caracteres) | descarta | se escribe desde el titular si falta; **dura** si sigue sin haber |
+| Emojis | descarta | se quitan; **dura** si queda alguno (la fuente no los dibuja) |
+| Legible: 28 px, contraste 4,5:1, nada se desborda | descarta | **dura**; si no cabe se quita el texto secundario y se dibuja otra vez |
+| Estructura mínima de la plantilla (2 pasos, 1 pregunta, 2 columnas, valores desde cero…) | descarta | **dura** (sin eso no hay qué dibujar ni el gráfico es honesto) |
+| Número de láminas | 1 (imagen) / 3–8 (carrusel) | 1 / **2–8** |
+| Titular de 8 palabras | descarta | nota; **dura** solo por encima de 14 (24 en `cita`) |
+| Palabras por lámina (30 / 40) | descarta | guía por plantilla (tabla 70, comparación y lista 60, pasos y preguntas 55); el código quita texto secundario |
+| Mayúsculas solo en etiquetas | descarta | se pasan a minúsculas (las siglas conocidas se quedan) |
+| Hashtags y «!!» | descarta | se corrigen |
+| Etiqueta con decoración | descarta | se limpia |
+| Portada en minúsculas | descarta | nota |
+| Palabra de acento de la portada | descarta | se quita si no está en el titular |
+| El carrusel empieza con portada | descarta | nota |
+| El cierre es una pregunta | descarta | nota |
+| Una sola portada | descarta | **quitada** |
+| Pasos 3–5, preguntas 2–4, barras 1–5 con un foco | descarta | se quedan los primeros (las 5 barras mayores) y el foco se fija; mínimo duro: 2 pasos, 1 pregunta, 1 barra |
+| Preguntas numeradas o con viñetas; elementos que no son pregunta | descarta | se quitan las marcas y los elementos que no son pregunta |
+| Pasos o preguntas en otra plantilla, campos sueltos | descarta | se quitan |
+| «Sígueme» | descarta | se quita |
+| Revisión visual: cualquier punto que falle | descarta | solo 1 (tema y amplía), 4, 5, 8 y 9 descartan; 2, 3, 6, 7 y 10 son observaciones |
+| Lienzo: 40 % vacío y titular dentro del lienzo | descartaba en el prototipo | **quitadas**; tope de palabras 80 → 90 |
+
+- **Criterios de aceptación:**
+  1. **Dado** un carrusel cuyo cierre no es una pregunta, **cuando** se valida, **entonces** sale como carrusel con una nota.
+  2. **Dado** una lámina con más palabras que la guía, **cuando** se valida, **entonces** el código quita el texto secundario y la imagen sale.
+  3. **Dado** una cifra sin fuente en el texto secundario, **cuando** se valida, **entonces** se quita esa cifra y la imagen sale; si la cifra es la lámina, se pide una corrección con el motivo exacto.
+  4. **Dado** el verificador visual, **cuando** falla solo un punto de estilo, **entonces** la imagen sale y el detalle muestra la observación.
+- **Cobertura QA:** `test_infografias_libres.RulesTests`, `test_infografias_libres.RealReasonsFlowTests` y las pruebas de reglas de `test_imagenes.RendererTests`.
+
+### IMG-INF-10 · Plantillas tabla, comparación, línea y lista <a id="img-inf-10"></a>
+
+- **Dónde:** backend (la PWA y la app ya muestran el nombre de la plantilla en el detalle de la pieza)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** más formas de ampliar un post: una tabla (varias cosas con los mismos atributos), una comparación en dos columnas (antes y después, dos opciones), una línea simple (una evolución, siempre con fuente) y una lista numerada con detalle corto. La plantilla `cita` la reserva el código para el respaldo ([IMG-INF-13](#img-inf-13)).
+- **Implementación backend:** `infografias.SLIDE` (campos `columns`, `rows`, `series`), `_structure` (reglas duras de cada una) y `render` (`_table`, `_comparison`, `_line_chart`). Un diseño guardado antes de estos campos se lee igual (`normalize`).
+- **Criterios de aceptación:**
+  1. **Dado** cada plantilla nueva, **cuando** se dibuja, **entonces** mide 1080×1080 (imagen) o 1080×1350 (carrusel) y respeta márgenes, paleta y 28 px.
+  2. **Dado** una tabla sin 2 a 4 columnas, una fila sin una celda por columna, una comparación sin dos encabezados, una línea con valores que no cuadran con sus puntos o negativos, o una lista de un solo punto, **cuando** se valida, **entonces** se rechaza con el motivo.
+  3. **Dado** una línea, **cuando** se valida, **entonces** necesita fuente como cualquier dato.
+- **Cobertura QA:** `test_infografias_libres.NewTemplatesTests`.
+
+### IMG-INF-11 · El editor visual elige el layout y no repite el anterior <a id="img-inf-11"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** sus imágenes no salen todas iguales: el editor visual elige el layout de la imagen única según el contenido (dato, barras, línea, tabla, comparación, pasos, lista, preguntas, portada) y, si coincide con el de la imagen anterior y otro también encaja, cambia.
+- **Implementación backend:** `editor_visual.request` añade `recent_layouts` (las 5 últimas imágenes listas de la cuenta) y `referent_visual` (el recurso visual del post referente que inspiró la pieza, solo como etiqueta: imagen, video, documento…; se lee a la defensiva y, si no hay, no se manda nada); `infografias.choice_schema` añade `layout` y `alternatives`; `editor_visual.settle_layout` aplica la regla de no repetir y la anota en el motivo. El diseñador recibe el layout en `brief.image.layout`.
+- **Criterios de aceptación:**
+  1. **Dado** que la imagen anterior fue `pasos` y el editor vuelve a elegir `pasos` con `lista` como alternativa, **cuando** se fija la elección, **entonces** sale `lista` y el motivo lo dice.
+  2. **Dado** que no hay alternativa, **cuando** se fija, **entonces** se mantiene la elección.
+  3. **Dado** el lienzo apagado, **cuando** el editor elige `lienzo`, **entonces** se usa su primera alternativa.
+- **Cobertura QA:** `test_infografias_libres.LayoutChoiceTests`.
+
+### IMG-INF-12 · Lienzo libre en HTML y CSS <a id="img-inf-12"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Interruptor:** `INFOGRAFIA_LIENZO`, apagado por defecto.
+- **Qué hace para Gustavo:** cuando ninguna plantilla le hace justicia al contenido (un esquema, un mapa, una composición propia), el diseñador escribe la composición en HTML y CSS con los colores, la tipografía y los márgenes del manual, y el código la valida y la dibuja. Si no pasa, sale la plantilla de la misma respuesta.
+- **Implementación backend:** `lienzo.py` y `lienzo_render.py`.
+  - **Saneado (rechaza con el motivo, nunca recorta en silencio):** sin scripts, manejadores `on…`, enlaces, imágenes, svg, iframes, formularios, `meta` distinto de `charset`, `javascript:` ni `data:`; atributos solo `class`, `style`, `colspan` y `rowspan`; CSS sin `url()`, `@import`, `@font-face`, `@media`, cadenas, degradados, sombras, transparencias, transformaciones, `!important`, variables propias, selectores de id, `html`, `body`, `:root` ni pseudo-elementos; colores solo de la paleta (hex o `var()`), nada por debajo de 28 px, sin `overflow` oculto ni `display:none`. El renderizador solo recibe la reconstrucción del documento, nunca la cadena del diseñador.
+  - **Verdad:** las mismas reglas que una plantilla (toda cifra con fuente, sin emojis, alt) y un tope de 90 palabras.
+  - **Render:** WeasyPrint (HTML/CSS a PDF, sin motor de JavaScript) y pdfium (PDF a PNG) en un proceso hijo `python -I` con el entorno filtrado (ninguna clave del worker), la red bloqueada (solo puede leer la fuente Ubuntu del paquete; cualquier otra URL hace fallar el render), memoria limitada a 1.024 MB de espacio de direcciones, un render a la vez (cerrojo en el proceso y en el contenedor) y un límite de tiempo (`INFOGRAFIA_LIENZO_TIMEOUT_S`, 45 s).
+  - **Medición del resultado:** una página, nada fuera del área de 888×744, nada por debajo de 28 px, colores de la paleta, contraste de 4,5:1, sin texto encima de texto; el código dibuja la fuente y el pie. Después pasa la misma revisión visual que una plantilla, con sus puntos propios.
+  - **Respaldo:** la plantilla de la misma respuesta (sin otra llamada pagada); después, la corrección ya es de plantilla; después, [IMG-INF-13](#img-inf-13).
+- **Elección del renderizador y su coste:**
+
+| Opción | Memoria del render (medida) | Imagen del contenedor | Decisión |
+| --- | --- | --- | --- |
+| WeasyPrint 70 + pypdfium2, proceso hijo | ~95–100 MiB PSS de pico; 1,4–2 s por render en local | +65–70 MB (Pango ~17 MB y paquetes Python ~50 MB) | **elegida**: sin JavaScript ni navegador, cabe en los 768 MB del worker |
+| Chromium headless (Playwright) | ~200 MiB PSS (515 MiB RSS) | +450–550 MB | descartada: ejecuta JavaScript y pesa el doble |
+| Servicio «navegador» aparte | un contenedor más | — | descartado: más superficie y red entre servicios |
+
+  WeasyPrint no ejecuta JavaScript y no soporta todo el CSS moderno (por ejemplo, `position: sticky` o algunas propiedades de grid), pero flex, grid básico, tablas y bordes alcanzan para una infografía.
+- **Para encenderlo en producción:** reconstruir la imagen del backend (el `Dockerfile` ya instala Pango), poner `INFOGRAFIA_LIENZO=true` y, si el servidor es lento, subir `INFOGRAFIA_LIENZO_TIMEOUT_S`.
+- **Criterios de aceptación:**
+  1. **Dado** el interruptor apagado, **cuando** se diseña, **entonces** la petición al diseñador es la de plantillas (mismo system, mismo esquema, mismas claves, 5.000 tokens) y no se renderiza ningún lienzo.
+  2. **Dado** un lienzo con algo fuera de la lista permitida, **cuando** se valida, **entonces** se rechaza con el motivo y sale la plantilla de la misma respuesta.
+  3. **Dado** un lienzo cuya medición falla, **cuando** se dibuja, **entonces** sale la plantilla de la misma respuesta, sin otra llamada.
+  4. **Dado** una página que pide recursos externos, **cuando** la renderiza el proceso hijo, **entonces** no sale ninguna conexión.
+- **Cobertura QA:** `test_infografias_libres.CanvasSanitizerTests`, `RealRenderTests` (render real; en CI no se salta) y `CanvasFlowTests`.
+
+### IMG-INF-13 · Respaldo con la frase del post antes que la tarjeta genérica <a id="img-inf-13"></a>
+
+- **Dónde:** backend (la PWA y la app muestran el respaldo y su motivo en el detalle de la revisión)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** si ningún diseño pasa, la pieza ya no sale con «A question worth exploring»: sale la frase clave de su post (y su pregunta, si la hace) en una tarjeta sin cifras; si no, la foto que propuso el editor visual; y solo si el post no tiene ninguna frase que sirva, la tarjeta genérica de marca.
+- **Implementación backend:** `imagenes.fallback` → `content_card` (plantilla `cita`, modo `tarjeta_contenido`; frases de 4 a 24 palabras sin cifras, enlaces, menciones ni llamadas a seguir, tal cual las dice el post) → `fallback_photo` (solo si la elección traía fotos con su alt; modo `foto_respaldo`) → `brand_card` (modo `fixed_brand_card`). Cada respaldo guarda `fallback: {level, reason}` en la revisión y una auditoría `editorial.image_fallback`. `imagenes.fallback_counts` los cuenta y `operador respaldos-imagen` los muestra.
+- **Cuántos respaldos se esperan:** solo un fallo de verdad que persiste tras la corrección (una cifra que es la lámina sin fuente, un dato privado, un texto que no cabe aun acortado) o un proveedor caído llevan al respaldo, y casi siempre a la frase del post. La tarjeta genérica queda para posts sin ninguna frase de 4 a 24 palabras sin cifras ni enlaces, sin foto propuesta: se estima por debajo del 5 % de las piezas (estimación, sin medir todavía en producción).
+- **Comando:** `python manage.py operador --usuario <admin> respaldos-imagen --cuenta <uuid> [--dias 30]`.
+- **Criterios de aceptación:**
+  1. **Dado** cada uno de los tres motivos reales, **cuando** se prepara la imagen, **entonces** sale una imagen con contenido (el diseño corregido o la frase del post), no la tarjeta genérica.
+  2. **Dado** un post sin ninguna frase que sirva y sin foto propuesta, **cuando** no pasa ningún diseño, **entonces** sale la tarjeta genérica y queda contada como último recurso.
+- **Cobertura QA:** `test_infografias_libres.RealReasonsFlowTests`, `ContentCardTests`; `test_imagenes.ImageWorkflowTests` y `test_editor_visual` (respaldo sin claves).
+
+### IMG-INF-14 · Una investigación propia para la imagen <a id="img-inf-14"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Interruptor:** `INFOGRAFIA_INVESTIGACION`, apagado por defecto.
+- **Qué hace para Gustavo:** si la pieza no trae ningún dato con fuente que una imagen pueda mostrar, el equipo busca una vez en la web un dato reciente o un caso real sobre la tesis, con su fuente y fecha, para que la infografía lo enseñe.
+- **Implementación backend:** `imagenes.research_for_image`, llamado por el director antes de pedirle la imagen al editor visual (`editorial._visual`, una línea). Usa el mismo arco `investigar_pieza` de la pieza (1 por ciclo), su reserva y sus topes. Solo corre si la reserva de la investigación (~0,83 USD con la configuración actual) **y** la de la etapa de imagen que viene después (~0,39 USD; 0,45 un carrusel) caben en lo que queda del ciclo (`pieza_diaria`, tope 8 USD) y en el presupuesto de IA del día; si no, se salta y lo anota en `usage` (`investigacion_imagen`), así nunca detiene el ciclo. La pregunta pasa por `research.safe_question`. No corre si el director ya usó la investigación de la pieza ni en fotos.
+- **Criterios de aceptación:**
+  1. **Dado** el interruptor apagado, **cuando** se prepara la imagen, **entonces** no hay ninguna búsqueda.
+  2. **Dado** que no cabe en el ciclo o en el presupuesto, **cuando** se prepara, **entonces** se salta con el motivo.
+  3. **Dado** que el ciclo se reanuda, **cuando** vuelve a pasar, **entonces** no se repite la búsqueda ni se duplica la fuente.
+- **Cobertura QA:** `test_infografias_libres.ImageResearchTests` (con la investigación simulada).
+
+### IMG-INF-15 · Rehacer las piezas que salieron con la tarjeta genérica <a id="img-inf-15"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** «ayúdame a corregir las piezas que ya tienen esa infografía genérica»: lista las piezas no publicadas con la tarjeta genérica y, si se confirma, rehace su imagen; la nueva versión pasa por el líder a la misma hora.
+- **Comando:** `python manage.py operador --usuario <admin> rehacer-tarjetas --cuenta <uuid>` (solo lista, con el costo estimado y el presupuesto que queda) y el mismo con `--confirmar` (llamadas pagadas).
+- **Implementación backend:** `retoque.redo_plan`, `redo_images` y `redo_image`, sobre la maquinaria de los retoques (ciclo `retoque_pieza`): la versión abierta se reemplaza, la imagen se diseña otra vez con sus respaldos, el paquete visual se vuelve a atar y se crea una versión nueva para el líder. No había una ruta «Rehecha a petición de Gustavo / image_review.redo» en el código: se construyó sobre los retoques.
+- **Criterios de aceptación:**
+  1. **Dado** una pieza ya publicada, **cuando** se lista, **entonces** dice «publicada, no se puede cambiar» (LinkedIn no permite cambiar la imagen de un post).
+  2. **Dado** una pieza a menos del plazo de veto de su hora, una sin versión pendiente o sin revisiones del líder en su ciclo, **cuando** se lista, **entonces** se omite y dice por qué.
+  3. **Dado** que no queda presupuesto de IA para su estimación, **cuando** se confirma, **entonces** no se toca.
+  4. **Dado** un fallo después de reemplazar la versión, **cuando** termina, **entonces** la pieza queda bloqueada con el motivo, como un retoque fallido.
+- **Cobertura QA:** `test_infografias_libres.RedoBrandCardsTests`.
 
 ## Retiradas
 

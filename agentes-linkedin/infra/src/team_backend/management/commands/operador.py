@@ -68,6 +68,12 @@ class Command(BaseCommand):
         cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
         cola.add_argument('--cuenta',required=True);cola.add_argument('--antes',required=True,help='Fecha y hora ISO con zona, por ejemplo 2026-11-12T20:40:00+00:00')
         cola.add_argument('--confirmar',action='store_true')
+        tar=sub.add_parser('rehacer-tarjetas',help='Piezas cuya imagen es la tarjeta genérica de marca: las lista con el costo '
+                           'estimado; con --confirmar rehace cada imagen (llamadas pagadas) y la nueva versión pasa por el líder. '
+                           'Las ya publicadas no se pueden cambiar')
+        tar.add_argument('--cuenta',required=True);tar.add_argument('--confirmar',action='store_true')
+        resp=sub.add_parser('respaldos-imagen',help='Cómo salieron las imágenes (diseño o qué respaldo) y por qué, en los últimos días')
+        resp.add_argument('--cuenta',required=True);resp.add_argument('--dias',type=int,default=30)
         reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública, descartados con un nivel que no es no_encaja (el fit del modelo, 18/11/2026) o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
         reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
         sub.add_parser('preguntas-casos-projectapp',help='Encola en Tu turno las preguntas a Gustavo sobre los dos casos reales de '
@@ -152,6 +158,38 @@ class Command(BaseCommand):
         ind.add_argument('--empresas',default='',help='Empresas semilla separadas por comas (p. ej. "Imagine Apps,Northwind Labs"): se buscan sus fundadores y van primero')
         ind.add_argument('--perfiles',default='',help='Perfiles semilla separados por comas (URL linkedin.com/in/... o identificador): se miden primero con los mismos criterios')
         ind.add_argument('--informe',action='store_true',help='Solo imprime el embudo de las búsquedas de industria de este mes (no encola nada)')
+        est=sub.add_parser('estado-flujos',help='El estado de cada flujo y sus etapas, como llega a Slack (solo lectura). Sin '
+                           '--enviar solo lo imprime')
+        est.add_argument('--enviar',action='store_true',help='Además lo envía al canal de resúmenes de Slack (una vez por minuto)')
+        est.add_argument('--manana',action='store_true',help='La versión corta de la mañana')
+        est.add_argument('--miembro',default=None,help='Usuario de Django de un miembro (por defecto, cada miembro activo)')
+
+    def flows(self,o):
+        """estado-flujos: the report of flujos.py for each active member (or --miembro), printed; --enviar also sends it
+        to the summaries channel, once per local minute (a retried command does not send it twice)."""
+        from django.utils import timezone
+        from team_backend import alertas_slack, flujos, miembros
+        from team_backend.models import Member
+        now=timezone.now()
+        if o['miembro']:
+            member=Member.objects.filter(user__username=o['miembro'],active=True).first()
+            if member is None:raise CommandError(f'«{o["miembro"]}» no es un miembro activo.')
+            members=[member]
+        else:members=miembros.active_members()
+        several=len(miembros.active_members())>1
+        for member in members:
+            text=flujos.text_for(now,member,morning=o['manana'])
+            if several and member is not None:text=alertas_slack.named(text,member)
+            self.stdout.write(text)
+            self.stdout.write('')
+            if not o['enviar']:continue
+            key=f'estado:manual:{now.astimezone(operador.local_tz()):%Y%m%d%H%M}'+(f':{member.pk}' if member is not None else '')
+            if not alertas_slack.webhook('resumen'):
+                self.stdout.write('No se envió: Slack no está configurado (SLACK_WEBHOOK_RESUMEN o SLACK_WEBHOOK_URL).')
+            elif alertas_slack.send(key,text,now,once='ever',channel='resumen',immediate=True):
+                self.stdout.write('Enviado al canal de resúmenes de Slack.')
+            else:self.stdout.write('No se envió: ya salió en este minuto.')
+        if not o['enviar']:self.stdout.write('Solo impreso: con --enviar también va a Slack.')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -202,6 +240,9 @@ class Command(BaseCommand):
             if o['accion']=='hecho-empresa':
                 self.company_facts(user,o)
                 return
+            if o['accion']=='estado-flujos':
+                self.flows(o)
+                return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp
                 from team_backend import miembros as org
@@ -241,6 +282,38 @@ class Command(BaseCommand):
                 result=red.requeue(user,account,before,confirm=o['confirmar'])
                 self.stdout.write(f"En cola clasificadas antes de {before.isoformat()}: {result['found']}. "+
                                   (f"Devueltas al clasificador: {result['requeued']}." if o['confirmar'] else 'Con --confirmar vuelven al clasificador.'))
+            elif o['accion']=='rehacer-tarjetas':
+                from team_backend import editorial, retoque
+                plan=retoque.redo_images(user,account,confirm=o['confirmar'])
+                todo=[r for r in plan if r['action']=='rehacer']
+                labels={'rehacer':'se rehace','omitir':'se omite','publicada':'publicada, no se puede cambiar',
+                        'rehecha':'rehecha','fallida':'falló'}
+                self.stdout.write(f'Piezas con la tarjeta genérica: {len(plan)}.')
+                for row in plan:
+                    piece=row['piece'];when=piece.scheduled_for.astimezone(operador.local_tz())
+                    detail=f' · {row["why"]}' if row['why'] else ''
+                    if row.get('scheduled_for'):detail+=f' · sale {row["scheduled_for"].astimezone(operador.local_tz()):%d/%m %H:%M}'
+                    self.stdout.write(f'  {when:%Y-%m-%d %H:%M} pieza {piece.id}: {labels.get(row["action"],row["action"])}{detail}')
+                if not o['confirmar']:
+                    total=sum(r['estimate_usd'] for r in todo)
+                    self.stdout.write(f'Costo estimado (reserva máxima de diseño y revisión visual): {total:.2f} USD para '
+                                      f'{len(todo)} pieza(s); presupuesto de IA que queda: {editorial.budget_left():.2f} USD.')
+                    self.stdout.write('Sin --confirmar no se cambia nada.')
+                else:
+                    self.stdout.write(f"Rehechas: {sum(r['action']=='rehecha' for r in plan)}; "
+                                      f"fallidas: {sum(r['action']=='fallida' for r in plan)}.")
+            elif o['accion']=='respaldos-imagen':
+                from datetime import timedelta
+                from django.utils import timezone
+                from team_backend import imagenes
+                since=(timezone.now()-timedelta(days=max(1,o['dias']))).date()
+                counts=imagenes.fallback_counts(account,since)
+                names={'diseño':'diseño propio','contenido':'tarjeta con la frase del post','foto':'foto de la galería',
+                       'marca':'tarjeta genérica de marca','sin imagen':'sin imagen lista'}
+                self.stdout.write(f"Imágenes desde {since:%Y-%m-%d}: {counts['total']}.")
+                for level,n in sorted(counts['by_level'].items(),key=lambda x:-x[1]):
+                    self.stdout.write(f'  {names.get(level,level)}: {n}')
+                for reason,n in counts['reasons']:self.stdout.write(f'  · {n}× {reason}')
             elif o['accion']=='reevaluar-compradores':
                 from team_backend import nivel_comprador
                 result=nivel_comprador.reevaluate(user,account,confirm=o['confirmar'])

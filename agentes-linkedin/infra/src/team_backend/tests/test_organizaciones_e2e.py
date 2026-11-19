@@ -32,6 +32,7 @@ import io
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -1158,7 +1159,9 @@ class VigilantesTests(OperatorBase):
         alertas_slack.vigilar(self.now, force=True)
         sent = set(AuditEvent.objects.filter(action='slack.alert').values_list('target', flat=True))
         self.assertTrue({key for _, key, text in both if text != '<lazy>'} <= sent)
-        self.assertEqual(len(self.sent), len(sent))
+        # One message per alert; a long one (the flows' report) goes in parts, each after the first saying «(sigue N/M)».
+        firsts = [text for text in self.sent if not re.search(r'\(sigue \d+/\d+\)$', text.split('\n', 1)[0])]
+        self.assertEqual(len(firsts), len(sent))
 
 
 # ====================================================================== phase 3: the identity out of the code
