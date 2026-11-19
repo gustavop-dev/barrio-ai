@@ -660,6 +660,7 @@ class ProfileReadPoolTests(NetworkBase):
         with self.assertRaises(operador.ProfileReadCapReached):
             operador.reserve_profile_read(self.account,'metrics',self.EVENING-timedelta(minutes=1))  # 48 actions left untouched
         operador.reserve_profile_read(self.account,'metrics',self.EVENING)  # after it, what the actions left is research's too
+        self.assertEqual(operador.profile_read_pools(self.member,self.EVENING)['investigacion'],{'tope':32,'usadas':33})
 
     def test_the_share_is_each_members_and_validated(self):
         self.assertEqual((operador.research_share(self.member),operador.profile_read_pools(self.member,self.MORNING)['investigacion']['tope']),(0.4,32))
@@ -692,7 +693,8 @@ class ProfileReadPoolTests(NetworkBase):
         follow=operador.create_proposal(self.gustavo,None,'RED-01',{'user_id':other.provider_user_id},contact=other,citations=red.NETWORK_UNITS)
         follow.state='approved';follow.approved_hash=follow.payload_hash;follow.review={'decision':'approve'};follow.save()
         with patch('django.utils.timezone.now',return_value=self.MORNING):operador.execute(self.gustavo,follow.id)
-        red._look(follow,self.fake_connector(),step='conciliacion')
+        with patch('django.utils.timezone.now',return_value=self.MORNING+timedelta(hours=1)):
+            red._look(follow,self.fake_connector(),step='conciliacion')
         steps=[(e.metadata['purpose'],e.metadata.get('step'),e.metadata['pool'])
                for e in AuditEvent.objects.filter(action='operator.profile_read').order_by('created_at','id')]
         self.assertEqual(steps,[('preflight',None,'acciones'),('execution','confirmacion','acciones'),('execution','conciliacion','acciones')])
