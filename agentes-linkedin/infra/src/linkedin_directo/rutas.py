@@ -144,8 +144,15 @@ def unescape(html):
     return html.replace('\\"', '"')
 
 
+# A JavaScript `\xHH` escape inside a script string: valid for the page, not for JSON (which only knows `\uHHHH`).
+JS_HEX = re.compile(r'(?<!\\)((?:\\\\)*)\\x([0-9A-Fa-f]{2})')
+
+
 def templates(text, request_id):
-    """Every ready-made request with this requestId in a page or component stream (dicts, in page order)."""
+    """Every ready-made request with this requestId in a page or component stream (dicts, in page order). Since
+    2026-11-19 the createComment request carries `optimisticKey` with a `\x3C` in it, and every comment stopped with
+    «la página no trae la caja de comentarios»: the page's JavaScript escapes are read as the JSON ones they mean."""
+    text = JS_HEX.sub(lambda m: m.group(1) + '\\u00' + m.group(2), text)
     found, decoder = [], json.JSONDecoder()
     for m in re.finditer(r'\{"requestId":"' + re.escape(request_id) + '"', text):
         try:
