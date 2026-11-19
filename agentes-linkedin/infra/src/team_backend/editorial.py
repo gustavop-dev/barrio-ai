@@ -996,6 +996,7 @@ def _story_research(piece,strategy):
 def _visual(piece,public,private):
     """The director requests tools sequentially; specialists never dispatch nested calls."""
     piece.stage='visual';piece.save(update_fields=['stage','updated_at'])
+    imagenes.research_for_image(piece)  # a datum or case for the image (INFOGRAFIA_INVESTIGACION, off by default)
     runtime=orquestacion.current()
     make_request=lambda:editor_visual.request(piece,public,private)
     request=runtime.snapshot('visual_input',make_request) if runtime else make_request()

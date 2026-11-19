@@ -11,13 +11,14 @@ from .models import GalleryPhoto
 from .orquestacion_schemas import ARRAY, OBJECT, STRING, obj
 
 
-# gustavo_request (the stored name of the member's own request, keyed for her in the message) is optional: requests
-# snapshotted before it existed still validate when a cycle resumes.
+# gustavo_request (the stored name of the member's own request, keyed for her in the message), recent_layouts (what the
+# account's last images looked like, not to repeat one) and referent_visual (the visual resource of the referent post
+# behind the piece, a label only) are optional: requests snapshotted before them still validate when a cycle resumes.
 REQUEST_SCHEMA = obj(('piece', 'text_sha256', 'context_sha256', 'post', 'brief', 'gallery', 'public_facts', 'sources'),
     piece=STRING, text_sha256=STRING, context_sha256=STRING, post=STRING, brief=OBJECT,
-    gallery=ARRAY, public_facts=ARRAY, sources=ARRAY, gustavo_request=ARRAY)
+    gallery=ARRAY, public_facts=ARRAY, sources=ARRAY, gustavo_request=ARRAY, recent_layouts=ARRAY, referent_visual=STRING)
 PROPOSAL_SCHEMA = obj(('text_sha256', 'context_sha256', 'choice', 'mode', 'reason'),
-    text_sha256=STRING, context_sha256=STRING, choice=infografias.CHOICE_SCHEMA,
+    text_sha256=STRING, context_sha256=STRING, choice=infografias.CHOICE_CONTRACT,
     mode={'type': 'string', 'enum': ['model', 'fallback']}, reason=STRING)
 PACKAGE_SCHEMA = obj(('text_sha256', 'context_sha256', 'media', 'images', 'design', 'review'),
     text_sha256=STRING, context_sha256=STRING, media=OBJECT, images=ARRAY, design=OBJECT, review=OBJECT)
@@ -30,7 +31,17 @@ y comentarios): si pide un formato (carrusel, infografía, su foto), ese es el f
 leen en orden) cuando el post avanza por partes: pasos de un proceso, una lista de errores, lecciones o señales, antes
 y después, un marco con sus piezas o varias opciones comparadas. Infografia cuando lo protagoniza un dato o una frase;
 preguntas para la audiencia (o preguntas y respuestas rápidas que pida {nombre}) llevan infografia, con su plantilla
-preguntas. Galería vacía o sin foto pertinente: infografia o carrusel, según cómo avance el texto. Usa solo fotos
+preguntas. Galería vacía o sin foto pertinente: infografia o carrusel, según cómo avance el texto.
+La imagen amplía el post: aporta algo que el texto no dice ya (un dato con fuente, un caso real, una comparación, los
+pasos o preguntas que llevan la idea más lejos), siempre sobre su tesis; nunca relleno genérico.
+Para una infografia elige también layout, la plantilla de la imagen única según el contenido: numero (un dato
+protagonista), barras (hasta cinco cantidades), linea (una evolución en el tiempo), tabla (varias cosas con los mismos
+atributos), comparacion (antes y después, o dos opciones), pasos (un proceso), lista (puntos sin orden de proceso),
+preguntas (preguntas para la audiencia) o portada (una frase protagonista); alternatives lista las otras que también
+encajan, la mejor primero. Las que llevan cifras (numero, barras, linea) necesitan un dato con fuente en public_facts o
+sources. recent_layouts son las imágenes recientes de la cuenta, la última primero: no repitas el layout de la última
+si otro encaja. referent_visual es el recurso visual del post de referente que inspiró la pieza (una pista, no una
+orden). En foto y carrusel, layout va vacío. Usa solo fotos
 ofrecidas, como máximo ocho y sin repetir. Lee notas, uso previo y permiso de edición; prefiere las fotos de la propuesta si son pertinentes.
 Alt describe la foto en inglés sin inventar experiencias. instruction cita literalmente la nota.
 No editar impide cualquier retoque. Una edición que {nombre} pide en la nota de su foto (fondo o lugar, peinado,
@@ -164,24 +175,90 @@ def request(piece, public, private):
     return {'piece': str(piece.id), 'text_sha256': imagenes.sha(piece.final_text.encode()),
         'context_sha256': context_hash(piece, public, private, photos), 'post': piece.final_text,
         'brief': piece.brief, 'gallery': photos, 'public_facts': public, 'sources': research.editorial_sources(piece),
-        'gustavo_request': piece_request(piece.id)}
+        'gustavo_request': piece_request(piece.id), 'recent_layouts': recent_layouts(piece),
+        'referent_visual': referent_visual(piece)}
+
+
+RECENT = 5
+
+
+def recent_layouts(piece):
+    """The account's last images before this piece (ready or published), the last first: {date, kind, layout}."""
+    from .models import EditorialPiece
+    rows = (EditorialPiece.objects.filter(account=piece.account, slot_date__lte=piece.slot_date)
+            .exclude(pk=piece.pk).exclude(image_kind='').filter(state='ready')
+            .order_by('-slot_date', '-scheduled_for')[:RECENT])
+    return [{'date': p.slot_date.isoformat(), 'kind': p.image_kind,
+             'layout': infografias.layout_of(p.image_kind, p.image_spec)} for p in rows]
+
+
+def _referent_refs(piece):
+    """Where a brief may name the referent post behind it, read defensively (the field's name is not settled): any brief
+    key with «referent» in it (a string, an object with an id or a list of them), the evidence of kind observed_post or
+    referent_outlier, and the signals it used. Absent: no hint."""
+    brief = piece.brief if isinstance(piece.brief, dict) else {}
+    refs = []
+
+    def add(value):
+        if isinstance(value, str) and value.strip():
+            refs.append(value.strip())
+        elif isinstance(value, dict):
+            for key in ('id', 'ref', 'post_id', 'observed_post', 'post'):
+                add(value.get(key)) if isinstance(value.get(key), str) else None
+        elif isinstance(value, list):
+            for item in value[:10]:
+                add(item)
+
+    for key, value in brief.items():
+        if 'referent' in str(key).lower():
+            add(value)
+    for item in [*(brief.get('evidence') or []), *([brief['audience_evidence']] if isinstance(brief.get('audience_evidence'), dict) else [])]:
+        if isinstance(item, dict) and item.get('kind') in ('observed_post', 'referent_outlier'):
+            add(item.get('ref'))
+    add([s.get('id') for s in piece.signals or [] if isinstance(s, dict)])
+    return list(dict.fromkeys(refs))
+
+
+def referent_visual(piece):
+    """The visual resource (ObservedPost.media: image, video, document…) of the first referent post behind the piece
+    that has one known, as a label; '' when none."""
+    import uuid
+    from .models import ObservedPost
+    for ref in _referent_refs(piece):
+        try:
+            query = {'id': uuid.UUID(ref)}
+        except ValueError:
+            query = {'provider_post_id': ref}
+        media = ObservedPost.objects.filter(**query).exclude(media='').values_list('media', flat=True).first()
+        if media:
+            return str(media)[:20]
+    return ''
 
 
 def fallback(request, reason):
     # Preserve IMG's original choice when the selector is unavailable; IMG retains its own fallback ladder.
     choice = request['brief'].get('image') or {'kind': 'infografia', 'reason': 'Tarjeta de marca disponible sin claves', 'photos': []}
     try:
-        infografias.schema_check(choice, infografias.CHOICE_SCHEMA)
+        infografias.check_choice(choice)
     except (ValueError, TypeError, KeyError):
         choice = {'kind': 'infografia', 'reason': 'Elección inicial inválida; alternativa de IMG', 'photos': []}
     return {'text_sha256': request['text_sha256'], 'context_sha256': request['context_sha256'],
             'choice': choice, 'mode': 'fallback', 'reason': reason}
 
 
-def system(member=None):
-    """The selector's instructions for the piece's member, with the infographic rule."""
+CANVAS = '''
+lienzo es otro layout posible de la infografia: un documento HTML y CSS libre que escribe el diseñador cuando ninguna
+plantilla le hace justicia al contenido (un esquema, un mapa, una composición propia). El código lo valida y lo dibuja;
+si no pasa, sale una plantilla. Úsalo con criterio, no por defecto.'''
+
+
+def system(member=None, canvas=None):
+    """The selector's instructions for the piece's member, with the infographic rule (and the free canvas while
+    INFOGRAFIA_LIENZO is on: `canvas` None reads the switch)."""
+    from . import lienzo
     ident = identidad.of(member)
-    return infografias.with_rule(ident.render(SYSTEM), ident.name)
+    canvas = lienzo.enabled() if canvas is None else canvas
+    return infografias.with_rule(ident.render(SYSTEM + (CANVAS if canvas else '')), ident.name)
 
 
 def propose(request):
@@ -191,13 +268,31 @@ def propose(request):
     ident = identidad.of_account(EditorialPiece.objects.select_related('account').get(pk=request['piece']).account)
     message = [{'type': 'text', 'text': json.dumps(ident.keyed(request, values=False), ensure_ascii=False, default=str)}]
     message += imagenes.previews(request['gallery'])
-    answer = providers.claude(system(ident), message,
-        output_schema=infografias.CHOICE_SCHEMA, max_tokens=2400,
+    from . import lienzo
+    canvas = lienzo.enabled()
+    answer = providers.claude(system(ident, canvas), message,
+        output_schema=infografias.choice_schema(canvas), max_tokens=2400,
         model=imagenes.connector.VISION_MODEL, effort='low', purpose='editorial-visual')
-    choice = json.loads(answer['text'])
-    infografias.schema_check(choice, infografias.CHOICE_SCHEMA)
+    choice = settle_layout(infografias.check_choice(json.loads(answer['text'])), request.get('recent_layouts') or [], canvas)
     return {'text_sha256': request['text_sha256'], 'context_sha256': request['context_sha256'],
             'choice': choice, 'mode': 'model', 'reason': choice['reason']}
+
+
+def settle_layout(choice, recent, canvas=False):
+    """The layout as the code holds it: only an infographic has one (a photo or a carousel: ''), the canvas only while
+    the switch is on, and never the last image's layout again when one of the alternatives also fits."""
+    choice = dict(choice, layout=choice.get('layout') or '', alternatives=list(choice.get('alternatives') or []))
+    if choice['kind'] != 'infografia':
+        return dict(choice, layout='', alternatives=[])
+    others = [x for x in dict.fromkeys(choice['alternatives']) if x and x != choice['layout'] and (canvas or x != 'lienzo')]
+    if choice['layout'] == 'lienzo' and not canvas:
+        choice['layout'] = others.pop(0) if others else ''
+    last = recent[0].get('layout') if recent and recent[0].get('kind') == 'infografia' else ''
+    if last and choice['layout'] == last and others:
+        choice['reason'] = (choice['reason'] + f' Se evita repetir {last}, el layout de la imagen anterior: {others[0]}.').strip()
+        choice['layout'], others = others[0], [last, *others[1:]]
+    choice['alternatives'] = others
+    return choice
 
 
 def accept(piece, proposal, public, private):
