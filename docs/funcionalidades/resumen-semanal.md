@@ -43,7 +43,7 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** los números del resumen salen de la base, no del modelo, y un dato que falta nunca se presenta como cero.
-- **Código:** `resumen_semanal.stats`, `week_stats`, `compare`, `data_warnings`.
+- **Código:** `resumen_semanal.stats`, `week_stats`, `compare`, `data_warnings`, `molds` (`moldes.comparison`).
 - **Criterios de aceptación:**
   1. **Dado** una semana, **cuando** se calculan las cifras, **entonces** traen las secciones `publicaciones`, `comentarios`, `red`, `oportunidades`, `conversaciones`, `capturas`, `gasto_ia`, `lider`, `pausas_y_bloqueos` y `compuertas` ([EDI-28](motor-editorial.md#edi-28)), cada una `{disponible: true, …}` o `{disponible: false, motivo}`.
   2. **Dado** `INBOX_ENABLED=false`, **cuando** se calculan, **entonces** `conversaciones` es `{disponible: false, motivo}`, no ceros.
@@ -52,8 +52,9 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
   5. **Dado** `comparacion`, **cuando** el valor anterior es 0 o falta, **entonces** `variacion_pct` es `null`.
   6. **Dado** la estrategia GASP ([EDI-29](motor-editorial.md#edi-29)), **cuando** se calculan, **entonces** `por_tipo` trae por tipo los posts publicados y medidos a 72 h, sus medianas de impresiones e interacción, los comentarios con sustancia y lo que más respondió la audiencia (primera línea, qué necesitaba el lector y la señal); sin posts con tipo es `{disponible: false, motivo}`. `plan_siguiente` dice qué señales de la audiencia movieron el plan de la semana siguiente, o que aún no tiene plan.
   7. **Dado** la fase 6 del comprador encendida (`BUYER_REPLY_ENABLED`, [BAR-23](red.md#bar-23)), **cuando** se calculan, **entonces** `comprador` trae la lectura determinista del embudo al cierre de la semana (`lectura_embudo`): la tabla de LI-12-M001-K04, la primera etapa que se rompe, su causa y un solo cambio, `muestra_chica` con menos de 30 invitaciones, la actividad de la semana y los borradores pendientes frente a enviados; apagada, `{disponible: false, motivo}`. El mismo lunes, dentro de la ventana de lectura, Slack la manda al canal de resúmenes en cinco líneas como mucho.
+  8. **Dado** `REFERENTES_MOLDE=true` ([OBS-08](observatorio-referentes.md#obs-08)), **cuando** se calculan, **entonces** `moldes` compara, sobre los posts publicados en las cuatro semanas que terminan con esta, los escritos sobre el molde de un referente (`con_molde`: salió la variante A), los días en que la variante libre le ganó al molde, las fusiones y los posts sin molde, cada grupo con sus medianas de impresiones e interacción a 72 h y `muestra_pequena`; cuántas veces ganó cada variante y los resultados de cada molde (etiqueta, estado, autor, enlace). Sin posts es `{disponible: false, motivo}`; apagado, la sección no existe y las cifras son las de antes.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente; `por_tipo` y `plan_siguiente` en `tests/test_estrategia.py` (pendiente de CI)
+- **Cobertura QA:** pendiente; `por_tipo` y `plan_siguiente` en `tests/test_estrategia.py`, `moldes` en `tests/test_moldes.py` (`ComparisonTests`) (pendiente de CI)
 
 ### SEM-03 · Validador de cifras <a id="sem-03"></a>
 

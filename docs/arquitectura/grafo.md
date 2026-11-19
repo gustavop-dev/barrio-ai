@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.17-verificacion-etapa-propia` · SHA-256 `4aba14a4b2e35f8a60c305c06e32b5ca6519259e609d86b5499523ea562996c9`.
+Versión `6.18-molde-referentes` · SHA-256 `2bd6df0415bf2957a6b627d8c57fb247f9bd48583413b30f8552a2109bfeb273`.
 
 46 nodos (46 activos), 75 aristas y 17 ciclos.
 
@@ -634,7 +634,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 
 | Nombre | Tipo | Código |
 | --- | --- | --- |
-| `brief` | `json_schema` | [team_backend.editorial.BRIEF_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
+| `brief` | `json_schema` | [team_backend.editorial.BRIEF_WITH_MOLD](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
 | `variants` | `json_schema` | [team_backend.editorial.WRITER_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
 | `panel` | `json_schema` | [team_backend.editorial.PANEL_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
 | `selection` | `json_schema` | [team_backend.editorial.SELECTION_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |

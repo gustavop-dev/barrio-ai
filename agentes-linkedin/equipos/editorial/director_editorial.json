@@ -386,7 +386,8 @@
       "muestras de voz",
       "assets autorizados",
       "aprendizaje real anterior; no requisito del primer borrador",
-      "selected_reader_ids y razón de selección se fijan en editorial_brief antes de evaluación; las cinco perspectivas están disponibles, no son fan-out obligatorio"
+      "selected_reader_ids y razón de selección se fijan en editorial_brief antes de evaluación; las cinco perspectivas están disponibles, no son fan-out obligatorio",
+      "moldes de referentes (solo con REFERENTES_MOLDE): en el plan semanal, moldes.ofrecidos; en el brief diario, strategy.planned.molde (el del día) y strategy.moldes (los ofrecidos). Elige uno por id o ninguno; nunca copia el texto del referente"
     ],
     "versiones_requeridas": [
       "contexto",

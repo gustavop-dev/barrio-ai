@@ -761,6 +761,11 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 
 - Un `tipo` desconocido devuelve 404.
 - Vetar una pieza o una acción en cola es `POST /api/v1/operador/actions/<id>/reject {"note"}`. En una acción de red, descarta a la persona.
+- **Molde del día (`REFERENTES_MOLDE`, apagado por defecto).** En `GET /api/v1/estrategia/semana`, un día cuyo plan se
+  escribe sobre el molde de un post de referente trae además
+  `"molde": { "id": "molde:<uuid>", "etiqueta": "Lista anunciada · Lista · Pregunta", "estado": "sostenida" | "hipotesis", "autor": "…", "url": "enlace al post", "veces_mediana": 3.0 }`.
+  Sin molde (o con el interruptor apagado) la clave no aparece: ningún día cambia de forma. Ver
+  [OBS-08](../docs/funcionalidades/observatorio-referentes.md#obs-08).
 
 ### Personas
 
@@ -1160,7 +1165,7 @@ Cada lunes, el rol `analista_barrio_resultados` resume la semana que terminó, c
 - `automatic_at` es el lunes de la semana en curso a `WEEKLY_SUMMARY_TIME`.
 - `estimated_usd` es la mediana de los resúmenes anteriores, o una llamada típica si no hay ninguno; `max_usd`, el peor caso de la reserva.
 
-**GET `/api/v1/resultados/resumen-semanal/<id>`** devuelve un `WeeklySummary` más `stats`, las cifras con las que se escribió (ver el documento del backend).
+**GET `/api/v1/resultados/resumen-semanal/<id>`** devuelve un `WeeklySummary` más `stats`, las cifras con las que se escribió (ver el documento del backend). Con `REFERENTES_MOLDE=true`, `stats.moldes` compara los posts con molde y sin molde de las últimas cuatro semanas ([SEM-02](../docs/funcionalidades/resumen-semanal.md#sem-02)); apagado, no aparece.
 
 **POST `/api/v1/resultados/resumen-semanal/generar`** recibe `{ "request_id": "uuid" }` (opcional) y devuelve `{ "week_start", "job": Job }`:
 - 202 si encola el trabajo `weekly_summary`, que tiene coste;

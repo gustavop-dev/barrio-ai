@@ -17,6 +17,7 @@ son la fuente de verdad de cada función; este plan explica los criterios, sus u
 | 17/11/2026 | La primera búsqueda no propuso a nadie (ver [primera corrida](#primera-corrida)). Gustavo puede dar empresas o perfiles semilla, y si la búsqueda del mes terminó sin propuestas se puede repetir. |
 | 17/11/2026 | «Analizar sus posts, qué les funciona y qué no, cómo lo hacen, qué estructura usan; descomponer sus temas y su estructura». Con cifras (el post, la mediana del autor, cuántas veces), por partes, y separando lo **duradero** de lo **pasajero** (ver [qué les funciona y qué no](#analisis)). |
 | 17/11/2026 | Los referentes de industria que añadió a mano entraron como «nicho»: `operador referente --industria` y `operador referente-tipo` (ver [tipo](#tipo)). |
+| 18/11/2026 | Del análisis al post: el **molde** de un post de referente que superó con claridad la mediana de su autor (etiquetas, rango de longitud, ángulo, fuente con enlace y estado). La variante A se escribe sobre él y la B queda libre; se usa ya como hipótesis, cada autor aporta sus mejores posts frente a su propia norma, con tope por autor, y se mide con molde frente a sin molde. Detrás de `REFERENTES_MOLDE`, apagado por defecto (ver [el molde](#molde)). |
 
 ## Qué es un referente de industria
 
@@ -246,6 +247,94 @@ toda frase causal sobre «referentes»: añadirla exige cambiar su prompt y su v
 (habría que descargar cada imagen: lecturas nuevas y ≈ 0,001–0,002 USD por imagen con un modelo pequeño de visión,
 menos de 0,05 USD al día con 15 referentes, pero requiere su visto bueno) ni para temas libres.
 
+## Del post viral al post propio: el molde (regla `molde-v1`) <a id="molde"></a>
+
+`moldes.py`, decidido por Gustavo el 18/11/2026. El análisis decía qué les funciona a los referentes, pero el post del
+día no tomaba esa forma: el plan citaba un atípico como evidencia y el director escribía libre. Además la regla estricta
+(`atipico-v1`) solo deja pasar cuentas grandes, así que un competidor con números pequeños nunca aportaba nada. El molde
+lleva la forma de un post que funcionó hasta la variante A del redactor y mide si sirvió. Sin llamadas pagadas nuevas ni
+lecturas de LinkedIn: trabaja sobre lo que `operador.observe` y el análisis ya guardaron.
+
+**Qué es un molde** (solo etiquetas de un vocabulario fijo y números, nunca una frase del post):
+
+| Campo | Qué lleva |
+| --- | --- |
+| `gancho` | Tipo (pregunta, lista anunciada, historia, cifra…), palabras y si va en su propia línea. |
+| `cuerpo` | Formato (lista, historia, opinión contraria, caso, tutorial, datos, pregunta abierta, opinión), esquema por bloques e ítems de lista. |
+| `cierre` | Tipo (pregunta, llamado, enlace, resumen, afirmación). |
+| `longitud` | Banda del post y el rango que pueden cumplir los redactores (corto 600–800, medio 600–1.300, largo 1.300–1.800 caracteres; su propia regla es 600–1.800). |
+| `angulo` | Experiencia propia, caso de cliente, a contracorriente, tutorial, datos, tendencia o general. |
+| `fuente` | Id del post, referente, autor, enlace, fecha, cuántas veces su mediana, interacciones, mediana del autor y muestra. |
+| `estado` | `sostenida` si su estructura (`gancho·formato·cierre`) es una estructura sostenida del [análisis](#analisis) (≥ 3 posts, ≥ 2 autores, ≥ 2 semanas); si no, `hipotesis`, con `faltan` (qué le falta para la regla estricta: «menos de 6 posts propios de base», «menos de 20 interacciones», «post de coyuntura»…). |
+
+**Cada autor frente a su propia norma.** Cada post original de un referente, de los últimos 120 días y con ≥ 48 h, se
+compara con la mediana de los **otros** posts del mismo autor (como `atipico-v1`) con una regla más suave, solo para
+ofrecer moldes: ≥ 3 posts de base (`MOLDES_MIN_MUESTRA`) y ≥ 1,5 × su mediana (`MOLDES_MIN_VECES_MEDIANA`), sin mínimo
+absoluto de interacciones ni z. Así un competidor con 4 interacciones de norma y un post de 12 aporta ese post. Se
+descartan los anuncios de vacantes, las promociones, los que el prefiltro del líder descartó y los de coyuntura (noticia,
+fecha o lanzamiento en el propio post). La marca estricta (`ObservedPost.outlier`, `atipico-v1`) no cambia: el molde
+solo la usa para decir `atipico_estricto` y qué le falta a una hipótesis. Un post leído por dos miembros cuenta una vez.
+
+**La oferta** (`Catalog.offer`): primero un ejemplo de cada estructura sostenida; después los mejores de cada autor por
+turnos (el mejor de cada uno antes que el segundo de nadie), como mucho `MOLDES_POR_AUTOR` (2) por autor y
+`MOLDES_OFERTA` (8) en total. Referentes de industria primero; sin ninguno con molde, todos los observados (como
+`estrategia.growth_models`).
+
+**La semana.** El plan del domingo recibe `moldes.ofrecidos` y cada opción dice sobre qué molde se escribe (`molde`: un
+id ofrecido, el id de una estructura sostenida `estructura:…` o vacío si ninguno encaja con el tema: un molde nunca
+fuerza un tema). Un día basado en un atípico (`audience_evidence` `referent_outlier`) toma el molde de ese post. El día
+guarda el molde entero, con su enlace; `plan.signals.used` lo registra como una señal más (`kind: molde`, etiqueta,
+estado, autor, enlace) y el resumen semanal lo lee en `plan_siguiente`. Como mucho `MOLDES_MAX_AUTOR_SEMANA` (2) días de
+una semana sobre moldes del mismo autor: los días que Gustavo fijó o que ya se prepararon cuentan primero y el resto por
+fecha; un día que se pasa del tope conserva su idea, pierde el molde y la semana lo avisa. Cambiar el tipo de un día o
+descartar su idea le quita el molde, mover dos días lo lleva con su idea y un día que se vuelve a planear con otra idea
+no conserva el de antes. La vista de la semana (`GET /api/v1/estrategia/semana`) trae el molde de cada día mientras el
+interruptor está encendido.
+
+**El día.** El director recibe `strategy.planned.molde` (el del plan) y `strategy.moldes` (los ofrecidos, sin los
+autores que ya llenan su tope de la semana). El brief lleva `molde` solo si es el planeado o uno ofrecido: sin decir
+nada se queda el planeado, vacío es ninguno y un id inventado no cuenta. Un día sin molde en el plan puede tomar uno
+ofrecido. Sin molde, nada cambia.
+
+**Los redactores.** A y B siguen saliendo de la misma llamada `redactor` (el grafo la cuenta una vez por pieza). Esa
+llamada recibe aparte `molde_variante_a`: gancho, cuerpo, cierre, rango de longitud, ángulo, estado y la regla de uso;
+sin autor, enlace, id ni texto. La variante A se escribe sobre él con el material y la voz de Gustavo; la B queda libre.
+El brief compartido no lleva el molde, y los lectores, la selección y el verificador no saben cuál variante lo sigue:
+juzgan las dos a ciegas.
+
+**La medición.** Al elegir, la pieza guarda `selection.molde` = `{id, estado, variante: "A", decision, ganadora}` con
+`ganadora` `molde` (ganó A), `libre` (ganó B), `fusion` o `descartada`. El resumen semanal añade a sus cifras `moldes`
+sobre los posts publicados en las cuatro semanas que terminan con la del resumen: con molde (el texto publicado es la
+variante A), libre le ganó al molde, fusión y sin molde, cada grupo con la mediana de impresiones y de interacción a las
+72 h y `muestra_pequena` con menos de tres medidos; cuántas veces ganó cada variante; y por molde (etiqueta, estado,
+autor, enlace) sus duelos y los resultados de los posts que salieron con su texto. Son datos: el analista los lee como
+otra sección de `estadisticas`, sin llamada nueva.
+
+**Interruptor y variables.** `REFERENTES_MOLDE=false` por defecto. Apagado, el plan, el director y los redactores leen
+exactamente lo de antes: sus instrucciones, esquemas y pedidos son los mismos byte a byte (las huellas de
+`tests/test_identidad_prompts.py` no cambian) y un molde guardado en un plan no se usa. Encendido, el plan y el director
+reciben como mucho 8 moldes (unos 450 tokens cada uno, menos de 4.000 en total) y el redactor unos 250 tokens más.
+
+| Variable | Defecto | Para qué |
+| --- | --- | --- |
+| `REFERENTES_MOLDE` | `false` | Enciende todo lo de esta sección. |
+| `MOLDES_POR_AUTOR` | 2 | Moldes de un mismo autor en la oferta. |
+| `MOLDES_MAX_AUTOR_SEMANA` | 2 | Días de una semana sobre moldes de un mismo autor. |
+| `MOLDES_MIN_MUESTRA` | 3 | Otros posts del autor que hacen su norma. |
+| `MOLDES_MIN_VECES_MEDIANA` | 1,5 | Cuántas veces su mediana debe superar un post. |
+| `MOLDES_OFERTA` | 8 | Moldes ofrecidos al plan y al director. |
+
+**Límites conocidos.**
+
+- A y B salen de una sola llamada: B no es una ejecución independiente (como antes), aunque la instrucción dice que no
+  use el molde. Separarlas costaría una llamada pagada más por pieza y cambiar el grafo (`call_group redactor`).
+- El molde no lleva texto del referente, pero los redactores ya recibían antes `sources`: el texto (hasta 700
+  caracteres) de los posts observados que el director cita en `signals_used`, entre ellos posts de referentes. No es
+  parte del molde y no se cambió; queda como [pregunta abierta](#preguntas-abiertas).
+- La coyuntura del molde mira el propio post (noticia, fecha, lanzamiento); no la de «varios referentes nombran lo
+  mismo la misma semana», que el análisis sí usa para sus estructuras.
+- Con pocos posts publicados, la comparación es una pista (`muestra_pequena`), no una conclusión.
+
 ## Interfaz para la estrategia semanal
 
 La rama de estrategia semanal consume dos funciones de `modelos_crecimiento` (sin llamadas pagadas):
@@ -279,3 +368,6 @@ La rama de estrategia semanal consume dos funciones de `modelos_crecimiento` (si
 6. Integración con la estrategia semanal (GASP), hecha el 14/11/2026: `estrategia.growth_models` usa estos atípicos
    antes que los de los referentes observados, y `audience_questions` es la señal `audience_question` del plan y del
    director (ids `tema:<pregunta|objecion>:<tema>`). Solo etiquetas y cifras; sin llamadas pagadas nuevas.
+7. Los redactores reciben en `sources` el texto de los posts observados que cita el director (hasta 700 caracteres),
+   también de referentes: «estructura y ángulo, nunca su texto» lo cumple el molde, pero esa entrada es anterior y
+   sigue igual. ¿Se le quita el texto a los posts de referentes en `sources`?
