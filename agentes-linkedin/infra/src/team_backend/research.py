@@ -5,9 +5,11 @@ function directly. Only public questions/URLs enter the tool context, never capt
 """
 import hashlib
 import json
+import math
 import os
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
 from urllib.parse import urlsplit
@@ -16,12 +18,14 @@ from django.conf import settings
 from django.db import connection, transaction
 from django.utils import timezone
 from knowledge import providers
+from knowledge.cycle_context import CycleStopped
 from . import oficina_eventos, web_sources
 from .models import WebResearchRun
 
 STAGE_PREFIX='etapa:'  # red.check_stages: the funding stage of a buyer's startup
 
-Status=Literal['complete','partial','unavailable','skipped','running']
+# interrupted: a claimed run that never finished (an exception, a stopped cycle, a process that died); its row says why.
+Status=Literal['complete','partial','unavailable','skipped','running','interrupted']
 
 
 @dataclass(frozen=True)
@@ -66,6 +70,8 @@ class ResearchResult:
     limitations:tuple[str,...]=()
     usage:dict=field(default_factory=dict)
     schema_version:int=1
+    # Counts and reasons only (never page content): why a run ended as it did (research.inspect, _interrupt).
+    diagnostic:dict=field(default_factory=dict)
 
     def to_dict(self):
         # Plain JSON types for model fields and the future tool response schema.
@@ -77,7 +83,8 @@ class ResearchResult:
         return cls(question=value['question'],status=value['status'],researched_at=value['researched_at'],
                    findings=tuple(Finding(f['text'],tuple(f['source_ids'])) for f in value.get('findings',[])),
                    sources=tuple(Source(**s) for s in value.get('sources',[])),
-                   limitations=tuple(value.get('limitations',[])),usage=value.get('usage',{}))
+                   limitations=tuple(value.get('limitations',[])),usage=value.get('usage',{}),
+                   diagnostic=value.get('diagnostic') or {})
 
 
 RESEARCH_FIELDS={
@@ -211,32 +218,120 @@ def native_findings(answer,at):
     return findings,list(sources.values()),limitations
 
 
+def _digest(request):
+    return hashlib.sha256(json.dumps(asdict(request),sort_keys=True).encode()).hexdigest()
+
+
+def counted(runs):
+    """The runs that take a daily allowance: neither the skipped ones nor those that stopped before paying any call
+    (interrupted or refused: their diagnostic says reintentable)."""
+    # Containment, not a key lookup: a key lookup is NULL on rows without the key and NOT NULL would drop them too.
+    return runs.exclude(state='skipped').exclude(result__contains={'diagnostic':{'reintentable':True}})
+
+
+def _spent(key):
+    """Whether a provider call of this key was reserved (settled, still reserved or uncertain): its money may be gone, so
+    the key is not paid again. A call stopped before its reservation (a cycle's cost cap, its call limit) left no row."""
+    from .models import UsageEntry
+    return UsageEntry.objects.filter(request_hash=hashlib.sha256(key.encode()).hexdigest(),purpose__in=providers.RESEARCH_PURPOSES,
+                                     status__in=('reserved','complete','uncertain')).exists()
+
+
+def _interrupt(run,question,reason):
+    """Close a claimed run that did not finish, with its honest state and reason. Without a reserved provider call it spent
+    nothing: it takes no daily allowance and its key may run again (_claim reuses it). With one, the key is not repeated.
+    Never raises: the caller is already handling an exception, and recover_stale closes whatever this could not."""
+    try:
+        spent=_spent(run.key)
+        tail='' if spent else '; no llegó a pagar ninguna llamada y puede repetirse'
+        result=ResearchResult(question,'interrupted',run.created_at.isoformat(),limitations=(f'Interrumpida: {reason}{tail}',),
+                              diagnostic={'motivo':'interrumpida','causa':reason,'reintentable':not spent})
+        WebResearchRun.objects.filter(pk=run.pk,state='running').update(state='interrupted',result=result.to_dict())
+        return result
+    except Exception:
+        return None
+
+
+def _why(exc):
+    """A short, content-free reason for an interruption: a provider body or a URL never reaches the stored row."""
+    if isinstance(exc,CycleStopped):return f'el ciclo se detuvo ({str(exc)[:60]})'
+    if isinstance(exc,(KeyboardInterrupt,SystemExit)):return 'el proceso se detuvo'
+    return f'error inesperado ({type(exc).__name__})'
+
+
+STALE_REASON='el proceso terminó sin cerrarla'
+
+
+def _stale(run,now=None):
+    return run.state=='running' and run.created_at<(now or timezone.now())-timedelta(minutes=settings.WEB_RESEARCH_STALE_MINUTES)
+
+
+def recover_stale(now=None):
+    """Runs left `running` by a process that died (no exception handler ran) are closed as interrupted after
+    WEB_RESEARCH_STALE_MINUTES. The worker's reconciliation (jobs.reconcile_interrupted) calls it on every loop."""
+    cutoff=(now or timezone.now())-timedelta(minutes=settings.WEB_RESEARCH_STALE_MINUTES)
+    closed=0
+    for run in WebResearchRun.objects.filter(state='running',created_at__lt=cutoff).order_by('created_at')[:50]:
+        closed+=_interrupt(run,'',STALE_REASON) is not None
+    return closed
+
+
 def _claim(request,question):
     """Serialize quota and idempotency decisions; release the DB lock before any network operation."""
     from .operador import period_starts
-    digest=hashlib.sha256(json.dumps(asdict(request),sort_keys=True).encode()).hexdigest()
+    digest=_digest(request)
     with transaction.atomic():
         with connection.cursor() as cursor:cursor.execute('SELECT pg_advisory_xact_lock(103510)')
         old=WebResearchRun.objects.filter(pk=request.key).first()
         if old:
             if old.request_hash!=digest:
                 return None,ResearchResult(question,'skipped',timezone.now().isoformat(),limitations=('La clave ya pertenece a otra investigación; no se repite',))
-            if old.result:return None,ResearchResult.from_dict(old.result)
-            return None,ResearchResult(question,'running',old.created_at.isoformat(),limitations=('Investigación en curso o interrumpida; no se repite el gasto',))
+            if _stale(old):
+                _interrupt(old,question,STALE_REASON);old.refresh_from_db()
+            retry=old.state!='running' and ((old.result or {}).get('diagnostic') or {}).get('reintentable') is True
+            if old.result and not retry:return None,ResearchResult.from_dict(old.result)
+            if not retry:
+                return None,ResearchResult(question,'running',old.created_at.isoformat(),limitations=('Investigación en curso o interrumpida; no se repite el gasto',))
         day,_=period_starts()
         # The network's stage checks of buyers (red.check_stages, keys etapa:) have their own daily allowance and do not
         # take the editorial research of the day.
         stage=request.key.startswith(STAGE_PREFIX)
         runs=WebResearchRun.objects.filter(created_at__gte=day,key__startswith=STAGE_PREFIX) if stage else \
             WebResearchRun.objects.filter(created_at__gte=day).exclude(key__startswith=STAGE_PREFIX)
-        count=runs.exclude(state='skipped').count()
+        count=counted(runs).exclude(pk=request.key).count()
         limit=int(os.environ.get('NETWORK_STAGE_CHECKS_PER_DAY','6')) if stage else settings.WEB_RESEARCH_DAILY_LIMIT
-        run=WebResearchRun.objects.create(key=request.key,request_hash=digest)
+        if old:
+            # A run that stopped before paying anything runs again under its key, as a run of today.
+            run=old;run.state='running';run.created_at=timezone.now();run.result={}
+            run.save(update_fields=['state','created_at','result'])
+        else:run=WebResearchRun.objects.create(key=request.key,request_hash=digest)
         if count>=limit:
             result=ResearchResult(question,'skipped',run.created_at.isoformat(),limitations=('Límite diario de investigaciones alcanzado',))
             run.state='skipped';run.result=result.to_dict();run.save(update_fields=['state','result'])
             return None,result
         return run,None
+
+
+def worst_case_usd(web,message):
+    """The reserve providers.claude will make for this research, estimated before claiming it: the server tools'
+    instructions (WEB_TOOLS_INPUT_TOKENS) plus the system prompt and the message at three characters a token."""
+    tokens=settings.WEB_TOOLS_INPUT_TOKENS+math.ceil(len(SYSTEM+message)/3)
+    return providers.reservation_usd(settings.WEB_RESEARCH_MODEL,tokens,settings.WEB_RESEARCH_MAX_TOKENS,web)
+
+
+def _no_room(web,message,question,at):
+    """Inside a cycle, a research whose reserve does not fit what the cycle has left is skipped before it claims a run
+    (no row, no daily allowance): reserving it would stop the whole cycle with cost_cap and leave the run behind."""
+    from .orquestacion import headroom
+    room=headroom()
+    if room is None:return None
+    usd,calls=room
+    need=worst_case_usd(web,message)
+    if calls<1:why='el ciclo ya no admite más llamadas al proveedor'
+    elif need>usd:why=f'su reserva ({need:.2f} USD) no cabe en lo que le queda al ciclo ({max(usd,Decimal(0)):.2f} USD)'
+    else:return None
+    return ResearchResult(question,'skipped',at,limitations=(f'No se inició la investigación: {why}',),
+                          diagnostic={'motivo':'presupuesto_ciclo','reserva_estimada_usd':f'{need:.4f}','restante_usd':f'{usd:.4f}'})
 
 
 def research(request:ResearchRequest)->ResearchResult:
@@ -253,9 +348,24 @@ def research(request:ResearchRequest)->ResearchResult:
     search=request.search and not blocked_search
     try:web_sources.live_web()
     except ValueError:return ResearchResult(question,'skipped',at,limitations=('Investigación web desactivada',))
+    web=providers.WebTools(settings.WEB_SEARCH_TOOL_TYPE,settings.WEB_FETCH_TOOL_TYPE,
+        settings.WEB_SEARCH_MAX_USES if search else 0,settings.WEB_FETCH_MAX_USES,
+        settings.WEB_FETCH_MAX_CONTENT_TOKENS,settings.WEB_SEARCH_RESERVED_TOKENS,Decimal(settings.WEB_SEARCH_USD_PER_REQUEST))
+    if search or request.urls:
+        skipped=_no_room(web,json.dumps({'public_question':question,'public_urls':list(request.urls)},ensure_ascii=False),question,at)
+        if skipped:return skipped
     run,cached=_claim(request,question)
     if cached is not None:return cached
-    at=run.created_at.isoformat();sources=[];findings=[];limitations=[];usage={}
+    try:
+        return _run(request,run,question,search,blocked_search,web)
+    except BaseException as exc:
+        # An exception, a stopped cycle or a stopped process never leaves the run `running` (it held its key forever).
+        _interrupt(run,question,_why(exc))
+        raise
+
+
+def _run(request,run,question,search,blocked_search,web):
+    at=run.created_at.isoformat();sources=[];findings=[];limitations=[];usage={};diagnostic={}
     if blocked_search:limitations.append('Se omitió la búsqueda: no se pudo separar una pregunta pública sin datos privados')
     urls=[]
     try:
@@ -279,9 +389,6 @@ def research(request:ResearchRequest)->ResearchResult:
                 except ValueError:pass  # REST failed; the server fetch tool may still read the public page.
             remaining.append(url)
         if search or remaining:
-            web=providers.WebTools(settings.WEB_SEARCH_TOOL_TYPE,settings.WEB_FETCH_TOOL_TYPE,
-                settings.WEB_SEARCH_MAX_USES if search else 0,settings.WEB_FETCH_MAX_USES,
-                settings.WEB_FETCH_MAX_CONTENT_TOKENS,settings.WEB_SEARCH_RESERVED_TOKENS,Decimal(settings.WEB_SEARCH_USD_PER_REQUEST))
             if remaining and not web.fetches:raise ValueError('Lectura web desactivada')
             if search and not web.searches:raise ValueError('Búsqueda web desactivada')
             answer=providers.claude(SYSTEM,json.dumps({'public_question':question,'public_urls':remaining},ensure_ascii=False),
@@ -298,13 +405,23 @@ def research(request:ResearchRequest)->ResearchResult:
     except (ValueError,TypeError,KeyError,AttributeError,ArithmeticError) as exc:
         # Do not leak provider bodies, URLs or request contents through events/outcomes.
         reason=str(exc).lower()
-        if any(word in reason for word in ('presupuesto','límite local')):limitations.append('Presupuesto de investigación o proveedor agotado')
+        budget=any(word in reason for word in ('presupuesto','límite local'))
+        if budget:limitations.append('Presupuesto de investigación o proveedor agotado')
         else:limitations.append('Investigación incompleta: proveedor o fuente no disponible; no se repite automáticamente')
+        # A failure before any reserved call (a refused budget, a definite provider refusal) spent nothing: it takes no
+        # daily allowance and the same key may run again.
+        diagnostic.update(motivo='presupuesto' if budget else 'error_proveedor',reintentable=not _spent(request.key))
     result=ResearchResult(question,'partial' if findings and limitations else ('complete' if findings else 'unavailable'),at,
-                          tuple(findings),tuple({s.id:s for s in sources}.values()),tuple(dict.fromkeys(limitations)),usage)
-    # An undo may have tombstoned the run during I/O. Never resurrect its result.
+                          tuple(findings),tuple({s.id:s for s in sources}.values()),tuple(dict.fromkeys(limitations)),usage,
+                          diagnostic=diagnostic)
+    # An undo may have tombstoned the run during I/O (state withdrawn): never resurrect its result.
     from .orquestacion import ensure_current
-    ensure_current()
+    try:ensure_current()
+    except CycleStopped:
+        # A stopped or obsolete worker does not report, but the answer it paid for stays under its key: a resumed cycle
+        # reads it instead of paying again or finding the run still `running`.
+        WebResearchRun.objects.filter(pk=run.pk,state='running').update(state=result.status,result=result.to_dict())
+        raise
     saved=WebResearchRun.objects.filter(pk=run.pk,state='running').update(state=result.status,result=result.to_dict())
     from .orquestacion import current
     # Monthly branches already report their real owner/node through the dispatcher.

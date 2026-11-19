@@ -61,6 +61,15 @@ class WebTools:
         # Every tool turn can replay all accumulated result/input tokens. Reserve before generating.
         return (input_tokens+256+self.searches*self.search_tokens+self.fetches*self.content_tokens)*(1+self.searches+self.fetches)
 
+def reservation_usd(model,input_tokens,max_tokens,web_tools=None):
+    """What one Claude call reserves before it is sent (its worst case): every input token a cache write, max_tokens of
+    output and, with web tools, every turn replaying the tools' results plus every search allowed. research.worst_case_usd
+    uses it before claiming a run, with an estimate of the input instead of the provider's count."""
+    ip,op=MODEL_PRICES[model]
+    reserved_input=web_tools.reserved_input(input_tokens) if web_tools else input_tokens+256
+    tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
+    return (Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost
+
 def embedding_model():
     model=os.environ.get('EMBEDDING_MODEL','text-embedding-3-small')
     if model not in EMBEDDING_PRICES:raise ValueError('Modelo de embeddings sin tarifa verificada')
@@ -321,14 +330,11 @@ def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context
     except (AttributeError,TypeError,ValueError):
         raise ValueError('Conteo de Claude no disponible; no se envió la generación.') from None
     ip,op=MODEL_PRICES[model]
-    # Worst case: every input token is a cache write.
     reserved_input=web_tools.reserved_input(input_tokens) if web_tools else input_tokens+256
-    tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
     metadata={'research':True,'reserved_web_search_requests':web_tools.searches,'reserved_web_fetch_requests':web_tools.fetches,
               'reserved_input_tokens':reserved_input,'model':model} if web_tools else None
     metadata=dict(metadata or {},model=model,effort=effort)
-    rid=reserve('anthropic',purpose,(Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost,
-                request_hash,metadata=metadata)
+    rid=reserve('anthropic',purpose,reservation_usd(model,input_tokens,max_tokens,web_tools),request_hash,metadata=metadata)
     request_id=None
     try:
         if current():client=client.with_options(timeout=timeout(120))

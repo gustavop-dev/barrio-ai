@@ -1142,9 +1142,9 @@ def stage_pending(account,now=None):
 def stage_checks_left(now=None):
     """Its own daily allowance, apart from the editorial research of the day (research._claim)."""
     from .models import WebResearchRun
-    from .research import STAGE_PREFIX
+    from .research import STAGE_PREFIX, counted
     day,_=operador.period_starts(now)
-    used=WebResearchRun.objects.filter(key__startswith=STAGE_PREFIX,created_at__gte=day).exclude(state='skipped').count()
+    used=counted(WebResearchRun.objects.filter(key__startswith=STAGE_PREFIX,created_at__gte=day)).count()
     return max(0,int(setting('NETWORK_STAGE_CHECKS_PER_DAY','6'))-used)
 
 def _public(text):

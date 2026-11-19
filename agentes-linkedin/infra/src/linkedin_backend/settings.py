@@ -63,6 +63,12 @@ WEB_SEARCH_USD_PER_REQUEST=os.environ.get('WEB_SEARCH_USD_PER_REQUEST','0.01')
 # Conservative reservation for search results and repeated tool-turn input; verify pricing on deploy.
 WEB_SEARCH_RESERVED_TOKENS=int(os.environ.get('WEB_SEARCH_RESERVED_TOKENS','25000'))
 WEB_RESEARCH_MAX_URLS=int(os.environ.get('WEB_RESEARCH_MAX_URLS','3'))
+# What count_tokens adds for the server web tools' own instructions (4,400–7,600 in production, 18/11/2026), with margin:
+# research.worst_case_usd estimates a run's reserve with it before claiming the run (it never reaches the provider).
+WEB_TOOLS_INPUT_TOKENS=int(os.environ.get('WEB_TOOLS_INPUT_TOKENS','9000'))
+# A run still `running` this long after it was claimed belongs to a process that died (the longest call timeout is
+# 300 s): the worker's reconciliation closes it as interrupted (research.recover_stale).
+WEB_RESEARCH_STALE_MINUTES=int(os.environ.get('WEB_RESEARCH_STALE_MINUTES','15'))
 WEB_GITHUB_MAX_BYTES=int(os.environ.get('WEB_GITHUB_MAX_BYTES','131072'))
 WEB_GITHUB_README_CHARS=int(os.environ.get('WEB_GITHUB_README_CHARS','8000'))
 WEB_GITHUB_TIMEOUT_S=float(os.environ.get('WEB_GITHUB_TIMEOUT_S','10'))

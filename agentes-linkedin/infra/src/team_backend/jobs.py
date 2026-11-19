@@ -144,6 +144,9 @@ def reconcile_interrupted():
             job.error='El trabajador perdió su latido. Revisar la ejecución y el ledger antes de crear otro trabajo.'
             job.save(update_fields=['state','finished_at','error'])
             audit(None,'job.interrupted',job.id,worker=str(job.worker_id))
+    # A web research left `running` by a process that died never finishes by itself (research.recover_stale).
+    from .research import recover_stale
+    recover_stale()
     return len(stale)
 
 def process_one(worker):

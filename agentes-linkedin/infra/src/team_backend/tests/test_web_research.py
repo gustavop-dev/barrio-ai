@@ -221,12 +221,23 @@ class ResearchTests(OperatorBase):
         model.assert_not_called()
 
     def test_budget_failure_timeout_and_no_citations_are_visible_and_not_replayed(self):
-        for i,outcome in enumerate((ValueError('Presupuesto web diario agotado'),ValueError('respuesta incierta'),
+        # A refused budget spent nothing and may run again (test_investigacion_web); an uncertain answer (its call was
+        # reserved: providers.claude settles it uncertain before raising) and an empty answer are never paid twice.
+        from team_backend.tests.test_investigacion_web import ledger
+        def reserved_then_uncertain(*args,**kwargs):
+            ledger('tool:1','uncertain');raise ValueError('respuesta incierta')
+        for i,outcome in enumerate((ValueError('Presupuesto web diario agotado'),reserved_then_uncertain,
                                     {'content':[],'text':'A claim with https://invented.example.com','stop_reason':'end_turn'})):
-            with patch.dict(os.environ,LIVE),patch('knowledge.providers.claude',side_effect=[outcome]) as model:
+            queue=[outcome,native_answer()]
+            def fake(*args,**kwargs):
+                item=queue.pop(0)
+                if isinstance(item,Exception):raise item
+                return item(*args,**kwargs) if callable(item) else item
+            with patch.dict(os.environ,LIVE),patch('knowledge.providers.claude',side_effect=fake) as model:
                 result=self.call(f'tool:{i}');again=self.call(f'tool:{i}')
-            self.assertEqual(result.status,'unavailable');self.assertTrue(result.limitations)
-            self.assertFalse(result.sources);self.assertEqual(result,again);self.assertEqual(model.call_count,1)
+            self.assertEqual(result.status,'unavailable');self.assertTrue(result.limitations);self.assertFalse(result.sources)
+            if i==0:self.assertEqual((again.status,model.call_count),('complete',2))
+            else:self.assertEqual((result,model.call_count),(again,1))
 
     def test_the_basic_web_tools_give_findings_and_dynamic_filtering_gives_none_and_says_why(self):
         # 16/11/2026: with web_search_20260209 every research came back without findings for a week.
