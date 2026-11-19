@@ -148,18 +148,62 @@ def unescape(html):
 JS_HEX = re.compile(r'(?<!\\)((?:\\\\)*)\\x([0-9A-Fa-f]{2})')
 
 
+def _readable(text):
+    """The page's JavaScript `\\xHH` escapes as the JSON `\\u00HH` they mean."""
+    return JS_HEX.sub(lambda m: m.group(1) + '\\u00' + m.group(2), text)
+
+
+def _starts(text, request_id):
+    return [m.start() for m in re.finditer(r'\{"requestId":"' + re.escape(request_id) + '"', text)]
+
+
 def templates(text, request_id):
     """Every ready-made request with this requestId in a page or component stream (dicts, in page order). Since
     2026-11-19 the createComment request carries `optimisticKey` with a `\x3C` in it, and every comment stopped with
     «la página no trae la caja de comentarios»: the page's JavaScript escapes are read as the JSON ones they mean."""
-    text = JS_HEX.sub(lambda m: m.group(1) + '\\u00' + m.group(2), text)
+    text = _readable(text)
     found, decoder = [], json.JSONDecoder()
-    for m in re.finditer(r'\{"requestId":"' + re.escape(request_id) + '"', text):
+    for start in _starts(text, request_id):
         try:
-            found.append(decoder.raw_decode(text, m.start())[0])
+            found.append(decoder.raw_decode(text, start)[0])
         except ValueError:  # a template cut by the page's own string splitting
             pass
     return found
+
+
+# A JSON key the way LinkedIn names its fields (camelCase, maybe `$type`- or `*elements`-like). Keys with digits,
+# capitals first, colons or dashes are left out on purpose: profile ids, urns and public ids are keys in some maps.
+FIELD_NAME = re.compile(r'"([$*]?[a-z][A-Za-z_]{0,59})":')
+
+
+def template_diagnostic(text, request_id):
+    """Why `templates` found nothing usable, for the record of a shape change (19/11/2026: a `\\x3C` the parser did not
+    know): how many times the request id appears raw, how many of those parsed, and for the first that did not, the
+    JSON error's message, its offset from the template's start and the nearest field NAME before it. Never a value
+    of the page."""
+    text = _readable(text)
+    starts, decoder = _starts(text, request_id), json.JSONDecoder()
+    out = {'apariciones': len(starts), 'leidas': 0}
+    for start in starts:
+        try:
+            decoder.raw_decode(text, start)
+            out['leidas'] += 1
+        except json.JSONDecodeError as exc:
+            if 'error' not in out:
+                names = FIELD_NAME.findall(text, start, exc.pos)
+                out.update(error=exc.msg, posicion=exc.pos - start, campo=names[-1] if names else '')
+    return out
+
+
+def comment_gaps(template):
+    """The names of what a createComment template needs and does not carry: its payload, the collection, a field of
+    the box or a field's binding key (comment_states raises on the first; this names them all)."""
+    payload = ((template or {}).get('requestedArguments') or {}).get('payload')
+    if not isinstance(payload, dict):
+        return ['payload']
+    gaps = [] if isinstance(payload.get('collection'), dict) else ['collection']
+    return gaps + [field for field, _, _ in COMMENT_BOX
+                   if not isinstance(payload.get(field), dict) or not payload[field].get('key')]
 
 
 def state(key, case, value, namespace='MemoryNamespace'):

@@ -332,7 +332,7 @@ Estado: `active`. Orquestador: `metricas`.
 - `collect_metrics`: METRICS_EVERY_MINUTES=180 si hay cortes pendientes; audiencia diaria.
 - `collect_outcomes`: OUTCOMES_EVERY_MINUTES=180 si hay comentarios propios (INT-03) con 72 h o acciones de red (RED-01/02/04) con 7 d sin desenlace; OUTCOMES_ENABLED=false lo apaga.
 - `import_analytics`: Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días y después los rangos exactos de ANALYTICS_DAILY_RANGES=7,14,28,90,365 (una vez al día, para en el primer fallo); solo cuentas «directo» con el servicio navegador configurado.
-- `check_linkedin`: Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector (16 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.
+- `check_linkedin`: Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector y lo que necesitan 4 escrituras, sin enviarlas (17 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.
 
 ```mermaid
 flowchart TD

@@ -69,15 +69,24 @@ class Cliente:
     def _page(self, path, operation):
         return rutas.unescape(self._send(Request('GET', path, 'page', operation=operation)))
 
-    def _write(self, request, operation, states=(), screen=None):
-        """One server-driven UI write. Its answer is a component stream whose `errors` list says whether the server
-        did it; a 2xx without the list is taken as done (the callers confirm every write by reading)."""
+    @staticmethod
+    def _draft(request, operation, states=(), screen=None):
+        """The Request of a server-driven UI write, built and not sent (the canary checks it against the allowlist)."""
         body = rutas.envelope(request, states, screen)
-        stream = self._send(Request('POST', rutas.sdui(request['requestId']), 'sdui', body, True, operation))
+        return Request('POST', rutas.sdui(request['requestId']), 'sdui', body, True, operation)
+
+    def _sent(self, write):
+        """Send a write built by _draft. Its answer is a component stream whose `errors` list says whether the server
+        did it; a 2xx without the list is taken as done (the callers confirm every write by reading)."""
+        stream = self._send(write)
         errors = lectura.stream_errors(stream)
         if errors:
-            raise LinkedInError(f'LinkedIn rechazó {operation} ({len(errors)} errores).', kind='rejected')
+            raise LinkedInError(f'LinkedIn rechazó {write.operation} ({len(errors)} errores).', kind='rejected')
         return stream
+
+    def _write(self, request, operation, states=(), screen=None):
+        """One server-driven UI write."""
+        return self._sent(self._draft(request, operation, states, screen))
 
     def _graphql(self, prefixes, variables, fallback, host, operation):
         """A query id the page used itself, for a call with the same variable names, wins over the fixed one."""
@@ -92,11 +101,13 @@ class Cliente:
         return self._get(rutas.graphql(host, query_id, variables), operation=operation)
 
     def _read(self, parse, *args):
-        """Parse an answer; a shape LinkedIn changed becomes a plain error, never a crash in the caller."""
+        """Parse an answer; a shape LinkedIn changed becomes a plain error, never a crash in the caller. Its detail
+        names the parser and the Python error, never the answer."""
         try:
             return parse(*args)
-        except PARSE_ERRORS:
-            raise LinkedInError('LinkedIn: respuesta con una forma inesperada.', kind='unreadable') from None
+        except PARSE_ERRORS as exc:
+            raise LinkedInError('LinkedIn: respuesta con una forma inesperada.', kind='unreadable',
+                                detail={'lectura': parse.__name__, 'error': type(exc).__name__}) from None
 
     def _own(self):
         if not self.me.get('fsd'):
@@ -125,7 +136,8 @@ class Cliente:
         """/me: answering it means the session works (one call)."""
         me = self._read(lectura.own, self._get('/me', operation='account_status'))
         if not me.get('fsd') or not me.get('public_id'):
-            raise LinkedInError('LinkedIn: /me sin el perfil de la cuenta.', kind='unreadable')
+            raise LinkedInError('LinkedIn: /me sin el perfil de la cuenta.', kind='unreadable', detail={
+                'lectura': 'own', 'faltan': [k for k in ('fsd', 'public_id') if not me.get(k)]})
         self.me = me
         if me.get('member'):
             self.members[me['fsd']] = me['member']
@@ -223,19 +235,49 @@ class Cliente:
                            f'&sortOrder=CHRONOLOGICAL', operation='list_comment_thread')
         return self._read(lectura.comments, answer, own['fsd'], cid, self.members)[:int(limit)]
 
-    def _comment_template(self, aid, parent, operation):
+    @staticmethod
+    def _comment_template(page, aid, parent):
         """The post page carries one createComment request for its box and one per reply box it draws (its first few
         comments); a reply to a comment it does not draw is built from those (rutas.comment_template). Without a base
-        nothing is sent."""
-        found = rutas.templates(self._page(rutas.post_page(aid), operation), rutas.COMMENT)
+        nothing is sent, and the error says why the page's templates did not read (rutas.template_diagnostic)."""
+        found = rutas.templates(page, rutas.COMMENT)
         try:
             template = rutas.comment_template(found, aid, parent)
         except PARSE_ERRORS:
             template = None
         if not template:
             raise LinkedInError('La página del post no trae la caja de comentarios; no se envió nada.',
-                                kind='template_missing')
+                                kind='template_missing', detail=rutas.template_diagnostic(page, rutas.COMMENT))
         return template
+
+    def _comment_write(self, aid, parent, text, operation, page=None):
+        """The createComment write for the post's box (or a reply to `parent`), built from the post page (read here
+        unless given) and not sent."""
+        if not isinstance(text, str) or not text.strip():
+            raise invalid('Texto del comentario')
+        if page is None:
+            page = self._page(rutas.post_page(aid), operation)
+        template = self._comment_template(page, aid, parent)
+        try:
+            states = rutas.comment_states(template, text)
+        except PARSE_ERRORS:
+            raise LinkedInError('La caja de comentarios cambió; no se envió nada.', kind='template_missing',
+                                detail={'faltan': rutas.comment_gaps(template)}) from None
+        return self._draft(template, operation, states, rutas.POST_SCREEN)
+
+    def comment_writes(self, post_id, parent, text='prueba'):
+        """For the canary: one read of the post page and, for create_comment and comment_in_thread (a reply to
+        `parent`), the write each would send or the LinkedInError that would stop it. NOTHING is sent: the caller only
+        checks the Requests (permitidas.check). The page read's own errors (the session, the service) are raised."""
+        aid, cid = activity_id(post_id), comment_id(parent)
+        page = self._page(rutas.post_page(aid), 'comment_template')
+        out = {}
+        for operation, reply_to in (('create_comment', None), ('comment_in_thread', cid)):
+            try:
+                out[operation] = self._comment_write(aid, reply_to, text, operation, page)
+            except LinkedInError as exc:
+                out[operation] = exc
+        return out
 
     def _written(self, text, stream, aid, thread=None):
         """What a comment write returns. Its answer draws the comment list again with the new comment in it: the id
@@ -247,14 +289,7 @@ class Cliente:
                 'author': lectura.user(self.me.get('fsd', ''), self.me.get('public_id', ''), kind='individual')}
 
     def _comment(self, aid, parent, text, operation):
-        if not isinstance(text, str) or not text.strip():
-            raise invalid('Texto del comentario')
-        template = self._comment_template(aid, parent, operation)
-        try:
-            states = rutas.comment_states(template, text)
-        except PARSE_ERRORS:
-            raise LinkedInError('La caja de comentarios cambió; no se envió nada.', kind='template_missing') from None
-        return self._write(template, operation, states, rutas.POST_SCREEN)
+        return self._sent(self._comment_write(aid, parent, text, operation))
 
     def create_comment(self, post_id, text):
         """Two calls: the post page (for the box's template) and the write."""
@@ -336,8 +371,12 @@ class Cliente:
         member = self.members.get(fsd) or self._person(fsd, 'follow_user')['member']
         if not member:
             raise LinkedInError('LinkedIn: perfil sin id de miembro; no se envió nada.', kind='not_found')
-        self._write(rutas.follow(member), 'follow_user')
+        self._sent(self.follow_request(member))
         return {'user_id': user_id}
+
+    def follow_request(self, member):
+        """The follow write for a member id, built and not sent (the canary checks it)."""
+        return self._draft(rutas.follow(member), 'follow_user')
 
     def send_invitation(self, user_id, note=None):
         """One write (the profile read first only for a public id). Answering it, LinkedIn also makes the account
@@ -383,9 +422,13 @@ class Cliente:
         if iid not in self.secrets:
             raise LinkedInError('La invitación ya no está entre las recibidas; no se envió nada.',
                                 kind='invitation_gone', status=404)
-        self._send(Request('POST', rutas.voyager(rutas.ACCEPT.format(iid)), 'voyager',
-                           rutas.acceptance(iid, self.secrets[iid]), True, 'accept_invitation'))
+        self._send(self.accept_request(iid))
         return {'request_id': request_id}
+
+    def accept_request(self, iid):
+        """The acceptance of a received invitation with its kept secret, built and not sent (the canary checks it)."""
+        return Request('POST', rutas.voyager(rutas.ACCEPT.format(iid)), 'voyager',
+                       rutas.acceptance(iid, self.secrets[iid]), True, 'accept_invitation')
 
     # --- inbox (reads only: nothing here sends, marks or edits a message) --------------------------------------------
     def list_chats(self, limit=20, inbox='CLASSIC_PRIMARY'):

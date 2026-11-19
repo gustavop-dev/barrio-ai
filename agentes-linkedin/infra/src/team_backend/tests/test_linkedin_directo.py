@@ -233,6 +233,44 @@ class PostAndCommentTests(SimpleTestCase):
         # An escaped backslash before an x is text, not an escape: it stays as it was.
         self.assertEqual(rutas.templates('{"requestId":"r","a":"c:\\\\x41"}','r'),[{'requestId':'r','a':'c:\\x41'}])
 
+    def test_a_template_the_parser_cannot_read_says_why_with_field_names_only(self):
+        """19/11/2026 with the parser of before the fix: the error carries what finds the cause (how many templates the
+        page has, how many read, the JSON error, its offset and the field it was in), never a value of the page, and the
+        connector names the operation. Without a database (this test) recording it is skipped, never a crash."""
+        plain=F.post_page(POST,(F.COMMENT_A,)).text
+        escaped=plain.replace('<PrefixToExecutionId>','\\x3CPrefixToExecutionId>')
+        with patch.object(rutas,'JS_HEX',re.compile(r'(?!x)x')):
+            c,t=connector(('GET',r'^/feed/update/',html(escaped)),sdui(rutas.COMMENT))
+            with self.assertRaises(ConnectorError) as e:c.create_comment(POST,'Hola')
+        exc=e.exception
+        self.assertEqual((exc.kind,exc.operation,[r.operation for r in t.sent]),('template_missing','create_comment',['create_comment']))
+        page=rutas.unescape(escaped);start=page.index('{"requestId":"'+rutas.COMMENT)
+        self.assertEqual(exc.detail,{'apariciones':3,'leidas':0,'error':'Invalid \\escape','posicion':page.index('\\x3C')-start,
+                                     'campo':'optimisticKey'})
+        self.assertEqual(rutas.template_diagnostic(page,rutas.COMMENT),{'apariciones':3,'leidas':3})  # with the fix it reads
+        # A box that lost fields names them all; a key that is an id is never taken for a field name.
+        template=rutas.templates(page,rutas.COMMENT)[0]
+        del template['requestedArguments']['payload']['externalImageId']
+        template['requestedArguments']['payload']['lastPasteCharacterCount']={}
+        self.assertEqual(rutas.comment_gaps(template),['externalImageId','lastPasteCharacterCount'])
+        broken='{"requestId":"r","memberEntityUrns":{"ACoAbc123":"urn:li:member:1","ana-ficticia":\\q}}'
+        self.assertEqual(rutas.template_diagnostic(broken,'r')['campo'],'memberEntityUrns')
+
+    def test_the_canary_prepares_both_comment_writes_from_one_page_read_and_sends_neither(self):
+        c,t=connector(page(F.COMMENT_A))
+        writes=c.client.comment_writes(POST,F.COMMENT_B)
+        self.assertEqual([(r.method,r.kind,r.operation,r.write) for r in t.sent],[('GET','page','comment_template',False)])
+        self.assertEqual({op:(r.write,r.path) for op,r in writes.items()},
+                         {'create_comment':(True,rutas.sdui(rutas.COMMENT)),'comment_in_thread':(True,rutas.sdui(rutas.COMMENT))})
+        for request in writes.values():permitidas.check(request)
+        collection=writes['comment_in_thread'].body['requestedArguments']['payload']['collection']
+        self.assertEqual(collection['parentCommentUrn']['commentId'],F.COMMENT_B)
+        c,t=connector(('GET',r'^/feed/update/',html('<html><body></body></html>')))
+        writes=c.client.comment_writes(POST,F.COMMENT_B)
+        self.assertEqual({op:(e.kind,e.detail) for op,e in writes.items()},
+                         {op:('template_missing',{'apariciones':0,'leidas':0}) for op in ('create_comment','comment_in_thread')})
+        self.assertEqual(len(t.sent),1)
+
     def test_create_comment_fills_the_page_box_and_makes_one_write(self):
         new=F.snowflake(datetime(2026,11,10,19,tzinfo=UTC),6)
         c,t=connector(page(),sdui(rutas.COMMENT,F.comment_written(POST,new,'Un aporte de prueba')))

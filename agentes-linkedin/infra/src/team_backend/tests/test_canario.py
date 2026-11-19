@@ -10,7 +10,7 @@ from unittest.mock import patch
 import httpx
 from django.contrib.auth.models import Permission, User
 from django.test import TestCase
-from linkedin_directo import LinkedInError, Request, Transport, rutas
+from linkedin_directo import LinkedInError, Request, Transport, permitidas, rutas
 from linkedin_directo import canario as prueba
 from linkedin_directo.servicio import ServiceTransport
 from team_backend import analitica, autopiloto, canario, connectors_directo, jobs, operador
@@ -30,6 +30,8 @@ SERVICE={'LIVE_LINKEDIN_DIRECTO':'true','NAVEGADOR_URL':'http://navegador.intern
 READS=['account_status','get_user','own_audience','profile_views','list_user_posts','get_post','list_comments',
        'list_comment_thread','search_people','search_parameters','list_invitations','list_sent_invitations','list_chats',
        'list_chat_messages']
+# What the writes depend on, prepared and never sent (19/11/2026); the last three only LinkedIn's answer can tell.
+WRITES=['create_comment','comment_in_thread','follow_user','accept_invitation','add_reaction','react_to_comment','send_invitation']
 
 def routes(views):
     """Every read of the canary, answered with the invented fixtures; `views` answers the profile views."""
@@ -41,7 +43,9 @@ def routes(views):
             ('POST','^'+re.escape(rutas.sdui(rutas.FILTER_BAR,'component'))+'$',F.filter_bar()),
             sdui(rutas.GEO_TYPEAHEAD,F.typeahead([('900001','Ciudad Ficticia')])),
             RECEIVED,('GET',r'^/voyager/api/relationships/sentInvitationViewsV2\?',ok(F.invitations('sent',[('7000003',LUIS,SENT_AT,'Nota enviada')]))),
-            CONVERSATIONS,MESSAGES]
+            CONVERSATIONS,MESSAGES,
+            # The post page whose comment box (and a reply box) the canary prepares: the comments' post.
+            ('GET',r'^/feed/update/urn:li:activity:\d+/$',F.post_page(POST,(F.COMMENT_A,)))]
 
 def grant(user,*codes):
     user.user_permissions.add(*Permission.objects.filter(content_type__app_label='team_backend',codename__in=codes))
@@ -76,19 +80,23 @@ class CanaryBase(TestCase):
 class CanaryTests(CanaryBase):
     def test_the_14_reads_once_keeping_states_and_counts_never_values(self):
         log=canario.run(self.account,now=self.at())
-        self.assertEqual((log.state,log.calls,log.error_kind,log.error),('ok',16,'',''))
-        self.assertEqual([r['operacion'] for r in log.operations],READS)
-        self.assertTrue(all(r['estado']=='ok' and r['filas']>=1 for r in log.operations if r['operacion']!='list_sent_invitations'))
-        self.assertEqual(len(self.transport.sent),16);self.assertFalse(any(r.write for r in self.transport.sent))
+        self.assertEqual((log.state,log.calls,log.error_kind,log.error),('ok',17,'',''))
+        self.assertEqual([r['operacion'] for r in log.operations],READS+WRITES)
+        reads=[r for r in log.operations if 'tipo' not in r]
+        self.assertTrue(all(r['estado']=='ok' and r['filas']>=1 for r in reads if r['operacion']!='list_sent_invitations'))
+        self.assertEqual({r['operacion']:(r['tipo'],r['estado']) for r in log.operations[len(READS):]},
+                         {**{op:('escritura','ok') for op in WRITES[:4]},**{op:('escritura','sin_probar') for op in WRITES[4:]}})
+        self.assertEqual({r['motivo'] for r in log.operations[len(READS)+4:]},{'solo se sabe al escribir'})
+        self.assertEqual(len(self.transport.sent),17);self.assertFalse(any(r.write for r in self.transport.sent))
         kept=json.dumps(log.operations)
-        for value in (OWN[0],OWN[1],ANA[0],POST,'Primer post','Ana'):self.assertNotIn(value,kept)
+        for value in (OWN[0],OWN[1],ANA[0],POST,'Primer post','Ana',F.COMMENT_A,'secreto-ficticio','prueba'):self.assertNotIn(value,kept)
         self.assertTrue(AuditEvent.objects.filter(action='linkedin.canary',target=str(self.account.id)).exists())
         self.assertFalse(self.notices().exists());self.push.assert_not_called()  # a first run that is fine says nothing
         self.assertFalse(canario.daily_due(self.account,self.at(hours=20)))  # one run a day once it judged LinkedIn
         self.assertTrue(canario.daily_due(self.account,self.at(days=1,hours=12)))
         shown=AccountOutput(self.account).data['canary']
         self.assertEqual({k:shown[k] for k in ('state','calls','failing','error_kind','error')},
-                         {'state':'ok','calls':16,'failing':[],'error_kind':'','error':''})
+                         {'state':'ok','calls':17,'failing':[],'error_kind':'','error':''})
         self.assertTrue(shown['started_at'] and shown['finished_at'])
         other=ConnectorAccount.objects.create(provider='fake',external_account_id='fake-prueba',label='Simulada')
         self.assertIsNone(AccountOutput(other).data['canary'])
@@ -98,7 +106,7 @@ class CanaryTests(CanaryBase):
         log=canario.run(self.account,now=self.at())
         self.assertEqual((log.state,canario.failing(log)),('roto',['profile_views']))
         [notice]=self.notices()
-        self.assertEqual((notice.layer,notice.title),('sistema','La prueba diaria de LinkedIn encontró lecturas rotas'))
+        self.assertEqual((notice.layer,notice.title),('sistema','La prueba diaria de LinkedIn encontró algo roto'))
         self.assertIn('profile_views',notice.detail);self.assertEqual(self.push.call_count,1)
         self.assertEqual(AccountOutput(self.account).data['canary']['failing'],['profile_views'])
         canario.run(self.account,now=self.at(days=1))
@@ -125,7 +133,7 @@ class CanaryTests(CanaryBase):
                                    ('GET',r'^/voyager/api/identity/profileUpdatesV2\?',ok(textless))]
         log=canario.run(self.account,now=self.at())
         self.assertEqual((log.state,canario.failing(log)),('roto',['list_user_posts','list_comments']))
-        self.assertEqual({r['operacion']:r['motivo'] for r in log.operations if r['estado']!='ok'},
+        self.assertEqual({r['operacion']:r['motivo'] for r in log.operations if prueba.broken(r)},
                          {'list_user_posts':'faltan campos: text','list_comments':'faltan campos: author.id'})
         row={'id':'9000001','text':'Muy buen punto','created_at':DAY,'author':{'id':'ACoAAFicticio','display_name':'Ana Ficticia'}}
         self.assertEqual(prueba.verdict([row],1,prueba.COMMENT),('roto','faltan campos: is_sender',1))
@@ -234,7 +242,7 @@ class CanaryTests(CanaryBase):
         jobs.enqueue_operation(bot,'check_linkedin',{'account':str(self.account.id)})
         jobs.process_one(worker)
         job=Job.objects.get(kind='check_linkedin')
-        self.assertEqual((job.state,job.result_status,job.error),('complete','prueba:ok llamadas:16',''))
+        self.assertEqual((job.state,job.result_status,job.error),('complete','prueba:ok llamadas:17',''))
         ConnectorAccount.objects.filter(pk=self.account.pk).update(paused=True)
         paused,_=jobs.enqueue_operation(bot,'check_linkedin',{'account':str(self.account.id)})
         jobs.process_one(worker);paused.refresh_from_db()
@@ -275,3 +283,66 @@ class AutopilotCanaryTests(MetricsBase):
         with patch.dict(os.environ,{'LINKEDIN_CANARY_ENABLED':'false'}):
             self.assertEqual(autopiloto._canary(self.bot,directo,late+timedelta(days=1)),0)
         self.assertEqual(autopiloto._canary(self.bot,directo,late+timedelta(days=1)),1)  # the next day
+
+
+class CanaryWritesTests(CanaryBase):
+    """What the writes depend on (19/11/2026): prepared from what the reads brought and one post page, checked against
+    the allowlist, and never sent."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'SLACK_WEBHOOK_URL':'https://hooks.slack.test/services/ALERTAS','SLACK_WEBHOOK_RESUMEN':''})
+        env.start();self.addCleanup(env.stop)
+        self.slack=[]
+        from team_backend import alertas_slack
+        mock=httpx.MockTransport(lambda r:self.slack.append(json.loads(r.content)['text']) or httpx.Response(200))
+        transport=patch.object(alertas_slack,'TRANSPORT',mock);transport.start();self.addCleanup(transport.stop)
+
+    def test_it_sends_no_write_and_only_the_17_allowed_calls(self):
+        checked=[];real=permitidas.check
+        def spy(request):
+            checked.append(request);return real(request)
+        with patch.object(prueba.permitidas,'check',side_effect=spy):
+            log=canario.run(self.account,now=self.at())
+        self.assertEqual(log.state,'ok')
+        self.assertEqual([(r.method,r.kind,r.operation,r.write) for r in self.transport.sent],
+                         [('GET','voyager','account_status',False),('GET','voyager','get_user',False),
+                          ('GET','voyager','own_audience',False),('GET','voyager','profile_views',False),
+                          ('GET','voyager','list_user_posts',False),('GET','voyager','get_post',False),
+                          ('GET','voyager','list_comments',False),('GET','voyager','list_comment_thread',False),
+                          ('GET','page','search_people',False),('GET','page','search_parameters',False),
+                          ('POST','sdui','search_parameters',False),('POST','sdui','search_parameters',False),
+                          ('GET','voyager','list_invitations',False),('GET','voyager','list_invitations',False),
+                          ('GET','voyager','list_chats',False),('GET','voyager','list_chat_messages',False),
+                          ('GET','page','comment_template',False)])
+        self.assertEqual(self.transport.sent[-1].path,rutas.post_page(POST))
+        for request in self.transport.sent:permitidas.check(request)  # every call it made is one the allowlist lets out
+        # The four writes it prepared passed the allowlist as they would leave, and none of them left.
+        drafts=[r for r in checked if r.write]
+        self.assertEqual([r.operation for r in drafts],['create_comment','comment_in_thread','follow_user','accept_invitation'])
+        self.assertEqual([r.path for r in drafts],[rutas.sdui(rutas.COMMENT)]*2+[rutas.sdui(rutas.FOLLOW),
+                         rutas.voyager(rutas.ACCEPT.format('7000001'))])
+        self.assertEqual(drafts[1].body['requestedArguments']['payload']['collection']['parentCommentUrn']['commentId'],F.COMMENT_A)
+        sent={(r.method,r.path) for r in self.transport.sent}
+        self.assertFalse(any((r.method,r.path) in sent for r in drafts))
+        self.assertEqual(self.slack,[])  # healthy pages: nothing for Slack
+
+    def test_a_write_that_cannot_be_prepared_is_broken_and_one_only_writing_tests_is_not(self):
+        # The profile read without the member id: follow_user could not be written for someone found that way.
+        def memberless(request):
+            answer=F.full_profile(OWN);answer['included'][0].pop('objectUrn');return ok(answer)
+        self.transport.routes[:0]=[('GET',r'^/voyager/api/identity/dash/profiles\?',memberless)]
+        log=canario.run(self.account,now=self.at())
+        self.assertEqual((log.state,canario.failing(log)),('roto',['follow_user']))
+        row=next(r for r in log.operations if r['operacion']=='follow_user')
+        self.assertEqual((row['tipo'],row['estado']),('escritura','roto'));self.assertIn('memberUrn',row['motivo'])
+        self.assertEqual(len(self.transport.sent),17);self.assertFalse(any(r.write for r in self.transport.sent))
+        # A reply box that would carry a mention of the parent's author is refused by the allowlist: broken, not sent.
+        page=F.post_page(POST).text.replace('"requestMetadata\\":{','"requestMetadata\\":{\\"m\\":{\\"$case\\":\\"mention\\"},',1)
+        self.transport.routes[:0]=[('GET',r'^/feed/update/',F.html(page))]
+        log=canario.run(self.account,now=self.at(days=1))
+        refused={r['operacion']:r['motivo'] for r in log.operations if prueba.broken(r)}
+        self.assertEqual(set(refused),{'follow_user','create_comment','comment_in_thread'})
+        self.assertIn('comentario con una mención',refused['create_comment'])
+        untried={r['operacion'] for r in log.operations if r['estado']=='sin_probar'}
+        self.assertEqual(untried,{'add_reaction','react_to_comment','send_invitation'})
+        self.assertFalse(any(prueba.broken(r) for r in log.operations if r['operacion'] in untried))

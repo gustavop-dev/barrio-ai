@@ -1,30 +1,55 @@
-"""The daily canary, ported from spikes/linkedin-directo/canario.py: the connector's 14 reads, once and READ-ONLY (16
-calls to LinkedIn), checking that each answer still gives the fields Barrio's callers use. LinkedIn renames things
-without warning and an HTTP 200 with a field gone is a silent break.
+"""The daily canary, ported from spikes/linkedin-directo/canario.py: the connector's 14 reads, once (16 calls to
+LinkedIn), checking that each answer still gives the fields Barrio's callers use; then what the writes depend on,
+WITHOUT writing (one more call: 17). LinkedIn renames things without warning and an HTTP 200 with a field gone is a
+silent break.
+
+The writes (since 19/11/2026, when the comment box's template stopped parsing and every comment failed while this
+canary, which only read, said all was fine): each write's Request is built as the client would send it and checked
+against the allowlist (permitidas.check), and never sent.
+- create_comment and comment_in_thread: one read of a post page (the comments' post), its createComment templates, the
+  states of the box and the reply built from them.
+- follow_user: the member id it needs, from the profile read and the people search already made (no call).
+- accept_invitation: the shared secret it needs, from the received invitations already read (no call).
+- add_reaction, react_to_comment and send_invitation go by a fixed route with a fixed body: nothing on a page tells
+  whether they still work, only LinkedIn's answer to a real one ('sin_probar': «solo se sabe al escribir»).
 
 It runs over any Transport: the backend's daily job sends it through the account's connector (team_backend/canario.py)
 and `python -m navegador canario` through the running service, so its calls pass the service's budgets and stops like
-any other. It reads only the account's own profile, posts and inbox, and the comments of the busiest post its feed
-brings along, like the spike. The report keeps states, row counts and field names, never a value (no names, texts or
-ids).
+any other. It reads only the account's own profile, posts and inbox, and the comments (and page) of the busiest post its
+feed brings along, like the spike. The report keeps states, row counts and field names, never a value (no names, texts
+or ids).
 
-Result: 'ok' every read gave its fields; 'roto' something broke (LinkedIn changed an answer); 'alto' LinkedIn pushed
-back or the service has the account stopped or without a session (do not retry: someone has to look); 'no_corrio' it
-could not run (the service unreachable, busy or out of budget, another internet exit, its configuration): nothing to
-judge."""
+Result: 'ok' nothing broke (`broken`); 'roto' something broke (LinkedIn changed an answer or a page); 'alto' LinkedIn
+pushed back or the service has the account stopped or without a session (do not retry: someone has to look);
+'no_corrio' it could not run (the service unreachable, busy or out of budget, another internet exit, its configuration):
+nothing to judge."""
 import json
 import time
 from datetime import datetime
 
-from . import lectura, rutas
+from . import lectura, permitidas, rutas
 from .cliente import Cliente
 from .errores import LinkedInError
 from .transporte import Transport
 
 OK, BROKEN, HALTED, NOT_RUN = 'ok', 'roto', 'alto', 'no_corrio'
+UNTRIED = 'sin_probar'
+WRITE = 'escritura'  # a row's `tipo` when it checks a write (the reads carry no `tipo`)
+ONLY_BY_WRITING = 'solo se sabe al escribir'
 # Nothing reached LinkedIn, or nothing came back: the run says nothing about LinkedIn and stops there.
 NOT_RUN_KINDS = ('config', 'disabled', 'not_sent', 'budget', 'network', 'egress')
 HALT_KINDS = ('stopped', 'login')
+# The reply the canary prepares when no comment of the post has answers: never sent, any comment id builds the same.
+ANY_COMMENT = '1'
+
+
+def broken(row):
+    """Whether a report row says something broke: a read that did not give its fields or could not be tried (a read
+    before it found nothing), or a write whose Request could not be prepared. A write left untried is not: either a
+    read before it found nothing to prepare it with, or it goes by a fixed route that only writing can test."""
+    if row.get('tipo') == WRITE:
+        return row.get('estado') == BROKEN
+    return row.get('estado') != OK
 
 
 class Skipped(Exception):
@@ -117,6 +142,13 @@ def steps(client, recorder, found):
         out = client.account_status()
         return (OK, '', 1) if out.get('status') == 'running' else (BROKEN, 'estado inesperado', 1)
 
+    def user():
+        # /me left the account's member id in `members`: out of it, so what follow_user checks is the profile read's.
+        client.members.pop(client.me.get('fsd'), None)
+        out = client.get_user('me')
+        found['profile_member'] = client.members.get(out.get('id')) or 'falta'
+        return verdict([out], 1, PERSON)
+
     def audience():
         out = client.own_audience()
         return verdict([out], 1, (('followers', 'num'), ('connections', 'num')))
@@ -150,6 +182,16 @@ def steps(client, recorder, found):
         rows = client.list_comment_thread(need('comment_post'), need('comment'), 10)
         return verdict(rows, 1, COMMENT + (('thread_id', 'texto'),))
 
+    def people():
+        rows = client.search_people('founder')
+        found['search_members'] = [client.members.get(r['id']) or 'falta' for r in rows]
+        return verdict(rows, 1, (('id', 'texto'),))
+
+    def received():
+        rows = client.list_invitations('received', 20)
+        found['received'] = [r['id'] for r in rows] or 'ninguna'
+        return verdict(rows, 0, INVITATION)
+
     def chats():
         rows = client.list_chats(10)
         if rows:
@@ -158,37 +200,98 @@ def steps(client, recorder, found):
 
     return [
         ('account_status', status),
-        ('get_user', lambda: verdict([client.get_user('me')], 1, PERSON)),
+        ('get_user', user),
         ('own_audience', audience),
         ('profile_views', views),
         ('list_user_posts', posts),
         ('get_post', post),
         ('list_comments', comments),
         ('list_comment_thread', thread),
-        ('search_people', lambda: verdict(client.search_people('founder'), 1, (('id', 'texto'),))),
+        ('search_people', people),
         ('search_parameters', lambda: verdict(client.search_parameters('LOCATION', 'Bogota'), 1,
                                               (('id', 'texto'), ('name', 'texto')))),
-        ('list_invitations', lambda: verdict(client.list_invitations('received', 20), 0, INVITATION)),
+        ('list_invitations', received),
         ('list_sent_invitations', lambda: verdict(client.list_invitations('sent', 20), 0, INVITATION)),
         ('list_chats', chats),
         ('list_chat_messages', lambda: verdict(client.list_chat_messages(need('chat'), 10), 1, MESSAGE)),
     ]
 
 
+def drafted(write):
+    """A write the client prepared (a Request) or the LinkedInError that stopped it: the Request must pass the
+    allowlist as it would leave. It is never sent."""
+    if isinstance(write, LinkedInError):
+        raise write
+    permitidas.check(write)
+    return OK, '', 1
+
+
+def write_steps(client, found):
+    """What the writes depend on, after the reads, as (name, call): the same shape as `steps`. One call in all (the
+    post page of the comments); everything else comes from what the reads already brought."""
+    def need(key):
+        if not found.get(key):
+            raise Skipped(f'sin dato de una operación anterior ({key})')
+        return found[key]
+
+    def comment(operation):
+        def check():
+            if 'writes' not in found:
+                found['writes'] = {}  # one page read for both: if it fails here, the reply says so without reading
+                found['writes'] = client.comment_writes(need('comment_post'), found.get('comment') or ANY_COMMENT)
+            if operation not in found['writes']:
+                raise Skipped('sin la página del post')
+            return drafted(found['writes'][operation])
+        return check
+
+    def follow():
+        members = [need('profile_member')] + list(found.get('search_members') or ())
+        if 'falta' in members:
+            return BROKEN, 'el perfil o la búsqueda no traen el id de miembro (memberUrn)', 0
+        return drafted(client.follow_request(members[0]))
+
+    def accept():
+        ids = need('received')
+        if ids == 'ninguna':
+            raise Skipped('no hay invitaciones recibidas para mirar')
+        if not all(i in client.secrets for i in ids):
+            return BROKEN, 'las invitaciones recibidas no traen su secreto (sharedSecret)', 0
+        return drafted(client.accept_request(ids[0]))
+
+    def by_writing():
+        raise Skipped(ONLY_BY_WRITING)
+
+    return [
+        ('create_comment', comment('create_comment')),
+        ('comment_in_thread', comment('comment_in_thread')),
+        ('follow_user', follow),
+        ('accept_invitation', accept),
+        ('add_reaction', by_writing),
+        ('react_to_comment', by_writing),
+        ('send_invitation', by_writing),
+    ]
+
+
 def run(transport, out=None, clock=time.time):
-    """{resultado, operaciones: [{operacion, estado, motivo, filas}], llamadas, segundos, error}. `error` is the
-    LinkedInError that ended it early ({kind, pausa, motivo}: the service's or our own message, never LinkedIn's
-    data), or None. `out` gets one line per read."""
+    """{resultado, operaciones: [{operacion, estado, motivo, filas, (tipo), (diagnostico)}], llamadas, segundos,
+    error}. A write's row has tipo 'escritura'; a row whose LinkedInError carried a detail (a template that did not
+    parse, the box fields missing) keeps it as `diagnostico` (counts and field names). `error` is the LinkedInError
+    that ended it early ({kind, pausa, motivo}: the service's or our own message, never LinkedIn's data), or None.
+    `out` gets one line per row."""
     started, recorder = clock(), Recorder(transport)
     client, found, rows, result, error = Cliente(recorder), {}, [], None, None
-    for name, check in steps(client, recorder, found):
-        row = {'operacion': name}
+    checks = [(name, check, None) for name, check in steps(client, recorder, found)]
+    checks += [(name, check, WRITE) for name, check in write_steps(client, found)]
+    for name, check, kind in checks:
+        row = {'operacion': name, **({'tipo': kind} if kind else {})}
         try:
             row['estado'], row['motivo'], row['filas'] = check()
         except Skipped as exc:
-            row.update(estado='sin_probar', motivo=str(exc))
+            row.update(estado=UNTRIED, motivo=str(exc))
         except LinkedInError as exc:
             row.update(estado=BROKEN, motivo=str(exc)[:300])
+            if isinstance(exc.detail, dict) and exc.detail:
+                row['diagnostico'] = exc.detail
             if exc.kind in NOT_RUN_KINDS:
                 row['estado'] = result = NOT_RUN
             elif exc.pause or exc.kind in HALT_KINDS:
@@ -201,10 +304,11 @@ def run(transport, out=None, clock=time.time):
             row.update(estado=BROKEN, motivo=f'respuesta ilegible ({type(exc).__name__})')
         rows.append(row)
         if out:
-            out(f'{row["estado"]:10} {name}' + (f' ({row["filas"]} filas)' if row['estado'] == OK else '')
-                + (f': {row["motivo"]}' if row.get('motivo') else ''))
+            done = (' (preparada, sin enviar)' if kind else f' ({row["filas"]} filas)') if row['estado'] == OK else ''
+            out(f'{row["estado"]:10} {name}{done}' + (f': {row["motivo"]}' if row.get('motivo') else '')
+                + (f' {json.dumps(row["diagnostico"], ensure_ascii=False)}' if row.get('diagnostico') else ''))
         if result:
             break
-    result = result or (OK if all(r['estado'] == OK for r in rows) else BROKEN)
+    result = result or (BROKEN if any(broken(r) for r in rows) else OK)
     return {'resultado': result, 'operaciones': rows, 'llamadas': recorder.calls,
             'segundos': round(clock() - started), 'error': error}

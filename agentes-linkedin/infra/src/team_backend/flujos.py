@@ -97,7 +97,10 @@ def _on(name, default='true'):
 # (pattern of the internal error, the reason in plain words, what to do or ''). The first match wins; the order goes
 # from the most specific to the most general. The cycle stops (orquestacion: cost_cap, call_timeout…) come bare from a
 # blocked job or after «Ciclo detenido: » in a piece's note.
+LINKEDIN_CAMBIO = ('Lo aprobado espera sin perderse. Prueba ahora con «manage.py operador --usuario <tu usuario> '
+                   'prueba-linkedin»; si sigue roto, hay que ajustar el conector directo (docs/operador-linkedin.md).')
 MOTIVOS = [
+    (r'LinkedIn cambió la página', 'LinkedIn cambió la página', LINKEDIN_CAMBIO),
     (r'Tope compartido de lecturas de perfil', 'sin lecturas de perfil: el cupo del día se gastó',
      'Sube OPERATOR_PROFILE_READ_DAILY_LIMIT (hasta 100) o baja OPERATOR_PROFILE_READ_RESEARCH_SHARE.'),
     (r'Parte de las acciones del cupo de lecturas', 'sin lecturas de perfil: la investigación dejó sin cupo a las acciones',
@@ -1331,7 +1334,7 @@ ESCRITURAS = {'CONT-09': 'posts', 'INT-03': 'comentarios', 'INT-04': 'respuestas
 def medir_salud(ctx):
     from knowledge import presupuesto
     from . import alertas_slack, autopiloto, operador
-    from .models import ActionProposal, CanaryRun, Job
+    from .models import ActionProposal, Job
     res = Resultado(FLUJOS_POR_ID['salud'])
     if not autopiloto.enabled():
         res.hallazgos.append(Hallazgo(ROJO, 'El autopiloto está apagado: nada se encola solo.', 'Enciende OPERATOR_AUTOPILOT.'))
@@ -1371,10 +1374,9 @@ def medir_salud(ctx):
     for account in _accounts(ctx).filter(paused=True):
         res.hallazgos.append(Hallazgo(ROJO, f'La cuenta «{account.label}» está en pausa: no lee ni escribe.',
                                       'Reanúdala desde la app cuando esté resuelto.'))
-    canary = CanaryRun.objects.filter(account__in=_accounts(ctx), **_in('started_at', ctx.dia)).order_by('-started_at').first()
-    if canary is not None and canary.state == CanaryRun.State.BROKEN:
-        res.hallazgos.append(Hallazgo(AMARILLO, 'La prueba diaria de LinkedIn encontró algo que cambió.',
-                                      'Mírala en Ajustes › LinkedIn.'))
+    canary = _canary_line(ctx)
+    if canary:
+        lines.append(canary)
 
     def cola_general(window):
         rows = Job.objects.filter(**_in('created_at', window))
@@ -1402,9 +1404,57 @@ def medir_salud(ctx):
             res.hallazgos.append(Hallazgo(AMARILLO, f'{_plural(uncertain, "escritura", "escrituras")} sin confirmar en LinkedIn.',
                                           'Respóndelas en Tu turno («¿Salió o no?»).'))
             res.para_hoy.append(f'{_plural(uncertain, "«¿Salió o no?» espera", "«¿Salió o no?» esperan")} tu respuesta')
-    res.clave = '; '.join(lines[:1]) or 'al día'
+    res.clave = '; '.join(lines[:1] + ([canary] if canary and lines[:1] != [canary] else [])) or 'al día'
     res.notas = lines
     return res
+
+
+def _canary_line(ctx):
+    """The day's line of the LinkedIn canary (the last run of the last 24 hours of the member's directo accounts): the
+    daily «all fine» lives here, never in a Slack message of its own; what it found broken turns its flows red
+    (_linkedin_findings)."""
+    from linkedin_directo.canario import UNTRIED, WRITE
+    from . import canario
+    from .models import CanaryRun
+    accounts = _accounts(ctx).filter(provider='directo')
+    if not accounts.exists():
+        return ''
+    run = (CanaryRun.objects.filter(account__in=accounts, **_in('started_at', ctx.dia)).exclude(state=CanaryRun.State.RUNNING)
+           .order_by('-started_at').first())
+    if run is None:
+        return 'Prueba de LinkedIn: sin correr en 24 h'
+    when = _hhmm(run.started_at)
+    if run.state == CanaryRun.State.OK:
+        untried = sum(1 for r in run.operations or [] if r.get('tipo') == WRITE and r.get('estado') == UNTRIED)
+        return (f'Prueba de LinkedIn: ok a las {when} ({len(run.operations or [])} comprobaciones, {run.calls} llamadas, '
+                f'ninguna escritura enviada' + (f'; {untried} escrituras solo se saben al escribir' if untried else '') + ')')
+    if run.state == CanaryRun.State.BROKEN:
+        return f'Prueba de LinkedIn: rota a las {when} ({", ".join(canario.failing(run)[:6])})'
+    return f'Prueba de LinkedIn: no pudo correr a las {when} ({motivo(run.error)})'
+
+
+def _linkedin_findings(res, ctx):
+    """LinkedIn changed a page or an answer this flow uses (cambios_linkedin): 🔴 while today's episode is open, with
+    what stops and what to do. Off flows stay off."""
+    from . import cambios_linkedin
+    if 'linkedin' not in ctx.cache:
+        try:
+            accounts = list(_accounts(ctx).filter(provider='directo'))
+            ctx.cache['linkedin'] = cambios_linkedin.problemas(accounts, ctx.now)
+            ctx.cache['linkedin_varias'] = len(accounts) > 1
+        except Exception:  # noqa: BLE001 - logged like a broken measure; never hides the flow
+            logger.warning('flujo_linkedin_failed', exc_info=True)
+            ctx.cache['linkedin'] = []
+    found = []
+    for account, episode in ctx.cache['linkedin']:
+        if res.flujo.id not in cambios_linkedin.flows(episode.operacion):
+            continue
+        what, stops = cambios_linkedin.plain(episode.operacion)
+        source = 'en uso' if cambios_linkedin.USE in episode.fuentes else 'en la prueba de LinkedIn'
+        label = f' en «{account.label}»' if ctx.cache.get('linkedin_varias', False) else ''
+        found.append(Hallazgo(ROJO, f'LinkedIn cambió la página{label}: no se puede {what} ({episode.operacion}) desde '
+                                    f'{_since(episode.desde, ctx.now)} ({source}): {stops}.', LINKEDIN_CAMBIO))
+    return found
 
 
 # --------------------------------------------------------------------------- the registry
@@ -1541,7 +1591,7 @@ def juzgar(res, ctx):
     if res.apagado:
         res.estado = APAGADO
         return res
-    res.hallazgos = res.hallazgos + _stage_findings(res, ctx)
+    res.hallazgos = _linkedin_findings(res, ctx) + res.hallazgos + _stage_findings(res, ctx)
     level = max((GRAVEDAD[h.nivel] for h in res.hallazgos), default=0)
     res.estado = {0: VERDE, 1: AMARILLO, 2: ROJO}[level]
     res.hallazgos.sort(key=lambda h: -GRAVEDAD[h.nivel])

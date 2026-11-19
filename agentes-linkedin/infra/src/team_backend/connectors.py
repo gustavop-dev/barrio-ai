@@ -16,10 +16,12 @@ class ConnectorError(Exception):
     """Definite failure: the provider did not apply the operation.
     pause=True means further writes on this account must stop until a human reviews it. `retry_after` (seconds), when
     known, is when the same call may be tried again (the navegador service's budget). `deferrable` is set only by
-    connectors_directo, for the navegador service's own refusals before anything left (see `deferred`)."""
-    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None,deferrable=False):
+    connectors_directo, for the navegador service's own refusals before anything left (see `deferred`). `operation` is
+    the connector method that failed and `detail` what helps find a shape LinkedIn changed (field names and counts,
+    never a value): both only from connectors_directo (cambios_linkedin records them)."""
+    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None,deferrable=False,operation='',detail=None):
         super().__init__(message);self.status=status;self.kind=kind;self.pause=pause;self.retry_after=retry_after
-        self.deferrable=deferrable
+        self.deferrable=deferrable;self.operation=operation;self.detail=detail
 
 def deferred(exc):
     """The one rule for «nothing left, wait and try again»: only the navegador service refusing before the call left,

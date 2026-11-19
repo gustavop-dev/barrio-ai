@@ -93,8 +93,12 @@ anteriores al 10/10/2025.
    Lo que solo vale para un rango exacto (miembros alcanzados, publicaciones principales, demografía del contenido)
    se muestra solo para ese rango, o con su propio rango.
 6. **Prueba diaria.** La del spike, llevada al backend (trabajo `check_linkedin`, `team_backend/canario.py`). Una vez
-   al día por cuenta `directo`, desde las 12:00 UTC (`LINKEDIN_CANARY_AFTER`), hace las 14 lecturas del conector (16
-   llamadas) y comprueba que cada respuesta trae los campos que usa Barrio. Va por el servicio como cualquier
+   al día por cuenta `directo`, desde las 12:00 UTC (`LINKEDIN_CANARY_AFTER`), hace las 14 lecturas del conector y
+   abre la página del post cuyos comentarios lee (17 llamadas; eran 16 hasta el 19/11/2026). Comprueba que cada respuesta trae los
+   campos que usa Barrio y prepara, sin enviarlas, las escrituras que dependen de la página: comentar, responder,
+   seguir y aceptar una invitación. Reaccionar e invitar van a rutas fijas y quedan «sin probar: solo se sabe al
+   escribir»; un fallo de forma en uso las detiene igual (`cambios_linkedin.py`, ver
+   [operador-linkedin.md](../agentes-linkedin/infra/docs/operador-linkedin.md)). Va por el servicio como cualquier
    lectura: gasta sus topes y respeta sus paradas. Guarda por lectura el estado, las filas y los campos que faltan,
    nunca un valor; quedan las 30 últimas. Si no pudo correr (servicio ocupado, caído o sin cupo), lo intenta otra vez
    a la hora, hasta 3 veces al día. Avisa en Notificaciones (`linkedin_canary`) una vez cuando algo se rompe o no pudo

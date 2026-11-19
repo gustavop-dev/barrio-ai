@@ -1010,6 +1010,22 @@ def _defer(execution,proposal,exc,user):
                kind=exc.kind,retry_at=at.isoformat())
     return OperatorBlocked(f'No salió nada ({exc}). Queda aprobada; se intenta de nuevo desde las {at.astimezone(local_tz()):%H:%M}.')
 
+WRITE_HELD='operator.write_held'
+
+def _hold(execution,proposal,exc,user):
+    """LinkedIn changed a page or an answer this action needs, before anything left (cambios_linkedin: the error comes
+    before the write). Like _defer: the execution is undone and the proposal approved again, and its spacing is given
+    back; cambios_linkedin.held keeps it and the rest of its capability waiting until the canary passes or the day ends.
+    connectors_directo already recorded the change (linkedin.shape_changed)."""
+    release_spacing(execution)
+    with transaction.atomic():
+        ActionExecution.objects.filter(pk=execution.pk).delete()
+        ActionProposal.objects.filter(pk=proposal.pk).update(state=ActionProposal.State.APPROVED)
+        _audit(user,WRITE_HELD,proposal.account_id,proposal=str(proposal.id),capability=proposal.capability,
+               operation=exc.operation,kind=exc.kind)
+    return OperatorBlocked(f'LinkedIn cambió la página ({exc.operation}): no se envió nada. Queda aprobada hasta que la '
+                           'prueba de LinkedIn vuelva a pasar o hasta mañana.')
+
 INACTIVE_HOLD='El miembro dueño de esta cuenta está inactivo: sus acciones esperan a que el administrador lo reactive.'
 
 def member_hold(member):
@@ -1062,6 +1078,9 @@ def execute(user,proposal_id):
         if not within_window():raise OperatorBlocked('Fuera de la ventana horaria de actividad; queda aprobada para después.')
         retry_at=None if proposal.piece_id else deferred_until(account,proposal.capability)
         if retry_at:raise OperatorBlocked(f'La última escritura de {proposal.capability} no salió; queda aprobada hasta las {retry_at.astimezone(local_tz()):%H:%M}.')
+        from . import cambios_linkedin
+        changed='' if proposal.piece_id else cambios_linkedin.held(account,proposal.capability)
+        if changed:raise OperatorBlocked(changed)  # LinkedIn changed a page this action needs: it waits, approved
         waits=batch_issue(proposal.capability) if not proposal.piece_id else ''
         if waits:raise OperatorBlocked(waits)
         if not spacing_ok(account,capability=proposal.capability):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
@@ -1157,6 +1176,10 @@ def execute(user,proposal_id):
         # its own notice and fails as before).
         if deferred(exc) and not getattr(execution,'_write_accepted',False) and not proposal.piece_id:
             raise _defer(execution,proposal,exc,user) from None
+        from . import cambios_linkedin
+        if exc.kind in cambios_linkedin.SHAPE_KINDS and getattr(exc,'operation','') and not proposal.piece_id \
+                and not getattr(execution,'_write_accepted',False):
+            raise _hold(execution,proposal,exc,user) from None
         from . import red
         red.provider_failure(account,proposal,exc,user)
         if getattr(execution,'_write_accepted',False):
