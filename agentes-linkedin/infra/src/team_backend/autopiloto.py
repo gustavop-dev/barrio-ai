@@ -146,7 +146,9 @@ def post_issues(proposal):
     from . import compuertas
     text=proposal.payload.get('text','')
     issues=compuertas.form_rules(text,compuertas.gate_policy(proposal.piece if proposal.piece_id else None))
-    issues+=guardas.text_checks(text,_author(proposal))  # her memory only (phase 4)
+    # Her memory only (phase 4). Of the first-person experience regex only an invented figure about her work is a rule of
+    # the post (19/11/2026, editorial.text_rules); the verdict on this exact text, required below, judges the rest.
+    issues+=guardas.text_checks(text,_author(proposal),experience='figures')
     verification=proposal.piece.verification if proposal.piece_id else {}
     if (verification.get('override') or {}).get('text_sha256')==hashlib.sha256(text.encode()).hexdigest():
         # EDI-23: Gustavo dismissed the block of this exact text: only what LinkedIn needs remains (length, image).

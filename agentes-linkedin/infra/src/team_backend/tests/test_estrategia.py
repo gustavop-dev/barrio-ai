@@ -321,11 +321,12 @@ class FindingTests(StrategyBase):
         self.assertEqual(self.codes('P',told,story=dict(self.STORY,source_ref='web:otra')),['unsourced_third_party_story'])
         self.assertEqual(self.codes('P','I almost shut my company down before launch.',story=self.STORY),['first_person_appropriation'])
         self.assertEqual(self.codes('P','Ana Ejemplo once said: «fear is the price of building anything».',story=self.STORY),['fabricated_quote'])
-        # One severity table (compuertas): a founder's story told wrong is hard; how a type is shaped is soft.
-        self.assertEqual({c for c in compuertas.STRATEGY_CODES if compuertas.severity(c)=='dura'},
-                         {'unsourced_third_party_story','fabricated_quote','first_person_appropriation'})
+        # One severity table (compuertas): a founder's story told as Gustavo's is hard; since 19/11/2026 an unsourced story
+        # or quote is a note the repair softens, and how a type is shaped is soft.
+        self.assertEqual({c for c in compuertas.STRATEGY_CODES if compuertas.severity(c)=='dura'},{'first_person_appropriation'})
         self.assertEqual({c for c in compuertas.STRATEGY_CODES if compuertas.severity(c)=='blanda'},
-                         {'cta_count','offer_in_growth','offer_in_personal','no_reader_need','repeated_story'})
+                         {'unsourced_third_party_story','fabricated_quote','cta_count','offer_in_growth','offer_in_personal',
+                          'no_reader_need','repeated_story'})
 
     def test_what_the_brief_decided_is_a_risk_never_a_block(self):
         piece=EditorialPiece(slot_date=self.today,brief={'gasp_type':'A','reader_value':''})

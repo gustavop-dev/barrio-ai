@@ -49,7 +49,7 @@ def text_checks(text,member=None,experience=True):
     """private_leaks and invented_experience of a text written in one member's name, against HER blocks and naming her
     (organizaciones, phase 4): never another member's facts or guidance. `member=None`: the default member's blocks
     (MiembroRequerido among several active ones) and the name of always (OWNER): a check that is not told whose text it
-    is reads no identity."""
+    is reads no identity. experience='figures': only invented_figures (the post's final gate, 19/11/2026)."""
     public,private=blocks(member)
     if member is None:
         name=OWNER
@@ -57,6 +57,7 @@ def text_checks(text,member=None,experience=True):
         from . import identidad
         name=identidad.of(member).name
     reasons=private_leaks(text,private,name)
+    if experience=='figures':return reasons+invented_figures(text,public,name)
     return reasons+invented_experience(text,public,name) if experience else reasons
 
 def _words(value):
@@ -102,6 +103,12 @@ cofounder client cliente customer'''.split(),'organizacion'),
 NUMBER=re.compile(r'\d+(?:[.,]\d+)*')
 SENTENCE=re.compile(r'(?<=[.!?])\s+|\n+')
 MAX_CLAIMS=3
+# A sentence that asks, imagines or reports what a source says narrates no lived experience, whatever its wording
+# (19/11/2026: «if we built…», «imagine my team…» or «last year I read that a study…» were flagged as invented).
+NOT_LIVED=re.compile(r"\b(?:if|imagine|suppose|according to|(?:a|the|one|this|that|new|recent) (?:report|study|survey)|"
+                     r"studies|research (?:shows|suggests|found|finds)|si|imagina|supongamos|según|"
+                     r"(?:un|el|este|ese) (?:informe|estudio)|una encuesta)\b",re.I)
+YEAR=re.compile(r'(?:19|20)\d\d')  # a year is a date, not a figure about his work
 
 def _plain(value):
     raw=value if isinstance(value,str) else json.dumps(value,ensure_ascii=False)
@@ -124,11 +131,14 @@ def _fact_text(fact):
     return ' '.join([str(fact.get('key','')).replace('.',' ').replace('_',' '),_plain(fact.get('fact',''))])
 
 def experience_claims(text):
-    """First-person experience claims: (sentence, trigger) for each sentence that attributes lived experience."""
+    """First-person experience claims: (sentence, trigger) for each sentence that attributes lived experience. A question,
+    a hypothesis or a sentence about what a source reports is skipped (NOT_LIVED)."""
     claims=[]
     for sentence in SENTENCE.split(text or ''):
+        sentence=sentence.strip()
+        if not sentence or sentence.rstrip('"\'”’»)').endswith('?') or NOT_LIVED.search(sentence):continue
         match=EXPERIENCE.search(sentence)
-        if match:claims.append((sentence.strip(),match.group(0)))
+        if match:claims.append((sentence,match.group(0)))
     return claims
 
 def invented_experience(text,public_facts,name=OWNER):
@@ -145,9 +155,24 @@ def invented_experience(text,public_facts,name=OWNER):
     reasons=[]
     for sentence,trigger in claims:
         quote=sentence if len(sentence)<=160 else sentence[:157]+'...'
-        numbers=_numbers(sentence);figures=sorted(numbers-known_numbers)
+        numbers=_numbers(sentence);figures=sorted(n for n in numbers-known_numbers if not YEAR.fullmatch(n))
         if figures:reasons.append(f'Cifra sobre el trabajo de {name} que no consta en sus hechos públicos («{figures[0]}» en «{quote}»)')
         elif not (_evidence(sentence)&known_words or numbers&known_numbers):
             reasons.append(f'Atribuye a {name} una experiencia que no consta en sus hechos públicos («{quote}»)')
+        if len(reasons)>=MAX_CLAIMS:break
+    return reasons
+
+
+def invented_figures(text,public_facts,name=OWNER):
+    """The concrete, checkable part of an invented experience: a figure (not a year) in a first-person experience
+    sentence that no public fact contains («we cut their costs 40%», «I closed 12 clients»). The post's deterministic
+    rule since 19/11/2026: the wording alone (invented_experience) only points sentences out to the verifier, because it
+    fired on opinions and general claims; a number about his work is a fact, and an invented one is never published."""
+    known=_numbers(' '.join(_fact_text(f) for f in public_facts or []));reasons=[]
+    for sentence,_ in experience_claims(text):
+        figures=sorted(n for n in _numbers(sentence)-known if not YEAR.fullmatch(n))
+        if figures:
+            quote=sentence if len(sentence)<=160 else sentence[:157]+'...'
+            reasons.append(f'Cifra sobre el trabajo de {name} que no consta en sus hechos públicos («{figures[0]}» en «{quote}»)')
         if len(reasons)>=MAX_CLAIMS:break
     return reasons

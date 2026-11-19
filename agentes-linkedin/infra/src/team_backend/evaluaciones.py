@@ -538,8 +538,7 @@ def _check(run,piece,text,claims,model,second=None):
 def _settle(piece,review,reasons,issues):
     """editorial.settle without the piece's web research (the eval has no research results): only hard findings block."""
     if not reasons or review is None or issues:return reasons,[]
-    hard,soft=compuertas.split(review,compuertas.gate_policy(piece))
-    return (reasons,[]) if hard else ([],soft)
+    return compuertas.settled(reasons,review,compuertas.gate_policy(piece))
 
 def gate(run,piece,model):
     """The production gate on the selection's text (editorial._check, _repair_round and settle): rules, verifier, one
