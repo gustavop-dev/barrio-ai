@@ -82,13 +82,23 @@ class RendererTests(TestCase):  # the name drawn at the foot is the member's (id
         im=Image.open(io.BytesIO(infografias.render(data['slides'][0])))
         self.assertEqual(im.size,(1080,1080));self.assertEqual(im.getpixel((95,95)),(247,246,240))
         infografias.validate({'slides':[slide('portada'),slide('preguntas'),slide('cierre')]},'carrusel')
-        for steps in (['What told you to pivot?'],['One?','Two?','Three?','Four?','Five?'],['1. What told you to pivot?','2. And to hold?'],
-                      ['- What told you to pivot?','- And to hold?'],['A statement, not a question','And to hold?'],
-                      ['What told you to pivot? And to hold?','Why?'],['Was it after 18 months?','Why?']):
+        # Hard: more than four, an element that is no question, a figure without its source.
+        for steps in (['One?','Two?','Three?','Four?','Five?'],['A statement, not a question','And to hold?'],
+                      ['Was it after 18 months?','Why?']):
             with self.subTest(steps=steps),self.assertRaises(ValueError):
                 infografias.validate({'slides':[dict(slide('preguntas'),steps=steps)]},'infografia')
-        with self.assertRaisesMessage(ValueError,'Pasos o preguntas fuera de su plantilla'):
-            infografias.validate({'slides':[dict(slide('portada'),steps=['What told you to pivot?','And to hold?'])]},'infografia')
+        # Style, mended by fix() (19/11/2026, «que no bloquee todo»): the marks go, the statement goes, the first four stay.
+        for steps,mended in ((['1. What told you to pivot?','2. And to hold?'],['What told you to pivot?','And to hold?']),
+                             (['- What told you to pivot?','- And to hold?'],['What told you to pivot?','And to hold?']),
+                             (['A statement, not a question','And to hold?'],['And to hold?']),
+                             (['One?','Two?','Three?','Four?','Five?'],['One?','Two?','Three?','Four?'])):
+            with self.subTest(steps=steps):
+                fixed,notes=infografias.fix({'slides':[dict(slide('preguntas'),steps=steps)]},'infografia')
+                self.assertEqual(infografias.validate(fixed,'infografia')['slides'][0]['steps'],mended)
+        # Steps a template does not draw leave the design instead of failing it.
+        fixed,notes=infografias.fix({'slides':[dict(slide('portada'),steps=['What told you to pivot?','And to hold?'])]},'infografia')
+        self.assertEqual(fixed['slides'][0]['steps'],[]);self.assertIn('no dibuja: steps',' '.join(notes))
+        infografias.validate(fixed,'infografia')
         # The first design of 12/11: the questions inside «numero». The error now names the template to use.
         old=dict(slide('numero'),title='Hold on, or pivot?',body='What signal told you to hold?',
                  source={'ref':'','label':'','date':'','estimate':False})
@@ -104,12 +114,20 @@ class RendererTests(TestCase):  # the name drawn at the foot is the member's (id
         self.assertEqual(pdf.count(b'/Alt <'),3);self.assertIn(b'/Marked true',pdf);self.assertIn(b'/Count 3',pdf)
 
     def test_rejects_long_text_forbidden_graphs_unsourced_data_and_missing_alt(self):
-        mutations=[{'title':'one two three four five six seven eight nine'}, {'body':'word '*41},
-                   {'template':'pie3d'}, {'steps':['one','two']}, {'steps':['one']*6}, {'alt':''}, {'title':'Hello 🚀'},
-                   {'title':'SHOUTING headline'}, {'title':'#topic here'}, {'title':'A question!!'}]
+        # What protects the truth and the legibility stays hard in validate()...
+        mutations=[{'title':' '.join(['word']*15)}, {'template':'pie3d'}, {'steps':['one']}, {'steps':['one']*7},
+                   {'alt':''}, {'title':'Hello 🚀'}]
         for mutation in mutations:
             with self.subTest(mutation=mutation),self.assertRaises(ValueError):
                 infografias.validate({'slides':[dict(slide(),**mutation)]},'infografia')
+        # ...style is fix()'s: mended, never a reason to discard the image (19/11/2026).
+        for mutation,field,mended in [({'title':'one two three four five six seven eight nine'},'title','one two three four five six seven eight nine'),
+                                      ({'body':'word '*80},'body',''),({'title':'SHOUTING headline'},'title','shouting headline'),
+                                      ({'title':'#topic here'},'title','topic here'),({'title':'A question!!'},'title','A question!'),
+                                      ({'alt':''},'alt','Start with a decision'),({'title':'Hello 🚀'},'title','Hello')]:
+            with self.subTest(style=mutation):
+                fixed,notes=infografias.fix({'slides':[dict(slide(),**mutation)]},'infografia')
+                self.assertEqual(infografias.validate(fixed,'infografia')['slides'][0][field],mended)
         for template in ('numero','barras'):
             with self.assertRaises(ValueError):infografias.validate({'slides':[slide(template)]},'infografia')
         value=slide('numero');value['source']['estimate']=True
@@ -123,14 +141,17 @@ class RendererTests(TestCase):  # the name drawn at the foot is the member's (id
         for title in ('Ship AI agents safely','Scope your MVP first','What a CTO should ask','APIs before UI polish'):
             with self.subTest(title=title):
                 infografias.validate({'slides':[dict(slide(),title=title,alt=f'Slide titled {title}.')]},'infografia')
-        for title in ('Start with the WORKFLOW','AI is NOT magic'):
-            with self.subTest(title=title),self.assertRaisesMessage(ValueError,'Mayúsculas solo en etiquetas'):
-                infografias.validate({'slides':[dict(slide(),title=title)]},'infografia')
+        # Shouting is style: fix() lowers the shouted word and keeps the acronym.
+        for title,mended in (('Start with the WORKFLOW','Start with the workflow'),('AI is NOT magic','AI is not magic')):
+            with self.subTest(title=title):
+                fixed,_=infografias.fix({'slides':[dict(slide(),title=title)]},'infografia')
+                self.assertEqual(infografias.validate(fixed,'infografia')['slides'][0]['title'],mended)
         self.assertEqual(infografias.shouting('LLM costs in the US and EU'),[])
         cover=dict(slide('portada'),title='Ship AI agents safely',highlight='agents')
         infografias.validate({'slides':[cover,slide(),slide('cierre')]},'carrusel')
-        with self.assertRaisesMessage(ValueError,'Portada en minúsculas'):
-            infografias.validate({'slides':[dict(cover,title='Ship Agents Safely',highlight='Agents'),slide(),slide('cierre')]},'carrusel')
+        # A cover in title case is a note for the designer, not a discard.
+        fixed,notes=infografias.fix({'slides':[dict(cover,title='Ship Agents Safely',highlight='Agents'),slide(),slide('cierre')]},'carrusel')
+        infografias.validate(fixed,'carrusel');self.assertIn('minúsculas',' '.join(notes))
 
 
 class ImageWorkflowTests(EditorialBase):
@@ -193,13 +214,14 @@ class ImageWorkflowTests(EditorialBase):
             other=self.piece('infografia')
             self.assertEqual(self.human.get(f'/api/v1/editorial/pieces/{other.id}/images/{image["id"]}/descartada').status_code,404)
 
-    def test_no_gallery_no_keys_falls_back_to_private_brand_card_with_alt(self):
+    def test_no_gallery_no_keys_falls_back_to_the_posts_key_line_privately_with_alt(self):
         piece=self.piece('infografia')
         with patch.dict(os.environ,{'LIVE_PROVIDERS':'false'}),patch('knowledge.providers.claude',side_effect=AssertionError('paid API')):
             imagenes.prepare(piece)
-        row=piece.images.get();self.assertEqual(row.kind,'tarjeta');self.assertTrue(row.alt)
+        row=piece.images.get();self.assertEqual((row.kind,row.template),('infografia','cita'));self.assertIn('Founders',row.alt)
+        self.assertEqual(row.data['subtitle'],'Which decision is your product helping someone make this week?')
         self.assertEqual(imagenes.issues(piece,imagenes.manifest(piece)),[])
-        data=self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json();self.assertEqual(data['images'][0]['kind'],'tarjeta')
+        data=self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json();self.assertEqual(data['images'][0]['template'],'cita')
         url=data['images'][0]['url'];response=self.human.get(url)
         self.assertEqual(response.status_code,200);self.assertIn('private',response['Cache-Control']);response.close()
         from rest_framework.test import APIClient
@@ -208,7 +230,8 @@ class ImageWorkflowTests(EditorialBase):
     def test_infographic_and_carousel_use_code_and_one_bounded_repair(self):
         for kind,slides in [('infografia',[slide()]),('carrusel',[slide('portada'),slide(),slide('cierre')])]:
             piece=self.piece(kind);fake=connectors_images.FakeImageConnector()
-            bad={'slides':[dict(slide(),title='word '*9)]};good={'slides':slides}
+            # A figure without a source in «numero» cannot be mended (the figure is the slide): one correction.
+            bad={'slides':[dict(slide('numero'),source={'ref':'','label':'','date':'','estimate':False})]};good={'slides':slides}
             with patch('knowledge.providers.claude',side_effect=[{'text':json.dumps(bad)},{'text':json.dumps(good)}]) as model:
                 imagenes.prepare(piece,client=fake)
             self.assertEqual(model.call_count,2);self.assertEqual(piece.images.count(),len(slides))
@@ -221,12 +244,14 @@ class ImageWorkflowTests(EditorialBase):
         piece=self.piece('infografia');fake=connectors_images.FakeImageConnector(ok=False)
         with patch('knowledge.providers.claude',return_value={'text':json.dumps({'slides':[slide()]})}) as model:
             imagenes.prepare(piece,client=fake)
-        self.assertEqual(model.call_count,2);self.assertEqual(piece.image_kind,'tarjeta')
-        self.assertIn('rechazada',piece.image_reason)
+        # No design passed: the post's own key line goes out, not the generic brand card.
+        self.assertEqual(model.call_count,2);self.assertEqual(piece.image_kind,'infografia')
+        self.assertEqual(piece.images.get().template,'cita');self.assertEqual(piece.image_review['mode'],'tarjeta_contenido')
+        self.assertIn('rechazada',piece.image_reason);self.assertIn('rechazada',piece.image_review['fallback']['reason'])
         piece=self.piece('infografia')
         with patch('knowledge.providers.claude',side_effect=ValueError('Proveedor incierto')) as model:
             imagenes.prepare(piece,client=connectors_images.FakeImageConnector())
-        self.assertEqual(model.call_count,1);self.assertEqual(piece.image_kind,'tarjeta')
+        self.assertEqual(model.call_count,1);self.assertEqual(piece.images.get().template,'cita')
 
     def test_tampered_bytes_alt_and_document_never_pass_policy(self):
         piece=self.piece('infografia');imagenes.fallback(piece,'Fixture');expected=imagenes.manifest(piece);row=piece.images.get()
@@ -249,7 +274,7 @@ class ImageWorkflowTests(EditorialBase):
         p=self.photo('no',size=(1200,600));piece=self.piece(photo=p);imagenes.prepare(piece)
         self.assertEqual((piece.images.get().width,piece.images.get().height),(1200,600))
         p=self.photo();piece=self.piece(photo=p);capturas.delete_photo(self.gustavo,p);imagenes.prepare(piece)
-        self.assertEqual(piece.image_kind,'tarjeta')
+        self.assertEqual((piece.image_kind,piece.image_review['mode']),('infografia','tarjeta_contenido'))
 
     def test_real_circuit_publishes_image_once_and_upload_failure_never_creates_post(self):
         piece=self.plan(answers());proposal=editorial_action(piece)

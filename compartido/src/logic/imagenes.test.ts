@@ -22,6 +22,13 @@ describe('image workflow contract', () => {
     expect(reviewLines({ ok: false, reasons: ['Se alteró un nombre'] })).toEqual(['Comprobación no aprobada', 'Se alteró un nombre']);
   });
 
+  it('says which fallback went out and why, and keeps style observations apart from a failed check', () => {
+    expect(reviewLines({ ok: true, mode: 'tarjeta_contenido', fallback: { level: 'contenido', reason: 'Dato sin fuente' } }))
+      .toEqual(['Respaldo: la frase clave del post, sin cifras; ningún diseño pasó.', 'Motivo: Dato sin fuente']);
+    expect(reviewLines({ ok: true, observations: ['Punto 3: titular largo'] }))
+      .toEqual(['Comprobación aprobada', 'Observación: Punto 3: titular largo']);
+  });
+
   it('tells an AI edit, a plain crop and the untouched photo apart (images from before the field are originals)', () => {
     expect(photoTreatment({ kind: 'foto', edited: true, cropped: false })).toBe('editada');
     expect(photoTreatment({ kind: 'foto', edited: false, cropped: true })).toBe('recortada');

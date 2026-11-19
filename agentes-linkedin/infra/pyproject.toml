@@ -19,6 +19,10 @@ dependencies = [
     "pywebpush>=2,<3",
     "cryptography>=43",
     "Pillow>=11,<13",
+    # The free infographic canvas (team_backend/lienzo.py, INFOGRAFIA_LIENZO): HTML+CSS to PDF without a browser or
+    # JavaScript, then PDF to PNG. Imported only by the render's child process (lienzo_render.py); needs Pango (Dockerfile).
+    "weasyprint>=70,<71",
+    "pypdfium2>=4.30,<6",
 ]
 
 [project.optional-dependencies]

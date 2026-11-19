@@ -5,9 +5,14 @@ export type ImageKind = 'foto' | 'infografia' | 'carrusel' | 'tarjeta';
 export interface ImageReview {
   ok?: boolean;
   started?: boolean;
-  stage?: 'datos';
+  stage?: 'datos' | 'lienzo';
   failures?: string[];
-  mode?: 'fixed_brand_card';
+  /** How a fallback went out: the post's key line, the editor's photo or, last, the fixed brand card. */
+  mode?: 'fixed_brand_card' | 'tarjeta_contenido' | 'foto_respaldo';
+  fallback?: { level: 'contenido' | 'foto' | 'marca'; reason: string };
+  /** Style points the visual check noted without discarding the image. */
+  observations?: string[];
+  notes?: string[];
   rule_version?: string;
   sha256?: string[];
   reasons?: string[];
@@ -32,7 +37,8 @@ export interface PieceImage {
   cropped?: boolean;
   ai_edit: AIEdit;
   reason: string;
-  template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | 'preguntas' | null;
+  template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | 'preguntas' | 'tabla' | 'comparacion' | 'linea' | 'lista'
+    | 'cita' | 'lienzo' | null;
   review: ImageReview;
   /** IMG-11 criterion 3: the last AI edit the visual check rejected, kept so Gustavo can judge it (never published). */
   rejected_edit?: RejectedEdit | null;

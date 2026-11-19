@@ -68,6 +68,12 @@ class Command(BaseCommand):
         cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
         cola.add_argument('--cuenta',required=True);cola.add_argument('--antes',required=True,help='Fecha y hora ISO con zona, por ejemplo 2026-11-12T20:40:00+00:00')
         cola.add_argument('--confirmar',action='store_true')
+        tar=sub.add_parser('rehacer-tarjetas',help='Piezas cuya imagen es la tarjeta genérica de marca: las lista con el costo '
+                           'estimado; con --confirmar rehace cada imagen (llamadas pagadas) y la nueva versión pasa por el líder. '
+                           'Las ya publicadas no se pueden cambiar')
+        tar.add_argument('--cuenta',required=True);tar.add_argument('--confirmar',action='store_true')
+        resp=sub.add_parser('respaldos-imagen',help='Cómo salieron las imágenes (diseño o qué respaldo) y por qué, en los últimos días')
+        resp.add_argument('--cuenta',required=True);resp.add_argument('--dias',type=int,default=30)
         reev=sub.add_parser('reevaluar-compradores',help='Compradores que salieron por la región, por falta de evidencia pública o que siguen sin nivel: los lista por puntaje con su nivel y motivo; sin --confirmar no cambia nada')
         reev.add_argument('--cuenta',required=True);reev.add_argument('--confirmar',action='store_true')
         sub.add_parser('preguntas-casos-projectapp',help='Encola en Tu turno las preguntas a Gustavo sobre los dos casos reales de '
@@ -241,6 +247,38 @@ class Command(BaseCommand):
                 result=red.requeue(user,account,before,confirm=o['confirmar'])
                 self.stdout.write(f"En cola clasificadas antes de {before.isoformat()}: {result['found']}. "+
                                   (f"Devueltas al clasificador: {result['requeued']}." if o['confirmar'] else 'Con --confirmar vuelven al clasificador.'))
+            elif o['accion']=='rehacer-tarjetas':
+                from team_backend import editorial, retoque
+                plan=retoque.redo_images(user,account,confirm=o['confirmar'])
+                todo=[r for r in plan if r['action']=='rehacer']
+                labels={'rehacer':'se rehace','omitir':'se omite','publicada':'publicada, no se puede cambiar',
+                        'rehecha':'rehecha','fallida':'falló'}
+                self.stdout.write(f'Piezas con la tarjeta genérica: {len(plan)}.')
+                for row in plan:
+                    piece=row['piece'];when=piece.scheduled_for.astimezone(operador.local_tz())
+                    detail=f' · {row["why"]}' if row['why'] else ''
+                    if row.get('scheduled_for'):detail+=f' · sale {row["scheduled_for"].astimezone(operador.local_tz()):%d/%m %H:%M}'
+                    self.stdout.write(f'  {when:%Y-%m-%d %H:%M} pieza {piece.id}: {labels.get(row["action"],row["action"])}{detail}')
+                if not o['confirmar']:
+                    total=sum(r['estimate_usd'] for r in todo)
+                    self.stdout.write(f'Costo estimado (reserva máxima de diseño y revisión visual): {total:.2f} USD para '
+                                      f'{len(todo)} pieza(s); presupuesto de IA que queda: {editorial.budget_left():.2f} USD.')
+                    self.stdout.write('Sin --confirmar no se cambia nada.')
+                else:
+                    self.stdout.write(f"Rehechas: {sum(r['action']=='rehecha' for r in plan)}; "
+                                      f"fallidas: {sum(r['action']=='fallida' for r in plan)}.")
+            elif o['accion']=='respaldos-imagen':
+                from datetime import timedelta
+                from django.utils import timezone
+                from team_backend import imagenes
+                since=(timezone.now()-timedelta(days=max(1,o['dias']))).date()
+                counts=imagenes.fallback_counts(account,since)
+                names={'diseño':'diseño propio','contenido':'tarjeta con la frase del post','foto':'foto de la galería',
+                       'marca':'tarjeta genérica de marca','sin imagen':'sin imagen lista'}
+                self.stdout.write(f"Imágenes desde {since:%Y-%m-%d}: {counts['total']}.")
+                for level,n in sorted(counts['by_level'].items(),key=lambda x:-x[1]):
+                    self.stdout.write(f'  {names.get(level,level)}: {n}')
+                for reason,n in counts['reasons']:self.stdout.write(f'  · {n}× {reason}')
             elif o['accion']=='reevaluar-compradores':
                 from team_backend import nivel_comprador
                 result=nivel_comprador.reevaluate(user,account,confirm=o['confirmar'])
