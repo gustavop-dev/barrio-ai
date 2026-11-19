@@ -94,6 +94,27 @@ class IdeaScheduleTests(EditorialBase):
         self.assertEqual(autopiloto._editorial(self.autobot,now),1)
         self.assertEqual(Job.objects.get(kind='prepare_piece').params['slot'],fourth.isoformat())
 
+    def test_a_day_whose_post_was_moved_to_another_day_is_prepared_again(self):
+        """19/11/2026: the posts prepared for the 19th and the 20th were moved to earlier days as extras, and both days
+        stayed empty: the autopilot kept asking for the id of the job that had already run. A job that ran and left no
+        piece anywhere is still the day's one automatic attempt."""
+        tz=operador.local_tz();now=datetime(2026,11,18,22,0,tzinfo=tz);day=date(2026,11,19)
+        with patch('django.utils.timezone.now',return_value=now):
+            self.assertEqual(autopiloto._editorial(self.autobot,now),1)
+            first=Job.objects.get(kind='prepare_piece');self.assertEqual(first.params['slot'],day.isoformat())
+            Job.objects.filter(pk=first.pk).update(state=Job.State.COMPLETE)
+            self.assertEqual(autopiloto._editorial(self.autobot,now),0)  # it ran and left nothing: no second attempt
+            moved=date(2026,11,20)
+            EditorialPiece.objects.create(account=self.official,slot_date=moved,second_of_day=True,state='ready',
+                scheduled_for=editorial.scheduled_for(moved)+timedelta(hours=3),origin_job=str(first.id))
+            self.assertEqual(autopiloto._editorial(self.autobot,now),1)
+            second=Job.objects.exclude(pk=first.pk).get(kind='prepare_piece');self.assertEqual(second.params['slot'],day.isoformat())
+            Job.objects.filter(pk=second.pk).update(state=Job.State.COMPLETE)
+            EditorialPiece.objects.create(account=self.official,slot_date=day,scheduled_for=editorial.scheduled_for(day),
+                state='ready',origin_job=str(second.id))
+            self.assertEqual(autopiloto._editorial(self.autobot,now),0)
+            self.assertEqual(Job.objects.filter(kind='prepare_piece').count(),2)
+
     def test_a_requested_day_and_hour_is_an_extra_post_and_the_days_own_never_moves(self):
         """Gustavo, 14/11/2026: «una fecha explícita es una orden». Before, his dated idea could take the next free day,
         move the team's post or wait for a «sí» in Tu turno days later. Now it goes out that day at that hour as an extra

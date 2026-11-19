@@ -481,10 +481,20 @@ def _editorial_for(user,now,member):
         return int(created)
     slot=urgente.next_slot(now,member=member) or editorial.next_slot(now,member=member)
     if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot,member) or editorial.scheduled_for(slot,member))<=0:return 0
-    attempt=pieces.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
     _,created=enqueue_operation(user,'prepare_piece',miembros.job_params(member,{'slot':slot.isoformat()}),
-                                request_id=_job_id('piece',slot,*parts) if not attempt else _job_id('piece',slot,attempt,*parts))
+                                request_id=_daily_job_id(pieces,slot,parts))
     return int(created)
+
+def _daily_job_id(pieces,slot,parts):
+    """The id of her day's next automatic attempt: one per piece the day already has (a renewed-budget retry gets its
+    own). A piece prepared for the day and later moved away as another day's extra (urgente: «a la hora que pediste»)
+    leaves the day free but its job keeps that attempt's id, so the attempt is skipped: 19/11/2026, two days stayed
+    without a post because every tick asked again for a job that had already run."""
+    attempt=pieces.filter(slot_date=slot,second_of_day=False).count()
+    while True:
+        jid=_job_id('piece',slot,*parts) if not attempt else _job_id('piece',slot,attempt,*parts)
+        if not pieces.filter(origin_job=str(jid)).exclude(slot_date=slot,second_of_day=False).exists():return jid
+        attempt+=1
 
 def author_cooldown():
     return timedelta(hours=int(setting('OPERATOR_AUTHOR_COOLDOWN_HOURS','48')))
