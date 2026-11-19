@@ -293,7 +293,8 @@
       "pruebas autorizadas de casos",
       "muestras de voz",
       "assets autorizados",
-      "aprendizaje real anterior; no requisito del primer borrador"
+      "aprendizaje real anterior; no requisito del primer borrador",
+      "molde_variante_a (solo con REFERENTES_MOLDE y un molde en el brief): la forma de un post de referente que superó con claridad la mediana de su autor, solo como etiquetas (tipo de gancho, formato y esquema del cuerpo, cierre, rango de longitud, ángulo y estado sostenida o hipotesis); sin texto, autor ni enlace del referente. La variante A se escribe sobre él con material propio."
     ],
     "versiones_requeridas": [
       "contexto",

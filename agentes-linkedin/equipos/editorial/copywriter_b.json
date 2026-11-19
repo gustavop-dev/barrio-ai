@@ -293,7 +293,8 @@
       "pruebas autorizadas de casos",
       "muestras de voz",
       "assets autorizados",
-      "aprendizaje real anterior; no requisito del primer borrador"
+      "aprendizaje real anterior; no requisito del primer borrador",
+      "ninguna entrada de molde: con REFERENTES_MOLDE la variante B queda libre aunque el día tenga molde (molde_variante_a es solo de la A), para comparar las dos"
     ],
     "versiones_requeridas": [
       "contexto",

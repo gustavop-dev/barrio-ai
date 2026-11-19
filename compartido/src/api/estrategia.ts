@@ -43,6 +43,19 @@ export interface AudienceEvidence {
   note: string;
 }
 
+/** The shape of a referent post a day is written on (REFERENTES_MOLDE, off by default): labels and a link, no text. */
+export interface PlanMold {
+  id: string;
+  /** Hook · body format · closing, in Spanish. */
+  etiqueta: string;
+  /** sostenida: the structure worked across posts, authors and weeks; hipotesis: not yet. */
+  estado: 'sostenida' | 'hipotesis' | string;
+  autor: string | null;
+  url: string | null;
+  /** How many times its author's median the post got. */
+  veces_mediana: number | null;
+}
+
 export interface PlanDay {
   date: string;
   type: GaspType;
@@ -61,6 +74,8 @@ export interface PlanDay {
   /** False once the day passed or its post is prepared. */
   editable: boolean;
   piece_id: string | null;
+  /** Only when the day is written on a referent's mold. */
+  molde?: PlanMold;
 }
 
 export interface KeptIdea {

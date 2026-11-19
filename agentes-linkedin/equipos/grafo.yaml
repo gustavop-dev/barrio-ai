@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.17-verificacion-etapa-propia",
+  "graph_version": "6.18-molde-referentes",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -258,9 +258,9 @@
   },
   "schemas": {
     "brief": {
-      "binding": "team_backend.editorial.BRIEF_SCHEMA",
+      "binding": "team_backend.editorial.BRIEF_WITH_MOLD",
       "kind": "json_schema",
-      "description": "brief"
+      "description": "brief (BRIEF_SCHEMA; con REFERENTES_MOLDE, molde opcional)"
     },
     "variants": {
       "binding": "team_backend.editorial.WRITER_SCHEMA",
@@ -727,7 +727,7 @@
       "role": "orchestrator",
       "status": "active",
       "binding": "team_backend.editorial._run",
-      "description": "El código editorial coordina el brief y la pieza. Consulta herramientas y decide si continuar; el director no publica. Cada domingo planea la semana GASP siguiente (estrategia.py).",
+      "description": "El código editorial coordina el brief y la pieza. Consulta herramientas y decide si continuar; el director no publica. Cada domingo planea la semana GASP siguiente (estrategia.py). Con REFERENTES_MOLDE, el plan guarda en cada día el molde de referente sobre el que se escribe (moldes.py) y el brief lo lleva; el director puede elegir uno de los ofrecidos en un día sin molde.",
       "skills": [
         "El código editorial coordina el brief y la pieza"
       ],
@@ -793,7 +793,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Redacta la variante A. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes.",
+      "description": "Redacta la variante A. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes. Con REFERENTES_MOLDE y un molde en el brief, la variante A se escribe sobre él (molde_variante_a: solo etiquetas de estructura y ángulo, sin texto, autor ni enlace del referente).",
       "skills": [
         "Redacta la variante A"
       ],
@@ -866,7 +866,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Redacta la variante B. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes.",
+      "description": "Redacta la variante B. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes. Con REFERENTES_MOLDE la variante B queda libre aunque el día tenga molde, para compararlas.",
       "skills": [
         "Redacta la variante B"
       ],
