@@ -69,6 +69,15 @@ WEB_TOOLS_INPUT_TOKENS=int(os.environ.get('WEB_TOOLS_INPUT_TOKENS','9000'))
 # A run still `running` this long after it was claimed belongs to a process that died (the longest call timeout is
 # 300 s): the worker's reconciliation closes it as interrupted (research.recover_stale).
 WEB_RESEARCH_STALE_MINUTES=int(os.environ.get('WEB_RESEARCH_STALE_MINUTES','15'))
+# Research by default (off by default): an authority (A) or educational (G) piece researches its thesis even when the
+# director did not ask (research.by_default), asking for 2–4 concrete dated findings and preferring these sites. Off,
+# every prompt and request stays as before. WEB_RESEARCH_STRICT_DOMAINS limits its search to them (allowed_domains).
+EDITORIAL_RESEARCH_DEFAULT=os.environ.get('EDITORIAL_RESEARCH_DEFAULT','false').lower()=='true'
+WEB_RESEARCH_PREFERRED_DOMAINS=os.environ.get('WEB_RESEARCH_PREFERRED_DOMAINS') or ','.join((
+    'anthropic.com','openai.com','blog.google','deepmind.google','nvidia.com','microsoft.com','ai.meta.com','aws.amazon.com',
+    'technologyreview.com','techcrunch.com','theverge.com','arstechnica.com','wired.com','hai.stanford.edu','mckinsey.com',
+    'a16z.com','ycombinator.com','stackoverflow.co','github.blog'))
+WEB_RESEARCH_STRICT_DOMAINS=os.environ.get('WEB_RESEARCH_STRICT_DOMAINS','false').lower()=='true'
 WEB_GITHUB_MAX_BYTES=int(os.environ.get('WEB_GITHUB_MAX_BYTES','131072'))
 WEB_GITHUB_README_CHARS=int(os.environ.get('WEB_GITHUB_README_CHARS','8000'))
 WEB_GITHUB_TIMEOUT_S=float(os.environ.get('WEB_GITHUB_TIMEOUT_S','10'))

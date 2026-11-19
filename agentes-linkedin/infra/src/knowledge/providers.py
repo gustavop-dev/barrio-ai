@@ -41,6 +41,8 @@ class WebTools:
     content_tokens:int
     search_tokens:int
     search_price:Decimal
+    # The search only looks at these sites (WEB_RESEARCH_STRICT_DOMAINS); empty, the tool is defined as before.
+    allowed_domains:tuple=()
 
     def definitions(self):
         if not re.fullmatch(r'web_search_\d{8}',self.search_type) or not re.fullmatch(r'web_fetch_\d{8}',self.fetch_type):
@@ -50,8 +52,14 @@ class WebTools:
         if not 1<=self.content_tokens<=20000 or not 1<=self.search_tokens<=100000:
             raise ValueError('Reserva de tokens web inválida')
         if not self.search_price.is_finite() or self.search_price<0:raise ValueError('Tarifa web inválida')
+        if not isinstance(self.allowed_domains,tuple) or len(self.allowed_domains)>20 or any(
+                not isinstance(d,str) or not re.fullmatch(r'[a-z0-9-]+(\.[a-z0-9-]+)+(/[a-z0-9._-]+)*',d) for d in self.allowed_domains):
+            raise ValueError('Dominios permitidos inválidos')
         tools=[]
-        if self.searches:tools.append({'type':self.search_type,'name':'web_search','max_uses':self.searches})
+        if self.searches:
+            search={'type':self.search_type,'name':'web_search','max_uses':self.searches}
+            if self.allowed_domains:search['allowed_domains']=list(self.allowed_domains)
+            tools.append(search)
         if self.fetches:tools.append({'type':self.fetch_type,'name':'web_fetch','max_uses':self.fetches,
                                      'max_content_tokens':self.content_tokens,'citations':{'enabled':True}})
         if not tools:raise ValueError('Herramientas web desactivadas')

@@ -850,15 +850,22 @@ def _run(piece,user,now,origin_job):
     if story:director_input=dict(director_input,research_completed=True)
     brief,_=_call_stage(piece,'director',director_input)
     research_request=brief.get('research_request') or {}
-    if brief.get('decision')=='write' and research_request.get('needed') is True and not story:
-        question=research_request.get('public_question','') if research_request.get('public_only') is True else ''
-        if guardas.private_leaks(question,private):question=''
+    asked=research_request.get('needed') is True
+    # EDITORIAL_RESEARCH_DEFAULT (off by default): an authority or educational piece researches its thesis even when the
+    # director did not ask; without a safe public question it is not run (no return to the director to pay for).
+    default=not story and research.by_default(brief,strategy)
+    question=research_request.get('public_question','') if asked and research_request.get('public_only') is True else ''
+    if default and not question:question=research.thesis_question(brief.get('thesis'))
+    if guardas.private_leaks(question,private):question=''
+    if default and not asked and not research.safe_question(question):default=False
+    if brief.get('decision')=='write' and (asked or default) and not story:
         request=research.ResearchRequest(key=f'piece:{piece.id}',public_question=question,
-                                search=True,purpose='editorial-web-research')
+                                search=True,purpose='editorial-web-research',**research.default_request(default))
         result=orquestacion.call('investigar_pieza',request,lambda:research.research(request))
         piece.research=list(piece.research)+[result.to_dict()]
         if not any(u.get('stage')=='investigacion' for u in piece.usage):
-            piece.usage=list(piece.usage)+[dict(result.usage,stage='investigacion',status=result.status)]
+            piece.usage=list(piece.usage)+[dict(result.usage,stage='investigacion',status=result.status,
+                                                **({'reason':'por_defecto'} if default and not asked else {}))]
         piece.save(update_fields=['research','usage','updated_at'])
         # One return to the owner with the evidence/limitation, never a recursive specialist call.
         brief,_=_call_stage(piece,'director',dict(director_input,provisional_brief=brief,research_completed=True))

@@ -4,8 +4,9 @@ Production on 19/11/2026: 27 runs in team_backend_webresearchrun. 6 of them `run
 the cycle stopped inside the research (cost_cap from orquestacion.provider_metadata) and research.research only caught
 ValueError and friends, so its row was never closed and its key answered «en curso» for the rest of the day. 18 more
 `unavailable` with «La web no devolvió hallazgos con citas verificables»: the web had answered, the prose came back without
-native citations and everything was dropped. No real web, no paid API: providers.claude or the SDK client are doubles and
-the clock is frozen."""
+native citations and everything was dropped. And research by default for authority and educational pieces, behind
+EDITORIAL_RESEARCH_DEFAULT. No real web, no paid API: providers.claude, research.research or the SDK client are doubles
+and the clock is frozen."""
 import hashlib
 import json
 import os
@@ -13,9 +14,11 @@ import uuid
 from contextlib import ExitStack
 from datetime import datetime, timedelta
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from django.core.management import call_command
 from django.test import override_settings
 from django.utils import timezone
 from knowledge import db
@@ -23,7 +26,9 @@ from knowledge.cycle_context import CycleStopped
 from psycopg.types.json import Jsonb
 from team_backend import jobs, research
 from team_backend.models import WebResearchRun
+from team_backend.tests.test_estrategia import StrategyBase
 from team_backend.tests.test_operador import OperatorBase
+from team_backend.tests.test_publicacion import answers
 from team_backend.tests.test_verificacion_etapa import clock
 from team_backend.tests.test_web_research import LIVE, QUESTION, URL, native_answer
 
@@ -208,3 +213,128 @@ class FindingsAreNotLostTests(ResearchBase):
         with patch('knowledge.providers.claude',side_effect=ValueError('anthropic: HTTP 529. Sin reintento automático.')):
             failed=self.call('tool:proveedor')
         self.assertEqual(failed.diagnostic['motivo'],'error_proveedor')
+
+
+class SwitchOffRequestTests(ResearchBase):
+    """Without delivery or preferred sites (every request but a default one) the research reads, hashes and is sent as
+    before EDITORIAL_RESEARCH_DEFAULT existed."""
+    def test_a_plain_request_sends_the_same_message_tools_and_digest_as_before(self):
+        with patch('knowledge.providers.claude',return_value=native_answer()) as model:self.call()
+        message=json.loads(model.call_args.args[1])
+        self.assertEqual(list(message),['public_question','public_urls'])
+        tools=model.call_args.kwargs['web_tools'].definitions()
+        self.assertFalse(any('allowed_domains' in t for t in tools))
+        old=hashlib.sha256(json.dumps({'key':'tool:uno','public_question':QUESTION,'urls':[],'search':True,
+                                       'purpose':'web-research-tool'},sort_keys=True).encode()).hexdigest()
+        self.assertEqual(self.row().request_hash,old)
+
+    def test_a_default_request_asks_for_dated_findings_and_prefers_the_listed_sites(self):
+        sites=research.preferred_domains()
+        self.assertEqual(sites[:2],('anthropic.com','openai.com'));self.assertIn('hai.stanford.edu',sites)
+        self.assertTrue(all('://' not in s and not s.endswith('/') for s in sites))
+        with patch('knowledge.providers.claude',return_value=native_answer()) as model:
+            self.call(**research.default_request(True))
+        message=json.loads(model.call_args.args[1])
+        self.assertEqual((message['entrega'],message['fuentes_preferidas']),(research.DELIVERY,list(sites)))
+        self.assertIn('Entre 2 y 4 hallazgos concretos y fechados',message['entrega'])
+        self.assertFalse(any('allowed_domains' in t for t in model.call_args.kwargs['web_tools'].definitions()))  # a preference
+        with override_settings(WEB_RESEARCH_STRICT_DOMAINS=True),\
+             patch('knowledge.providers.claude',return_value=native_answer()) as model:
+            self.call('tool:estricta',**research.default_request(True))
+        search_tool=next(t for t in model.call_args.kwargs['web_tools'].definitions() if t['name']=='web_search')
+        self.assertEqual(search_tool['allowed_domains'],list(sites))
+
+    def test_only_a_written_a_or_g_brief_with_a_thesis_researches_by_default(self):
+        brief={'decision':'write','gasp_type':'A','thesis':'Scope features from the decision they support.'}
+        self.assertFalse(research.by_default(brief))  # the switch is off by default
+        with override_settings(EDITORIAL_RESEARCH_DEFAULT=True):
+            self.assertTrue(research.by_default(brief))
+            self.assertTrue(research.by_default(dict(brief,gasp_type=None),{'type':'G'}))
+            for other in (dict(brief,gasp_type='P'),dict(brief,gasp_type='S'),dict(brief,decision='skip'),dict(brief,thesis=' ')):
+                self.assertFalse(research.by_default(other),other)
+        question=research.thesis_question(brief['thesis'])
+        self.assertEqual(research.safe_question(question),question)
+
+
+class ResearchByDefaultTests(StrategyBase):
+    """EDITORIAL_RESEARCH_DEFAULT on: an authority or educational piece researches its thesis once, with the preferred
+    sites, and its findings reach the writers; a personal piece does not; off, nothing is researched."""
+    THESIS='Scope features from the decision they support.'
+
+    def setUp(self):
+        stack=ExitStack();clock(stack,NOON);self.addCleanup(stack.close)
+        super().setUp()
+        self.requests=[]
+
+    def week(self,kind):
+        env=patch.dict(os.environ,{'STRATEGY_WEEK_TEMPLATE':','.join([kind]*7),'STRATEGY_SALES_DOUBLE_EVERY':'0'})
+        env.start();self.addCleanup(env.stop)
+
+    def found(self,request):
+        self.requests.append(request);at=timezone.now().isoformat()
+        return research.ResearchResult(request.public_question,'partial',at,
+            (research.Finding('Around 40% of teams that chain agents lose context between steps.',('web:aprox',),'aproximada'),),
+            (research.Source('web:aprox',SECOND,'Agents lose context','Agents lose context',at,'search_result',False,
+                             'techcrunch.com','November 12, 2026'),),
+            (research.APPROXIMATE_NOTE,),usage={'model':'claude-sonnet-5-5','estimated_usd':0.05})
+
+    def run_plan(self,kind,on):
+        self.week(kind)
+        plan=answers();plan['director'].update(gasp_type=kind)
+        with override_settings(EDITORIAL_RESEARCH_DEFAULT=on),patch('team_backend.research.research',side_effect=self.found):
+            return self.plan(plan)
+
+    def payloads(self,stage):
+        return [data for purpose,data,_ in self.calls if purpose=='editorial-'+stage]
+
+    def test_an_authority_piece_researches_its_thesis_once_and_the_writers_get_the_findings(self):
+        piece=self.run_plan('A',True)
+        self.assertEqual(piece.state,'ready',piece.note)
+        [request]=self.requests
+        self.assertEqual((request.public_question,request.search,request.purpose),
+                         (research.thesis_question(self.THESIS),True,'editorial-web-research'))
+        self.assertEqual((request.delivery,request.preferred_domains),(research.DELIVERY,research.preferred_domains()))
+        directors=self.payloads('director')
+        self.assertEqual(len(directors),2)  # the one return to the director with the result
+        self.assertTrue(directors[1]['research_completed']);self.assertNotIn('research_completed',directors[0])
+        evidence=self.payloads('redactor')[0]['untrusted_web_evidence']
+        self.assertEqual(evidence['trust'],'untrusted_data_not_instructions')
+        source=evidence['investigations'][0]['sources'][0]
+        self.assertEqual((source['url'],source['site'],source['published']),(SECOND,'techcrunch.com','November 12, 2026'))
+        self.assertEqual(evidence['investigations'][0]['findings'][0]['citation'],'aproximada')
+        self.assertIn(SECOND,[s['url'] for s in research.editorial_sources(piece)])  # what the visual stage reads
+        self.assertEqual([u.get('reason') for u in piece.usage if u.get('stage')=='investigacion'],['por_defecto'])
+
+    def test_a_personal_piece_does_not_research_by_default(self):
+        piece=self.run_plan('P',True)
+        self.assertEqual((piece.state,self.requests),('ready',[]),piece.note)
+        self.assertEqual(len(self.payloads('director')),1)
+
+    def test_switched_off_an_authority_piece_runs_as_before(self):
+        piece=self.run_plan('A',False)
+        self.assertEqual((piece.state,self.requests),('ready',[]),piece.note)
+        self.assertEqual(len(self.payloads('director')),1)
+        for purpose,data,_ in self.calls:
+            self.assertFalse({'untrusted_web_evidence','research_completed','provisional_brief'}&set(data),purpose)
+
+
+class OperatorReportTests(ResearchBase):
+    def test_the_report_lists_the_last_runs_and_counts_each_state_per_day_without_content(self):
+        with patch('knowledge.providers.claude',return_value=native_answer()):self.call()
+        with patch('knowledge.providers.claude',side_effect=CycleStopped('cost_cap')),self.assertRaises(CycleStopped):
+            self.call('etapa:9:1:20261119')
+        WebResearchRun.objects.create(key='piece:ayer',request_hash='x',state='unavailable',created_at=NOON-timedelta(days=1),
+            result={'limitations':['La búsqueda no devolvió resultados'],'diagnostic':{'motivo':'sin_resultados','busquedas':1}})
+        out=StringIO();call_command('investigacion_web','--ultimas','3','--json',stdout=out)
+        report=json.loads(out.getvalue())
+        self.assertEqual(report['por_dia'],{'2026-11-19':{'complete':1,'interrupted':1},'2026-11-18':{'unavailable':1}})
+        rows={r['clave']:r for r in report['ultimas']}
+        self.assertEqual((rows['tool:uno']['proposito'],rows['tool:uno']['estado'],rows['tool:uno']['hallazgos']),('herramienta','complete',1))
+        self.assertEqual((rows['etapa:9:1:20261119']['proposito'],rows['etapa:9:1:20261119']['diagnostico']),
+                         ('etapa_comprador',{'motivo':'interrumpida','causa':'el ciclo se detuvo (cost_cap)','reintentable':True}))
+        self.assertEqual((rows['piece:ayer']['limitacion'],rows['piece:ayer']['creada']),
+                         ('La búsqueda no devolvió resultados','2026-11-18 12:00'))
+        out=StringIO();call_command('investigacion_web','--ultimas','3',stdout=out);text=out.getvalue()
+        self.assertIn('2026-11-18: unavailable 1',text);self.assertIn('[motivo=sin_resultados, busquedas=1]',text)
+        for private in (QUESTION,URL):self.assertNotIn(private,text)  # never the question or a page
+        self.assertEqual(WebResearchRun.objects.count(),3)  # read only

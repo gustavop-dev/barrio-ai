@@ -35,12 +35,19 @@ class ResearchRequest:
     urls:tuple[str,...]=()
     search:bool=False
     purpose:Literal['web-research-capture','editorial-web-research','web-research-tool']='web-research-tool'
+    # Only the research of an authority or educational piece (EDITORIAL_RESEARCH_DEFAULT) carries them: what to deliver
+    # and the sites to look at first. Empty, a request reads, hashes and is sent exactly as before.
+    delivery:str=''
+    preferred_domains:tuple[str,...]=()
 
     def __post_init__(self):
         if not isinstance(self.key,str) or not isinstance(self.public_question,str) or type(self.search) is not bool:
             raise TypeError('Tipos de solicitud de investigación inválidos')
         if not isinstance(self.urls,tuple) or any(not isinstance(url,str) for url in self.urls):
             raise TypeError('urls debe ser una tupla de enlaces')
+        if not isinstance(self.delivery,str) or not isinstance(self.preferred_domains,tuple) or \
+                any(not isinstance(d,str) for d in self.preferred_domains):
+            raise TypeError('Tipos de solicitud de investigación inválidos')
 
 
 @dataclass(frozen=True)
@@ -301,7 +308,55 @@ def unavailable_reason(diagnostic,search,urls):
 
 
 def _digest(request):
-    return hashlib.sha256(json.dumps(asdict(request),sort_keys=True).encode()).hexdigest()
+    # Without delivery or preferred sites the digest is the one of before those fields existed: a stored run keeps its key.
+    body={k:v for k,v in asdict(request).items() if k not in ('delivery','preferred_domains') or v}
+    return hashlib.sha256(json.dumps(body,sort_keys=True).encode()).hexdigest()
+
+
+def _message(request,question,urls):
+    """What the research model reads. delivery and fuentes_preferidas only travel when the request has them."""
+    body={'public_question':question,'public_urls':list(urls)}
+    if request.delivery:body['entrega']=request.delivery
+    if request.preferred_domains:body['fuentes_preferidas']=list(request.preferred_domains)
+    return json.dumps(body,ensure_ascii=False)
+
+
+# --------------------------------------------------------------------------- research by default (EDITORIAL_RESEARCH_DEFAULT)
+
+# The GASP types that research their thesis by default: authority (A) and growth, the educational one (G). Sales (S)
+# and Personal (P, which has its own founder-story research) keep today's flow.
+DEFAULT_TYPES=('A','G')
+DELIVERY=('Entre 2 y 4 hallazgos concretos y fechados (una cifra, un lanzamiento, un estudio o una declaración pública, '
+          'de los últimos 12 meses si los hay) que respalden, maticen o contradigan la tesis; cada uno con su fuente, su '
+          'URL y su fecha.')
+
+
+def by_default(brief,strategy=None):
+    """Whether this brief researches its thesis without the director asking: EDITORIAL_RESEARCH_DEFAULT on, a piece to
+    write, of type A or G (the brief's, else the day's strategy), with a thesis. Off (the default), nothing changes."""
+    if not settings.EDITORIAL_RESEARCH_DEFAULT or (brief or {}).get('decision')!='write':return False
+    kind=brief.get('gasp_type') or (strategy or {}).get('type')
+    return kind in DEFAULT_TYPES and bool(' '.join(str(brief.get('thesis') or '').split()))
+
+
+def thesis_question(thesis):
+    """The public question of a default research: the brief's thesis, nothing else (safe_question still filters it)."""
+    thesis=' '.join(str(thesis or '').split())[:220]
+    return f'Datos recientes, concretos y fechados sobre esta tesis: {thesis}'
+
+
+def preferred_domains():
+    """WEB_RESEARCH_PREFERRED_DOMAINS as bare domains (no scheme), the form the search tool's allowed_domains takes."""
+    out=[]
+    for raw in str(settings.WEB_RESEARCH_PREFERRED_DOMAINS or '').split(','):
+        domain=raw.strip().lower().removeprefix('https://').removeprefix('http://').rstrip('/')
+        if re.fullmatch(r'[a-z0-9-]+(\.[a-z0-9-]+)+(/[a-z0-9._-]+)*',domain) and domain not in out:out.append(domain)
+    return tuple(out[:20])
+
+
+def default_request(default):
+    """The extra fields of a piece's ResearchRequest when it researches by default; none otherwise."""
+    return {'delivery':DELIVERY,'preferred_domains':preferred_domains()} if default else {}
 
 
 def counted(runs):
@@ -430,11 +485,13 @@ def research(request:ResearchRequest)->ResearchResult:
     search=request.search and not blocked_search
     try:web_sources.live_web()
     except ValueError:return ResearchResult(question,'skipped',at,limitations=('Investigación web desactivada',))
+    # WEB_RESEARCH_STRICT_DOMAINS: the search only looks at the preferred sites (allowed_domains); off, they are a preference.
+    strict=tuple(request.preferred_domains) if search and settings.WEB_RESEARCH_STRICT_DOMAINS else ()
     web=providers.WebTools(settings.WEB_SEARCH_TOOL_TYPE,settings.WEB_FETCH_TOOL_TYPE,
         settings.WEB_SEARCH_MAX_USES if search else 0,settings.WEB_FETCH_MAX_USES,
-        settings.WEB_FETCH_MAX_CONTENT_TOKENS,settings.WEB_SEARCH_RESERVED_TOKENS,Decimal(settings.WEB_SEARCH_USD_PER_REQUEST))
+        settings.WEB_FETCH_MAX_CONTENT_TOKENS,settings.WEB_SEARCH_RESERVED_TOKENS,Decimal(settings.WEB_SEARCH_USD_PER_REQUEST),strict)
     if search or request.urls:
-        skipped=_no_room(web,json.dumps({'public_question':question,'public_urls':list(request.urls)},ensure_ascii=False),question,at)
+        skipped=_no_room(web,_message(request,question,request.urls),question,at)
         if skipped:return skipped
     run,cached=_claim(request,question)
     if cached is not None:return cached
@@ -473,7 +530,7 @@ def _run(request,run,question,search,blocked_search,web):
         if search or remaining:
             if remaining and not web.fetches:raise ValueError('Lectura web desactivada')
             if search and not web.searches:raise ValueError('Búsqueda web desactivada')
-            answer=providers.claude(SYSTEM,json.dumps({'public_question':question,'public_urls':remaining},ensure_ascii=False),
+            answer=providers.claude(SYSTEM,_message(request,question,remaining),
                 max_tokens=settings.WEB_RESEARCH_MAX_TOKENS,model=settings.WEB_RESEARCH_MODEL,effort='low',
                 purpose=request.purpose,web_tools=web,request_hash=hashlib.sha256(request.key.encode()).hexdigest())
             usage={**answer.get('usage',{}),'model':answer.get('model'),'estimated_usd':answer.get('estimated_usd'),
@@ -513,6 +570,53 @@ def _run(request,run,question,search,blocked_search,web):
     if saved and not request.key.startswith(STAGE_PREFIX) and not (current() and current().cycle['id']=='referentes_mensuales'):
         oficina_eventos.emit('entrega','investigador_referentes','director_editorial',outcome_text(result.to_dict()))
     return result
+
+
+# --------------------------------------------------------------------------- operator report (manage.py investigacion_web)
+
+KINDS=(('piece:','pieza'),('capture:','captura'),(STAGE_PREFIX,'etapa_comprador'),('referents:','referentes'),
+       ('profile:','perfil'),('tool:','herramienta'))
+SHOWN=('motivo','causa','reintentable','busquedas','resultados_busqueda','lecturas','paginas_leidas','hallazgos_nativos',
+       'hallazgos_aproximados','errores_busqueda','errores_lectura','stop_reason','reserva_estimada_usd','restante_usd')
+
+
+def kind(key):
+    return next((label for prefix,label in KINDS if key.startswith(prefix)),'otra')
+
+
+def inspect(last=20,days=7,now=None):
+    """Read only: the last runs (key, purpose, state, first limitation, compact diagnostic) and the runs per state per
+    local day. Never the question, a URL or page content: what the operator needs to tell why research came back empty."""
+    from .operador import local_tz
+    tz=local_tz();now=now or timezone.now()
+    rows=[]
+    for run in WebResearchRun.objects.order_by('-created_at')[:max(1,last)]:
+        result=run.result or {};diagnostic=result.get('diagnostic') or {}
+        rows.append({'clave':run.key,'proposito':kind(run.key),'estado':run.state,
+                     'creada':timezone.localtime(run.created_at,tz).strftime('%Y-%m-%d %H:%M'),
+                     'hallazgos':len(result.get('findings') or []),'fuentes':len(result.get('sources') or []),
+                     'limitacion':str((result.get('limitations') or [''])[0])[:200],
+                     'diagnostico':{k:diagnostic[k] for k in SHOWN if diagnostic.get(k) not in (None,'',[])}})
+    start=(timezone.localtime(now,tz)-timedelta(days=max(1,days)-1)).replace(hour=0,minute=0,second=0,microsecond=0)
+    per_day={}
+    for created,state in WebResearchRun.objects.filter(created_at__gte=start).values_list('created_at','state'):
+        day=per_day.setdefault(timezone.localtime(created,tz).date().isoformat(),{})
+        day[state]=day.get(state,0)+1
+    return {'ultimas':rows,'por_dia':dict(sorted(per_day.items(),reverse=True))}
+
+
+def render(report):
+    lines=['Últimas investigaciones (más reciente primero):']
+    for r in report['ultimas']:
+        why=', '.join(f'{k}={v}' for k,v in r['diagnostico'].items())
+        lines.append(f"- {r['creada']} {r['estado']:<11} {r['proposito']:<15} {r['clave']} · {r['hallazgos']} hallazgos, "
+                     f"{r['fuentes']} fuentes" + (f" · {r['limitacion']}" if r['limitacion'] else '') + (f' · [{why}]' if why else ''))
+    if not report['ultimas']:lines.append('- (ninguna)')
+    lines.append('Por día y estado:')
+    for day,states in report['por_dia'].items():
+        lines.append(f'- {day}: '+', '.join(f'{k} {v}' for k,v in sorted(states.items())))
+    if not report['por_dia']:lines.append('- (ninguna en el periodo)')
+    return '\n'.join(lines)
 
 
 def outcome_text(result):
