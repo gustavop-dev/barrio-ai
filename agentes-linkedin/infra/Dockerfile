@@ -4,6 +4,10 @@ COPY pyproject.toml uv.lock ./
 COPY src ./src
 COPY --from=equipo grafo.yaml ./equipos/grafo.yaml
 COPY manage.py ./
+# Pango for WeasyPrint (lienzo.py: the free infographic canvas, rendered without a browser; its font is the bundled
+# Ubuntu.ttf). ~17 MB with fontconfig; no Chromium.
+RUN apt-get update && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev && useradd --uid 10001 --create-home app && mkdir staticfiles media && chown app:app staticfiles media
 COPY assets/tiktoken ./assets/tiktoken
 ENV TIKTOKEN_CACHE_DIR="/app/assets/tiktoken"

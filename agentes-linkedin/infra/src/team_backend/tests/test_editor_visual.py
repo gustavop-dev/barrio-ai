@@ -30,7 +30,7 @@ class VisualTests(EditorialBase):
             editorial._visual(piece, public, private)
         return run
 
-    def test_empty_gallery_uses_existing_brand_card_and_hands_back_once(self):
+    def test_empty_gallery_uses_the_posts_key_line_and_hands_back_once(self):
         piece = self.piece(kind='infografia')
         # Use the real unavailable connector so IMG chooses its no-provider fallback.
         public, private = guardas.blocks()
@@ -42,11 +42,13 @@ class VisualTests(EditorialBase):
             count = AuditEvent.objects.filter(action='office.orchestration').count()
             with run.session():
                 editorial._visual(piece, public, private)
-        self.assertEqual(piece.image_kind, 'tarjeta')
+        # 19/11/2026: the fallback is the post's own key line, not the generic brand card.
+        self.assertEqual(piece.image_kind, 'infografia')
         self.assertEqual(piece.images.count(), 1)
+        self.assertEqual((piece.images.get().template, piece.image_review['mode']), ('cita', 'tarjeta_contenido'))
         self.assertEqual(imagenes.issues(piece, imagenes.manifest(piece)), [])
         self.assertEqual(piece.selection['visual']['decided_by'], 'director_editorial')
-        self.assertEqual(piece.selection['visual']['final_kind'], 'tarjeta')
+        self.assertEqual(piece.selection['visual']['final_kind'], 'infografia')
         self.assertEqual(piece.usage, [{'stage': 'visual', 'mode': 'fallback', 'model': None}])
         ledger = CycleLedger.objects.get(pk=run.id)
         self.assertEqual(ledger.calls, 2)
@@ -148,7 +150,7 @@ class VisualTests(EditorialBase):
                 with patch('knowledge.providers.claude', return_value={'text': '{}'}):
                     if rendered:
                         self.visual(piece)
-                        self.assertEqual(piece.image_kind, 'tarjeta')
+                        self.assertEqual((piece.image_kind, piece.image_review['mode']), ('infografia', 'tarjeta_contenido'))
                     else:
                         with patch('team_backend.infografias.render', side_effect=ValueError('Render no disponible')):
                             with self.assertRaisesRegex(ValueError, 'Render no disponible'):

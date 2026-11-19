@@ -11,6 +11,7 @@ export const IMAGE_KIND_LABEL: Record<ImageKind, string> = {
 };
 export const TEMPLATE_LABEL: Record<NonNullable<PieceImage['template']>, string> = {
   portada: 'Portada', pasos: 'Pasos', barras: 'Barras', numero: 'Número', cierre: 'Cierre', preguntas: 'Preguntas',
+  tabla: 'Tabla', comparacion: 'Comparación', linea: 'Línea', lista: 'Lista', cita: 'Frase del post', lienzo: 'Lienzo libre',
 };
 
 export function orderedImages(images: readonly PieceImage[] = []): PieceImage[] {
@@ -32,11 +33,14 @@ export function imageAspect(image: Pick<PieceImage, 'width' | 'height'>): number
 /** Describe only the verdict actually received; a fixed card is not a model's visual check. */
 export function reviewLines(review: ImageReview = {}): string[] {
   const title = review.mode === 'fixed_brand_card' ? 'Plantilla fija de marca; sin revisión visual dinámica.'
+    : review.mode === 'tarjeta_contenido' ? 'Respaldo: la frase clave del post, sin cifras; ningún diseño pasó.'
+    : review.mode === 'foto_respaldo' ? 'Respaldo: la foto que propuso el editor visual; ningún diseño pasó.'
     : review.ok === true ? 'Comprobación aprobada' : review.ok === false ? 'Comprobación no aprobada'
       : review.started ? 'Comprobación en curso' : '';
   return [
     ...(title ? [title] : []),
-    ...(review.failures ?? []), ...(review.reasons ?? []),
+    ...(review.fallback?.reason ? [`Motivo: ${review.fallback.reason}`] : []),
+    ...(review.failures ?? []), ...(review.reasons ?? []), ...(review.observations ?? []).map((note) => `Observación: ${note}`),
     ...(review.checks ?? []).map((check) => `${check.point}. ${check.ok ? 'Correcto' : 'Revisar'}: ${check.reason}`),
   ];
 }

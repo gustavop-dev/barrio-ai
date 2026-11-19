@@ -1328,7 +1328,7 @@ type PieceImage = {
   url: string; alt: string; width: number; height: number; mime: string; sha256: string;
   source_photos: {id: string; url: string}[]; // [] para render; un original para foto
   edited: boolean; ai_edit: AIEdit; reason: string;
-  template: "portada" | "pasos" | "barras" | "numero" | "cierre" | null;
+  template: "portada" | "pasos" | "barras" | "numero" | "cierre" | "preguntas" | "tabla" | "comparacion" | "linea" | "lista" | "cita" | "lienzo" | null;
   review: ImageReview;
 };
 ```

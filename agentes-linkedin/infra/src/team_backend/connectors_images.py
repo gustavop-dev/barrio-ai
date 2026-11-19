@@ -199,16 +199,46 @@ class ImageConnector:
                 'incluyendo inglés correcto, una idea/foco, ninguna decoración, alt con dato y conclusión y todas las '
                 'afirmaciones contra public_facts y sources; nunca atribuyas hechos privados o no confirmados a {nombre}. '
                 'Devuelve checks con los puntos 1 a 10, y ok=false si cualquiera falla. En fotos checks puede ser vacío.')
+        if not original:system+=INFOGRAPHIC_CHECK+(CANVAS_CHECK if context.get('lienzo') else '')
         message=[{'type':'text','text':json.dumps(dict(context,instruction=instruction),ensure_ascii=False,default=str)}]
         if original:message+=[{'type':'text','text':'Original'},block(original)]
         message+=[block(raw) for raw in images]
         result=providers.claude(infografias.with_rule(system,author),message,max_tokens=2400,output_schema=CHECK_SCHEMA,
                                 effort='low',model=VISION_MODEL,purpose='image-check')
         verdict=json.loads(result['text']);infografias.schema_check(verdict,CHECK_SCHEMA)
-        if any(not c['ok'] for c in verdict['checks']):verdict['ok']=False
+        if original:
+            if any(not c['ok'] for c in verdict['checks']):verdict['ok']=False
+        else:verdict=soften(verdict)
         if not original and ({c['point'] for c in verdict['checks']}!=set(range(1,11)) or len(verdict['checks'])!=10):
             verdict['ok']=False;verdict['reasons'].append('Falta la lista completa de diez puntos')
         return dict(verdict,sha256=[hashlib.sha256(raw).hexdigest() for raw in images],rule_version=infografias.version())
+
+
+# The review points that discard an infographic (19/11/2026: «que no bloquee todo»): those that protect the truth and
+# the legibility, and its purpose. 1: on the post's thesis and expanding it, not generic; 4: nothing under 28 px (and,
+# for the canvas, nothing cut off, overflowing or on top of other text); 5: every figure has its source and matches
+# it; 8: contrast; 9: correct public English. The rest (one focal point and accent, word counts, bars and labels,
+# decoration, the alt's wording) are style: a failure there is an observation, never a discard.
+BLOCKING=frozenset((1,4,5,8,9))
+INFOGRAPHIC_CHECK=('\nSolo los puntos 1, 4, 5, 8 y 9 descartan una infografía: el punto 1 falla si la imagen no trata la '
+    'tesis del post, es genérica (serviría para cualquier post) o solo repite su texto; si podría ampliarlo más, anótalo '
+    'en reasons con ok=true en ese punto. Los demás puntos son estilo: marca ok=false si no se cumplen, pero no dejes '
+    'que decidan el veredicto.')
+CANVAS_CHECK=('\nEs un lienzo libre (HTML y CSS dibujados por el código): falla el punto 4 si algún texto es ilegible, '
+    'queda cortado, se desborda o pisa otro texto; el punto 2 si usa colores fuera de la paleta; el punto 5 si una cifra '
+    'no coincide con su fuente en public_facts o sources.')
+
+
+def soften(verdict):
+    """An infographic's verdict: it fails only on a blocking point; a failed style point goes to `observations`. With
+    no failed point the model's own ok stands."""
+    failed=[c for c in verdict['checks'] if not c['ok']]
+    blocking=[c for c in failed if int(c['point']) in BLOCKING]
+    observations=[f'Punto {int(c["point"])}: {c["reason"]}' for c in failed if int(c['point']) not in BLOCKING]
+    if blocking:return dict(verdict,ok=False,reasons=[f'Punto {int(c["point"])}: {c["reason"]}' for c in blocking],
+                            observations=observations)
+    if failed:return dict(verdict,ok=True,reasons=[],observations=observations)
+    return dict(verdict,observations=[])
 
 
 def _author(author):
