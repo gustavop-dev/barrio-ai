@@ -1018,19 +1018,21 @@ def _check(piece,memory,frozen,text,claims,public,private,second=None):
     settle as observations) or, when the rules stop the text first, travel with the rules to the same repair."""
     policy=compuertas.gate_policy(piece)
     hard,soft=strategy_issues(piece,text,policy)
-    issues=text_rules(text,public,private,policy)+research.source_issues(claims,piece.research)+hard
+    issues=text_rules(text,public,private,policy)+hard
     if issues:return None,issues+soft,issues+soft
     review,_=_call_stage(piece,'verificador',verifier_payload(piece,memory,frozen,text,claims,second))
     review=compuertas.with_code_findings(review,soft)
-    return review,_blocking(review)+research.source_issues(claims,piece.research,review),[]
+    # An incomplete web citation (a ref not saved, a claim the verifier did not contrast) is a note, never a block
+    # (Gustavo, 19/11/2026: «lo importante es que la investigación no se pierda»).
+    notes=research.source_issues(claims,piece.research,review)
+    return (dict(review,source_notes=notes) if notes else review),_blocking(review),[]
 
 def settle(piece,review,reasons,issues,claims):
-    """(blocking reasons, observations) once the repair round had its chance (or could not run). The rules and the source
-    checks always block; of the verifier's findings only the hard ones do. A text that only has soft findings goes out
-    with them as observations."""
+    """(blocking reasons, observations) once the repair round had its chance (or could not run). The rules always block;
+    of the verifier's findings only the hard ones do. A text that only has soft findings goes out with them as
+    observations; the web-source checks are notes (review['source_notes']), never a block."""
     if not reasons or review is None or issues:return reasons,[]
     hard,soft=compuertas.split(review,compuertas.gate_policy(piece))
-    hard+=research.source_issues(claims,piece.research,review)
     if hard:return reasons,[]
     return [],soft
 

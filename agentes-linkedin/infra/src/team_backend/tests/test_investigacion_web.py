@@ -119,3 +119,92 @@ class StaleRunTests(ResearchBase):
         self.running('tool:viva',2)  # a run still inside its call keeps its key: nothing is paid twice
         with patch('knowledge.providers.claude') as model:self.assertEqual(self.call('tool:viva').status,'running')
         model.assert_not_called()
+
+
+SECOND='https://techcrunch.com/2026/11/12/agents-context/'
+
+
+def answer(*blocks,stop='end_turn'):
+    """A research answer as providers.claude returns it, with its server blocks."""
+    return {'text':'','model':'fake','stop_reason':stop,'estimated_usd':.03,'ledger_id':'fake',
+            'usage':{'web_search_requests':1,'input_tokens':900,'output_tokens':200},'content':list(blocks)}
+
+
+def search(*results,error=None):
+    return [{'type':'server_tool_use','id':'srv_1','name':'web_search','input':{'query':QUESTION}},
+            {'type':'web_search_tool_result','tool_use_id':'srv_1',
+             'content':{'type':'web_search_tool_result_error','error_code':error} if error else
+             [{'type':'web_search_result','url':url,'title':title,'encrypted_content':'SECRETO-CIFRADO','page_age':age}
+              for url,title,age in results]}]
+
+
+def text(value,**cited):
+    return {'type':'text','text':value,**({'citations':[cited]} if cited else {})}
+
+
+class FindingsAreNotLostTests(ResearchBase):
+    def run_with(self,reply,key='tool:uno',**kwargs):
+        with patch('knowledge.providers.claude',return_value=reply):return self.call(key,**kwargs)
+
+    def test_search_results_without_native_citations_become_approximate_findings(self):
+        reply=answer(text('Voy a buscar datos recientes.'),
+                     *search((URL,'Release notes','November 12, 2026'),(SECOND,'Agents lose context','November 12, 2026')),
+                     text('Según TechCrunch, el 40 % de los equipos que encadenan agentes pierde contexto entre pasos '
+                          '([fuente](https://inventada.example.com/x)); la versión de Python añade una función pública.'))
+        result=self.run_with(reply)
+        self.assertEqual(result.status,'partial')
+        self.assertEqual([(f.citation,len(f.source_ids)) for f in result.findings],[('aproximada',2)])
+        finding=result.findings[0].text
+        self.assertTrue(finding.startswith('Según TechCrunch, el 40 %'));self.assertNotIn('inventada',finding)
+        self.assertNotIn('Voy a buscar',finding)  # the chatter before the search is not the summary
+        self.assertEqual([(s.url,s.title,s.kind,s.site,s.published) for s in result.sources],
+                         [(URL,'Release notes','search_result','news.example.com','November 12, 2026'),
+                          (SECOND,'Agents lose context','search_result','techcrunch.com','November 12, 2026')])
+        self.assertIn(research.APPROXIMATE_NOTE,result.limitations)
+        diagnostic=self.row().result['diagnostic']
+        self.assertEqual({k:diagnostic[k] for k in ('busquedas','resultados_busqueda','hallazgos_nativos','hallazgos_aproximados',
+                                                    'textos_sin_cita','textos_citados')},
+                         {'busquedas':1,'resultados_busqueda':2,'hallazgos_nativos':0,'hallazgos_aproximados':1,
+                          'textos_sin_cita':2,'textos_citados':0})
+        self.assertNotIn('SECRETO',json.dumps(diagnostic));self.assertNotIn('40 %',json.dumps(diagnostic))  # counts only
+
+    def test_without_a_summary_each_search_result_is_its_own_approximate_finding(self):
+        result=self.run_with(answer(*search((URL,'Release notes','2 days ago'),(SECOND,'Agents lose context',''))))
+        self.assertEqual([f.text for f in result.findings],
+                         ['Release notes (news.example.com, 2 days ago)','Agents lose context (techcrunch.com)'])
+        self.assertTrue(all(f.citation=='aproximada' for f in result.findings))
+
+    def test_native_citations_still_win_and_carry_their_date(self):
+        reply=answer(*search((URL,'Release notes','November 12, 2026')),
+                     text('La versión añade una función pública.',type='web_search_result_location',url=URL,
+                          title='Release notes',cited_text='A new public feature is available.'))
+        result=self.run_with(reply)
+        self.assertEqual((result.status,[f.citation for f in result.findings]),('complete',['nativa']))
+        source=result.sources[0]
+        self.assertEqual((source.kind,source.quoted_text,source.published),('web','A new public feature is available.','November 12, 2026'))
+        self.assertEqual(self.row().result['diagnostic']['citas'],{'web_search_result_location':1})
+
+    def test_urls_written_in_the_prose_are_never_evidence(self):
+        result=self.run_with(answer(text('Un informe dice que el 90 % lo usa: https://inventada.example.com/informe')))
+        self.assertEqual((result.status,result.findings,result.sources),('unavailable',(),()))
+
+    def test_every_unavailable_run_says_which_case_it_was(self):
+        cases={'sin_resultados':(answer(*search()),'La búsqueda no devolvió resultados'),
+               'busqueda_fallida':(answer(*search(error='too_many_requests')),'La búsqueda falló (too_many_requests)'),
+               'sin_busqueda':(answer(text('No necesito buscar.')),'El modelo terminó sin buscar ni leer ninguna página')}
+        for n,(code,(reply,why)) in enumerate(cases.items()):
+            with self.subTest(code):
+                result=self.run_with(reply,f'tool:caso{n}')
+                self.assertEqual(result.status,'unavailable');self.assertIn(why,result.limitations)
+                self.assertEqual(result.diagnostic['motivo'],code)
+        fetch=answer({'type':'server_tool_use','id':'srv_2','name':'web_fetch','input':{'url':URL}},
+                     {'type':'web_fetch_tool_result','tool_use_id':'srv_2',
+                      'content':{'type':'web_fetch_tool_result_error','error_code':'url_not_accessible'}})
+        with patch.object(research.web_sources,'public_addresses',return_value=['93.184.216.34']), \
+             patch('knowledge.providers.claude',return_value=fetch):
+            read=research.research(research.ResearchRequest('tool:lectura',urls=(URL,)))
+        self.assertIn('No se pudo leer ninguna de las páginas indicadas',read.limitations)
+        self.assertEqual((read.diagnostic['motivo'],read.diagnostic['errores_lectura']),('lectura_fallida',['url_not_accessible']))
+        with patch('knowledge.providers.claude',side_effect=ValueError('anthropic: HTTP 529. Sin reintento automático.')):
+            failed=self.call('tool:proveedor')
+        self.assertEqual(failed.diagnostic['motivo'],'error_proveedor')

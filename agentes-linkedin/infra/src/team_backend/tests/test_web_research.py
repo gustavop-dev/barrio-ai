@@ -117,7 +117,10 @@ class PublicURLTests(TestCase):  # safe_question reads the members' names (ident
         self.assertEqual(len(facts),1);self.assertEqual(sources[0].url,URL);self.assertTrue(sources[0].quoted_text)
         self.assertEqual(facts[0].source_ids,(sources[0].id,));self.assertFalse(errors)
         answer['content'][-1]['citations'][0]['url']='https://invented.example.com/'
-        self.assertEqual(research.native_findings(answer,'now')[:2],([],[]))
+        facts,sources,errors=research.native_findings(answer,'now')
+        # A citation to a URL the search never returned is not evidence; the search result stays, marked approximate.
+        self.assertEqual([(s.url,s.kind) for s in sources],[(URL,'search_result')])
+        self.assertEqual([f.citation for f in facts],['aproximada'])
 
     def test_fetch_document_citations_and_errors(self):
         answer={'content':[
@@ -137,11 +140,14 @@ class PublicURLTests(TestCase):  # safe_question reads the members' names (ident
             {'type':'web_fetch_tool_result','content':{'type':'web_fetch_tool_result_error','error_code':'unavailable'}},
             {'type':'text','text':'An unsupported conclusion with https://invented.example.com.'}]}
         facts,sources,errors=research.native_findings(answer,'2026-11-09T08:00:00Z')
-        self.assertEqual(len(sources),1);self.assertEqual(sources[0].url,URL)
+        self.assertEqual([(s.url,s.kind) for s in sources],[(URL,'web'),(URL,'search_result')])
         self.assertEqual(facts[0].text,'Verified literal text.');self.assertEqual(facts[0].source_ids,(sources[0].id,))
-        self.assertTrue(errors)
+        self.assertTrue(errors);self.assertNotIn('invented',json.dumps([s.url for s in sources]))
         answer['content'][2]['content'][0]['content']['source']={'type':'base64','data':'not-readable'}
-        self.assertEqual(research.native_findings(answer,'now')[:2],([],[]))
+        facts,sources,_=research.native_findings(answer,'now')
+        # The unreadable document is not evidence and the prose URL never is; the search result stays, approximate.
+        self.assertEqual([(s.url,s.kind) for s in sources],[(URL,'search_result')])
+        self.assertTrue(all(f.citation=='aproximada' and 'invented' not in ' '.join(f.source_ids) for f in facts))
 
     def test_fetch_array_native_citation_resolves_document_index(self):
         answer={'content':[
@@ -253,7 +259,7 @@ class ResearchTests(OperatorBase):
         self.assertEqual((empty.status,empty.findings,empty.sources),('unavailable',(),()))
         self.assertTrue(empty.usage)  # it reached the web: red.research_silent counts it
         stored=WebResearchRun.objects.get(pk='tool:dinamica').result['limitations']
-        for limitation in ('La web no devolvió hallazgos con citas verificables',
+        for limitation in ('El modelo terminó sin buscar ni leer ninguna página',
                            'La herramienta web configurada no devuelve citas nativas (filtrado dinámico); revisar WEB_SEARCH_TOOL_TYPE.'):
             self.assertIn(limitation,empty.limitations);self.assertIn(limitation,stored)
 
@@ -475,21 +481,22 @@ class EditorialWebTests(EditorialBase):
         self.assertIn('untrusted_web_evidence',directors[-1][1]);self.assertEqual(piece.research[0]['sources'][0]['url'],URL)
         self.assertEqual(self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json()['research'],piece.research)
 
-    def test_unsourced_web_claim_is_blocked_before_verifier_even_if_it_would_approve(self):
+    def test_an_unsaved_web_ref_is_a_note_and_the_piece_goes_out(self):
+        # 19/11/2026: an incomplete citation is a note kept with the verification, never a block (compuertas.md).
         plan=answers(claims=[{'text':'A new public feature is available.','kind':'web_source','ref':'web:invented'}])
         piece=self.plan(plan)
-        self.assertEqual(piece.state,'blocked');self.assertFalse(piece.proposals.exists())
-        self.assertTrue(any('sin fuente guardada' in r for r in piece.verification['blocking_reasons']))
-        self.assertNotIn('editorial-verificador',[c[0] for c in self.calls])
+        self.assertEqual(piece.state,'ready');self.assertEqual(piece.verification['blocking_reasons'],[])
+        self.assertTrue(any('sin fuente guardada' in n for n in piece.verification['source_notes']))
+        self.assertIn('editorial-verificador',[c[0] for c in self.calls])
 
-    def test_web_claim_needs_exact_checked_source_and_supported_status(self):
+    def test_a_web_claim_the_verifier_did_not_contrast_is_a_note_not_a_reason(self):
         claim={'text':'A new public feature is available.','kind':'web_source','ref':'web:fixture'}
         piece=SimpleNamespace(research=[stored_result().to_dict()],signals=[])
         review={'verdict':'ready_for_execution','findings':[],'checked_claims':[dict(claim,status='general_knowledge')]}
         with patch.object(editorial,'_stage',return_value=(review,'fake')):
-            _,reasons,_=editorial._check(piece,{}, {},GOOD_POST,[claim],[],[])
-        self.assertTrue(any('sin contraste' in r for r in reasons))
+            checked,reasons,_=editorial._check(piece,{}, {},GOOD_POST,[claim],[],[])
+        self.assertEqual(reasons,[]);self.assertTrue(any('sin contraste' in n for n in checked['source_notes']))
         review['checked_claims'][0]['status']='supported_source'
         with patch.object(editorial,'_stage',return_value=(review,'fake')):
-            _,reasons,_=editorial._check(piece,{}, {},GOOD_POST,[claim],[],[])
-        self.assertEqual(reasons,[])
+            checked,reasons,_=editorial._check(piece,{}, {},GOOD_POST,[claim],[],[])
+        self.assertEqual(reasons,[]);self.assertNotIn('source_notes',checked)

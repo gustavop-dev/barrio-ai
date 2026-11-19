@@ -124,7 +124,7 @@ PINNED = {
     'referentes_industria.system': '85feedce2ac790daa67edf4ca37948cbd4f55ab35d1c3ea01d91d43354811cef',
     'referentes_research.system': '62047932d29038023981a6ccea42f40b6b095363f79345583f76701ff2b84627',
     'research.intent_guide': 'ce9d6e744bd7501b3a1778b5296a79cb8994a7916cb65ec75bde36c7ecf03441',
-    'research.system': '934c2ac331bcbab4aed77a78c1cefb49e36d0da99f96482fcc919410f7e17954',
+    'research.system': 'dce1f62b2cc34bdff5481a104130fa6e41862bed513b7429eb7403172cc7db0b',
     'respuesta_comprador.questions': 'bcbdd0480d309b4193fd8ae1af8bafadedaf2496a4e20c01c29863cf974beab7',
     'respuesta_comprador.system_interesado': 'd02ccc266b4c13f21cfe88634845cb72b876c5bd9a249dde79ff1a5fa41f0cb1',
     'respuesta_comprador.system_no_es_el_momento': '900f2d703dfa9d798e10f238a02c82fa0e7c3b020a26ac193e6c2db442d31f38',
