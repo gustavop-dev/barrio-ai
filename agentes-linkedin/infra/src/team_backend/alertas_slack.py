@@ -12,6 +12,8 @@ A watcher of a member's own rhythm (organizaciones, phase 2: her caps, reads, ra
 for each active member; with one member (or none) its alerts are exactly those of before, with several each one names
 her and a later member's key carries her id. The machine's (the queue, the navegador, the AI budget, the buyers' events)
 stay one for the installation.
+The state of every flow and its stages (flujos.py, 19/11/2026) is one watcher too, estado_de_flujos: a short report in the
+morning and the full one in the evening, on the summaries channel; it replaces the old daily summary while it is on.
 Only what no table records is sent where it happens: a paid provider refusing its credentials
 (knowledge.providers.CREDENTIAL_LISTENERS, registered in apps.ready). The push alerts of alerts.py and notificaciones.py
 are another channel and stay as they are.
@@ -180,8 +182,34 @@ def send(key,text,now=None,once='day',channel='alertas',immediate=False):
     else:transaction.on_commit(lambda:_post(event.pk,key,url,text))
     return True
 
+PART_CHARS=3500  # Slack shows a message whole up to about 4,000 characters: a longer text goes in several parts
+
+def parts(text,limit=PART_CHARS):
+    """The text in messages of at most `limit` characters, cut between blocks (a blank line), else between lines. Each
+    part after the first starts with the first line (who and what) and «(sigue N/M)», so it reads alone on a phone."""
+    if len(text)<=limit:return [text]
+    head=text.split('\n',1)[0][:200];room=limit-len(head)-20;pieces=[]
+    for block in text.split('\n\n'):
+        lines=[]
+        for line in block.split('\n'):lines+=[line[i:i+room] for i in range(0,len(line),room)] or ['']
+        while lines:
+            chunk=lines.pop(0)
+            while lines and len(chunk)+1+len(lines[0])<=room:chunk+='\n'+lines.pop(0)
+            pieces.append(chunk)
+    out=[]
+    for piece in pieces:
+        if out and len(out[-1])+2+len(piece)<=room:out[-1]+='\n\n'+piece
+        else:out.append(piece)
+    return [out[0]]+[f'{head} (sigue {n}/{len(out)})\n\n{part}' for n,part in enumerate(out[1:],2)]
+
 def _post(event_id,key,url,text):
-    """One POST {"text": ...}. Failures are logged and audited without the URL; nothing is raised."""
+    """One POST {"text": ...} per part (parts). Failures are logged and audited without the URL; nothing is raised. A
+    failed part stops the rest: the alert is not sent again that day, like any other."""
+    for part in parts(text):
+        if not _post_one(event_id,key,url,part):return False
+    return True
+
+def _post_one(event_id,key,url,text):
     try:
         with httpx.Client(transport=TRANSPORT,timeout=TIMEOUT) as client:
             response=client.post(url,json={'text':text})
@@ -1035,6 +1063,23 @@ def summary_text(now):
 @vigilante
 def resumen_diario(now):
     """At the close of the read window (SLACK_DAILY_SUMMARY, on with a webhook): the day's activity and every cap, once a
-    day, on the summaries channel."""
-    if not summary_enabled() or now<close_of_day(now):return []
+    day, on the summaries channel. Only while the flows' report is off (SLACK_ESTADO_FLUJOS=false): that report carries
+    the same day by flow, and two summaries a day in one channel were what nobody read (19/11/2026)."""
+    from . import flujos
+    if not summary_enabled() or flujos.enabled() or now<close_of_day(now):return []
     return [Aviso('resumen:diario',lambda:summary_text(now),channel='resumen')]
+
+# --------------------------------------------------------------------------- the state of every flow (flujos.py)
+
+@vigilante
+@por_miembro
+def estado_de_flujos(now,member):
+    """Every flow and its stages, on the summaries channel (Gustavo, 19/11/2026: «repórtame a Slack el estado de cada
+    flujo y sus etapas»): the full report from SLACK_ESTADO_FLUJOS_HORA (18:00) and a short one from
+    SLACK_ESTADO_FLUJOS_MANANA (08:45), once a day each (the key carries the slot). Built only when it goes out (lazy text):
+    the report reads many tables and the tick runs every five minutes. Each active member gets hers (por_miembro); the
+    machine's own lines go only in the first one's. Off with SLACK_ESTADO_FLUJOS=false."""
+    from . import flujos
+    slot=flujos.slot(now) if flujos.enabled() else None
+    if slot is None:return []
+    return [Aviso(f'estado:{slot}',lambda:flujos.text_for(now,member,morning=slot=='manana'),channel='resumen')]

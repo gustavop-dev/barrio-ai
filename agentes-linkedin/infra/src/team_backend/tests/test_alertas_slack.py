@@ -19,7 +19,9 @@ SUMMARY='https://hooks.slack.test/services/RESUMEN'
 class SlackBase(WindowBase):
     def setUp(self):
         super().setUp()
+        # The flows' report (flujos.py) has its own tests (test_estado_flujos); here the alerts and the old daily summary.
         env=patch.dict('os.environ',{'SLACK_WEBHOOK_URL':ALERTS,'SLACK_WEBHOOK_RESUMEN':'','SLACK_DAILY_SUMMARY':'true',
+                                     'SLACK_ESTADO_FLUJOS':'false',
                                      'ALERT_CAP_THRESHOLD':'0.8','ALERT_REPLY_PENDING_HOURS':'4','ALERT_READS_GAP_HOURS':'3'})
         env.start();self.addCleanup(env.stop)
         self.sent=[];self.answer=200
