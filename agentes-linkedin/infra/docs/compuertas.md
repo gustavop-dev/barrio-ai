@@ -4,6 +4,10 @@ Gustavo, 14/11/2026: «el verificador es demasiado rígido… busca una manera d
 nos bloquea buscar una manera de reintentar… no digo que lo quitemos… tampoco iteraciones infinitas: al menos que en la
 segunda revisión ya pase, de haber corregido lo que bloqueó… que esto sea sostenible».
 
+Gustavo, 19/11/2026: «el verificador es muy rígido… es un post… no tiene que ser tan estricto… su propia rigidez nos
+perjudica… ayúdame a regularlo y a bajarlo más». Y sobre la lista de lo que bloquea: las cifras o citas atribuidas a una
+fuente que la evidencia no tiene «menos estricto»: nota, nunca bloqueo.
+
 Este documento reúne las compuertas que pueden parar una pieza, un comentario o una acción de red; cuáles bloquean siempre
 y cuáles dejan pasar con una observación; la escalera de reintentos con sus topes y su coste; y cómo se audita todo sin
 llamar a modelos. Código: `team_backend/compuertas.py` (severidad, segunda revisión y segundo intento) y
@@ -16,8 +20,16 @@ llamar a modelos. Código: `team_backend/compuertas.py` (severidad, segunda revi
   observación». La segunda revisión, tras la reparación, comprueba lo que se corrigió y solo marca problemas graves
   nuevos. Un día que una compuerta de contenido bloqueó tiene un segundo intento. Un comentario que el líder descartó se
   reescribe una vez con sus razones.
-- **No cambia.** Experiencias inventadas, cifras o afirmaciones sin respaldo, datos privados, fugas de la guía privada,
-  pitch agresivo, las reglas fijas y las fuentes web siguen bloqueando siempre, en cualquier revisión. Los criterios de
+- **Desde el 19/11/2026.** El post se lee como un post de opinión de LinkedIn, no como un informe: Gustavo puede
+  razonar, explicar por qué pasa algo, generalizar y opinar. Solo bloquean, tras la ronda de reparación, un hecho
+  inventado sobre Gustavo, su empresa o sus clientes presentado como real (clientes, ingresos, resultados, credenciales,
+  anécdotas) y el material privado. Una cifra o cita atribuida a una fuente que no está en la evidencia, una afirmación
+  sin respaldo, un `blocked` sin hallazgos y el tono de venta que lee el verificador son notas: la reparación suaviza esa
+  frase («varios informes sugieren…», la cita pasa a paráfrasis) y, si no lo hace, la pieza sale con la observación.
+  Las citas web incompletas (`research.source_issues`) son notas. Cada pieza guarda cuántas notas y bloqueos dio cada
+  regla (`verification.conteo_reglas`).
+- **No cambia.** Las reglas fijas (longitud, correo, teléfono, enlaces, pitch, hashtags), la fuga de la guía privada y
+  una cifra sobre su trabajo que no consta en sus hechos públicos siguen bloqueando, en cualquier revisión. Los criterios de
   la red (el clasificador y el riesgo que juzga el líder) no se tocan. La versión de una pieza que Gustavo comentó nunca
   sale sin él ([EDI-22](../../../docs/funcionalidades/motor-editorial.md#edi-22)). Sin `gate_policy` en el brief, la
   publicación se comporta como antes respecto al contacto: ninguna petición de contacto pasa.
@@ -26,8 +38,9 @@ llamar a modelos. Código: `team_backend/compuertas.py` (severidad, segunda revi
 
 | Compuerta | Código | Qué para | Qué pasa después |
 | --- | --- | --- | --- |
-| Reglas fijas del post | `compuertas.form_rules` (`editorial.text_rules` antes del verificador; `autopiloto.post_issues` como compuerta final) | longitud, correo, teléfono, enlaces, pitch, hashtags; más `guardas.private_leaks` e `invented_experience` | ronda de reparación; si sigue, `blocked` (dura) |
-| Fuentes web | `research.source_issues` | afirmación web sin fuente guardada o con ref inventada | dura |
+| Reglas fijas del post | `compuertas.form_rules` (`editorial.text_rules` antes del verificador; `autopiloto.post_issues` como compuerta final) | longitud, correo, teléfono, enlaces, pitch, hashtags; más `guardas.private_leaks` y `guardas.invented_figures` (cifra sobre su trabajo que no consta en sus hechos públicos) | ronda de reparación; si sigue, `blocked` (dura) |
+| Experiencia por redacción | `guardas.invented_experience` | frases en primera persona que parecen vivencias | desde el 19/11/2026 no bloquea: va al verificador como `experience_flags` para que las juzgue |
+| Fuentes web | `research.source_issues` | afirmación web sin fuente guardada, sin contraste o con ref inventada | nota (`review.source_notes`); desde el 19/11/2026 nunca bloquea |
 | Verificador del post | `editorial._check`, `VERIFIER_SYSTEM` | hallazgos `material` y afirmaciones `unsupported` | según severidad (abajo) |
 | Ronda de reparación | `editorial._repair_round` | una por pieza | segunda revisión acotada |
 | Revisión visual | `editorial._visual`, `editor_visual` | imagen que no pasa | `blocked` («Pieza bloqueada: imagen»); cuenta como compuerta para el segundo intento |
@@ -42,23 +55,25 @@ llamar a modelos. Código: `team_backend/compuertas.py` (severidad, segunda revi
 
 ## Severidad del verificador
 
-`compuertas.split` decide sobre lo que devuelve el verificador. Una afirmación `unsupported` y un `blocked` sin hallazgos
-concretos son duros siempre.
+`compuertas.split` decide sobre lo que devuelve el verificador. Desde el 19/11/2026 una afirmación `unsupported` y un
+`blocked` sin hallazgos concretos son notas (blandas): pasan por la ronda de reparación y, si siguen, salen como
+observación.
 
-| `issue` | Severidad | Por qué |
-| --- | --- | --- |
-| `invented_experience` | dura | atribuye a Gustavo algo que no vivió |
-| `unsourced_figure` | dura | una cifra sin fuente es un hecho falso posible |
-| `unsupported_claim` | dura | un hecho sin respaldo |
-| `private_data` | dura | expone a personas |
-| `private_guidance_leak` | dura | expone sus prioridades privadas |
-| `aggressive_pitch` | dura; blanda solo con `gate_policy.cta_max=1` | venta y petición de contacto; la regla fija sigue parando la venta dura |
-| `hook_not_delivered` | blanda | calidad: la ronda la intenta arreglar; si no, sale como observación |
-| `off_brief` | blanda | calidad |
-| `other` | blanda | solo calidad; el prompt manda los problemas graves a su categoría |
-| `unsourced_third_party_story` | dura | estrategia (P): la historia de un founder no está en una fuente guardada |
-| `fabricated_quote` | dura | estrategia (P): una cita entre comillas que no está literal en la fuente |
-| `first_person_appropriation` | dura | estrategia (P): la historia ajena contada como de Gustavo o sin atribuir |
+| `issue` | Antes del 19/11/2026 | Ahora | Por qué |
+| --- | --- | --- | --- |
+| `invented_experience` | dura | dura | un hecho sobre Gustavo, su empresa o sus clientes que no consta (clientes, ingresos, resultados, credenciales, anécdotas) |
+| `private_data` | dura | dura | expone a personas |
+| `private_guidance_leak` | dura | dura | expone sus prioridades privadas |
+| `first_person_appropriation` | dura | dura | estrategia (P): la historia ajena contada como de Gustavo |
+| `unsourced_figure` | dura | blanda | cifra atribuida a una fuente que la evidencia no tiene: la reparación quita o suaviza la atribución; con la fuente en la evidencia, una cifra aproximada o una paráfrasis no es hallazgo |
+| `fabricated_quote` | dura | blanda | cita literal atribuida a alguien que no está en la evidencia: la reparación la pasa a paráfrasis |
+| `unsourced_third_party_story` | dura | blanda | estrategia (P): la historia de un founder sin fuente guardada |
+| `unsupported_claim` | dura | blanda | explicar por qué pasa un hecho confirmado es opinión, no un dato sin respaldo |
+| `aggressive_pitch` | dura; blanda con `cta_max=1` | blanda | lectura del verificador; la regla fija `Contiene pitch…` sigue parando la venta dura |
+| `blocked` sin hallazgos | dura | blanda | no deja nada concreto que corregir |
+| `hook_not_delivered` | blanda | blanda | calidad: la ronda la intenta arreglar; si no, sale como observación |
+| `off_brief` | blanda | blanda | calidad |
+| `other` | blanda | blanda | solo calidad; el prompt manda los problemas graves a su categoría |
 | `cta_count` | blanda | estrategia: más de una llamada a la acción en S, o alguna en P |
 | `offer_in_growth`, `offer_in_personal` | blanda | estrategia: ofrece servicios en un post G o P |
 | `no_reader_need`, `repeated_story` | blanda | estrategia: lo decidió el brief; viajan solo como riesgo «Estrategia: …», sin ronda |
@@ -67,13 +82,31 @@ Los códigos de la estrategia semanal (`compuertas.STRATEGY_CODES`, `estrategia.
 tabla (`compuertas.HARD`/`SOFT`): no hay otra. El código los busca en el texto exacto antes del verificador
 (`editorial.strategy_issues`): los duros paran el texto como una regla fija y no se paga el verificador; los blandos se
 suman a la revisión del verificador como hallazgos `material` marcados `by: "codigo"` (`compuertas.with_code_findings`),
-pasan por la ronda de reparación (`source: "estrategia"`) y, si siguen, salen como observación. Un `blocked` del modelo
-sin hallazgos propios sigue siendo duro aunque el código haya añadido los suyos.
+pasan por la ronda de reparación (`source: "estrategia"`) y, si siguen, salen como observación.
 
 `COMPUERTAS_DURAS=other,off_brief` vuelve duras más categorías si la auditoría muestra que salen piezas que no deberían.
-Un hallazgo `minor` nunca bloquea (como antes). El prompt del verificador dice ahora que solo un **hecho** sin respaldo es
-material; las opiniones, el criterio, los razonamientos, las preguntas y la voz de Gustavo no lo son, y «I think…» no es
-una anécdota («last week I…» sí). Ante la duda en un hallazgo de calidad, `minor`.
+Un hallazgo `minor` nunca bloquea (como antes). El prompt del verificador dice que revisa un post de opinión de LinkedIn:
+opiniones, razonamientos, explicaciones, generalizaciones, preguntas, hipótesis y la voz de Gustavo no son defectos, y
+«I think…» no es una anécdota («last week a client…» sí). Ante la duda, `minor`. La reparación corrige solo la frase
+señalada y nunca recorta el texto por una nota.
+
+### Reglas deterministas antes y después
+
+| Regla | Antes | Ahora |
+| --- | --- | --- |
+| Longitud, correo, teléfono, enlaces, pitch, hashtags (`form_rules`) | dura | dura (sin cambios) |
+| Fuga de la guía privada (`guardas.private_leaks`) | dura | dura (sin cambios) |
+| Experiencia en primera persona (`guardas.invented_experience`) | dura | quitada como regla: solo la señala al verificador (`experience_flags`), que decide; ya no salta con preguntas, hipótesis («if», «imagine», «si», «supongamos») ni con lo que reporta otro («according to», «según», «a study found») |
+| Cifra sobre su trabajo que no consta (`guardas.invented_figures`) | dentro de la anterior | dura; un año («In 2024…») no es cifra |
+| Citas web (`research.source_issues`) | dura | nota |
+
+## Conteo por regla
+
+`verification.conteo_reglas` guarda en cada pieza `{regla: {"notas": n, "bloqueos": m}}` (`compuertas.rule_tally`). Un
+bloqueo es un motivo que paró la pieza; una nota es todo lo que una regla o el verificador marcó sin pararla: un
+hallazgo blando o `minor` de la última revisión, uno duro que la ronda de reparación corrigió, una nota de fuente web
+(`fuente_web`) o una frase que la regex de experiencia solo señaló (`experiencia_por_redaccion`). Solo etiquetas, nunca
+la cita. Sirve para ver qué regla frena de verdad y cuál solo anota.
 
 Lo blando queda en `verification.observations` y en los riesgos de la propuesta («Conservada como observación (issue):
 …»); el detalle de la pieza lo muestra en «Cómo se escribió».
@@ -177,7 +210,7 @@ segunda revisión.
 | --- | --- | --- |
 | `EDITORIAL_DAY_ATTEMPTS` | 2 | piezas de contenido por día como máximo (1 apaga el segundo intento) |
 | `EDITORIAL_RETRY_MIN_MINUTES` | 90 | margen mínimo antes de la hora para el segundo intento |
-| `COMPUERTAS_DURAS` | vacío | categorías del verificador que también bloquean siempre |
+| `COMPUERTAS_DURAS` | vacío | categorías del verificador que también bloquean siempre (p. ej. `unsourced_figure` para volver a la regla de antes) |
 | `COMMENT_LEAD_REDRAFT` | true | reescritura de un comentario con las razones del líder |
 | `COMPUERTAS_ALERTA_TASA` | 0.5 | tasa de parada a 7 días que dispara `gate_alert` |
 | `COMPUERTAS_ALERTA_MIN` | 4 | decisiones mínimas para ese aviso |
