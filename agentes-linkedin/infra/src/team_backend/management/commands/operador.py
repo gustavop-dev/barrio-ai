@@ -158,6 +158,38 @@ class Command(BaseCommand):
         ind.add_argument('--empresas',default='',help='Empresas semilla separadas por comas (p. ej. "Imagine Apps,Northwind Labs"): se buscan sus fundadores y van primero')
         ind.add_argument('--perfiles',default='',help='Perfiles semilla separados por comas (URL linkedin.com/in/... o identificador): se miden primero con los mismos criterios')
         ind.add_argument('--informe',action='store_true',help='Solo imprime el embudo de las búsquedas de industria de este mes (no encola nada)')
+        est=sub.add_parser('estado-flujos',help='El estado de cada flujo y sus etapas, como llega a Slack (solo lectura). Sin '
+                           '--enviar solo lo imprime')
+        est.add_argument('--enviar',action='store_true',help='Además lo envía al canal de resúmenes de Slack (una vez por minuto)')
+        est.add_argument('--manana',action='store_true',help='La versión corta de la mañana')
+        est.add_argument('--miembro',default=None,help='Usuario de Django de un miembro (por defecto, cada miembro activo)')
+
+    def flows(self,o):
+        """estado-flujos: the report of flujos.py for each active member (or --miembro), printed; --enviar also sends it
+        to the summaries channel, once per local minute (a retried command does not send it twice)."""
+        from django.utils import timezone
+        from team_backend import alertas_slack, flujos, miembros
+        from team_backend.models import Member
+        now=timezone.now()
+        if o['miembro']:
+            member=Member.objects.filter(user__username=o['miembro'],active=True).first()
+            if member is None:raise CommandError(f'«{o["miembro"]}» no es un miembro activo.')
+            members=[member]
+        else:members=miembros.active_members()
+        several=len(miembros.active_members())>1
+        for member in members:
+            text=flujos.text_for(now,member,morning=o['manana'])
+            if several and member is not None:text=alertas_slack.named(text,member)
+            self.stdout.write(text)
+            self.stdout.write('')
+            if not o['enviar']:continue
+            key=f'estado:manual:{now.astimezone(operador.local_tz()):%Y%m%d%H%M}'+(f':{member.pk}' if member is not None else '')
+            if not alertas_slack.webhook('resumen'):
+                self.stdout.write('No se envió: Slack no está configurado (SLACK_WEBHOOK_RESUMEN o SLACK_WEBHOOK_URL).')
+            elif alertas_slack.send(key,text,now,once='ever',channel='resumen',immediate=True):
+                self.stdout.write('Enviado al canal de resúmenes de Slack.')
+            else:self.stdout.write('No se envió: ya salió en este minuto.')
+        if not o['enviar']:self.stdout.write('Solo impreso: con --enviar también va a Slack.')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -207,6 +239,9 @@ class Command(BaseCommand):
                 return
             if o['accion']=='hecho-empresa':
                 self.company_facts(user,o)
+                return
+            if o['accion']=='estado-flujos':
+                self.flows(o)
                 return
             if o['accion']=='preguntas-casos-projectapp':
                 from team_backend import projectapp
