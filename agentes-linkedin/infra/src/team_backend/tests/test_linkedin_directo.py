@@ -218,6 +218,21 @@ class PostAndCommentTests(SimpleTestCase):
         with self.assertRaises(ConnectorError) as e:c.list_comment_thread(POST,'abc')
         self.assertEqual(e.exception.kind,'invalid');self.assertEqual(len(t.sent),2)
 
+    def test_the_comment_box_is_read_when_the_page_writes_javascript_hex_escapes(self):
+        """19/11/2026: the page began to write the `<` of `optimisticKey` («<PrefixToExecutionId>…») as `\\x3C`, a
+        JavaScript escape that JSON does not know: no createComment template could be read and no comment went out
+        («la página del post no trae la caja de comentarios»)."""
+        plain=F.post_page(POST).text;mark='<PrefixToExecutionId>'
+        self.assertIn(mark,plain)
+        escaped=plain.replace(mark,'\\x3CPrefixToExecutionId>')
+        before=rutas.templates(rutas.unescape(plain),rutas.COMMENT);after=rutas.templates(rutas.unescape(escaped),rutas.COMMENT)
+        self.assertTrue(before);self.assertEqual(after,before)
+        c,t=connector(('GET',r'^/feed/update/urn:li:activity:\d+/$',type(F.post_page(POST))(200,escaped)),sdui(rutas.COMMENT,F.comment_written(POST,F.snowflake(datetime(2026,11,19,9,tzinfo=UTC),6),'Hola')))
+        c.create_comment(POST,'Hola');self.assertEqual(len(t.sent),2)
+        self.assertEqual(t.sent[1].body['requestedArguments']['payload']['optimisticKey'],'<PrefixToExecutionId>optimisticComment')
+        # An escaped backslash before an x is text, not an escape: it stays as it was.
+        self.assertEqual(rutas.templates('{"requestId":"r","a":"c:\\\\x41"}','r'),[{'requestId':'r','a':'c:\\x41'}])
+
     def test_create_comment_fills_the_page_box_and_makes_one_write(self):
         new=F.snowflake(datetime(2026,11,10,19,tzinfo=UTC),6)
         c,t=connector(page(),sdui(rutas.COMMENT,F.comment_written(POST,new,'Un aporte de prueba')))
