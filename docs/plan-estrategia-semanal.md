@@ -169,6 +169,10 @@ Reglas de mezcla dentro de la semana:
 6. **Cada día,** el director prepara la pieza con el tipo como restricción: G con los modelos de referentes, S con
    el propósito de la semana y P con la historia investigada o tu material. El verificador revisa lo propio de cada
    tipo y el código lo comprueba en el texto final (ver [Comprobaciones](#comprobaciones-por-tipo)).
+   Con `REFERENTES_MOLDE` encendido (apagado por defecto), un día basado en un post de referente que funcionó guarda su
+   **molde** (gancho, formato del cuerpo, cierre, rango de longitud y ángulo, con su enlace): la variante A se escribe
+   sobre él y la B queda libre, como mucho dos días por semana sobre moldes del mismo autor, y el resumen semanal compara
+   los posts con molde y sin molde ([el molde](plan-referentes-industria.md#molde)).
 7. **Resultados y el resumen semanal** muestran la interacción media y las impresiones medianas por tipo; el resumen
    dice además qué respondió más la audiencia en cada tipo y qué señales movieron el plan de la semana siguiente.
 
