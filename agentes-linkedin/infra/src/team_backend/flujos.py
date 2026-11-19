@@ -49,7 +49,7 @@ PALABRA = {VERDE: 'funcionando', AMARILLO: 'con atención', ROJO: 'detenido', AP
 GRAVEDAD = {VERDE: 0, AMARILLO: 1, ROJO: 2}
 DIAS = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
 PREPARACION = timedelta(hours=2)  # what a daily post may take once its lead window opened before it counts as not prepared
-GENERICAS_MAX = 2  # pieces of the last 14 with the generic image that keep the daily post yellow
+GENERICAS_MAX = 2  # pieces of the last seven days (and tomorrow's) with a fallback image that keep the daily post yellow
 INVESTIGACION_A_MEDIAS = timedelta(minutes=30)  # a web research run still «running» after this was left half way
 CAPTURA_A_MEDIAS = timedelta(hours=1)  # a capture still being transcribed or processed after this is stuck
 ESPERA_RED = timedelta(hours=24)  # approved network actions wait for their rounds and caps: a day is still normal
@@ -448,9 +448,24 @@ def _piece_status(piece):
     return status, action
 
 
-def generic_image(piece):
-    """The piece's image is the fixed brand card the code draws when its own image could not be made (imagenes.fallback)."""
-    return (piece.image_review or {}).get('mode') == 'fixed_brand_card' or piece.image_kind == 'tarjeta'
+RESPALDOS = {'contenido': 'la tarjeta con la frase del post', 'foto': 'una foto de la galería', 'marca': 'la tarjeta genérica'}
+
+
+def fallback_level(piece):
+    """Which fallback carries the piece's image when its own could not be made, or None for its own image. Since #144
+    (imagenes.fallback) the post's key line goes first, then the editor's photo, and only then the fixed brand card."""
+    from .imagenes import FALLBACKS
+    review = piece.image_review if isinstance(piece.image_review, dict) else {}
+    level = {mode: name for name, mode in FALLBACKS.items()}.get(review.get('mode'))
+    return level or ('marca' if piece.image_kind == 'tarjeta' else None)
+
+
+def fallback_reason(piece):
+    """Why the piece's own image did not go out, in plain words: the fallback's own reason (image_reason carries it
+    behind a «Respaldo con…» prefix)."""
+    review = piece.image_review if isinstance(piece.image_review, dict) else {}
+    fallback = review.get('fallback') if isinstance(review.get('fallback'), dict) else {}
+    return motivo(fallback.get('reason') or piece.image_reason)
 
 
 def _post_switch(ctx):
@@ -550,8 +565,8 @@ def medir_post(ctx):
 
     def imagen(window):
         ready = list(pieces.filter(state='ready', **_in('created_at', window)))
-        generic = [p for p in ready if generic_image(p)]
-        return Conteo(len(ready), len(ready) - len(generic), 0, len(generic), Counter(motivo(p.image_reason) for p in generic))
+        generic = [p for p in ready if fallback_level(p)]
+        return Conteo(len(ready), len(ready) - len(generic), 0, len(generic), Counter(fallback_reason(p) for p in generic))
 
     def metricas(window):
         captured = _own(PostMetric.objects.all(), ctx, 'piece__member').filter(**_in('captured_at', window)).count()
@@ -575,17 +590,20 @@ def medir_post(ctx):
         etapa(ctx, 'Publicado', contar_escrituras(ctx, 'CONT-09'), entra='propuestos', descarta='descartados o vetados'),
         etapa(ctx, 'Métricas', metricas, cortes_pendientes, espera=timedelta(hours=12), cola='cortes pendientes'),
     ]
-    # The image: the generic brand card is a fallback, never a failure of the post: yellow with its reason, when one was
-    # made in the last 24 hours or GENERICAS_MAX of the week's pieces carry it (17–18/11/2026: 4 of 14).
+    # The image: a fallback (the post's key line, a gallery photo or the generic brand card) is never a failure of the
+    # post: yellow with which one and why, when one was made in the last 24 hours or GENERICAS_MAX of the week's pieces
+    # carry one (17–18/11/2026: 4 of 14 with the brand card).
     image = res.etapas[2]
     week = list(pieces.filter(state='ready', slot_date__gt=ctx.today.date() - timedelta(days=7),
                               slot_date__lte=ctx.today.date() + timedelta(days=1)))
-    generic = [p for p in week if generic_image(p)]
+    generic = [p for p in week if fallback_level(p)]
     if image.dia.fallaron or len(generic) >= GENERICAS_MAX:
-        reason = image.dia.motivo() or Counter(motivo(p.image_reason) for p in generic).most_common(1)[0][0]
-        lead = (f'{_plural(image.dia.fallaron, "pieza lista lleva", "piezas listas llevan")} la tarjeta genérica de respaldo '
-                'en vez de su imagen propia' if image.dia.fallaron else 'Varias piezas llevan la tarjeta genérica de respaldo')
-        res.hallazgos.append(Hallazgo(AMARILLO, f'{lead} ({reason}); {len(generic)} de {len(week)} esta semana.',
+        recent = [p for p in pieces.filter(state='ready', **_in('created_at', ctx.dia)) if fallback_level(p)]
+        kinds = ' y '.join(dict.fromkeys(RESPALDOS[fallback_level(p)] for p in recent or generic))
+        reason = image.dia.motivo() or Counter(fallback_reason(p) for p in generic).most_common(1)[0][0]
+        lead = (f'{_plural(image.dia.fallaron, "pieza lista lleva", "piezas listas llevan")} un respaldo en vez de su imagen '
+                'propia' if image.dia.fallaron else 'Varias piezas llevan un respaldo en vez de su imagen propia')
+        res.hallazgos.append(Hallazgo(AMARILLO, f'{lead} ({kinds}: {reason}); {len(generic)} de {len(week)} esta semana.',
                                       'Revisa por qué falló la imagen propia en el detalle de la pieza.'))
     image.dia = Conteo(image.dia.entraron, image.dia.avanzaron)  # judged above: not again as a failure rate
     found, morning = _post_expected(ctx)
@@ -1397,7 +1415,8 @@ FLUJOS = (
           (('Plan del día', 'el autopiloto encarga la preparación del hueco (trabajos prepare_piece)'),
            ('Preparación', 'director, investigación, redacción, lectores, verificación y reparación (piezas creadas, '
                            'listas, saltadas por el director, fallidas o bloqueadas con su nota)'),
-           ('Imagen propia', 'piezas listas con su propia imagen; la tarjeta genérica de respaldo cuenta aparte'),
+           ('Imagen propia', 'piezas listas con su propia imagen; los respaldos (la frase del post, una foto de la galería '
+                             'o la tarjeta genérica) cuentan aparte'),
            ('Programado', 'la propuesta de publicación aprobada por el líder o por ti, o descartada (CONT-09)'),
            ('Publicado', 'escrituras CONT-09 en LinkedIn; los intentos fallidos de execute_action, con su motivo'),
            ('Métricas', 'cortes de 24 h, 72 h y 7 días leídos (PostMetric) y los cortes vencidos sin leer')),

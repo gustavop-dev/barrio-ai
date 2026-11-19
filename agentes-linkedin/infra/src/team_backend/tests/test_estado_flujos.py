@@ -242,8 +242,24 @@ class IncidentTests(FlowsBase):
         self.piece(DAY.date() + timedelta(days=1), at(18, 0), image_kind='tarjeta', image_review={'ok': True, 'mode': 'fixed_brand_card'},
                    image_reason='Infografía rechazada tras una corrección: el texto no cabe')
         post = self.only(self.results(), 'post_diario', flujos.AMARILLO)
-        self.assertEqual(post.hallazgos[0].texto, '1 pieza lista lleva la tarjeta genérica de respaldo en vez de su imagen propia '
-                                                  '(la revisión visual rechazó la infografía); 1 de 2 esta semana.')
+        self.assertEqual(post.hallazgos[0].texto, '1 pieza lista lleva un respaldo en vez de su imagen propia (la tarjeta '
+                                                  'genérica: la revisión visual rechazó la infografía); 1 de 2 esta semana.')
+
+    def test_the_other_fallbacks_count_too(self):
+        """Since #144 the post's key line and the editor's photo come before the brand card: still not its own image, so
+        the same yellow, naming which fallback and the reason behind its «Respaldo con…» prefix."""
+        reason = 'Infografía rechazada tras una corrección: el texto no cabe'
+        self.piece(DAY.date() + timedelta(days=1), at(18, 0), image_kind='infografia',
+                   image_review={'ok': True, 'mode': 'tarjeta_contenido', 'fallback': {'level': 'contenido', 'reason': reason}},
+                   image_reason='Respaldo con la frase clave del post: ' + reason)
+        self.piece(DAY.date() - timedelta(days=2), at(9, 0, -3), image_kind='foto',
+                   image_review={'ok': True, 'mode': 'foto_respaldo', 'fallback': {'level': 'foto', 'reason': 'Sin proveedor visual'}},
+                   image_reason='Respaldo con una foto de la galería: Sin proveedor visual')
+        post = self.only(self.results(), 'post_diario', flujos.AMARILLO)
+        self.assertEqual(post.hallazgos[0].texto, '1 pieza lista lleva un respaldo en vez de su imagen propia (la tarjeta con '
+                                                  'la frase del post: la revisión visual rechazó la infografía); 2 de 3 esta semana.')
+        stage = {e.nombre: e for e in post.etapas}['Imagen propia']
+        self.assertEqual((stage.hoy.entraron, stage.hoy.avanzaron), (1, 0))
 
 
 class ReadOnlyTests(FlowsBase):

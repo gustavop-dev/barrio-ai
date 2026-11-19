@@ -84,7 +84,7 @@ Las reglas miran **las últimas 24 horas**, así un problema de anoche no desapa
 | --- | --- |
 | ⚪ apagado | Su interruptor está apagado, y el informe dice cuál. Una etapa sola también puede estar apagada; se marca con ⚪ y su interruptor. |
 | 🔴 detenido | No pasó algo que debía pasar hoy (cada flujo dice qué espera; ver su sección). O una etapa falló todos sus intentos de las últimas 24 horas, con al menos `ESTADO_FLUJOS_FALLOS_MIN` (3) fallos. O algo lleva esperando a la máquina más de `ESTADO_FLUJOS_DETENIDO_HORAS` (24). |
-| 🟡 con atención | Una etapa falló al menos 3 veces en 24 horas y más del `ESTADO_FLUJOS_FALLOS_PCT` (20 %) de sus intentos. O algo espera a la máquina más que el límite de su etapa. O salió algo con un respaldo, como la imagen genérica. O hay un hallazgo propio del flujo (ver su sección). |
+| 🟡 con atención | Una etapa falló al menos 3 veces en 24 horas y más del `ESTADO_FLUJOS_FALLOS_PCT` (20 %) de sus intentos. O algo espera a la máquina más que el límite de su etapa. O salió algo con un respaldo, como una imagen de respaldo en vez de la propia. O hay un hallazgo propio del flujo (ver su sección). |
 | 🟢 funcionando | Nada de lo anterior. |
 
 **Lo que no pone un flujo en amarillo:**
@@ -105,7 +105,7 @@ Las reglas miran **las últimas 24 horas**, así un problema de anoche no desapa
 2. Seguir e invitar sin lecturas de perfil, porque la investigación gastó el cupo, pone **Crecimiento de red** en 🟡 con las cifras de cada parte del cupo.
 3. Las investigaciones que quedan «en curso» para siempre, y las verificaciones que fallan por presupuesto, ponen **Investigación en internet** en 🟡 y **Crecimiento de red** en 🔴.
 4. Compradores descartados con un nivel que los mantiene ponen **Crecimiento de red** en 🟡 y nombran el comando para recuperarlos.
-5. Piezas con la tarjeta genérica de respaldo ponen **Post diario** en 🟡, con el motivo y la cuenta de la semana.
+5. Piezas con una imagen de respaldo (la tarjeta genérica, la tarjeta con la frase del post o una foto de la galería) ponen **Post diario** en 🟡, con cuál fue, el motivo y la cuenta de la semana.
 
 ### FLU-03 · Envío a Slack <a id="flu-03"></a>
 
@@ -196,7 +196,7 @@ Dos flujos no tienen ciclo propio en ese registro:
    - los lectores
    - la verificación
    - la reparación
-3. **Imagen propia:** las piezas listas con su propia imagen. La tarjeta genérica de respaldo cuenta aparte.
+3. **Imagen propia:** las piezas listas con su propia imagen. Los respaldos cuentan aparte. Cuando la imagen propia no sale, el código pone primero una tarjeta con la frase del post, si no puede una foto de la galería y, como último recurso, la tarjeta genérica de marca.
 4. **Programado:** la propuesta de publicación (CONT-09). La aprueba el líder o la apruebas tú, o se descarta o se veta.
 5. **Publicado:** el post escrito en LinkedIn, y los intentos fallidos con su motivo.
 6. **Métricas:**
@@ -231,7 +231,7 @@ Dos flujos no tienen ciclo propio en ese registro:
 
 **Se pone en 🟡 cuando:**
 
-- **Una pieza lista lleva la tarjeta genérica de respaldo** en vez de su propia imagen en las últimas 24 horas, o **2 o más** de las piezas de la semana la llevan. El informe da el motivo y la cuenta de la semana, por ejemplo «4 de 14».
+- **Una pieza lista lleva un respaldo** en vez de su propia imagen en las últimas 24 horas, o **2 o más** de las piezas de la semana llevan uno. El informe dice cuál respaldo fue, el motivo y la cuenta de la semana, por ejemplo «4 de 14».
 - Una etapa falla a menudo, o algo espera más de lo normal (las reglas de [FLU-02](#flu-02)).
 
 **Cifra clave:** «publicado hoy a las 08:30; el de mañana, listo».
