@@ -484,6 +484,60 @@ class NothingHappenedTests(SlackBase):
                                                           'nada sale: mira los motivos en el calendario («Mostrar lo que no salió»).'])
 
 
+class ProfileReadPartsAlertTests(SlackBase):
+    """18/11/2026: the day's profile reads split between the actions and research (operador.profile_read_pools). The
+    day the cap ran out at 13:04 no follow or invitation went out after it and nobody was told."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict('os.environ',{'OPERATOR_PROFILE_READ_DAILY_LIMIT':'80','OPERATOR_PROFILE_READ_POOL_CUTOFF':'17:00',
+                                     'OPERATOR_PROFILE_READ_RESEARCH_SHARE':'0.4'})
+        env.start();self.addCleanup(env.stop)
+
+    def reserve(self,purpose,count,when):
+        for i in range(count):operador.reserve_profile_read(self.account,purpose,when+timedelta(seconds=i))
+
+    def out(self):
+        return [t for t in self.texts() if 'sin lecturas de perfil' in t]
+
+    def test_the_actions_running_out_before_the_cutoff_is_said_once(self):
+        self.reserve('research',32,at(9));self.reserve('preflight',24,at(10));self.reserve('execution',23,at(11))
+        self.watch(at(12));self.assertEqual(self.out(),[])  # 47 of their 48
+        self.reserve('reconciliation',1,at(13,4))
+        self.watch(at(13,5));self.watch(at(15))
+        self.assertEqual(self.out(),['Barrio · Las acciones se quedaron sin lecturas de perfil a las 13:04, antes de las 17:00: acciones '
+                                     '48/48, investigación 32/32, total 80/80. Seguir, invitar y confirmar esperan a las 17:00 (lo que la '
+                                     'investigación dejó pasa a las acciones) o a mañana. Se ajusta con OPERATOR_PROFILE_READ_RESEARCH_SHARE '
+                                     '(su parte para investigar) u OPERATOR_PROFILE_READ_DAILY_LIMIT (hasta 100).'])
+        # The next day the actions keep within their part until 17:00 and then use what research left: no alert.
+        self.reserve('research',10,at(9,0,1));self.reserve('preflight',40,at(10,0,1));self.reserve('execution',30,at(17,30,1))
+        self.watch(at(18,0,1))
+        self.assertEqual(len(self.out()),1)
+        text=alertas_slack.summary_text(at(21,0,1))
+        self.assertIn('• Lecturas de perfil por parte: acciones 70/48, investigación 10/32 (se juntan a las 17:00)',text)
+
+    def test_buyers_out_with_a_level_that_keeps_them(self):
+        def buyer(slug,level,when=at(10),**extra):
+            Contact.objects.create(account=self.account,provider_user_id=slug,display_name=f'Nombre {slug}',source='search',
+                                   stage='discarded',updated_at=when,
+                                   classification={'fit':False,'role':'comprador','buyer':{'level':level},**extra})
+        buyer('b1','probable');buyer('b2','por_confirmar');buyer('b3','por_confirmar')
+        buyer('b4','no_encaja',rule='Evidencia en contra.')  # evidence against: right
+        buyer('b5','probable',rule='Sin criterio del curso recuperado para sustentar el veredicto.')  # a rule of the code
+        buyer('b6','probable',when=at(10,0,-1))  # yesterday's
+        self.watch(at(9));self.assertEqual([t for t in self.texts() if 'compradores' in t],[])  # not yet today
+        operador._audit(None,'network.buyer_fit_overridden','x',corrections=['fit_del_modelo'],fit=True,model_fit=False,
+                        account=str(self.account.id))
+        AuditEvent.objects.filter(action='network.buyer_fit_overridden').update(created_at=at(10))
+        self.watch(at(11));self.watch(at(12))
+        texts=[t for t in self.texts() if 'compradores salieron' in t]
+        self.assertEqual(texts,['Barrio · 3 compradores salieron hoy del barrio con un nivel que no es no_encaja (por_confirmar: 2, '
+                                'probable: 1). Solo no_encaja con un motivo de la lista saca a un comprador. Hoy el código corrigió 1 '
+                                'respuestas del modelo. Se ven y se recuperan, sin pagar otra clasificación, con `manage.py operador '
+                                f'--usuario <tu usuario> reevaluar-compradores --cuenta {self.account.id}` (grupo descartado_con_nivel; '
+                                'sin --confirmar no cambia nada).'])
+        self.assertNotIn('Nombre',texts[0])  # counts, never names
+
+
 class FullSummaryTests(SlackBase):
     def test_the_summary_has_the_day_and_every_cap(self):
         piece,_=self.post_at(at(8,0,-1),'Post de ayer.')
