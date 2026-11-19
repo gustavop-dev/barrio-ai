@@ -190,11 +190,11 @@ class UseFindsTheChangeTests(ChangeBase):
                          {'apariciones': 3, 'leidas': 0, 'error': 'Invalid \\escape', 'campo': 'optimisticKey'})
         self.assertTrue(AuditEvent.objects.filter(action=operador.WRITE_HELD, target=str(self.directo.id),
                                                   metadata__operation='create_comment').exists())
-        [text] = self.texts()
+        [text] = self.texts()  # both wait: the one that saw the change and the other one
         self.assertTrue(text.startswith(
             'Barrio · LinkedIn cambió la página: desde las 18:30 no se puede comentar en un post (create_comment): no salen '
-            'comentarios en posts de otros. No se envió nada. 1 comentario aprobado espera sin perderse: sale solo cuando la '
-            'prueba de LinkedIn vuelva a pasar, o mañana con un primer intento.'), text)
+            'comentarios en posts de otros. No se envió nada. 2 comentarios aprobados esperan sin perderse: sale solo cuando '
+            'la prueba de LinkedIn vuelva a pasar, o mañana con un primer intento.'), text)
         self.assertIn('campo «optimisticKey»', text)
         # The second comment waits without reading anything: no page read, no write, still approved.
         jobs.process_one(self.worker)

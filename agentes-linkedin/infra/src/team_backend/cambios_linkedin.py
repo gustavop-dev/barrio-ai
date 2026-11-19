@@ -321,13 +321,17 @@ def held(account, capability, now=None):
 
 
 def waiting(account, operation):
-    """[(capability, approved actions that have not started)] of the capabilities that depend on the operation."""
-    from .models import ActionProposal
+    """[(capability, actions that wait)] of the capabilities that depend on the operation: the approved ones that have
+    not started, and the one in flight, which is usually the action that just saw the change and goes back to approved
+    (operador._hold) right after this is told."""
+    from django.db.models import Q
+    from .models import ActionExecution, ActionProposal
     caps = capabilities(operation)
     counts = dict.fromkeys(caps, 0)
-    for capability in ActionProposal.objects.filter(account=account, state=ActionProposal.State.APPROVED,
-                                                    execution__isnull=True, piece__isnull=True,
-                                                    capability__in=caps).values_list('capability', flat=True):
+    rows = ActionProposal.objects.filter(account=account, piece__isnull=True, capability__in=caps).filter(
+        Q(state=ActionProposal.State.APPROVED, execution__isnull=True)
+        | Q(state=ActionProposal.State.EXECUTING, execution__state=ActionExecution.State.EXECUTING))
+    for capability in rows.values_list('capability', flat=True):
         counts[capability] += 1
     return [(capability, n) for capability, n in counts.items() if n]
 
