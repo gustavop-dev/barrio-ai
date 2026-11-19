@@ -92,6 +92,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   4. **Dado** una clave de memoria ya abierta, rechazada, retirada o conocida, **cuando** el director la vuelve a preguntar, **entonces** no se crea una pregunta duplicada.
   5. **Dado** posts de referentes observados en los últimos 7 días, **cuando** el director los usa, **entonces** `signals` de la pieza guarda solo los que el brief lista en `signals_used`.
   6. **Dado** hechos actuales esenciales ausentes, **cuando** el director pide `research_request`, **entonces** el workflow llama una vez a `research(ResearchRequest)` por pieza, persiste el resultado y lo devuelve al director para cerrar el brief. No envía memoria privada a las herramientas web ni permite una segunda investigación en esa pieza.
+  7. **Dado** `EDITORIAL_RESEARCH_DEFAULT=true` (apagado por defecto) y un brief de autoridad (A) o de crecimiento (G) con tesis, **cuando** el director no pidió investigar, **entonces** se investiga igual una vez: la pregunta sale solo de la tesis (`research.thesis_question`), pide entre 2 y 4 hallazgos concretos y fechados (`entrega`) y prefiere los sitios de `WEB_RESEARCH_PREFERRED_DOMAINS` (`fuentes_preferidas`; con `WEB_RESEARCH_STRICT_DOMAINS=true` la búsqueda se limita a ellos). El resultado vuelve una vez al director y llega a redacción, selección, reparación, verificador y visual como `untrusted_web_evidence` con nombre del sitio, URL y fecha; `piece.usage` lo marca `reason: "por_defecto"`. Un post personal (P) o de venta (S) no cambia. Apagado, cada prompt y cada solicitud quedan como antes. Peor caso: ≈ 0,91 USD de reserva de la investigación y ≈ 0,62–0,87 USD de la vuelta al director por pieza; lo real suele ser mucho menos ([`acceso-web-equipo.md`](../../agentes-linkedin/infra/docs/acceso-web-equipo.md#investigación-por-defecto)).
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -124,14 +125,14 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** un texto que rompe las reglas fijas (largo, enlaces, contacto, pitch, hashtags, datos privados, experiencias inventadas) se frena antes de pagar al verificador.
-- **Código:** `editorial.text_rules`, `editorial._check`, `autopiloto.post_issues`, `guardas.private_leaks`, `guardas.invented_experience`.
+- **Qué hace para Gustavo:** un texto que rompe las reglas fijas (largo, enlaces, contacto, pitch, hashtags, datos privados, una cifra sobre su trabajo que no consta) se frena antes de pagar al verificador.
+- **Código:** `editorial.text_rules`, `editorial._check`, `autopiloto.post_issues`, `guardas.private_leaks`, `guardas.invented_figures`, `guardas.invented_experience`.
 - **Criterios de aceptación:**
   1. **Dado** un texto final de 150 caracteres, **cuando** pasan las reglas, **entonces** `verification.rules` incluye «Longitud fuera de 200–2200 caracteres» y el verificador no corre (faltan `model_verdict`, `findings` y `checked_claims`).
   2. **Dado** un texto con un correo, un teléfono o un enlace, **cuando** pasan las reglas, **entonces** `verification.rules` lo nombra («Contiene un correo», «Contiene un número de teléfono», «Contiene enlaces»).
   3. **Dado** un texto con cuatro hashtags, **cuando** pasan las reglas, **entonces** aparece «Más de 3 hashtags».
   4. **Dado** un texto que menciona «60/40» o «Spanish-speaking founders», **cuando** pasan las reglas, **entonces** se marca como filtración privada sin citar el fragmento.
-  5. **Dado** que la memoria no tiene hechos públicos, **cuando** el texto dice «I built…» en primera persona, **entonces** se marca como experiencia inventada.
+  5. **Dado** una cifra sobre su trabajo que sus hechos públicos no tienen («a client… cut their costs by 40%»), **cuando** pasan las reglas, **entonces** se marca «Cifra sobre el trabajo de Gustavo que no consta en sus hechos públicos». Desde el 19/11/2026 la redacción en primera persona sin cifra («I built…», «last month I…») ya no es una regla: va al verificador como `experience_flags` y él decide; una pregunta, una hipótesis («if», «imagine», «si») o lo que reporta otro («según un estudio») tampoco se marcan, y un año no es una cifra.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -143,9 +144,9 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Código:** `editorial._check`, `editorial._blocking`, `editorial.settle`, `editorial.verifier_payload`, `compuertas.split`, `VERIFIER_SYSTEM`.
 - **Criterios de aceptación:**
   1. **Dado** un texto que pasó las reglas, **cuando** corre el verificador, **entonces** `verification` guarda `verdict`, `model_verdict`, `findings`, `checked_claims`, `blocking_reasons`, `observations`, `day_attempt`, `context` (hashes) y `text_sha256` igual al SHA-256 del texto final.
-  2. **Dado** un hallazgo `material` duro o una afirmación `unsupported`, **cuando** se calcula el veredicto, **entonces** es `blocked` aunque el modelo diga `ready_for_execution`. Un hallazgo `material` blando sigue [EDI-25](#edi-25).
+  2. **Dado** un hallazgo `material` duro, **cuando** se calcula el veredicto, **entonces** es `blocked` aunque el modelo diga `ready_for_execution`. Desde el 19/11/2026 una afirmación `unsupported` es blanda; un hallazgo `material` blando sigue [EDI-25](#edi-25).
   3. **Dado** que el texto cambia después del veredicto, **cuando** la política lo revisa, **entonces** lo descarta con «El veredicto del verificador no corresponde a este texto exacto».
-  4. **Dado** una afirmación `web_source`, **cuando** se verifica, **entonces** exige una fuente guardada con URL, fecha y extracto, y una entrada `supported_source` con texto y ref coincidentes. Una ref inventada bloquea aunque el modelo quiera aprobar. El verificador contrasta también hechos actuales que el redactor omitió o etiquetó como conocimiento general.
+  4. **Dado** una afirmación `web_source`, **cuando** se verifica, **entonces** se comprueba que tenga una fuente guardada con URL y una entrada `supported_source` con texto y ref coincidentes. Desde el 19/11/2026 una ref que no está guardada, sin contraste o inventada queda como nota en `verification.source_notes` y no bloquea: lo importante es no perder la investigación. Un hallazgo `aproximada` (resumen de resultados de búsqueda sin cita nativa) respalda lo que dice en términos generales.
   5. **Dado** fuentes web con instrucciones maliciosas, **cuando** se usan en texto o infografía, **entonces** llegan como datos no confiables; redactor, selección, reparación y verificadores reciben la regla explícita de ignorarlas.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
@@ -160,9 +161,10 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   1. **Dado** un hallazgo `material` concreto y `EDITORIAL_REPAIR=true`, **cuando** termina el verificador, **entonces** corre la etapa `reparacion` y después se repiten una vez las reglas y el verificador; `verification.repair` guarda `trigger`, `findings`, `original_text`, `first_review`, `changes` y `outcome`.
   2. **Dado** que el texto reparado pasa, **cuando** se crea la propuesta CONT-09, **entonces** lleva el riesgo «Reparada en una ronda: N hallazgo(s) de … corregido(s)».
   3. **Dado** que el texto reparado sigue con un hallazgo duro, o la reparación lo descarta o no cambia nada y los hallazgos eran duros, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos y no hay una segunda ronda. Si solo quedan blandos, sale con ellos como observación ([EDI-25](#edi-25)); la verificación tras la ronda es la segunda revisión acotada ([EDI-26](#edi-26)).
-  4. **Dado** un `blocked` del verificador sin hallazgos concretos, **cuando** termina, **entonces** no hay ronda y la pieza queda `blocked`.
-  5. **Dado** `EDITORIAL_REPAIR=false`, **cuando** hay hallazgos, **entonces** la pieza queda `blocked` sin ronda.
+  4. **Dado** un `blocked` del verificador sin hallazgos concretos, **cuando** termina, **entonces** no hay ronda y la pieza sale con la observación «El verificador emitió blocked sin hallazgos concretos» (desde el 19/11/2026; antes quedaba `blocked`).
+  5. **Dado** `EDITORIAL_REPAIR=false`, **cuando** hay hallazgos duros, **entonces** la pieza queda `blocked` sin ronda; los blandos salen como observación.
   6. **Dado** que el presupuesto de IA se agota durante la ronda, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos originales si son duros (no `failed`) y ese día puede tener su segundo intento ([EDI-27](#edi-27)); si eran blandos, sale con ellos como observación.
+  7. **Dado** un hallazgo duro (por ejemplo un cliente o un resultado inventado), **cuando** corre la ronda, **entonces** la reparación cambia solo esa frase; si el hecho inventado sigue tras ella, la pieza queda `blocked`. Una nota (cifra o cita atribuida a una fuente que la evidencia no tiene) la puede suavizar («varios informes sugieren…», la cita pasa a paráfrasis); si no la suaviza, la pieza sale igual.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -438,17 +440,18 @@ Gustavo, 14/11/2026: «el verificador es demasiado rígido… si nos bloquea bus
 
 - **Dónde:** app · backend
 - **Estado:** implementado
-- **Qué hace para Gustavo:** el verificador sigue parando lo que no puede salir (algo inventado, una cifra o un hecho sin respaldo, datos privados, sus prioridades privadas, venta agresiva), pero ya no deja un día sin post por un gancho flojo o una pieza algo fuera del brief: eso se intenta arreglar una vez y, si sigue, sale con la observación anotada en el detalle.
+- **Qué hace para Gustavo:** el verificador sigue parando lo que no puede salir (un hecho inventado sobre él, su empresa o sus clientes presentado como real, datos privados, sus prioridades privadas), pero desde el 19/11/2026 lee el texto como un post de opinión: una explicación, una generalización, una cifra o cita atribuida a una fuente que la evidencia no tiene, un gancho flojo o una pieza algo fuera del brief se intentan arreglar una vez y, si siguen, la pieza sale con la observación anotada en el detalle. Cada pieza guarda cuántas notas y bloqueos dio cada regla (`verification.conteo_reglas`).
 - **Código:** `compuertas.HARD`, `SOFT`, `split`, `hard_issues` (`COMPUERTAS_DURAS`), `observation_risks`, `gate_policy`, `form_rules`; `editorial.settle`, `editorial.verifier_payload`; `VERIFIER_SYSTEM`. App `movil/src/pieza/ComoSeEscribio.tsx` (bloque del verificador).
 - **Criterios de aceptación:**
-  1. **Dado** un hallazgo `material` de `invented_experience`, `unsourced_figure`, `private_data`, `private_guidance_leak` o `aggressive_pitch`, o una afirmación `unsupported`, **cuando** termina la verificación (con o sin ronda), **entonces** la pieza queda `blocked` como antes.
-  2. **Dado** solo hallazgos `material` de `hook_not_delivered`, `off_brief` u `other`, **cuando** la ronda de reparación no los resuelve (o no puede correr), **entonces** el veredicto final es `ready_for_execution`, `verification.observations` los guarda (`issue`, `quote`, `detail`) y la propuesta CONT-09 lleva el riesgo «Conservada como observación (issue): …».
-  3. **Dado** un `blocked` del modelo sin hallazgos concretos, **cuando** se decide, **entonces** bloquea («El verificador emitió blocked»).
+  1. **Dado** un hallazgo `material` de `invented_experience`, `first_person_appropriation`, `private_data` o `private_guidance_leak`, **cuando** termina la verificación (con o sin ronda), **entonces** la pieza queda `blocked`.
+  2. **Dado** solo hallazgos `material` blandos (`unsourced_figure`, `fabricated_quote`, `unsourced_third_party_story`, `aggressive_pitch`, `hook_not_delivered`, `off_brief`, `other`, los de la estrategia) o afirmaciones `unsupported`, **cuando** la ronda de reparación no los resuelve (o no puede correr), **entonces** el veredicto final es `ready_for_execution`, `verification.observations` los guarda (`issue`, `quote`, `detail`) y la propuesta CONT-09 lleva el riesgo «Conservada como observación (issue): …».
+  3. **Dado** un `blocked` del modelo sin hallazgos concretos, **cuando** se decide, **entonces** no bloquea: queda como observación (desde el 19/11/2026).
   4. **Dado** `COMPUERTAS_DURAS=other`, **cuando** aparece un `other` material, **entonces** bloquea.
   5. **Dado** un brief sin `gate_policy`, **cuando** pasan las reglas y el verificador, **entonces** cualquier petición de contacto frena la pieza, como antes; con `gate_policy: {cta_max: 1}` (lo pone un tipo de post, nunca el modelo), una sola invitación conversacional pasa y la venta dura sigue parando.
   6. **Dado** una pieza con observaciones, **cuando** Gustavo abre «Cómo se escribió» en la app, **entonces** ve «Conservadas como observación» con cada una.
-- **Brechas código/docs:** las reglas fijas, las fuentes web, la privacidad y la experiencia inventada siguen cubiertas por las pruebas que ya existían, sin cambios.
-- **Cobertura QA:** `tests/test_compuertas.py` (`SeverityTests`, `SecondReviewTests`); `PiezaScreen.test.tsx` (observaciones); escrito, CI pendiente.
+  7. **Dado** una pieza verificada, **cuando** se guarda, **entonces** `verification.conteo_reglas` dice por regla cuántas notas y cuántos bloqueos dio ([`compuertas.md`](../../agentes-linkedin/infra/docs/compuertas.md#conteo-por-regla)).
+- **Brechas código/docs:** las reglas fijas y la privacidad siguen cubiertas por las pruebas que ya existían, sin cambios.
+- **Cobertura QA:** `tests/test_compuertas.py` (`SeverityTests`, `SecondReviewTests`), `tests/test_verificador_flexible.py`; `PiezaScreen.test.tsx` (observaciones); escrito, CI pendiente.
 
 ### EDI-26 · Segunda revisión acotada tras la reparación <a id="edi-26"></a>
 

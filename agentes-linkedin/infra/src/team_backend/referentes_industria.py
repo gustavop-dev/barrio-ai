@@ -363,8 +363,8 @@ def guard(account, *, tope_usd=None, candidatos=6, busquedas=DEFAULT_SEARCHES, e
     if team < min(tope, est['usd_max']):
         issues.append(f'Quedan {team} USD en el presupuesto del equipo hoy.')
     day, _ = period_starts(now)
-    runs = (WebResearchRun.objects.filter(created_at__gte=day).exclude(key__startswith=STAGE_PREFIX)
-            .exclude(state='skipped').count())
+    from .research import counted
+    runs = counted(WebResearchRun.objects.filter(created_at__gte=day).exclude(key__startswith=STAGE_PREFIX)).count()
     if settings.WEB_RESEARCH_DAILY_LIMIT - runs < est['web_calls']:
         warnings.append(f'Hoy quedan {max(0, settings.WEB_RESEARCH_DAILY_LIMIT - runs)} investigaciones web; las que falten se omiten.')
     if tope < est['usd_max']:

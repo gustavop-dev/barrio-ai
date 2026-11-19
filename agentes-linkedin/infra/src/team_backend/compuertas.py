@@ -4,11 +4,16 @@ Gustavo (2026-11-14): «el verificador es demasiado rígido… que no nos bloque
 de reintentar… no digo que lo quitemos… tampoco iteraciones infinitas: al menos que en la segunda revisión ya pase, de
 haber corregido lo que bloqueó».
 
-- Severity. HARD findings (invented experience, figures or claims without support, private data, a leak of his private
-  guidance, aggressive pitch) block at every review: they protect people, the truth and his privacy. SOFT findings
-  (a hook the text does not deliver, a drift from the brief, other quality issues) trigger the one repair round and,
-  whatever that round does, stay as observations on a piece that goes out. Minor findings never block. The
-  deterministic rules and the web-source checks are always hard.
+- Severity. Gustavo (2026-11-19): «el verificador es muy rígido… es un post… no tiene que ser tan estricto».
+  HARD findings are only an invented fact about him, his company or his clients presented as real (invented
+  experience, someone else's story told as his) and private material (private data, a leak of his private guidance):
+  they get the one repair round, which fixes that sentence, and block if they survive it. Everything else is SOFT: a
+  figure or quote attributed to a source the evidence does not hold, an unsupported claim, a selling tone, a hook the
+  text does not deliver, a drift from the brief. Soft findings are notes for the repair round and observations of a
+  piece that goes out, never a block. Minor findings never block. The deterministic form rules (CONT-09), the
+  private-guidance guard and a figure about his work that his facts do not hold (guardas.invented_figures) stay hard;
+  the rest of the first-person experience regex only points sentences out to the verifier (guardas.invented_experience)
+  and the web-source checks are notes (research.source_issues).
 - Second review. After the repair the verifier gets the first findings and the changes (second_review): it checks that
   each one was resolved and flags only new hard problems. Code blocks only on hard findings there.
 - Second attempt. A day whose piece a content gate blocked while it was prepared gets ONE more attempt
@@ -26,18 +31,21 @@ import re
 from datetime import timedelta
 from .models import EditorialPiece
 
-HARD=('invented_experience','unsourced_figure','private_data','private_guidance_leak','unsupported_claim',
-      # A founder's public story on a Personal post (estrategia.findings): an unsourced story, an invented quote or his
-      # story told as Gustavo's misleads about a real person.
-      'unsourced_third_party_story','fabricated_quote','first_person_appropriation')
+HARD=('invented_experience','private_data','private_guidance_leak',
+      # A founder's public story on a Personal post (estrategia.findings) told as Gustavo's: a fact about him invented.
+      'first_person_appropriation')
 SOFT=('hook_not_delivered','off_brief','other',
+      # Attribution to a source (19/11/2026): the repair drops or softens the attribution, or turns a quote into a
+      # paraphrase; if it cannot, the piece goes out with the note.
+      'unsourced_figure','unsupported_claim','fabricated_quote','unsourced_third_party_story',
+      # The verifier's reading of a selling tone; the deterministic pitch rule of CONT-09 (form_rules) still stops it.
+      'aggressive_pitch',
       # What fits a GASP type (estrategia.findings and notes): how a post is shaped, never a safety problem.
       'cta_count','offer_in_growth','offer_in_personal','no_reader_need','repeated_story')
 # The finding codes of the weekly strategy; an issue line of estrategia reads «code: detail».
 STRATEGY_CODES=('unsourced_third_party_story','fabricated_quote','first_person_appropriation','cta_count','offer_in_growth',
                 'offer_in_personal','no_reader_need','repeated_story')
-# aggressive_pitch is hard unless the piece's policy allows one conversational call to action (then the verifier's
-# finding is soft and the deterministic rule still stops hard selling).
+# The piece's policy allows one conversational call to action (cta_max=1); the deterministic rule (form_rules) counts it.
 DEFAULT_POLICY={'cta_max':0}
 BLOCKED_BARE='El verificador emitió blocked'
 LEAD_REDRAFT='Reescrito una vez con las razones del líder'  # risk of a comment redrafted after a lead discard
@@ -63,27 +71,33 @@ def custom(policy):
 def hard_issues(policy=None):
     """COMPUERTAS_DURAS (comma separated) makes more verifier issues hard, e.g. «other» if it proves too loose."""
     extra={i.strip() for i in os.environ.get('COMPUERTAS_DURAS','').split(',') if i.strip()}
-    hard=set(HARD)|extra
-    if not (policy or DEFAULT_POLICY).get('cta_max'):hard.add('aggressive_pitch')
-    return hard
+    return set(HARD)|extra
 
 def severity(issue,policy=None):
     return 'dura' if issue in hard_issues(policy) else 'blanda'
 
 def split(review,policy=None):
-    """(hard reasons, soft findings) of one verifier review. The reasons use the wording of editorial._blocking. A bare
-    «blocked» without material findings or unsupported claims of the model is hard: there is nothing concrete to keep as
-    an observation (the strategy's own findings, added by code, never stand in for the model's)."""
+    """(hard reasons, soft findings) of one verifier review. The reasons use the wording of editorial._blocking. Only a
+    material finding of a hard issue blocks. An unsupported claim and a bare «blocked» without anything concrete are
+    soft since 19/11/2026: a note for the repair and an observation, never a stop."""
     review=review or {};hard=hard_issues(policy);reasons=[];soft=[]
     material=[f for f in review.get('findings',[]) if f.get('severity')=='material']
     unsupported=[c for c in review.get('checked_claims',[]) if c.get('status')=='unsupported']
-    own=[f for f in material if f.get('by')!=BY_CODE]
-    if review.get('verdict')!='ready_for_execution' and not own and not unsupported:reasons.append(BLOCKED_BARE)
     for f in material:
         if f.get('issue') in hard:reasons.append(f'Hallazgo material ({f.get("issue")}): {f.get("detail") or f.get("quote")}')
         else:soft.append({'issue':f.get('issue') or 'other','quote':f.get('quote') or '','detail':f.get('detail') or ''})
-    reasons+=[f'Afirmación sin respaldo: {c.get("text")}' for c in unsupported]
+    soft+=[{'issue':'unsupported_claim','quote':c.get('text') or '','detail':'Afirmación sin respaldo en la evidencia'}
+           for c in unsupported]
+    if review.get('verdict')!='ready_for_execution' and not material and not unsupported:
+        soft.append({'issue':'other','quote':'','detail':BLOCKED_BARE+' sin hallazgos concretos'})
     return reasons,soft
+
+def settled(reasons,review,policy=None):
+    """(blocking reasons, observations) of the last review once the repair round had its chance: the hard findings,
+    with the round's own note when it could not fix them, block; everything else goes out as an observation."""
+    hard,soft=split(review,policy)
+    if hard:return hard+[r for r in reasons if str(r).startswith('Ronda de reparación')],[]
+    return [],soft
 
 # --------------------------------------------------------------------------- the strategy's per-type findings
 
@@ -111,6 +125,30 @@ def with_code_findings(review,issues):
         flagged.add(code)
         extra.append({'issue':code,'severity':'material','quote':'','detail':str(line).split(':',1)[1].strip(),'by':BY_CODE})
     return dict(review,findings=list(review.get('findings',[]))+extra) if extra else review
+
+def rule_tally(reasons,review=None,repair=None,policy=None):
+    """{rule: {'notas': n, 'bloqueos': m}} of one verification, kept with it (Gustavo, 19/11/2026: which rule stops a
+    piece and which only notes). A block is a reason that stopped the piece; a note is whatever a rule or the verifier
+    flagged without stopping it: a soft or minor finding of the last review, a finding the repair round fixed, a web-source
+    note, a sentence the experience regex only pointed out to the verifier. The round's own notes («Ronda de reparación:
+    …») explain a block and are not a rule. Labels only (category, issue codes), never a quote."""
+    tally={}
+    def add(rule,kind):tally.setdefault(rule,{'notas':0,'bloqueos':0})[kind]+=1
+    def label(text):return strategy_code(text) or category(text)
+    for reason in reasons:
+        if str(reason).startswith('Ronda de reparación'):continue
+        code=strategy_code(reason)
+        add(label(reason),'notas' if code and severity(code,policy)=='blanda' else 'bloqueos')
+    if review:
+        for found in split(review,policy)[1]:
+            add('veredicto_sin_hallazgos' if found['detail'].startswith(BLOCKED_BARE) else found['issue'],'notas')
+        for found in review.get('findings',[]):
+            if found.get('severity')=='minor':add(found.get('issue') or 'other','notas')
+        for _ in review.get('source_notes') or []:add('fuente_web','notas')
+        for _ in review.get('experience_flags') or []:add('experiencia_por_redaccion','notas')
+    for found,result in zip((repair or {}).get('findings') or [],(repair or {}).get('resolution') or []):
+        if result.get('resolved'):add(label(found.get('detail')) if found.get('source')=='reglas' else found.get('issue') or 'other','notas')
+    return tally
 
 def observation_risks(observations):
     """What the proposal (and the detail) say about a soft finding that did not stop the piece."""
@@ -209,7 +247,7 @@ CATEGORIES=(('Afirmación sin respaldo','unsupported_claim'),(BLOCKED_BARE,'vere
             ('Longitud','longitud'),('Contiene un correo','correo'),('Contiene un número de teléfono','telefono'),
             ('Contiene enlaces','enlaces'),('Contiene pitch','pitch'),('Más de','hashtags'),
             ('Deja traslucir orientación privada','private_guidance_leak'),('Reproduce orientación privada','private_guidance_leak'),
-            ('Atribuye','invented_experience'),('Cifra sobre el trabajo de Gustavo','invented_experience'),
+            ('Atribuye','invented_experience'),('Cifra sobre el trabajo de','invented_experience'),
             ('Ronda de reparación: sin presupuesto','reparacion_sin_presupuesto'),
             ('Ronda de reparación: el texto reparado no se pudo verificar','reparacion_sin_presupuesto'),
             ('Ronda de reparación: la descartó','reparacion_descartada'),('Ronda de reparación: no cambió','reparacion_sin_cambios'),

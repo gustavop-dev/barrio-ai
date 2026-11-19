@@ -587,6 +587,26 @@ def provider_metadata(provider, purpose, amount_usd, connection):
             'graph_hash': row.graph_hash, 'job_id': str(row.job_id or '')}
 
 
+def headroom():
+    """(USD, provider calls) the current cycle has left before provider_metadata stops it: its cost cap minus what its
+    budget family spent or holds in reserve, the daily cap's rest when it has one, and its calls left. The same sums as
+    provider_metadata, read without its lock: a step that would not fit (research.research) is skipped before it claims
+    anything instead of stopping the whole cycle. None outside a cycle."""
+    runtime = current()
+    if runtime is None:
+        return None
+    row = CycleLedger.objects.get(pk=runtime.id)
+    left = Decimal(str(runtime.limits['cost_cap_usd'])) - amount(budget_usage(row))
+    if runtime.limits.get('daily_cost_cap_usd') is not None:
+        day = timezone.localtime(timezone.now(), ZoneInfo('America/Bogota')).replace(hour=0, minute=0, second=0, microsecond=0)
+        rows = UsageEntry.objects.filter(created_at__gte=day).filter(
+            models.Q(usage__cycle=runtime.cycle['id']) | models.Q(purpose__startswith='editorial-') | models.Q(purpose__startswith='image-'))
+        left = min(left, Decimal(str(runtime.limits['daily_cost_cap_usd'])) - amount(rows))
+    calls = UsageEntry.objects.filter(usage__cycle_id=str(runtime.id)).exclude(
+        models.Q(status='rejected') & models.Q(usage__has_key='fallback')).count()
+    return left, runtime.limits['max_provider_calls'] - calls
+
+
 def timeout(default):
     call = _active_call.get()
     if call is None:

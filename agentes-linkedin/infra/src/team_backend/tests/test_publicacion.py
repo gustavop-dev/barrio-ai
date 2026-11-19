@@ -371,11 +371,11 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(piece.verification['repair']['outcome'],'sin_cambios')
         self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
         self.assertIn('bloqueó',self.notify.call_args.args[0])
-        # Even if the model reviewer would miss it, the deterministic guard stops first-person experience without public
-        # facts before the verifier is paid (R3).
+        # Even if the model reviewer would miss it, the deterministic guard stops an invented figure about his work before
+        # the verifier is paid (R3; since 19/11/2026 the wording alone only points the sentence out to the verifier).
         before=len(self.calls)
         again=self.plan(answers(final=INVENTED))
-        self.assertEqual(again.state,'blocked');self.assertIn('sin hechos públicos confirmados',again.note)
+        self.assertEqual(again.state,'blocked');self.assertIn('Cifra sobre el trabajo de Gustavo',again.note)
         self.assertNotIn('editorial-verificador',[c[0] for c in self.calls[before:]])
         self.assertEqual(self.linkedin.state['writes'],0)
 

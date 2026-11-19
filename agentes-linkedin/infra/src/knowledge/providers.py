@@ -41,6 +41,8 @@ class WebTools:
     content_tokens:int
     search_tokens:int
     search_price:Decimal
+    # The search only looks at these sites (WEB_RESEARCH_STRICT_DOMAINS); empty, the tool is defined as before.
+    allowed_domains:tuple=()
 
     def definitions(self):
         if not re.fullmatch(r'web_search_\d{8}',self.search_type) or not re.fullmatch(r'web_fetch_\d{8}',self.fetch_type):
@@ -50,8 +52,14 @@ class WebTools:
         if not 1<=self.content_tokens<=20000 or not 1<=self.search_tokens<=100000:
             raise ValueError('Reserva de tokens web inválida')
         if not self.search_price.is_finite() or self.search_price<0:raise ValueError('Tarifa web inválida')
+        if not isinstance(self.allowed_domains,tuple) or len(self.allowed_domains)>20 or any(
+                not isinstance(d,str) or not re.fullmatch(r'[a-z0-9-]+(\.[a-z0-9-]+)+(/[a-z0-9._-]+)*',d) for d in self.allowed_domains):
+            raise ValueError('Dominios permitidos inválidos')
         tools=[]
-        if self.searches:tools.append({'type':self.search_type,'name':'web_search','max_uses':self.searches})
+        if self.searches:
+            search={'type':self.search_type,'name':'web_search','max_uses':self.searches}
+            if self.allowed_domains:search['allowed_domains']=list(self.allowed_domains)
+            tools.append(search)
         if self.fetches:tools.append({'type':self.fetch_type,'name':'web_fetch','max_uses':self.fetches,
                                      'max_content_tokens':self.content_tokens,'citations':{'enabled':True}})
         if not tools:raise ValueError('Herramientas web desactivadas')
@@ -60,6 +68,15 @@ class WebTools:
     def reserved_input(self,input_tokens):
         # Every tool turn can replay all accumulated result/input tokens. Reserve before generating.
         return (input_tokens+256+self.searches*self.search_tokens+self.fetches*self.content_tokens)*(1+self.searches+self.fetches)
+
+def reservation_usd(model,input_tokens,max_tokens,web_tools=None):
+    """What one Claude call reserves before it is sent (its worst case): every input token a cache write, max_tokens of
+    output and, with web tools, every turn replaying the tools' results plus every search allowed. research.worst_case_usd
+    uses it before claiming a run, with an estimate of the input instead of the provider's count."""
+    ip,op=MODEL_PRICES[model]
+    reserved_input=web_tools.reserved_input(input_tokens) if web_tools else input_tokens+256
+    tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
+    return (Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost
 
 def embedding_model():
     model=os.environ.get('EMBEDDING_MODEL','text-embedding-3-small')
@@ -321,14 +338,11 @@ def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context
     except (AttributeError,TypeError,ValueError):
         raise ValueError('Conteo de Claude no disponible; no se envió la generación.') from None
     ip,op=MODEL_PRICES[model]
-    # Worst case: every input token is a cache write.
     reserved_input=web_tools.reserved_input(input_tokens) if web_tools else input_tokens+256
-    tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
     metadata={'research':True,'reserved_web_search_requests':web_tools.searches,'reserved_web_fetch_requests':web_tools.fetches,
               'reserved_input_tokens':reserved_input,'model':model} if web_tools else None
     metadata=dict(metadata or {},model=model,effort=effort)
-    rid=reserve('anthropic',purpose,(Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost,
-                request_hash,metadata=metadata)
+    rid=reserve('anthropic',purpose,reservation_usd(model,input_tokens,max_tokens,web_tools),request_hash,metadata=metadata)
     request_id=None
     try:
         if current():client=client.with_options(timeout=timeout(120))

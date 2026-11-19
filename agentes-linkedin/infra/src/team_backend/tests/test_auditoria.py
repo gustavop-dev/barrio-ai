@@ -130,7 +130,9 @@ class IdeaReleaseTests(MediaMixin,EditorialBase):
 
     def test_an_idea_returns_to_the_table_when_the_verifier_blocks_its_piece(self):
         idea=self.idea()
-        plan=answers(verdict='blocked');plan['director']=dict(plan['director'],ideas_used=[str(idea.id)])
+        # Since 19/11/2026 only a hard finding blocks (an invented fact about Gustavo), not a bare «blocked».
+        invented={'issue':'invented_experience','severity':'material','quote':'Last year a client of mine','detail':'Not in public_facts.'}
+        plan=answers(verdict='blocked',findings=[invented]);plan['director']=dict(plan['director'],ideas_used=[str(idea.id)])
         piece=self.plan(plan)
         self.assertEqual(piece.state,'blocked')
         idea.refresh_from_db()

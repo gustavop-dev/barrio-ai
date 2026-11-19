@@ -325,7 +325,8 @@ def _rewrite(piece, decision, memory, frozen, public, private, capture):
     piece.final_text = new
     piece.verification = dict(review or {}, model_verdict=(review or {}).get('verdict'), verdict='ready_for_execution',
         blocking_reasons=[], rules=issues, text_sha256=editorial._sha(new), claims=claims, rework=str(capture.id),
-        observations=observations, **({'repair': repair} if repair else {}))
+        observations=observations, **({'repair': repair} if repair else {}),
+        conteo_reglas=compuertas.rule_tally([], review, repair, compuertas.gate_policy(piece)))
     piece.save(update_fields=['final_text', 'verification', 'updated_at'])
     return True
 

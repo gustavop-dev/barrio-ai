@@ -34,29 +34,31 @@ class SeverityTests(SimpleTestCase):
         self.assertEqual(reasons,['Hallazgo material (invented_experience): Not in public_facts.'])
         self.assertEqual(soft,[{'issue':'hook_not_delivered','quote':'Which decision','detail':'The hook promises more than the close.'}])
         self.assertEqual(compuertas.split(review(SOFT)),([],[soft[0]]))
-        self.assertEqual(compuertas.split(review(unsupported=['Most founders fail']))[0],['Afirmación sin respaldo: Most founders fail'])
+        # 19/11/2026: an unsupported claim is a note for the repair and an observation, never a stop.
+        self.assertEqual(compuertas.split(review(unsupported=['Most founders fail'])),
+                         ([],[{'issue':'unsupported_claim','quote':'Most founders fail','detail':'Afirmación sin respaldo en la evidencia'}]))
 
-    def test_a_bare_blocked_verdict_is_hard_and_a_ready_one_is_clean(self):
-        self.assertEqual(compuertas.split(review()),(['El verificador emitió blocked'],[]))
+    def test_a_bare_blocked_verdict_is_a_note_and_a_ready_one_is_clean(self):
+        self.assertEqual(compuertas.split(review()),([],[{'issue':'other','quote':'','detail':'El verificador emitió blocked sin hallazgos concretos'}]))
         self.assertEqual(compuertas.split(review(MINOR,verdict='ready_for_execution')),([],[]))
 
-    def test_every_safety_issue_is_hard_and_pitch_depends_on_the_policy(self):
-        for issue in ('invented_experience','unsourced_figure','private_data','private_guidance_leak','unsupported_claim','aggressive_pitch'):
+    def test_only_invented_facts_about_him_and_private_material_are_hard(self):
+        for issue in ('invented_experience','private_data','private_guidance_leak','first_person_appropriation'):
             self.assertEqual(compuertas.severity(issue),'dura',issue)
-        for issue in ('hook_not_delivered','off_brief','other'):self.assertEqual(compuertas.severity(issue),'blanda',issue)
-        self.assertEqual(compuertas.severity('aggressive_pitch',{'cta_max':1}),'blanda')
+        for issue in ('hook_not_delivered','off_brief','other','unsourced_figure','unsupported_claim','aggressive_pitch'):
+            self.assertEqual(compuertas.severity(issue),'blanda',issue)
         self.assertEqual(compuertas.severity('invented_experience',{'cta_max':1}),'dura')
         with patch.dict(os.environ,{'COMPUERTAS_DURAS':'other'}):self.assertEqual(compuertas.severity('other'),'dura')
 
-    def test_the_strategys_findings_follow_the_one_table_and_never_hide_a_bare_blocked_verdict(self):
-        lines=['cta_count: 2 llamadas a la acción; una venta lleva una sola','fabricated_quote: «x» no aparece en las fuentes']
+    def test_the_strategys_findings_follow_the_one_table_and_a_bare_blocked_verdict_stops_nothing(self):
+        lines=['cta_count: 2 llamadas a la acción; una venta lleva una sola','first_person_appropriation: la historia no se atribuye a Ana']
         self.assertEqual(compuertas.strategy_split(lines),([lines[1]],[lines[0]]))
         with patch.dict(os.environ,{'COMPUERTAS_DURAS':'cta_count'}):self.assertEqual(compuertas.strategy_split(lines),(lines,[]))
         found={'issue':'cta_count','quote':'','detail':'2 llamadas a la acción; una venta lleva una sola'}
         ready=compuertas.with_code_findings(review(verdict='ready_for_execution'),lines[:1])
         self.assertEqual(ready['findings'],[dict(found,severity='material',by=compuertas.BY_CODE)])
         self.assertEqual(compuertas.split(ready,{'cta_max':1}),([],[found]))  # soft: repaired, else an observation
-        self.assertEqual(compuertas.split(compuertas.with_code_findings(review(),lines[:1]))[0],['El verificador emitió blocked'])
+        self.assertEqual(compuertas.split(compuertas.with_code_findings(review(),lines[:1]))[0],[])  # a bare blocked stops nothing
         model=review({'issue':'cta_count','severity':'material','quote':'q','detail':'d'},verdict='ready_for_execution')
         self.assertEqual(len(compuertas.with_code_findings(model,lines[:1])['findings']),1)  # one the model flagged is not doubled
 
@@ -144,7 +146,7 @@ class SecondReviewTests(tae.EditorialAuditBase):
         plan=answers();plan['reparacion']=dict(plan['reparacion'],final_text=tae.FIXED)
         piece=self.plan_with(plan,verificador=[dict(answers()['verificador'],verdict='blocked',findings=[tae.RepairRoundTests.finding]),
                                                plan['verificador']])
-        self.assertEqual(piece.verification['repair']['resolution'],[{'source':'verificador','issue':'unsourced_figure','resolved':True}])
+        self.assertEqual(piece.verification['repair']['resolution'],[{'source':'verificador','issue':'invented_experience','resolved':True}])
 
     def test_the_eval_second_review_is_the_production_second_review(self):
         plan=answers()

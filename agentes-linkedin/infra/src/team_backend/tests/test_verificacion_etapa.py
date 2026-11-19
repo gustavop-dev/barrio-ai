@@ -245,16 +245,37 @@ class CycleWorstCaseTests(StageCheckRunBase):
 
 
 class RealStopTests(StageCheckRunBase):
+    def test_a_research_that_does_not_fit_what_the_run_has_left_is_skipped_before_it_claims_anything(self):
+        """19/11/2026: the research estimates its reserve (research.worst_case_usd) and, when it does not fit the run's
+        cost_cap_usd, is skipped with the reason before it claims a run: no row left `running`, no allowance taken, no
+        stopped cycle. Here a WEB_SEARCH_RESERVED_TOKENS four times larger makes one research reserve more than the run's
+        budget."""
+        waiting=self.waiting()
+        with override_settings(WEB_SEARCH_RESERVED_TOKENS=100000):
+            job,ledger,calls=self.one_run('check_buyer_stages')
+        self.assertEqual((job.state,ledger.state,ledger.stop_reason,calls),('complete','complete','',[]))
+        self.assertTrue(job.result_status.startswith('etapas:0'))
+        self.assertFalse(WebResearchRun.objects.exists())
+        self.assertEqual(red.stage_checks_left(MORNING),6)
+        waiting.refresh_from_db();self.assertEqual(waiting.classification['stage_check'],{'state':'pending'})  # no attempt spent
+
     def test_a_run_that_really_passes_its_budget_still_stops_and_tells_gustavo(self):
         """The alert stays as it was: a run that passes its cost_cap_usd stops, leaves its card in Tu turno and pushes
-        (Web Push, Expo and OPERATOR_ALERT_WEBHOOK: Slack). Here a WEB_SEARCH_RESERVED_TOKENS four times larger makes one research reserve
-        more than the run's budget."""
+        (Web Push, Expo and OPERATOR_ALERT_WEBHOOK: Slack). Here the estimate is wrong (far below the provider's count) and
+        a WEB_SEARCH_RESERVED_TOKENS four times larger makes the real reserve more than the run's budget: the research
+        row ends interrupted, not `running`, and takes no allowance."""
+        from team_backend import research
         waiting=self.waiting()
         hook=MagicMock();hook.__enter__.return_value.post.return_value.status_code=200
         with override_settings(WEB_SEARCH_RESERVED_TOKENS=100000),patch.dict(os.environ,{'OPERATOR_ALERT_WEBHOOK':'https://hooks.example/barrio'}), \
+             patch.object(research,'worst_case_usd',return_value=Decimal('0.01')), \
              patch('team_backend.alerts.httpx.Client',return_value=hook),patch('team_backend.push.broadcast',return_value=1) as web_push, \
              patch('team_backend.expo.broadcast',return_value=1) as phone_push:
             job,ledger,calls=self.one_run('check_buyer_stages')
+        run=WebResearchRun.objects.get()
+        self.assertEqual((run.state,run.result['diagnostic']['reintentable']),('interrupted',True))
+        self.assertEqual(run.result['limitations'],['Interrumpida: el ciclo se detuvo (cost_cap); no llegó a pagar ninguna llamada y puede repetirse'])
+        self.assertEqual(red.stage_checks_left(MORNING),6)
         self.assertEqual((job.state,job.result_status,job.error),('failed','blocked','cost_cap'))
         self.assertEqual((ledger.state,ledger.stop_reason,ledger.needs_attention),('stopped','cost_cap',True))
         self.assertEqual(calls,[])  # nothing was reserved, nothing spent

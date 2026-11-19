@@ -66,7 +66,7 @@ class RulesBeforeVerifierTests(EditorialAuditBase):
         self.assertEqual(piece.state,'ready')
         repair=piece.verification['repair']
         self.assertEqual((repair['trigger'],repair['outcome'],repair['original_text']),('reglas','reparada',WITH_LINK))
-        self.assertEqual(repair['findings'],[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces'}])
+        self.assertEqual(repair['findings'],[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces','severity':'dura'}])
         self.assertIsNone(repair['first_review'])  # the verifier never saw the text with the link
         self.assertEqual((piece.final_text,piece.verification['text_sha256'],piece.verification['rules']),(GOOD_POST,sha(GOOD_POST),[]))
         self.assertEqual(self.message('verificador')['text'],GOOD_POST)
@@ -134,21 +134,23 @@ class RulesBeforeVerifierTests(EditorialAuditBase):
 
 class RepairRoundTests(EditorialAuditBase):
     """R4: one repair pass with the verifier's exact findings, then the rules and the verifier once more."""
-    finding={'issue':'unsourced_figure','severity':'material','quote':'cuts costs by 40%','detail':'Figure without a source.'}
+    # A hard finding (19/11/2026: an unsourced figure is a note, an invented fact about Gustavo still stops the piece).
+    finding={'issue':'invented_experience','severity':'material','quote':'a client of mine cut costs by 40%','detail':'Not in public_facts.'}
 
     def blocked(self):
         return dict(answers()['verificador'],verdict='blocked',findings=[self.finding])
 
     def test_a_verifier_finding_is_repaired_and_verified_again(self):
         plan=answers()
-        plan['reparacion']=dict(plan['reparacion'],final_text=FIXED,changes=[{'finding':'unsourced_figure','change':'Quité la cifra.'}])
+        plan['reparacion']=dict(plan['reparacion'],final_text=FIXED,changes=[{'finding':'invented_experience','change':'Quité la cifra.'}])
         piece=self.plan_with(plan,verificador=[self.blocked(),plan['verificador']])
         self.assertEqual(self.purposes(),['director','redactor','lectores','seleccion','verificador','reparacion','verificador'])
         self.assertEqual(piece.state,'ready')
         repair=piece.verification['repair']
         self.assertEqual((repair['trigger'],repair['outcome'],repair['original_sha256'],repair['repaired_sha256']),
                          ('verificador','reparada',sha(GOOD_POST),sha(FIXED)))
-        self.assertEqual(repair['findings'],[{'source':'verificador','issue':'unsourced_figure','quote':'cuts costs by 40%','detail':'Figure without a source.'}])
+        self.assertEqual(repair['findings'],[{'source':'verificador','issue':'invented_experience','quote':'a client of mine cut costs by 40%',
+                                              'detail':'Not in public_facts.','severity':'dura'}])
         self.assertEqual(repair['first_review']['verdict'],'blocked');self.assertTrue(repair['first_review']['blocking_reasons'])
         self.assertEqual(repair['changes'][0]['change'],'Quité la cifra.')
         self.assertEqual(self.message('reparacion')['findings'],repair['findings'])
@@ -162,7 +164,7 @@ class RepairRoundTests(EditorialAuditBase):
         piece=self.plan_with(plan,verificador=[self.blocked()])
         self.assertEqual(self.purposes().count('reparacion'),1);self.assertEqual(self.purposes().count('verificador'),2)
         self.assertEqual((piece.state,piece.verification['repair']['outcome'],piece.final_text),('blocked','bloqueada',FIXED))
-        self.assertIn('unsourced_figure',piece.note)
+        self.assertIn('invented_experience',piece.note)
         self.assertIn('El verificador bloqueó',self.notify.call_args.args[0])
 
     def test_a_discarded_or_unchanged_repair_keeps_the_original_reasons(self):
@@ -174,10 +176,12 @@ class RepairRoundTests(EditorialAuditBase):
         self.assertIn('Ronda de reparación: la descartó: La cifra es el centro de la pieza.',piece.verification['blocking_reasons'])
         self.assertEqual(piece.verification['text_sha256'],sha(GOOD_POST))
 
-    def test_a_bare_blocked_verdict_gives_the_repair_nothing_to_fix(self):
+    def test_a_bare_blocked_verdict_gives_the_repair_nothing_to_fix_and_never_stops_the_piece(self):
         piece=self.plan_with(answers(verdict='blocked'))
         self.assertNotIn('reparacion',self.purposes())
-        self.assertEqual((piece.state,piece.note),('blocked','El verificador emitió blocked'))
+        self.assertEqual(piece.state,'ready')  # 19/11/2026: nothing concrete is a note, not a block
+        self.assertEqual(piece.verification['observations'],
+                         [{'issue':'other','quote':'','detail':'El verificador emitió blocked sin hallazgos concretos'}])
 
     def test_a_spent_budget_skips_the_repair_and_the_piece_ends_blocked_not_failed(self):
         left=lambda now=None:Decimal('0') if 'editorial-verificador' in [c[0] for c in self.calls] else Decimal('15')

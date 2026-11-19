@@ -152,6 +152,7 @@ class ReworkTests(ReworkBase):
         self.assertEqual((piece.final_text, new.payload['text']), (NEW_POST, NEW_POST))
         self.assertEqual(piece.verification['text_sha256'], imagenes.sha(NEW_POST.encode()))
         self.assertEqual(piece.verification['rework'], str(capture.id))
+        self.assertEqual(piece.verification['conteo_reglas'], {})  # a clean review: no rule noted or stopped anything
         self.assertGreaterEqual(piece.scheduled_for, timezone.now() + urgente.veto_window())
         self.assertTrue(capture.routed_to['rework']['moved'])
         self.assertEqual(autopiloto.post_issues(new), [])

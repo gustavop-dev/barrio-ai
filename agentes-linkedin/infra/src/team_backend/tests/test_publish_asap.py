@@ -61,7 +61,10 @@ class PriorityTests(EditorialBase):
 
     def test_urgent_idea_still_passes_verifier_and_releases_on_block(self):
         c=self.idea();plan=answers();plan['director']['ideas_used']=[str(c.id)]
-        plan['verificador']['verdict']='blocked';piece=self.plan(plan)
+        plan['verificador']['verdict']='blocked'
+        plan['verificador']['findings']=[{'issue':'invented_experience','severity':'material','quote':'Founders often arrive',
+                                          'detail':'Not in public_facts.'}]
+        piece=self.plan(plan)
         self.assertEqual(piece.state,'blocked');c.refresh_from_db();self.assertEqual(c.state,'idea')
         self.assertFalse(piece.proposals.exists());self.assertEqual(self.linkedin.state['posts'],[])
 

@@ -259,15 +259,20 @@ class PaidRunTests(EvalBase):
         self.piece(fate='rejected',final=texts['vetoed']);self.piece(fate='discarded',final=texts['discarded'])
         calls=[]
         def answer(purpose,data):
-            # Agrees with every fate except the vetoed piece, which it lets through.
+            # Agrees with every fate except the vetoed piece, which it lets through. A block names an invented fact about
+            # Gustavo: since 19/11/2026 a bare «blocked» stops nothing.
             ready=data['text'] in (texts['published'],texts['vetoed'])
-            return verdict('ready_for_execution' if ready else 'blocked')
+            if 'findings' in data:return dict(answers()['reparacion'],decision='discard',final_text='',rationale='Es el centro.')
+            if ready:return verdict()
+            return dict(verdict('blocked'),findings=[{'issue':'invented_experience','severity':'material','quote':'Case',
+                                                      'detail':'Not in public_facts.'}])
         with patch('knowledge.providers.claude',side_effect=recorder(calls,answer)),patch('knowledge.providers.typesafe',side_effect=forbidden):
             report=self.evaluate(['verificador'],execute=True,max_usd=Decimal('2'))
         result=report['agentes']['verificador']['resultados']['claude-opus-5-5']
         self.assertEqual({c['purpose'] for c in calls},{'eval-verificador'})
         self.assertEqual({c['model'] for c in calls},{'claude-opus-5-5'})
         self.assertEqual((calls[0]['effort'],calls[0]['max_tokens']),('high',16000))
+        self.assertEqual(sum('findings' in c['data'] for c in calls),2)  # the two blocks got their repair round
         cases={c['id']:c for c in result['casos']}
         self.assertEqual(cases[published]['compuerta'],'ready_for_execution')
         metrics=result['metricas']
@@ -275,9 +280,9 @@ class PaidRunTests(EvalBase):
         self.assertEqual(metrics['acuerdo_compuerta']['aciertos'],3)
         self.assertEqual(metrics['matriz_compuerta']['positivo_que_falto'],1)
         self.assertEqual(metrics['acuerdo_modelo']['aciertos'],3)
-        self.assertEqual((metrics['paradas_por_reglas'],metrics['reparaciones']),(0,{}))  # no findings: nothing to repair
+        self.assertEqual((metrics['paradas_por_reglas'],metrics['reparaciones']),(0,{'descartada':2}))
         self.assertEqual(metrics['esquema_valido'],{'aciertos':4,'total':4,'pct':100.0})
-        self.assertEqual(report['gasto_usd'],0.04)
+        self.assertEqual(report['gasto_usd'],0.06)  # four reviews and the two repairs
         self.assertEqual(report['detenida'],'')
 
     def test_the_gate_runs_the_rules_first_and_one_repair_round_as_in_production(self):
@@ -288,7 +293,7 @@ class PaidRunTests(EvalBase):
             report=self.evaluate(['verificador'],execute=True,max_usd=Decimal('2'),models=['claude-sonnet-5-5'])
         # The rules stop the link before the verifier is paid; the repair keeps the production model; the verifier sees the fix.
         self.assertEqual([('findings' in c['data'],c['model']) for c in calls],[(True,'claude-opus-5-5'),(False,'claude-sonnet-5-5')])
-        self.assertEqual(calls[0]['data']['findings'],[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces'}])
+        self.assertEqual(calls[0]['data']['findings'],[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces','severity':'dura'}])
         self.assertIn('<tono_de_voz',calls[0]['system'])
         self.assertEqual((calls[0]['data']['text'],calls[1]['data']['text']),(WITH_LINK,GOOD_POST))
         self.assertEqual({c['purpose'] for c in calls},{'eval-verificador'})
