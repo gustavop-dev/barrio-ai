@@ -117,11 +117,13 @@ class StageCheckTests(NetworkBase):
         return research.ResearchResult('q','complete','2026-11-12T00:00:00+00:00',
                                        (research.Finding('Acme Robotics raised a seed round.',('s1',)),),(source,))
 
-    def judge(self,verdict):
+    def judge(self,verdict,against=''):
+        """`against`: the judge's en_contra (18/11/2026: a no_encaja without one of the list stays por_confirmar)."""
         def fake(system,message,**kwargs):
             self.judged.append(kwargs.get('purpose'))
             return {'text':json.dumps({'verdict':verdict,'evidence':'La fuente dice que levantó una ronda semilla.',
-                                       'source_urls':['https://news.example/acme-seed','https://invented.example']}),
+                                       'source_urls':['https://news.example/acme-seed','https://invented.example'],
+                                       'en_contra':against}),
                     'model':'claude-sonnet-5-5'}
         return patch('knowledge.providers.claude',side_effect=fake)
 
@@ -148,11 +150,12 @@ class StageCheckTests(NetworkBase):
     def test_evidence_against_leaves_and_no_findings_stays_por_confirmar_after_three_tries(self):
         ana=self.buyer('ana-pre','Ana Pre');beto=self.buyer('beto-none','Beto None')
         web=lambda request:self.found() if request.key.startswith(f'etapa:{ana.pk}:') else NOTHING
-        with patch('team_backend.research.research',side_effect=web),self.judge('no_encaja'):
+        with patch('team_backend.research.research',side_effect=web),self.judge('no_encaja',against='idea_sin_empresa'):
             red.check_stages(self.bot,self.account)
         ana.refresh_from_db();beto.refresh_from_db()
         self.assertEqual((ana.stage,ana.classification['fit'],ana.classification['stage_check']['state']),('discarded',False,'failed'))
-        self.assertEqual((ana.classification['rule'],ana.classification['buyer']['level']),(red.no_fit_rule(),'no_encaja'))
+        self.assertEqual((ana.classification['rule'],ana.classification['buyer']['level'],ana.classification['buyer']['against']),
+                         (red.no_fit_rule(),'no_encaja','idea_sin_empresa'))
         self.assertEqual((beto.classification['stage_check']['state'],beto.classification['stage_check']['attempts']),('pending',1))
         self.assertFalse(red.stage_pending(self.account))  # the retry is due at the next reading window
         when=timezone.now()

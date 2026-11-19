@@ -41,6 +41,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-28](#edi-28) | Auditoría de compuertas y aviso cuando frenan demasiado | backend | implementado |
 | [EDI-29](#edi-29) | La semana GASP: un tipo por día y el plan del domingo | app · backend | implementado |
 | [EDI-30](#edi-30) | El tipo del día en la pieza y sus comprobaciones | backend | implementado |
+| [EDI-31](#edi-31) | El molde de un referente: la variante A sobre él, la B libre | backend | implementado |
 
 ---
 
@@ -536,6 +537,21 @@ La semana GASP ([`plan-estrategia-semanal.md`](../plan-estrategia-semanal.md)): 
   8. **Dado** un hallazgo blando por tipo (`cta_count`, `offer_in_growth`, `offer_in_personal`), **cuando** la ronda de reparación no lo arregla, **entonces** la pieza sale con él como observación; uno duro (`unsourced_third_party_story`, `fabricated_quote`, `first_person_appropriation`) la bloquea sin pagar el verificador.
 - **Brechas:** —
 - **Cobertura QA:** `tests/test_estrategia.py` (`PersonalStoryTests`, `FindingTests`, `SalesGateTests`); `tests/test_compuertas.py` (`SeverityTests`). Pendiente de CI.
+
+### EDI-31 · El molde de un referente: la variante A sobre él, la B libre <a id="edi-31"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado (18/11/2026), detrás de `REFERENTES_MOLDE` (apagado por defecto); cómo se arma el molde está en [OBS-08](observatorio-referentes.md#obs-08) y en el [plan](../plan-referentes-industria.md#molde).
+- **Qué hace para Gustavo:** cuando el día se basa en un post de referente que funcionó, el post propio toma su forma, no su texto: la variante A sigue su gancho, el formato de su cuerpo, su cierre y su rango de longitud con el material de Gustavo; la B se escribe libre. El director elige entre las dos sin saber cuál sigue el molde, y la pieza guarda cuál ganó.
+- **Responsable:** `director_editorial` (plan y brief), `copywriter_a` (la A sobre el molde), `copywriter_b` (la B libre), `seleccion_editorial` (elige a ciegas).
+- **Código:** `estrategia.director_input` / `_with_molds` (`strategy.planned.molde`, `strategy.moldes`), `finalize_brief` / `_brief_mold` (`moldes.choose`); `editorial.MOLD_DIRECTOR_RULES`, `MOLD_WRITER_RULES`, `_schema` (`BRIEF_WITH_MOLD`), `_run` (`molde_variante_a` = `moldes.for_writer`, `selection.molde` = `moldes.outcome`); `orquestacion_schemas.WRITER_INPUT`.
+- **Criterios de aceptación:**
+  1. **Dado** un día cuyo plan guarda un molde, **cuando** el director escribe el brief sin nombrar otro, **entonces** el brief lleva ese molde entero (etiquetas, estado, fuente con enlace); vacío es ninguno y un id que no se le ofreció no cuenta.
+  2. **Dado** un brief con molde, **cuando** escriben los redactores, **entonces** la misma llamada recibe `molde_variante_a` (gancho, cuerpo, cierre, longitud, ángulo, estado y regla de uso), sin texto, autor, enlace ni id del referente; el brief compartido, las fuentes, los lectores, la selección y el verificador no lo llevan.
+  3. **Dado** la selección, **cuando** elige A, B, mezcla o descarta, **entonces** `selection.molde.ganadora` es `molde`, `libre`, `fusion` o `descartada`.
+  4. **Dado** `REFERENTES_MOLDE=false`, **cuando** se prepara la pieza, **entonces** las instrucciones del director y de los redactores, el esquema del brief y los pedidos son los de antes, aunque el plan guarde un molde.
+- **Brechas:** A y B siguen en una sola llamada `redactor` (el grafo la cuenta una vez): la B no es una ejecución independiente. Separarlas costaría una llamada pagada más por pieza.
+- **Cobertura QA:** `tests/test_moldes.py` (`MoldFlowTests`, `SwitchPromptTests`, `CatalogTests`). La suite completa, en CI.
 
 ## Retiradas
 

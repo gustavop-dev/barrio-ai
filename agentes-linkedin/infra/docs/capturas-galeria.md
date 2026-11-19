@@ -158,7 +158,7 @@ El coste de una transcripción ya hecha no se devuelve.
    - `ASSEMBLYAI_USD_PER_HOUR=0.21`; `ASSEMBLYAI_LIMIT_USD` es opcional (vacío: solo cuenta el presupuesto general de IA, `AI_MONTHLY_LIMIT_USD`);
    - `MEDIA_ROOT=/app/media` (no cambiarlo: es la ruta del volumen y la imagen la crea con dueño `app`).
 2. **Volumen.** `compose.prod.yaml` monta el volumen con nombre `media` en `/app/media` para `api` y `worker`. El worker lee el audio para transcribirlo, así que ambos deben ver los mismos archivos. Docker inicializa el volumen con el dueño del directorio de la imagen (uid 10001).
-3. **Copias.** `deploy/backup.sh` guarda junto al volcado de la base un `backups/media-<fecha>.tar.gz` y conserva 14 días. Para restaurar:
+3. **Copias.** `deploy/backup.sh` guarda junto al volcado de la base un `backups/media-<fecha>.tar.gz` y conserva solo la última copia y la anterior. Para restaurar:
 
    ```bash
    docker compose -f compose.prod.yaml --env-file .env exec -T api sh -c 'tar -C "${MEDIA_ROOT:-/app/media}" -xzf -' < backups/media-<fecha>.tar.gz

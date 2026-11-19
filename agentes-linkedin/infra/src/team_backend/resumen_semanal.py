@@ -424,13 +424,30 @@ def data_warnings(week):
         if not week[key].get('disponible'):out.append(f'Sin datos de {label}: {week[key]["motivo"]}')
     return out
 
+MOLD_WEEKS=4  # a week alone rarely has more than one or two posts on a mold: the comparison reads her last four
+
+def molds(week_start,member=None):
+    """«Con molde vs sin molde» and each referent mold's results (moldes.comparison) on her posts published in the four
+    weeks that end with this one, with their 72 h cuts. Data only, no model."""
+    from . import moldes
+    last=window(week_start)
+    w=resultados.Window(week_start-timedelta(days=7*(MOLD_WEEKS-1)),last.last,window(week_start-timedelta(days=7*(MOLD_WEEKS-1))).start,last.end)
+    posts=_her_posts(w,member)
+    if not posts:return unavailable(f'Sin posts publicados en las últimas {MOLD_WEEKS} semanas.')
+    return {'desde':w.first.isoformat(),'hasta':w.last.isoformat(),**moldes.comparison(posts,THIN_POSTS)}
+
 def stats(week_start,now=None,member=None):
-    """The deterministic figures the analysis may quote: her week, the one before and the comparison."""
+    """The deterministic figures the analysis may quote: her week, the one before and the comparison. With
+    REFERENTES_MOLDE on, also the posts written on a referent's mold against the ones without (molds); off, the figures
+    of before."""
+    from . import moldes
     now=now or timezone.now()
     week=week_stats(window(week_start),now,member);previous=week_stats(window(week_start-timedelta(days=7)),now,member)
-    return {'zona_horaria':str(operador.local_tz()),'semana':week,'semana_anterior':previous,'comparacion':compare(week,previous),
-            'avisos_de_datos':data_warnings(week),'plan_siguiente':next_plan(week_start,member),
-            'al_generar':{'maquina_detenida':operador.globally_paused(),'cuentas_en_pausa':ConnectorAccount.objects.filter(paused=True).count()}}
+    out={'zona_horaria':str(operador.local_tz()),'semana':week,'semana_anterior':previous,'comparacion':compare(week,previous),
+         'avisos_de_datos':data_warnings(week),'plan_siguiente':next_plan(week_start,member),
+         'al_generar':{'maquina_detenida':operador.globally_paused(),'cuentas_en_pausa':ConnectorAccount.objects.filter(paused=True).count()}}
+    if moldes.enabled():out['moldes']=molds(week_start,member)
+    return out
 
 # --------------------------------------------------------------------------- the analysis (one Claude call)
 

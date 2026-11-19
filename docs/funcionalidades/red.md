@@ -162,8 +162,29 @@ miembro todo lo de esta página sigue igual.
   1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 20/día y 100/semana, RED-02 según etapa (inicialmente 16 y 80, [BAR-17](#bar-17)), RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 80, `sync` 4. Fin de semana y reservas compartidas siguen BAR-15.
   2. **Dado** que se agotó el cupo de lecturas de perfil, **cuando** toca clasificar, **entonces** se detiene y lo dice en su error; el preflight usa además el contador global compartido y, si este se agota, la escritura espera sin saltarse la comprobación.
   3. **Dado** una escritura de red, un comentario y una publicación del mismo miembro, **cuando** se programan, **entonces** comparten su espaciado mínimo; las de otro miembro no lo esperan.
-- **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+  4. **Dado** el cupo de 80 con 0,4 y la investigación con sus 32 gastadas a media mañana, **cuando** toca seguir o invitar antes de las 17:00, **entonces** la comprobación y la relectura salen de las 48 de las acciones. Las acciones nunca prestan a la investigación antes del corte. Después del corte, lo que sobró de una parte es de la otra, y el total sigue en 80 (18/11/2026).
+  5. **Dado** que las acciones se quedaron sin lecturas antes de las 17:00, **cuando** corre el vigilante de Slack, **entonces** avisa una vez ese día con las dos partes y cómo ajustarlas.
+- **Partes del cupo de lecturas de perfil (18/11/2026):**
+  - **Qué pasó:** el 18/11/2026 el cupo de 80 se agotó a las 13:04: investigación 41, ejecución 17, preflight 16, conciliación 5, métricas 1. Después no salió ningún follow ni invitación: 3 y 2 ese día, contra 9 y 15 el anterior.
+  - **Cómo queda (`operador.reserve_profile_read`, `operador.profile_read_pools`):**
+    - Las lecturas que protegen o confirman una escritura tienen su parte: `preflight`, `execution` y `reconciliation` (`operador.ACTION_READS`).
+    - Todas las demás (investigación de candidatos, referentes, métricas, posts de compradores, respuestas, comunidad…) tienen `OPERATOR_PROFILE_READ_RESEARCH_SHARE` del cupo del miembro. Con 80 y 0,4: 32 para investigar y 48 para las acciones.
+    - Antes de `OPERATOR_PROFILE_READ_POOL_CUTOFF` (17:00, hora local) ninguna parte toma la otra. Desde esa hora, lo que una dejó es de la otra. `00:00` vuelve a un solo total.
+    - El total no sube. Cada miembro tiene sus partes: la parte se fija por miembro (`manage.py operador ajustes`, de 0,1 a 0,9; un valor malo del `.env` vale 0,4 y nunca detiene las lecturas).
+    - Cada lectura guarda su parte (`pool`) y, si es de una ejecución, su paso (`step`: `confirmacion` o `conciliacion`). El mensaje de espera nombra la parte agotada y la hora del corte.
+  - **Por qué 0,4:** una acción escrita gasta 2 lecturas (la comprobación antes de escribir y la relectura que confirma). La que no escribe (ya lo sigues, invitación pendiente, fuera de alcance) gasta 1. Para 16–20 invitaciones y unos 10 follows al día hacen falta unas 52–60 lecturas en el peor caso y 35–45 en un día normal, más la conciliación. 48 cubren el día normal, y lo que la investigación deja pasa a las 17:00. Con 32 la investigación clasifica unas 30 personas al día (el 18/11 usó 41).
+  - **Por qué cada acción leía tanto (16 + 17 lecturas para 5 acciones):**
+    - Son dos lecturas por diseño: la comprobación antes de escribir y la relectura que confirma. Una lectura de horas antes no sirve como comprobación: no dice si ahora hay una invitación pendiente, si ya es conexión o si el perfil está restringido. No se reutiliza.
+    - Cada ejecución que no escribe gasta su comprobación, y cada reintento diferido (`operador._defer`) gasta otra.
+    - Una escritura que LinkedIn aún no muestra (`sent`) se releía cada hora durante 24 h: hasta 24 lecturas de «ejecución» cada una.
+  - **Ahorros aplicados:**
+    - **Conciliación con espera creciente (`autopiloto.reconcile_due`):** se relee a los 10 min y después cuando lleva esperando al menos lo mismo (1 h, 1,5 h, 3 h, 6 h, 12 h). Son 6 lecturas en 24 h en vez de 24.
+    - **La comprobación no leída se devuelve (`operador.release_unread_preflight`):** si la ejecución no llegó a leer (cuenta detenida, el proveedor difirió antes, una compuerta paró una aceptación), la reserva queda como `operator.profile_read_unused` y no cuenta.
+    - **Prefiltro por titular (`red.headline_settles`):** un reclutador, estudiante, pasante o quien busca empleo, sin un titular de founder o dueño, se clasifica por el titular sin gastar la lectura de señales.
+    - Revisado y sin cambio: nadie ya clasificado se relee (la cola es `classification={}`), la clasificación compartida entre miembros no lee, y la sincronización solo relee a quien salió de la lista de invitaciones enviadas.
+  - **Aviso:** `alertas_slack.acciones_sin_lecturas` avisa una vez al día si las acciones se quedaron sin lecturas antes del corte. El resumen diario trae las dos partes.
+- **Brechas código/docs:** cuánto ahorra cada cambio en producción solo se ve con los eventos del día (consultas en `agentes-linkedin/infra/tasks/active_context.md`).
+- **Cobertura QA:** `tests/test_fase2_curso.py` (`ProfileReadPoolTests`, la conciliación con espera creciente), `tests/test_red.py` (prefiltro por titular), `tests/test_alertas_slack.py` (`ProfileReadPartsAlertTests`). Corridas en local con conectores falsos y reloj fijo; la regresión completa corre en CI.
 
 ### BAR-09 · Pausa de invitaciones si LinkedIn las limita <a id="bar-09"></a>
 
@@ -304,7 +325,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 | Nuevos OPERATOR_* de agenda | `OPERATOR_WEEKLY_ACTIVITY_TARGET=100`, `OPERATOR_ACTIVITY_RAMP_TARGETS=50,75,100`, `OPERATOR_WEEKEND_FACTOR=0.5`. Invitaciones laborables y techo 20/100 se validan también en código, aunque el env pida más. |
 | Nuevos OPERATOR_* de rampa | `OPERATOR_INVITE_RAMP_ENABLED=true`, `OPERATOR_INVITE_RAMP_STAGES=5/20,10/50,20/100`, `OPERATOR_INVITE_RAMP_MIN_DAYS=7`; estado/etapa en base, no reiniciable por env. |
 | Nuevos OPERATOR_* de salud | `OPERATOR_INVITE_ACCEPTANCE_MIN=0.40`, `OPERATOR_INVITE_ACCEPTANCE_PAUSE=0.25`, `OPERATOR_INVITE_ACCEPTANCE_DROP_PP=10`, `OPERATOR_INVITE_SAMPLE_MIN=20`, `OPERATOR_INVITE_MATURITY_DAYS=7`, `OPERATOR_INVITE_COHORT_DAYS=28`. |
-| Lecturas de perfiles | Nuevo `OPERATOR_PROFILE_READ_DAILY_LIMIT=80`, techo duro 100 aun con overrides; cuenta lecturas de investigación, preflight, conciliación y futuras visitas entre todos los conectores. `NETWORK_READ_CAPS=comments=60,search=20,profile=80,sync=4` sustituye profile=30, subordinado al contador global; reservar margen para conciliación. Lectura actual no equivale a visita notificada. |
+| Lecturas de perfiles | Nuevo `OPERATOR_PROFILE_READ_DAILY_LIMIT=80`, techo duro 100 aun con overrides; cuenta lecturas de investigación, preflight, conciliación y futuras visitas entre todos los conectores. `NETWORK_READ_CAPS=comments=60,search=20,profile=80,sync=4` sustituye profile=30, subordinado al contador global; reservar margen para conciliación. Lectura actual no equivale a visita notificada. Desde el 18/11/2026 el cupo se parte entre acciones e investigación ([BAR-08](#bar-08)). |
 | Autopiloto y guardas existentes | Verificar `OPERATOR_AUTOPILOT=true`, `NETWORK_ENABLED=true` y modos de `OPERATOR_AUTONOMY` efectivos; auto para participación autorizada, sin saltar verificador/líder/veto ni `OPERATOR_PAUSED`. No levantar pausas o restricciones de cuenta al desplegar. Mantener cooldown por autor y espera de invitación salvo nueva decisión explícita. |
 | Tipo de cuenta y notas, nuevos | `LINKEDIN_ACCOUNT_TIER=free` y `LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT=3`, tope prudente de producto, no cuota garantizada por LinkedIn. [BAR-16](#bar-16) define reservas, límites efectivos y fallback. Un upgrade no sube los techos generales ni salta la rampa. |
 | Gasto | Desde el 10/11/2026, un solo presupuesto de IA para todo el equipo (`AI_MONTHLY_LIMIT_USD=100` y el tope de seguridad diario `AI_DAILY_FUSE_USD=15`, `knowledge/presupuesto.py`), sin topes diarios por área. Caps del registro ARQ-05: pieza 8 USD por ciclo, referentes 5 USD/mes y Perfil 10 USD por ciclo. No subirlos para forzar 100 acciones. |
@@ -812,6 +833,26 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
     - Lo real observado es 0,03–0,07 USD por investigación.
     - No hay error de cálculo. Es un peor caso deliberado: cada búsqueda o lectura puede volver a enviar todo lo anterior (×5) y una búsqueda puede traer hasta 25 000 tokens.
     - **Propuesta, no aplicada:** si se quiere margen sin perder el peor caso, bajar `WEB_SEARCH_RESERVED_TOKENS` a ~12 000 según lo que midan las búsquedas reales (la reserva queda en ~0,53–0,56 USD) o `WEB_FETCH_MAX_USES` a 1 (~0,65–0,68 USD). Hoy no hace falta: la corrida propia tiene ~7 % de holgura.
+- **El nivel decide el encaje (18/11/2026):**
+  - **Qué pasaba:** el 18/11/2026 se clasificaron 16 compradores tras BAR-24/BAR-25. 10 salieron del barrio con nivel `por_confirmar` (9) o `probable` (1), 3 con `no_encaja` (bien) y 2 entraron. Un ejemplo (anonimizado): `probable`, puntaje 68, «Fundador y CEO de una empresa en Florida…; tamaño no consta», `fit: false`.
+  - **Causa:** `red._classify_batch` tomaba el encaje de `result['fit']` y de la confianza mínima, y el nivel solo iba al bloque del comprador. El modelo respondía `fit=false` junto a un nivel que lo deja dentro («es una hipótesis», «no consta») y con confianza baja. `evaluaciones.run_classifier` copiaba el mismo corte. La verificación web ya derivaba el encaje del nivel (`_settle_stage`), y el líder no saca a nadie (solo deja descansar la acción), así que ninguno tenía este defecto. Los demás papeles no tienen nivel: siguen con `fit` y la confianza mínima, sin cambio.
+  - **Cómo queda (`nivel_comprador.decide`, `red.classifier_fit`):**
+    - Solo `no_encaja` saca a un comprador; `confirmado`, `probable` y `por_confirmar` entran. Su confianza ordena, nunca lo saca.
+    - Si el modelo dice `fit=false` con otro nivel, gana el nivel y queda auditado (`AuditEvent network.buyer_fit_overridden`, con lo que dijo el modelo, lo que quedó y la corrección).
+    - `no_encaja` exige un motivo de la lista cerrada (`buyer_against` en el clasificador, `en_contra` en el juez). Sin motivo baja a `por_confirmar`. El motivo queda en `buyer.against`.
+    - Un comprador sin nivel queda `por_confirmar`, o `no_encaja` si dio un motivo válido. `no_contactar` siempre saca.
+  - **Motivos válidos de `no_encaja` (`nivel_comprador.AGAINST`):**
+    - `no_decide`: no es dueño, founder ni decide; vende, recluta o ejecuta para otros.
+    - `vende_servicios`: vive de vender sus servicios (consultor, freelance, coach, agencia) en vez de dirigir una empresa con producto u operación propia.
+    - `competidor_software`: su empresa vende desarrollo de software.
+    - `demasiado_grande`: más de 1000 personas (línea ProjectApp; también lo pone el código con `projectapp.too_big`).
+    - `idea_sin_empresa`: idea sin empresa, estudiante o presemilla declarada sin ingresos.
+    - `empresa_cerrada`: la empresa cerró o ya no opera.
+    - `no_contactar`: pide no ser contactado (solo el clasificador: lo dice el perfil, no la web).
+    - No son motivos: «tamaño no consta», «sin datos públicos», «es una hipótesis».
+  - **Contador:** `nivel_comprador.corrections_count(desde, hasta, cuentas)` devuelve el total, el desglose por corrección (`fit_del_modelo`, `no_encaja_sin_motivo`, `sin_nivel`, `motivo_sin_no_encaja`, `no_contactar`) y cuántos entraron pese a `fit=false` del modelo. `reevaluar-compradores` lo imprime para los últimos 7 días. El resumen de `network.classified` trae `buyer_fit_corrected`.
+  - **Prompts:** `red.classify`, `red.stage` y sus versiones de ProjectApp cambiaron: hay una `criterion_version` nueva en las dos líneas. Un experimento que cruce el cambio cierra «inconcluso» (`experimentos`, versiones de criterio distintas).
+  - **Aviso:** `alertas_slack.compradores_descartados_con_nivel` avisa una vez al día si un comprador salió hoy con un nivel que no es `no_encaja` (cuenta, sin nombres, y dice cómo rescatarlo).
 - **Entrada y embudo:**
   - El recorrido guarda el nivel, el puntaje y la versión con que el equipo fue por la persona (`comprador._project`). Mientras solo está elegida siguen a su nivel, porque la verificación web suele responder el mismo día. El primer follow o la primera invitación los fijan, y una subida de nivel posterior cambia el puntaje actual, no la entrada.
   - `GET /api/v1/resultados/embudo-comprador` trae `entrada_comprador`, de solo lectura:
@@ -829,7 +870,9 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
     - `sin_evidencia_web`: se restaura `por_confirmar` con `stage_check: ok`, sin búsqueda nueva.
     - `sin_evidencia_clasificador`: vuelve a la cola y lo juzga la clasificación normal con el prompt nuevo, en sus lotes y su presupuesto.
     - `sin_nivel`: se completan el nivel y el puntaje, y nada más cambia.
-  - **A quién no toca:** a nadie a quien Gustavo o LinkedIn le dijeron que no, a quien Gustavo confirmó, ni a quien está invitado, conectado o cerrado.
+    - `descartado_con_nivel` (18/11/2026): salió con un nivel que lo deja dentro (`nivel_comprador.left_by_model_fit`). Se restaura con su nivel, línea, segmento, evidencia y puntaje, sin pagar otra clasificación; con la verificación web encendida queda `pending`. Va antes de `sin_evidencia_clasificador`, para que su «no consta» no lo mande de nuevo al clasificador.
+    - Un comprador con `no_encaja` guardado ya no vuelve al clasificador aunque su motivo diga «no consta» (hasta el 18/11 un `no_encaja` con `fit=false` no llevaba regla).
+  - **A quién no toca:** a nadie a quien Gustavo o LinkedIn le dijeron que no, a quien Gustavo confirmó, ni a quien está invitado, conectado o cerrado. Tampoco restaura a quien salió por una regla del código (sin cita del curso, tamaño, colega) ni a quien atiende otro miembro en el registro compartido (`registro.gate`).
   - **Registro y repetición:** cada fila deja `AuditEvent network.buyer_reevaluated`. Una segunda corrida no encuentra a nadie.
   - **Qué imprime:** filas por puntaje («`61* por_confirmar reclasificar Nombre · grupo · motivo`»; el `*` marca un puntaje provisional).
 - **Criterios de aceptación:**
@@ -842,14 +885,18 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   7. **Dado** una corrida de `reevaluar-compradores` sin `--confirmar`, **cuando** termina, **entonces** nada cambió; con `--confirmar` cada uno queda una vez y una segunda corrida no encuentra a nadie.
   8. **Dado** todos los `BUYER_*_ENABLED` apagados, **cuando** corre el caso `BAR-24-compradores`, **entonces** el resultado es el mismo y no se escribe ningún recorrido.
   9. **Dado** un lote de 10 por clasificar y compradores esperando su verificación, **cuando** corre `classify_contacts`, **entonces** solo clasifica y no se detiene por presupuesto. **Cuando** corre `check_buyer_stages`, verifica a uno, dentro de su propio presupuesto, y deja `ok` con nivel, fuentes y señales. La suma del peor caso de cada corrida del ciclo `red` no pasa su `cost_cap_usd` (18/11/2026).
+  10. **Dado** un comprador que el modelo devuelve con `fit=false` y nivel `por_confirmar` o `probable` («es una hipótesis», confianza 0,5), **cuando** se clasifica, **entonces** entra con su nivel y su puntaje, se sigue y se invita, y queda un `network.buyer_fit_overridden` (18/11/2026).
+  11. **Dado** un `no_encaja` sin motivo de la lista («tamaño no consta»), **cuando** se clasifica o lo juzga la web, **entonces** queda `por_confirmar`. Con motivo (`no_decide`, `idea_sin_empresa`…) sale, y el motivo queda en `buyer.against`.
+  12. **Dado** compradores descartados con nivel `probable` o `por_confirmar`, **cuando** corre `reevaluar-compradores` sin `--confirmar`, **entonces** los lista en `descartado_con_nivel` sin cambiar nada ni pagar. Con `--confirmar` vuelven con su nivel y puntaje, una sola vez; nunca vuelven los vetados, los restringidos, los sacados por una regla ni los que atiende otro miembro.
 - **Brechas:**
-  - Cómo responde el modelo real con el prompt nuevo solo se mide con una corrida pagada. Las pruebas miden qué hace el código con cada respuesta.
+  - Cómo responde el modelo real con el prompt nuevo solo se mide con una corrida pagada. Las pruebas miden qué hace el código con cada respuesta. Desde el 18/11/2026 los dobles incluyen la forma real (`real` en `BUYERS_CASE` y `PROJECTAPP_CASE`): respuestas incoherentes como las de producción.
   - La reevaluación no se corrió contra ninguna base real: la aplica Gustavo en producción.
+  - Entrarán más compradores con poca certeza (`por_confirmar`): el 18/11 habrían sido 12 de 16 en vez de 2. Ordenan por puntaje y nadie se descarta por eso; el riesgo es gastar invitaciones en gente que no compra, y se mide con la aceptación y las respuestas por nivel (`entrada_comprador.por_nivel`).
   - El puntaje usa el titular y la bio. Sin perfil leído, los componentes toman el valor del medio.
 - **Cobertura QA:**
-  - `tests/test_compradores_niveles.py`: el caso, niveles, puntaje, cupos y reevaluación.
+  - `tests/test_compradores_niveles.py`: el caso, niveles, puntaje, cupos y reevaluación. Desde el 18/11/2026 también el caso con la forma real (`RealShapeTests`), la tabla de `decide` (`DecideTests`), el juez sin motivo y el rescate `descartado_con_nivel` (`LeftByFitTests`).
   - `tests/test_red_eeuu.py`, `tests/test_red.py` y `tests/test_comprador.py`.
-  - `tests/test_comprador_e2e.py`: el recorrido `por_confirmar`, el de Latinoamérica con y sin calentamiento, y la reverificación que sube el nivel.
+  - `tests/test_comprador_e2e.py`: el recorrido `por_confirmar`, el de Latinoamérica con y sin calentamiento, y la reverificación que sube el nivel. `RealShapeBuyerPathTests` (18/11/2026): `fit=false` con `por_confirmar` entra, se sigue y se invita; `no_encaja` con motivo sale y sin motivo se queda.
   - `tests/test_verificacion_etapa.py` (18/11/2026): con el cliente de Anthropic falso y los precios y reservas reales, cubre:
     - la clasificación sola;
     - la verificación en su corrida;
@@ -890,6 +937,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 - **Partner:** se sigue, sus posts se leen dentro del tope de lecturas de compradores (un cuarto, `projectapp.read_share`), se comenta en el cupo «comunidad» del día (2 de 15) hasta 2 veces en 30 días, y se invita en su cupo. No tiene recorrido de comprador ni mensajes. El líder pregunta `competidor` (una agencia de desarrollo es par).
 - **Reparto:** sin `NETWORK_ROLE_SHARE` en el `.env`, el valor por defecto con el interruptor es `comprador_projectapp=28,comprador_startup=12,partner=12,recomendador+aliado=8,par=10,divulgador=10`. Si el `.env` lo fija (como `deploy/.env.example`, que trae el de BAR-24), hay que poner este valor a mano; vacío apaga los cupos. Los papeles `partner` y `comprador_*` solo valen con el interruptor: apagarlo con ellos en la variable es un error de configuración (`ValueError`), así que se revierten juntos. Dentro de ProjectApp, 60/40 suave entre líderes de tecnología y dueños (sin papel, turno de dueños). Un grupo sin candidatos cede su turno. El reporte del plan trae por grupo meta, invitados, déficit, listos y planeados, y el desglose por papel.
 - **Prueba con casos:** el caso del segmento de la persona (`case_for`) entra en el mensaje 2 de la secuencia y en las respuestas a interesado y pide información, con `CASE_RULES`. `case_issues` (regla fija) rechaza un caso de otro segmento y una cifra que no esté en los hechos confirmados ni en la oferta; el líder pregunta `caso_inventa` (máx. 0,2). Los hechos salen solo de las respuestas de Gustavo con uso público a `preguntas-casos-projectapp` (cinco por caso; idempotente); un «no» a nombrar al cliente lo deja sin nombre.
+- **El nivel decide (18/11/2026, [BAR-24](#bar-24)):** con el prompt de ProjectApp el modelo también respondía `fit=false` junto a `por_confirmar` o `probable` («tamaño no consta»). Ahora el nivel decide en las dos líneas, `demasiado_grande` es uno de los motivos de `no_encaja` (y lo pone el código si el perfil o la web dicen más de 1000 personas), y el caso `BAR-25-comprador-projectapp` pasa 8/8 también con la forma real de las respuestas (`real`).
 - **Reevaluación (`reevaluar-compradores`, con el interruptor):** además de los grupos de BAR-24, `linea` (comprador en curso sin línea: completar en su lugar), `otra_linea` (encaja y nadie lo tocó: vuelve al clasificador) y `posible_partner` (agencia descartada como aliado, recomendador o divulgador: vuelve al clasificador). Nunca a quien dijo que no ni dos veces a la misma persona. En seco sin `--confirmar`.
 - **Medición:** `GET /api/v1/resultados/embudo-comprador` trae `por_linea`, `por_segmento` (cada uno con la regla de muestra de 30) y `prueba_projectapp` (semana N de 13, invitaciones, aceptaciones, respuestas y reuniones por segmento, partners invitados, `muestra`). La lectura del lunes suma una línea: semana, invitaciones por segmento y partners, si alguno tiene muestra y la revisión del 17/02/2027.
 - **Criterios de aceptación:**

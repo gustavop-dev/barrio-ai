@@ -49,6 +49,8 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 17/11/2026 | **Oferta de ProjectApp:** equipo dedicado desde unos 20 millones de pesos al mes (unos 5.000 USD) o proyecto por requerimientos desde unos 20 millones; argumento nearshore: buena calidad a menor costo. **Casos reales:** dos plataformas grandes a la medida (educación en línea y retail); ningún otro dato confirmado. Un caso solo se cita a un comprador de su mismo segmento y solo con hechos que Gustavo confirmó. |
 | 17/11/2026 | **Prueba de tres meses, del 17/11/2026 al 17/02/2027**, con los segmentos `educacion_en_linea`, `retail_ecommerce`, `duenos_latinos_eeuu` y `otro`. Señales de la clase 08 con fuente y fecha: contratar desarrolladores es la mejor; también lanzamiento, sistema heredado y crecimiento. Sin 30 invitaciones de un segmento no se juzga. |
 | 17/11/2026 | **Las 80 invitaciones de la semana:** ProjectApp 28, startup 12, partner 12, recomendador y aliado 8, par 10, divulgador 10; a los líderes solo se les comenta. No hay post semanal de negocio: en su lugar, preguntas a Gustavo sobre los casos (Tu turno). |
+| 18/11/2026 | **El nivel decide si un comprador entra** ([BAR-24](funcionalidades/red.md#bar-24)). De 16 compradores clasificados ese día, 10 salieron con `por_confirmar` o `probable`: el clasificador tomaba el `fit=false` del modelo («tamaño no consta», «es una hipótesis»). Ahora solo `no_encaja` con un motivo de lista cerrada (no decide, vende servicios, competidor de software, más de 1000 personas, idea sin empresa, empresa cerrada, pide no ser contactado) saca a un comprador; el modelo que se contradice queda contado. Los que salieron así vuelven con `reevaluar-compradores` (grupo `descartado_con_nivel`), sin pagar otra clasificación. |
+| 18/11/2026 | **Las acciones tienen su parte de las lecturas de perfil** ([BAR-08](funcionalidades/red.md#bar-08)). El cupo de 80 se agotó a las 13:04 y no salió nada más. Ahora 48 son de seguir, invitar y confirmar y 32 de investigar (`OPERATOR_PROFILE_READ_RESEARCH_SHARE=0.4`); a las 17:00 lo que sobra de una parte pasa a la otra. El total no sube. |
 
 ## Lo que ya funciona
 
@@ -548,6 +550,13 @@ Orden en producción:
    seco, revisar la lista y repetir con `--confirmar`; y `manage.py operador --usuario <u> preguntas-casos-projectapp`
    (lo corre Gustavo). Mirar `network.searched` por audiencia, `network.classified`, `network.planned` (`distribution` y
    el reparto) y el embudo por segmento. Apagarlo vuelve a BAR-24 (con `NETWORK_ROLE_SHARE` de vuelta a `comprador=20,recomendador+aliado=15,divulgador=20,par=25` si se fijó: `partner` y `comprador_*` no valen apagado); las líneas y segmentos guardados se quedan.
+
+9. **El nivel decide y las lecturas por partes (18/11/2026).** Sin migración. En el `.env`, si no están, los valores
+   por defecto ya valen: `OPERATOR_PROFILE_READ_RESEARCH_SHARE=0.4` y `OPERATOR_PROFILE_READ_POOL_CUTOFF=17:00`;
+   reiniciar el worker, el autopiloto y la API. Después, `manage.py operador --usuario <u> reevaluar-compradores
+   --cuenta <id>` en seco: el grupo `descartado_con_nivel` lista a quienes el fit del modelo sacó, con su nivel y
+   puntaje; revisar y repetir con `--confirmar`. Mirar `network.buyer_fit_overridden`, `network.classified`
+   (`buyer_fit_corrected`) y los `operator.profile_read` por `metadata.pool`.
 
 Sin verificar contra Cal.com real: que el enlace de reserva conserve `metadata[barrio]` y que una reprogramación lo
 mantenga; si no llega, la reserva se empareja por el correo o el nombre, o la empareja Gustavo.

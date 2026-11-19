@@ -627,7 +627,7 @@ def run_classifier(run,cases,model,results):
         found={str(r.get('id')):r for r in data.get('contacts',[]) if isinstance(r,dict)}
         for case in batch:
             result=found.get(case['id']);confidence=_confidence(result.get('confidence')) if result else 0.0
-            fit=bool(result and result.get('fit')) and confidence>=red.min_confidence()  # the same cut as red.classify
+            fit=bool(result) and red.classifier_fit(result,confidence)[0]  # the same cut as red.classify (a buyer: her level)
             results.append({'id':case['id'],'etiqueta':case['label'],'esperado':case['expected'],'predicho':fit,'base':case['baseline'],
                             'confianza':round(confidence,2),'sin_resultado':result is None,'esquema':errors})
 
@@ -851,6 +851,10 @@ def grade_referents_case(dossier):
 # production functions (red.classify, red.check_stages, red.plan) with fake models and grades it with grade_buyers_case.
 # The fakes prove what the code does with those answers; whether the real model answers like `despues` is only measured
 # with a paid run. Nobody is invited, followed or written to outside the fake connector.
+# `real` (18/11/2026) is the shape the production model actually answered after BAR-24: fit=false next to por_confirmar
+# or probable («es una hipótesis», «no consta»), a confidence under NETWORK_MIN_CONFIDENCE, fit=true next to a no_encaja,
+# and a «no contactar» with a level that would keep him. The case must grade the same with `despues` and with `real`:
+# the level decides a buyer's fit in code (red.classifier_fit), never the model's fit.
 BUYERS_CASE={
     'id':'BAR-24-compradores',
     'variants':{
@@ -861,6 +865,9 @@ BUYERS_CASE={
                                             'pequeño y ya tuvo una salida; la tracción actual es una hipótesis, pues está en stealth.'},
               'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'probable','us_market':True,
                          'reason':'Founder en stealth en Nueva York con una salida previa y equipo: señales indirectas.'},
+              'real':{'fit':False,'buyer_profile':'stealth','buyer_level':'probable','us_market':True,'confidence':0.5,
+                      'reason':'Co-founder y CTO en stealth con una salida previa; trayectoria fuerte, pero comprador es una '
+                               'hipótesis y la tracción no consta.'},
               'web':None},
         'C2':{'label':'«Founder @X» sin más','name':'Beto Escueto','location':'San Francisco Bay Area','headline':'Founder @Lumora',
               'bio':'',
@@ -868,6 +875,9 @@ BUYERS_CASE={
                                             'clientes que pagan.'},
               'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':True,
                          'reason':'Founder en EE. UU. con un perfil escueto: hipótesis por confirmar.'},
+              'real':{'fit':False,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':True,'confidence':0.4,
+                      'reason':'Founder en EE. UU. con un titular escueto; es una hipótesis de comprador, sin datos públicos '
+                               'de su empresa.'},
               'web':None},
         'C3':{'label':'bootstrapped con clientes nombrados','name':'Clara Bootstrap','location':'Austin, Texas, United States',
               'headline':'Founder & CEO at Agendia · bootstrapped scheduling SaaS for dental clinics',
@@ -875,6 +885,8 @@ BUYERS_CASE={
               'antes':{'fit':True,'reason':'Founder de un SaaS bootstrapped en Austin con clientes nombrados.'},
               'despues':{'fit':True,'buyer_profile':'bootstrapped','buyer_level':'probable','us_market':True,
                          'reason':'Founder de un SaaS bootstrapped en Austin con clientes nombrados y precios publicados.'},
+              'real':{'fit':True,'buyer_profile':'bootstrapped','buyer_level':'probable','us_market':True,'confidence':0.8,
+                      'reason':'Founder de un SaaS bootstrapped en Austin con clientes nombrados y precios publicados.'},
               'web':{'text':'Agendia lists paying dental clinics as customers and publishes monthly pricing plans.',
                      'url':'https://agendia.example/pricing'}},
         'C4':{'label':'founder en Latinoamérica','name':'Dana Bogotá','location':'Bogotá, D.C., Capital District, Colombia',
@@ -882,24 +894,35 @@ BUYERS_CASE={
               'antes':{'fit':True,'reason':'Cofundadora y CEO de una fintech en Bogotá.'},
               'despues':{'fit':True,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':False,
                          'reason':'Cofundadora y CEO de una fintech en Bogotá, sin datos públicos de etapa.'},
+              'real':{'fit':False,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':False,'confidence':0.45,
+                      'reason':'Cofundadora y CEO de una fintech en Bogotá; fuera de EE. UU. y sin datos públicos de etapa: '
+                               'hipótesis.'},
               'web':None},
         'C5':{'label':'director de ventas de una empresa grande','name':'Eli Ventas','location':'Chicago, Illinois, United States',
               'headline':'Enterprise Sales Director at a global cloud software company','bio':'',
               'antes':{'fit':False,'reason':'Director de ventas enterprise de una empresa grande que vende; no decide compras.'},
-              'despues':{'fit':False,'buyer_profile':'ejecutivo','buyer_level':'no_encaja','us_market':True,
+              'despues':{'fit':False,'buyer_profile':'ejecutivo','buyer_level':'no_encaja','us_market':True,'buyer_against':'no_decide',
                          'reason':'Vende para una empresa grande; no es founder ni decide contratar desarrollo.'},
+              # The real model also says fit=true next to a no_encaja: the motive keeps her out.
+              'real':{'fit':True,'buyer_profile':'ejecutivo','buyer_level':'no_encaja','us_market':True,'buyer_against':'no_decide',
+                      'confidence':0.7,'reason':'Director de ventas de una empresa grande: no decide contratar desarrollo.'},
               'web':None},
         'C6':{'label':'pide no ser contactado','name':'Fer Nocontact','location':'Miami, Florida, United States',
               'headline':'Founder · Not taking sales calls or pitches','bio':'Please do not contact me with offers or pitches.',
               'antes':{'fit':False,'reason':'Su perfil pide expresamente que no lo contacten.'},
-              'despues':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,
+              'despues':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,'buyer_against':'no_contactar',
                          'reason':'Pide expresamente que no lo contacten.'},
+              # Even with a level that would keep him, «no_contactar» always leaves.
+              'real':{'fit':False,'buyer_profile':'stealth','buyer_level':'por_confirmar','us_market':True,
+                      'buyer_against':'no_contactar','confidence':0.3,'reason':'Founder que pide que no lo contacten.'},
               'web':None},
         'C7':{'label':'presemilla declarada sin ingresos','name':'Gabi Idea','location':'Seattle, Washington, United States',
               'headline':'Pre-seed founder · idea stage, no revenue yet · looking for a technical co-founder','bio':'',
               'antes':{'fit':False,'reason':'Presemilla declarada, en etapa de idea y sin ingresos.'},
               'despues':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,
-                         'reason':'Presemilla declarada sin ingresos: evidencia en contra.'},
+                         'buyer_against':'idea_sin_empresa','reason':'Presemilla declarada sin ingresos: evidencia en contra.'},
+              'real':{'fit':False,'buyer_profile':'stealth','buyer_level':'no_encaja','us_market':True,
+                      'buyer_against':'idea_sin_empresa','confidence':0.9,'reason':'Presemilla en etapa de idea, sin ingresos.'},
               'web':None},
     },
     # kept: still in the neighborhood after the web check; levels: accepted current levels; order: the invitations of
@@ -939,6 +962,9 @@ def grade_buyers_case(outcomes,order):
 # not measured with the real model. `despues` is what the ProjectApp prompt asks for. `web` is what the web check finds
 # (None: nothing citable). tests/test_comprador_projectapp.py runs the case through the production functions
 # (red.classify, red.check_stages, red.plan) with fake models and grades it with grade_projectapp_case.
+# `real` (18/11/2026, the buyers only) is the shape the production model answered with the ProjectApp prompt: fit=false
+# next to por_confirmar or probable («es una hipótesis», «no consta»), a confidence under the threshold, a «probable»
+# with more than 1000 people and no motive. With `real` the case must grade exactly as with `despues`.
 PROJECTAPP_CASE={
     'id':'BAR-25-comprador-projectapp',
     'variants':{
@@ -951,6 +977,10 @@ PROJECTAPP_CASE={
               'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
                          'buyer_level':'probable','us_market':True,'buyer_segment':'retail_ecommerce','company_size':'20_a_200',
                          'reason':'Líder de tecnología de una cadena de retail de 80 personas en Texas que contrata ingenieros.'},
+              'real':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
+                      'buyer_level':'probable','us_market':True,'buyer_segment':'retail_ecommerce','company_size':'20_a_200',
+                      'buyer_against':'','confidence':0.8,
+                      'reason':'CTO de una cadena de retail de 80 personas en Texas que contrata ingenieros de software.'},
               'web':{'text':'Lone Star Outfitters has about 80 employees and lists two open Software Engineer positions.',
                      'url':'https://lonestar.example/careers','fecha':'2026-11-10'}},
         'P2':{'label':'dueña de una academia en línea de 30 personas en Florida, titular en español','name':'Lucia Academia',
@@ -964,6 +994,12 @@ PROJECTAPP_CASE={
                          'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'educacion_en_linea','company_size':'20_a_200',
                          'affinity':'hispanohablante_declarada',
                          'reason':'Dueña de una academia en línea de 30 personas en Miami; titular en español.'},
+              # The shape of 18/11/2026: fit=false next to por_confirmar, «es una hipótesis», confidence under the threshold.
+              'real':{'fit':False,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional',
+                      'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'educacion_en_linea','company_size':'20_a_200',
+                      'affinity':'hispanohablante_declarada','buyer_against':'','confidence':0.5,
+                      'reason':'Fundadora de una academia en línea en Miami; comprador de ProjectApp es una hipótesis: ingresos '
+                               'y operación no constan.'},
               'web':None},
         'P3':{'label':'dueño de un negocio de 5 personas','name':'Pablo Plomero','location':'Phoenix, Arizona, United States',
               'headline':'Owner at Desert Plumbing Co. · a five-person plumbing team','bio':'',
@@ -972,6 +1008,11 @@ PROJECTAPP_CASE={
               'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional',
                          'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'otro','company_size':'menos_de_20',
                          'reason':'Dueño de un negocio de plomería de cinco personas en Phoenix: por debajo del tamaño buscado.'},
+              'real':{'fit':False,'role':'comprador','modality':'projectapp','buyer_profile':'dueno_empresa_tradicional',
+                      'buyer_level':'por_confirmar','us_market':True,'buyer_segment':'otro','company_size':'menos_de_20',
+                      'buyer_against':'','confidence':0.35,
+                      'reason':'Dueño de un negocio de cinco personas en Phoenix; por debajo del tamaño buscado y sin datos '
+                               'de que necesite software: hipótesis.'},
               'web':None},
         'P4':{'label':'directora en una multinacional de 20.000 empleados','name':'Diana Global','location':'Atlanta, Georgia, United States',
               'headline':'Director of IT, North America · global consumer goods company, 20,000 employees','bio':'',
@@ -981,6 +1022,10 @@ PROJECTAPP_CASE={
               'despues':{'fit':True,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
                          'buyer_level':'probable','us_market':True,'buyer_segment':'otro','company_size':'mas_de_1000',
                          'reason':'Directora de TI de una multinacional de 20.000 empleados.'},
+              # Real: fit=false with «probable» and no motive; the size in the profile is what takes her out (code).
+              'real':{'fit':False,'role':'comprador','modality':'projectapp','buyer_profile':'lider_tecnologia',
+                      'buyer_level':'probable','us_market':True,'buyer_segment':'otro','company_size':'mas_de_1000',
+                      'buyer_against':'','confidence':0.4,'reason':'Directora de TI de una empresa de 20.000 personas.'},
               'web':None},
         'P5':{'label':'fundador de una agencia de marketing que subcontrata desarrollo','name':'Marco Agencia',
               'location':'Austin, Texas, United States',
@@ -1004,6 +1049,9 @@ PROJECTAPP_CASE={
               'despues':{'fit':True,'role':'comprador','modality':'personal_startups','buyer_profile':'startup_financiada',
                          'buyer_level':'confirmado','us_market':True,'buyer_segment':'','company_size':'',
                          'reason':'Cofundadora de una startup con ronda semilla: línea startup.'},
+              'real':{'fit':True,'role':'comprador','modality':'personal_startups','buyer_profile':'startup_financiada',
+                      'buyer_level':'confirmado','us_market':True,'buyer_segment':'','company_size':'','buyer_against':'',
+                      'confidence':0.9,'reason':'Cofundadora y CEO con ronda semilla liderada por un fondo.'},
               'web':None},
         'P8':{'label':'aliado clásico (servicio complementario para startups)','name':'Alicia Aliada','location':'Boston, Massachusetts, United States',
               'headline':'Fractional CFO for seed-stage startups · fundraising models and board reporting','bio':'',
