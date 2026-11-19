@@ -898,6 +898,21 @@ def _signals_read(account,allowance):
         AuditEvent.objects.create(action='network.signals_read',target=str(account.id))
     return True
 
+# 18/11/2026: whoever's headline alone says she is not someone the network goes after (a recruiter, a student or an
+# intern, someone looking for a job) is classified on it without a signals read, as when the allowance is spent: her
+# bio would not change the verdict, and the read is one of the research part of the day's profile reads.
+NOT_A_TARGET=re.compile(r'(?<![a-z])(recruit\w*|reclutador\w*|talent acquisition|headhunter\w*|student|estudiante|intern|internship|'
+                        r'pasante|practicante|becari[oa]|open to work|looking for (?:a |my )?(?:new )?(?:job|role|position|opportunit\w*)|'
+                        r'busco (?:empleo|trabajo|oportunidad\w*)|en b[uú]squeda (?:de|activa de) (?:empleo|trabajo))(?![a-z])',re.I)
+
+# …unless the same headline also names someone who leads or owns a company: then the bio is read as before.
+LEADS=re.compile(r'(?<![a-z])(founder|co-?founder|fundador\w*|cofundador\w*|owner|due[nñ][oa]|ceo|cto|coo|president\w*|'
+                 r'presidente|socio|partner|director\w*|head of)(?![a-z])',re.I)
+
+def headline_settles(headline):
+    """True when the headline alone settles that the person is not a target (NOT_A_TARGET without LEADS)."""
+    return bool(NOT_A_TARGET.search(headline or '')) and not LEADS.search(headline or '')
+
 def _enrich(account,contacts):
     """DESC-03 before DESC-07: comment authors arrive without a headline (LinkedIn lists name and id only), and
     classifying them blind discards good people. Read each profile once, within the daily profile cap; whoever
@@ -906,7 +921,8 @@ def _enrich(account,contacts):
     before, and never wait for a read."""
     ready=[];connector=None;allowance=signals_allowance();room=allowance>0;stop=None
     for i,contact in enumerate(contacts):
-        if contact.profile_checked_at or (contact.headline and (_has_signals(contact) or not room)):ready.append(contact);continue
+        if contact.profile_checked_at or (contact.headline and (_has_signals(contact) or not room or headline_settles(contact.headline))):
+            ready.append(contact);continue
         try:
             if not contact.headline:_read(account,'profile')
             elif not _signals_read(account,allowance):room=False;ready.append(contact);continue  # the headline alone
@@ -1729,9 +1745,13 @@ def _execution_read(proposal,read):
     AuditEvent.objects.create(action='network.read',target=str(proposal.account_id),
                               metadata={'kind':'execution','read':read,'capability':proposal.capability})
 
-def _look(proposal,connector):
+def _look(proposal,connector,step='confirmacion'):
+    """One profile read of an execution, from the actions' part of the day's reads (operador.ACTION_READS): the first
+    takes the preflight operador.execute reserved (the pre-check before writing: always fresh, the profile of hours
+    ago does not say whether a request is pending now); the read-back that confirms a write and the reconciliation of
+    an unconfirmed one (`step`) reserve their own."""
     if getattr(proposal,'_preflight_reserved',False):proposal._preflight_reserved=False
-    else:operador.reserve_profile_read(proposal.account,'execution')
+    else:operador.reserve_profile_read(proposal.account,'execution',step=step)
     _execution_read(proposal,'profile')
     return connector.get_profile(proposal.payload['user_id'])
 
@@ -1803,7 +1823,7 @@ def execute_action(execution,proposal,connector,user):
                             note='' if confirmed else 'Aceptado por el proveedor; aún no visible al releer el perfil.')
 
 def reconcile_action(execution,proposal,connector,user,stale):
-    profile=_look(proposal,connector)
+    profile=_look(proposal,connector,step='conciliacion')
     done={RED.FOLLOW:bool(profile.get('is_following')),
           RED.INVITE:profile.get('relation_request_status')=='PENDING' or profile.get('network_distance')=='FIRST_DEGREE',
           RED.ACCEPT:profile.get('network_distance')=='FIRST_DEGREE'}[proposal.capability]
